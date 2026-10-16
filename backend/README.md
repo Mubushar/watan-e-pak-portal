@@ -25,6 +25,7 @@ Full manuals live in [`../docs/`](../docs/README.md). The documentation set is:
 | [Agentic AI Guide](../docs/AGENTIC_AI_GUIDE.md) | The Agentic OS: products, agents, run engine and approval gates. |
 | [Messaging Guide](../docs/MESSAGING_GUIDE.md) | The messaging + notifications system end to end. |
 | [Testing Guide](../docs/TESTING_GUIDE.md) | Running and extending the test suites. |
+| [Data Migration Guide](../docs/DATA_MIGRATION_GUIDE.md) | Admins migrating the in-memory data to PostgreSQL. |
 
 Auto-generated references (regenerate with `uv run python ..\docs\_gen\gen_docs.py`) live in
 `../docs/reference/` — tools, resources, prompts, REST endpoints, agents, messaging

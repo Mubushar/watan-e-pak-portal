@@ -56,3 +56,7 @@ secrets.*
 # ---- Logs ----
 *.log
 logs/
+
+# ---- PostgreSQL migration output (generated; re-run `migrate_to_postgres.py all`)
+db/data/
+db/load.sql
