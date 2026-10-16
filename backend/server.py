@@ -58,6 +58,7 @@ import intelligence
 import leasing
 import maintenance
 import marketing
+import messaging
 import pmo
 import tools
 import transactions
@@ -4982,6 +4983,77 @@ def fastapi_info() -> str:
                 "GET  /pmo/report.html",
                 "GET  /pmo/portal",
                 "GET  /pmo/portal.html",
+                "--- messaging (team communication & notifications) ---",
+                "GET  /messaging/overview",
+                "GET  /messaging/channels",
+                "GET  /messaging/categories",
+                "GET  /messaging/attachment-kinds",
+                "GET  /messaging/profiles",
+                "POST /messaging/presence",
+                "POST /messaging/presence/heartbeat",
+                "GET  /messaging/preferences/{user_id}",
+                "PUT  /messaging/preferences/{user_id}",
+                "GET  /messaging/conversations",
+                "POST /messaging/conversations",
+                "GET  /messaging/conversations/{conversation_id}",
+                "GET  /messaging/conversations/{conversation_id}/context",
+                "POST /messaging/conversations/{conversation_id}/archive",
+                "GET  /messaging/conversations/{conversation_id}/members",
+                "POST /messaging/conversations/{conversation_id}/members",
+                "PUT  /messaging/conversations/{conversation_id}/members/{member_id}",
+                "DELETE /messaging/conversations/{conversation_id}/members/{member_id}",
+                "POST /messaging/direct",
+                "POST /messaging/property-thread",
+                "POST /messaging/revoke-access",
+                "GET  /messaging/conversations/{conversation_id}/messages",
+                "POST /messaging/conversations/{conversation_id}/messages",
+                "GET  /messaging/conversations/{conversation_id}/read",
+                "GET  /messaging/conversations/{conversation_id}/summary",
+                "GET  /messaging/conversations/{conversation_id}/digest",
+                "POST /messaging/conversations/{conversation_id}/action-items",
+                "GET  /messaging/conversations/{conversation_id}/attachments",
+                "POST /messaging/conversations/{conversation_id}/attachments",
+                "GET  /messaging/conversations/{conversation_id}/actions",
+                "POST /messaging/conversations/{conversation_id}/actions",
+                "GET  /messaging/messages/{message_id}",
+                "PUT  /messaging/messages/{message_id}",
+                "DELETE /messaging/messages/{message_id}",
+                "POST /messaging/messages/{message_id}/pin",
+                "POST /messaging/messages/{message_id}/react",
+                "GET  /messaging/messages/{message_id}/thread",
+                "GET  /messaging/messages/{message_id}/receipts",
+                "GET  /messaging/search",
+                "GET  /messaging/unread/{user_id}",
+                "GET  /messaging/unread-summary/{user_id}",
+                "GET  /messaging/attachments/{attachment_id}/link",
+                "GET  /messaging/attachments/{attachment_id}",
+                "GET  /messaging/attachments/resolve/{token}",
+                "GET  /messaging/actions",
+                "GET  /messaging/actions/{action_id}",
+                "PUT  /messaging/actions/{action_id}",
+                "POST /messaging/actions/{action_id}/complete",
+                "GET  /messaging/notifications/{user_id}",
+                "POST /messaging/notifications/{notification_id}/read",
+                "POST /messaging/notifications/{user_id}/read-all",
+                "POST /messaging/dispatch",
+                "GET  /messaging/outbox",
+                "POST /messaging/telegram/link-code",
+                "POST /messaging/telegram/link",
+                "POST /messaging/telegram/unlink",
+                "GET  /messaging/telegram/links",
+                "GET  /messaging/telegram/status/{user_id}",
+                "POST /messaging/telegram/update",
+                "POST /messaging/telegram/alert",
+                "GET  /messaging/audit",
+                "GET  /messaging/retention",
+                "POST /messaging/purge",
+                "GET  /messaging/reports",
+                "POST /messaging/reports",
+                "POST /messaging/reports/{report_id}/moderate",
+                "GET  /messaging/statistics",
+                "GET  /messaging/portal",
+                "GET  /messaging/portal.html",
+                "WS   /ws/messaging/{conversation_id}",
             ],
         }
     )
@@ -9069,6 +9141,675 @@ def prompt_pm_risk(project_id: str = "", horizon_days: int = 30) -> str:
 
 
 # ============================================================
+# ====== TEAM MESSAGING & NOTIFICATIONS ======================
+# ============================================================
+#
+# Framework-free logic lives in ``messaging``; everything below is the MCP
+# surface for it.  ``api.py`` reuses the very same functions over REST and adds a
+# WebSocket feed on top of ``messaging.subscribe``.
+
+
+@mcp.tool()
+def msg_overview() -> str:
+    """Team-messaging overview: config, channels, categories, counts and rollout plan."""
+    return dump(messaging.messaging_overview())
+
+
+@mcp.tool()
+def msg_channels(channel_key: Optional[str] = None) -> str:
+    """Default team channels (Sales, Property Verification, GIS & Mapping, Support, Management)."""
+    return dump(messaging.messaging_channels(channel_key))
+
+
+@mcp.tool()
+def msg_categories(category: Optional[str] = None) -> str:
+    """Notification categories with their default delivery channels and urgency."""
+    return dump(messaging.notification_categories(category))
+
+
+@mcp.tool()
+def msg_attachment_kinds(kind: Optional[str] = None) -> str:
+    """Attachment kinds, accepted extensions and default sensitivity."""
+    return dump(messaging.attachment_rules(kind))
+
+
+@mcp.tool()
+def msg_profiles(presence: Optional[str] = None, role: Optional[str] = None,
+                 query: Optional[str] = None) -> str:
+    """Team directory of messaging profiles (filter by presence, role or text)."""
+    return dump(messaging.list_profiles(presence=presence, role=role, query=query))
+
+
+@mcp.tool()
+def msg_set_presence(user_id: str, presence: str = "online") -> str:
+    """Set a user's presence (online/away/busy/offline) and stamp last-seen."""
+    return dump(messaging.set_presence(user_id, presence))
+
+
+@mcp.tool()
+def msg_presence_heartbeat(user_id: str, presence: Optional[str] = None) -> str:
+    """Heartbeat a user's presence without spamming the audit trail."""
+    return dump(messaging.touch_presence(user_id, presence))
+
+
+@mcp.tool()
+def msg_preferences(user_id: str) -> str:
+    """A user's notification preferences, quiet hours, digest mode and Telegram state."""
+    return dump(messaging.get_preferences(user_id))
+
+
+@mcp.tool()
+def msg_set_preferences(user_id: str, prefs: Optional[Dict[str, List[str]]] = None,
+                        quiet_start: Optional[str] = None, quiet_end: Optional[str] = None,
+                        digest: Optional[str] = None, telegram_opt_in: Optional[bool] = None,
+                        telegram_categories: Optional[List[str]] = None) -> str:
+    """Update per-category channels, quiet hours, digest mode and Telegram opt-in."""
+    quiet = {"start": quiet_start, "end": quiet_end} if (quiet_start or quiet_end) else None
+    return dump(messaging.set_preferences(user_id, prefs=prefs, quiet_hours=quiet, digest=digest,
+                                          telegram_opt_in=telegram_opt_in,
+                                          telegram_categories=telegram_categories))
+
+
+@mcp.tool()
+def msg_create_conversation(kind: str = "group", title: str = "", created_by: Optional[str] = None,
+                            participants: Optional[List[str]] = None, channel_key: Optional[str] = None,
+                            property_id: Optional[str] = None, topic: Optional[str] = None,
+                            restricted: Optional[bool] = None, roles_allowed: Optional[List[str]] = None,
+                            retention_days: Optional[int] = None,
+                            announcement: Optional[str] = None) -> str:
+    """Create a direct / group / channel / property conversation and seed its members."""
+    return dump(messaging.create_conversation(
+        kind=kind, title=title, created_by=created_by, participants=participants,
+        channel_key=channel_key, property_id=property_id, topic=topic, restricted=restricted,
+        roles_allowed=roles_allowed, retention_days=retention_days, announcement=announcement))
+
+
+@mcp.tool()
+def msg_conversations(user_id: str, kind: Optional[str] = None, include_archived: bool = False,
+                      property_id: Optional[str] = None, channel_key: Optional[str] = None) -> str:
+    """List a user's conversations with unread counts, newest activity first."""
+    return dump(messaging.list_conversations(user_id, kind=kind, include_archived=include_archived,
+                                             property_id=property_id, channel_key=channel_key))
+
+
+@mcp.tool()
+def msg_conversation(conversation_id: str, user_id: str) -> str:
+    """One conversation with members, pins, unread count and full context."""
+    return dump(messaging.get_conversation(conversation_id, user_id))
+
+
+@mcp.tool()
+def msg_conversation_context(conversation_id: str, user_id: Optional[str] = None) -> str:
+    """What a conversation is tied to: property, pinned messages, actions, attachments."""
+    return dump(messaging.conversation_context(conversation_id, user_id))
+
+
+@mcp.tool()
+def msg_archive_conversation(conversation_id: str, user_id: str, archived: bool = True) -> str:
+    """Archive or restore a conversation (owner/admin only)."""
+    return dump(messaging.archive_conversation(conversation_id, user_id, archived))
+
+
+@mcp.tool()
+def msg_members(conversation_id: str, user_id: Optional[str] = None) -> str:
+    """Members of a conversation with roles, presence and read positions."""
+    return dump(messaging.list_members(conversation_id, user_id))
+
+
+@mcp.tool()
+def msg_add_member(conversation_id: str, member_id: str, actor_id: Optional[str] = None,
+                   role: str = "member") -> str:
+    """Add (or re-role) a member of a conversation."""
+    return dump(messaging.add_member(conversation_id, member_id, actor_id=actor_id, role=role))
+
+
+@mcp.tool()
+def msg_remove_member(conversation_id: str, member_id: str, actor_id: Optional[str] = None,
+                      reason: Optional[str] = None) -> str:
+    """Remove a member from a conversation (audited access revocation)."""
+    return dump(messaging.remove_member(conversation_id, member_id, actor_id=actor_id, reason=reason))
+
+
+@mcp.tool()
+def msg_update_member(conversation_id: str, member_id: str, actor_id: Optional[str] = None,
+                      role: Optional[str] = None, muted: Optional[bool] = None,
+                      pinned: Optional[bool] = None, notification_level: Optional[str] = None) -> str:
+    """Update a member's role, mute/pin state or notification level."""
+    return dump(messaging.update_member(conversation_id, member_id, actor_id=actor_id, role=role,
+                                        muted=muted, pinned=pinned,
+                                        notification_level=notification_level))
+
+
+@mcp.tool()
+def msg_direct(user_a: str, user_b: str) -> str:
+    """Find or create the 1-to-1 conversation between two users."""
+    return dump(messaging.get_or_create_direct(user_a, user_b))
+
+
+@mcp.tool()
+def msg_property_thread(property_id: str, created_by: Optional[str] = None,
+                        title: Optional[str] = None) -> str:
+    """Get or create the internal discussion panel for a property record."""
+    if find_property(property_id) is None:
+        return dump({"error": f"property '{property_id}' not found"})
+    return dump(messaging.get_or_create_property_thread(property_id, created_by=created_by, title=title))
+
+
+@mcp.tool()
+def msg_revoke_access(user_id: str, actor_id: Optional[str] = None, reason: Optional[str] = None) -> str:
+    """Revoke a user's access to every conversation and unlink Telegram (staff leaving)."""
+    return dump(messaging.revoke_user_access(user_id, actor_id=actor_id, reason=reason))
+
+
+@mcp.tool()
+def msg_post(conversation_id: str, author_id: str, body: str = "",
+             message_type: str = "text", parent_id: Optional[str] = None,
+             mentions: Optional[List[str]] = None, attachment_ids: Optional[List[str]] = None,
+             property_id: Optional[str] = None) -> str:
+    """Post a message (checked for membership, length and rate limit); notifies recipients."""
+    return dump(messaging.post_message(conversation_id, author_id, body, message_type=message_type,
+                                       parent_id=parent_id, mentions=mentions,
+                                       attachment_ids=attachment_ids, property_id=property_id))
+
+
+@mcp.tool()
+def msg_messages(conversation_id: str, user_id: str, limit: int = 50,
+                 before_seq: Optional[int] = None, thread_id: Optional[str] = None,
+                 include_deleted: bool = False) -> str:
+    """Page through a conversation's messages (or one thread), oldest to newest."""
+    return dump(messaging.list_messages(conversation_id, user_id, limit=limit, before_seq=before_seq,
+                                        thread_id=thread_id, include_deleted=include_deleted))
+
+
+@mcp.tool()
+def msg_message(message_id: str, user_id: str) -> str:
+    """One message with its attachments, reactions, read receipts and replies."""
+    return dump(messaging.get_message(message_id, user_id))
+
+
+@mcp.tool()
+def msg_edit_message(message_id: str, user_id: str, body: str) -> str:
+    """Edit a message (author only, within the edit window)."""
+    return dump(messaging.edit_message(message_id, user_id, body))
+
+
+@mcp.tool()
+def msg_delete_message(message_id: str, user_id: str, reason: Optional[str] = None) -> str:
+    """Soft-delete a message (author or conversation admin)."""
+    return dump(messaging.delete_message(message_id, user_id, reason))
+
+
+@mcp.tool()
+def msg_pin_message(message_id: str, user_id: str, pinned: bool = True) -> str:
+    """Pin or unpin a message in its conversation."""
+    return dump(messaging.pin_message(message_id, user_id, pinned))
+
+
+@mcp.tool()
+def msg_react(message_id: str, user_id: str, emoji: str) -> str:
+    """Toggle an emoji reaction on a message."""
+    return dump(messaging.react_to_message(message_id, user_id, emoji))
+
+
+@mcp.tool()
+def msg_thread(message_id: str, user_id: str, limit: int = 100) -> str:
+    """The threaded replies to a message."""
+    return dump(messaging.thread(message_id, user_id, limit))
+
+
+@mcp.tool()
+def msg_search(user_id: str, query: str = "", conversation_id: Optional[str] = None,
+               property_id: Optional[str] = None, mention: Optional[str] = None,
+               limit: int = 25) -> str:
+    """Search messages across every conversation the user may access."""
+    return dump(messaging.search_messages(user_id, query, conversation_id=conversation_id,
+                                          property_id=property_id, mention=mention, limit=limit))
+
+
+@mcp.tool()
+def msg_mark_read(conversation_id: str, user_id: str, up_to_seq: Optional[int] = None) -> str:
+    """Mark a conversation read up to a sequence number (defaults to the latest)."""
+    return dump(messaging.mark_read(conversation_id, user_id, up_to_seq))
+
+
+@mcp.tool()
+def msg_unread(user_id: str) -> str:
+    """Unread totals overall and per conversation, plus mention count."""
+    return dump(messaging.unread_counts(user_id))
+
+
+@mcp.tool()
+def msg_read_receipts(message_id: str, user_id: str) -> str:
+    """Who has read a message (read receipts)."""
+    return dump(messaging.read_receipts(message_id, user_id))
+
+
+@mcp.tool()
+def msg_summarize(conversation_id: str, user_id: str, limit: int = 80) -> str:
+    """Rules-based extractive summary: participants, topics, keywords and salient lines."""
+    return dump(messaging.summarize_conversation(conversation_id, user_id, limit))
+
+
+@mcp.tool()
+def msg_action_items(conversation_id: str, user_id: str, limit: int = 100,
+                     create: bool = False, owner_default: Optional[str] = None) -> str:
+    """Extract action items from a conversation (optionally create tracked actions)."""
+    return dump(messaging.extract_action_items(conversation_id, user_id, limit=limit, create=create,
+                                               owner_default=owner_default))
+
+
+@mcp.tool()
+def msg_attach(conversation_id: str, uploaded_by: str, filename: str,
+               kind: Optional[str] = None, size_bytes: int = 0, mime: Optional[str] = None,
+               storage_key: Optional[str] = None, source_url: Optional[str] = None,
+               sensitivity: Optional[str] = None, linked_type: Optional[str] = None,
+               linked_id: Optional[str] = None) -> str:
+    """Register a file reference (controlled storage or an existing portal record)."""
+    return dump(messaging.register_attachment(
+        conversation_id, uploaded_by, filename, kind=kind, size_bytes=size_bytes, mime=mime,
+        storage_key=storage_key, source_url=source_url, sensitivity=sensitivity,
+        linked_type=linked_type, linked_id=linked_id))
+
+
+@mcp.tool()
+def msg_attachment_link(attachment_id: str, user_id: str,
+                        ttl_minutes: Optional[int] = None) -> str:
+    """Mint a signed, expiring, permission-checked download link for an attachment."""
+    return dump(messaging.attachment_link(attachment_id, user_id, ttl_minutes))
+
+
+@mcp.tool()
+def msg_attachment_resolve(token: str, user_id: Optional[str] = None) -> str:
+    """Verify a signed attachment link (signature + expiry) and re-check access."""
+    return dump(messaging.resolve_attachment_link(token, user_id))
+
+
+@mcp.tool()
+def msg_attachments(conversation_id: str, user_id: str, kind: Optional[str] = None,
+                    sensitivity: Optional[str] = None) -> str:
+    """List a conversation's shared files (references, never embedded content)."""
+    return dump(messaging.list_attachments(conversation_id, user_id, kind=kind,
+                                           sensitivity=sensitivity))
+
+
+@mcp.tool()
+def msg_create_action(conversation_id: str, created_by: str, title: str, kind: str = "task",
+                      message_id: Optional[str] = None, detail: Optional[str] = None,
+                      owner_id: Optional[str] = None, due_on: Optional[str] = None,
+                      property_id: Optional[str] = None, create_crm_task: bool = False) -> str:
+    """Turn a message into a tracked action (task/approval/verification/request), optional CRM task."""
+    linked = None
+    if create_crm_task:
+        task = Task(title=title, description=detail, assigned_agent_id=owner_id,
+                    related_type="property" if property_id else "conversation",
+                    related_id=property_id or conversation_id, due_date=due_on, priority="medium")
+        tasks_db.append(task)
+        linked = task.id
+    return dump(messaging.create_action(
+        conversation_id, created_by, title, kind=kind, message_id=message_id, detail=detail,
+        owner_id=owner_id, due_on=due_on, property_id=property_id, linked_task_id=linked))
+
+
+@mcp.tool()
+def msg_actions(user_id: str, conversation_id: Optional[str] = None,
+                owner_id: Optional[str] = None, status: Optional[str] = None,
+                kind: Optional[str] = None, overdue_only: bool = False) -> str:
+    """List tracked actions the user can see (filter by conversation, owner, status, kind)."""
+    return dump(messaging.list_actions(user_id, conversation_id=conversation_id, owner_id=owner_id,
+                                       status=status, kind=kind, overdue_only=overdue_only))
+
+
+@mcp.tool()
+def msg_action(action_id: str, user_id: str) -> str:
+    """One tracked action with its updates and overdue flag."""
+    return dump(messaging.get_action(action_id, user_id))
+
+
+@mcp.tool()
+def msg_update_action(action_id: str, user_id: str, status: Optional[str] = None,
+                      owner_id: Optional[str] = None, due_on: Optional[str] = None,
+                      note: Optional[str] = None) -> str:
+    """Update an action's status, owner or due date and add a note."""
+    return dump(messaging.update_action(action_id, user_id, status=status, owner_id=owner_id,
+                                        due_on=due_on, note=note))
+
+
+@mcp.tool()
+def msg_complete_action(action_id: str, user_id: str, note: Optional[str] = None) -> str:
+    """Mark an action done and notify its creator."""
+    return dump(messaging.complete_action(action_id, user_id, note))
+
+
+@mcp.tool()
+def msg_notifications(user_id: str, unread_only: bool = False, category: Optional[str] = None,
+                      limit: int = 50) -> str:
+    """A user's notifications (queue + delivered) with unread count."""
+    return dump(messaging.notifications(user_id, unread_only=unread_only, category=category, limit=limit))
+
+
+@mcp.tool()
+def msg_read_notification(notification_id: str, user_id: str) -> str:
+    """Mark one notification read."""
+    return dump(messaging.read_notification(notification_id, user_id))
+
+
+@mcp.tool()
+def msg_mark_all_notifications_read(user_id: str) -> str:
+    """Mark every notification read for a user."""
+    return dump(messaging.mark_all_notifications_read(user_id))
+
+
+@mcp.tool()
+def msg_dispatch(user_id: Optional[str] = None, limit: int = 200, force: bool = False) -> str:
+    """Drain the notification queue into the outbox (the background-worker seam)."""
+    return dump(messaging.dispatch_pending(user_id=user_id, limit=limit, force=force))
+
+
+@mcp.tool()
+def msg_outbox(channel: Optional[str] = None, user_id: Optional[str] = None,
+               limit: int = 100) -> str:
+    """Delivered notifications with rendered e-mail and Telegram payloads."""
+    return dump(messaging.outbox(channel=channel, user_id=user_id, limit=limit))
+
+
+@mcp.tool()
+def msg_unread_summary(user_id: str) -> str:
+    """Combined unread picture: conversations, mentions, notifications and open actions."""
+    return dump(messaging.unread_summary(user_id))
+
+
+@mcp.tool()
+def msg_telegram_link_code(user_id: str) -> str:
+    """Mint a single-use /start code so a user can link their Telegram chat."""
+    return dump(messaging.telegram_link_code(user_id))
+
+
+@mcp.tool()
+def msg_telegram_link(user_id: str, chat_id: str, username: Optional[str] = None,
+                      categories: Optional[List[str]] = None) -> str:
+    """Opt a user in: bind a Telegram chat id and the allowed notification categories."""
+    return dump(messaging.telegram_link(user_id, chat_id, username=username, categories=categories))
+
+
+@mcp.tool()
+def msg_telegram_unlink(user_id: str) -> str:
+    """Unlink a user's Telegram chat and disable Telegram alerts."""
+    return dump(messaging.telegram_unlink(user_id))
+
+
+@mcp.tool()
+def msg_telegram_links(active_only: bool = True) -> str:
+    """Every Telegram link (optionally only the active ones)."""
+    return dump(messaging.telegram_links(active_only))
+
+
+@mcp.tool()
+def msg_telegram_status(user_id: str) -> str:
+    """Whether a user is linked to Telegram, which categories and the bot name."""
+    return dump(messaging.telegram_status(user_id))
+
+
+@mcp.tool()
+def msg_telegram_update(update: Dict[str, Any]) -> str:
+    """Process one inbound Telegram bot update (/start, /stop, /mute, /digest, /status)."""
+    return dump(messaging.telegram_handle_update(update))
+
+
+@mcp.tool()
+def msg_telegram_alert(user_id: str, text: str, priority: str = "normal",
+                       conversation_id: Optional[str] = None,
+                       message_id: Optional[str] = None) -> str:
+    """Queue and dispatch a sanitised alert (short text + deep link, never documents)."""
+    return dump(messaging.telegram_alert(user_id, text, priority=priority,
+                                         conversation_id=conversation_id, message_id=message_id))
+
+
+@mcp.tool()
+def msg_audit(limit: int = 100, action: Optional[str] = None, actor_id: Optional[str] = None,
+              target_type: Optional[str] = None) -> str:
+    """The messaging audit trail of important actions (access, files, moderation)."""
+    return dump(messaging.list_audit(limit=limit, action=action, actor_id=actor_id,
+                                     target_type=target_type))
+
+
+@mcp.tool()
+def msg_retention_report() -> str:
+    """Per-conversation retention picture: messages, pins and purgeable counts."""
+    return dump(messaging.retention_report())
+
+
+@mcp.tool()
+def msg_purge_retention(dry_run: bool = True, retention_days: Optional[int] = None,
+                        actor_id: Optional[str] = None) -> str:
+    """Apply the retention policy (soft-delete past the window; pinned exempt)."""
+    return dump(messaging.purge_retention(dry_run=dry_run, retention_days=retention_days,
+                                          actor_id=actor_id))
+
+
+@mcp.tool()
+def msg_report_message(message_id: str, reporter_id: str, reason: str = "other",
+                       detail: Optional[str] = None) -> str:
+    """Report a message (spam, abuse, confidential leak, off-topic)."""
+    return dump(messaging.report_message(message_id, reporter_id, reason=reason, detail=detail))
+
+
+@mcp.tool()
+def msg_reports(status: Optional[str] = None, limit: int = 100) -> str:
+    """Message reports and their status (spam-control queue)."""
+    return dump(messaging.list_reports(status=status, limit=limit))
+
+
+@mcp.tool()
+def msg_moderate_report(report_id: str, actor_id: str, action: str,
+                        note: Optional[str] = None) -> str:
+    """Resolve a report: dismiss, delete the message, mute the author or escalate."""
+    return dump(messaging.moderate_report(report_id, actor_id, action, note=note))
+
+
+@mcp.tool()
+def msg_conversation_digest(conversation_id: str, user_id: str, days: int = 7) -> str:
+    """Recent-activity digest for a conversation over a window."""
+    return dump(messaging.conversation_digest(conversation_id, user_id, days=days))
+
+
+@mcp.tool()
+def msg_statistics() -> str:
+    """Aggregate messaging statistics for the portal dashboard."""
+    return dump(messaging.messaging_statistics())
+
+
+def _messaging_activity_svg(rows: List[Dict[str, Any]]) -> str:
+    """Compact horizontal bars for the busiest conversations."""
+    if not rows:
+        return '<p style="color:var(--muted)">No conversations yet.</p>'
+    top = sorted(rows, key=lambda r: r.get("messages", 0), reverse=True)[:10]
+    width = max([r.get("messages", 0) for r in top] + [1])
+    out = ["<div style='display:flex;flex-direction:column;gap:8px'>"]
+    for r in top:
+        pct = 100.0 * r.get("messages", 0) / width
+        out.append(
+            "<div style='display:flex;align-items:center;gap:10px;font-size:13px'>"
+            f"<div style='width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>"
+            f"{r.get('title','')}</div>"
+            f"<svg width='260' height='14'><rect width='260' height='14' rx='3' fill='#e5e7eb'/>"
+            f"<rect width='{260 * pct / 100.0:.1f}' height='14' rx='3' fill='#2563eb'/></svg>"
+            f"<span style='width:60px;text-align:right'>{r.get('messages',0)}</span>"
+            f"<span style='width:110px;color:var(--muted)'>{r.get('kind','')}</span>"
+            "</div>")
+    out.append("</div>")
+    return "".join(out)
+
+
+def messaging_portal_html(lang: str = "en", theme: str = "auto") -> str:
+    """The Team Messaging & Notifications page as printable HTML."""
+    ov = messaging.messaging_overview()
+    stats = messaging.messaging_statistics()
+    channels = messaging.messaging_channels()
+    conversation_rows = []
+    for conv in sorted(messaging.conversations_db, key=lambda c: c.message_count, reverse=True)[:25]:
+        conversation_rows.append([conv.id[:14], conv.kind, conv.title,
+                                  str(len(messaging.members_of(conv.id))), str(conv.message_count),
+                                  conv.last_message_at or conv.created_at])
+    audit_rows = [[e.at, e.action, messaging.display_name_for(e.actor_id), e.detail or ""]
+                  for e in sorted(messaging.audit_db, key=lambda e: e.at, reverse=True)[:20]]
+    outbox_rows = [[o.created_at, o.channel, messaging.display_name_for(o.user_id),
+                    (o.subject or "")[:60]] for o in sorted(messaging.outbox_db,
+                                                            key=lambda o: o.created_at, reverse=True)[:20]]
+    sections = [
+        {"kind": "cards", "heading": "Workspace", "items": [
+            ("Team profiles", str(stats["profiles"]), f"{stats['online']} online"),
+            ("Conversations", str(stats["conversations"]),
+             ", ".join(f"{k} {v}" for k, v in stats["by_kind"].items()) or "none yet"),
+            ("Live messages", str(stats["messages_live"]), f"{stats['messages']} total"),
+            ("Attachments", str(stats["attachments"]), f"{stats['attachments_confidential']} confidential"),
+            ("Open actions", str(stats["actions_open"]), f"{stats['actions']} total"),
+            ("Telegram opt-in", str(stats["telegram_opt_in"]), "optional alert channel"),
+        ]},
+        {"kind": "html", "heading": "Busiest conversations",
+         "html": _messaging_activity_svg([
+             {"title": c.title, "messages": c.message_count, "kind": c.kind}
+             for c in sorted(messaging.conversations_db, key=lambda c: c.message_count, reverse=True)
+         ])},
+        {"kind": "table", "heading": "Conversations",
+         "columns": ["Id", "Kind", "Title", "Members", "Messages", "Last activity"],
+         "rows": conversation_rows},
+        {"kind": "table", "heading": "Channels",
+         "columns": ["Key", "Channel", "Purpose", "Restricted"],
+         "rows": [[c["key"], c["name"], c["purpose"], "yes" if c["restricted"] else "no"]
+                  for c in channels["channels"]]},
+        {"kind": "table", "heading": "Notification categories & delivery",
+         "columns": ["Category", "Delivered via", "Urgent"],
+         "rows": [[k, ", ".join(v["channels"]), "yes" if v["urgent"] else "no"]
+                  for k, v in messaging.NOTIFICATION_CATEGORIES.items()]},
+        {"kind": "table", "heading": "Notification outbox",
+         "columns": ["At", "Channel", "Recipient", "Subject"], "rows": outbox_rows},
+        {"kind": "table", "heading": "Audit trail",
+         "columns": ["At", "Action", "Actor", "Detail"], "rows": audit_rows},
+        {"kind": "text", "heading": "Rollout", "text": "\n".join(ov["rollout"])},
+        {"kind": "text", "heading": "Storage & delivery note", "text": ov["storage_note"]},
+    ]
+    return gis.build_report_html(title="Team Messaging & Notifications",
+                                 subtitle="Conversations tied to properties, plans, customers and tasks",
+                                 sections=sections, ticker_html=_portal_ticker(lang),
+                                 lang=lang, theme=theme)
+
+
+@mcp.tool()
+def msg_portal(lang: str = "en", theme: str = "auto") -> str:
+    """The Team Messaging & Notifications wing as a printable HTML page."""
+    return messaging_portal_html(lang, theme)
+
+
+@mcp.resource("messaging://overview", name="Messaging overview",
+              description="Workspace config, channels, categories and counts.")
+def res_msg_overview() -> str:
+    return dump(messaging.messaging_overview())
+
+
+@mcp.resource("messaging://channels", name="Team channels",
+              description="Default team channels with purpose and access rules.")
+def res_msg_channels() -> str:
+    return dump(messaging.messaging_channels())
+
+
+@mcp.resource("messaging://categories", name="Notification categories",
+              description="Notification categories, delivery channels and urgency.")
+def res_msg_categories() -> str:
+    return dump(messaging.notification_categories())
+
+
+@mcp.resource("messaging://profiles", name="Messaging directory",
+              description="Team messaging profiles with presence and unread counts.")
+def res_msg_profiles() -> str:
+    return dump(messaging.list_profiles())
+
+
+@mcp.resource("messaging://outbox", name="Notification outbox",
+              description="Delivered notifications with rendered e-mail/Telegram payloads.")
+def res_msg_outbox() -> str:
+    return dump(messaging.outbox(limit=50))
+
+
+@mcp.resource("messaging://audit", name="Messaging audit",
+              description="Audit trail of messaging actions.")
+def res_msg_audit() -> str:
+    return dump(messaging.list_audit(limit=100))
+
+
+@mcp.resource("messaging://reports", name="Message reports",
+              description="Message reports and moderation status.")
+def res_msg_reports() -> str:
+    return dump(messaging.list_reports())
+
+
+@mcp.resource("messaging://statistics", name="Messaging statistics",
+              description="Aggregate messaging statistics.")
+def res_msg_statistics() -> str:
+    return dump(messaging.messaging_statistics())
+
+
+@mcp.resource("messaging://conversation/{conversation_id}", name="Conversation",
+              description="One conversation (members, pins, context) by id.")
+def res_msg_conversation(conversation_id: str) -> str:
+    conv = messaging._get(messaging.conversations_db, "id", conversation_id)
+    if conv is None:
+        return dump({"error": f"conversation '{conversation_id}' not found"})
+    view = messaging.conversation_view(conv)
+    view["context"] = messaging.conversation_context(conversation_id)
+    return dump({"conversation": view})
+
+
+@mcp.resource("messaging://unread/{user_id}", name="Unread summary",
+              description="Unread conversations, mentions, notifications and open actions for a user.")
+def res_msg_unread(user_id: str) -> str:
+    return dump(messaging.unread_summary(user_id))
+
+
+@mcp.prompt(name="messaging_briefing_prompt",
+            description="Brief a team member on their messaging workspace and open items.")
+def prompt_messaging_briefing(user_id: str = "", focus: str = "everything urgent") -> str:
+    return (
+        "You are the Arz-e-Pak team-workspace assistant.\n"
+        + (f"User: {user_id}.\n" if user_id else "Scope: whole team.\n")
+        + f"Focus: {focus}.\n"
+        "1. msg_unread_summary (or msg_unread) for unread counts, mentions and open actions.\n"
+        "2. msg_conversations to list active threads; msg_summary on the busiest ones.\n"
+        "3. msg_actions(overdue_only=true) for slipping work; msg_telegram_* only for elective alerts.\n"
+        "4. Produce a short briefing: what needs a reply, what is overdue, what can wait. "
+        "Never quote confidential attachment content in summary e-mails or Telegram text."
+    )
+
+
+@mcp.prompt(name="messaging_thread_digest_prompt",
+            description="Summarise a conversation thread and extract its action items.")
+def prompt_messaging_digest(conversation_id: str = "", days: int = 7) -> str:
+    return (
+        "You are summarising an internal Arz-e-Pak conversation"
+        + (f" ({conversation_id})" if conversation_id else "") + f" over the last {days} days.\n"
+        "1. msg_conversation_digest for activity; msg_summarize for topics and salient lines.\n"
+        "2. msg_action_items to surface requests and assignments; create only what the team confirms.\n"
+        "3. Reply with: decisions made, who owns what by when, and any unresolved question."
+    )
+
+
+@mcp.prompt(name="messaging_escalation_prompt",
+            description="Draft a formal e-mail escalation for an unresolved internal issue.")
+def prompt_messaging_escalation(conversation_id: str = "", issue: str = "") -> str:
+    return (
+        "You are drafting a formal escalation e-mail for an internal Arz-e-Pak issue.\n"
+        + (f"Source conversation: {conversation_id}.\n" if conversation_id else "")
+        + (f"Issue: {issue}.\n" if issue else "")
+        + "1. msg_summarize + msg_actions to gather the facts and the current owner.\n"
+        "2. msg_create_action(kind='approval' or 'task') to record the escalation in the portal.\n"
+        "3. Produce a concise e-mail (subject, context, impact, requested decision, deadline) "
+        "and note that it will be dispatched through the notification outbox."
+    )
+
+
+
+
+
+# ============================================================
 # ====== AGENTIC OS · TRANSACTIONS · INTELLIGENCE ============
 # ====== LEASING · MARKETING · COMMERCIALIZATION =============
 # ============================================================
@@ -11192,6 +11933,12 @@ MODEL_REGISTRY: Dict[str, Any] = {
     "pm_cost_entry": pmo.PmCostEntry, "pm_risk": pmo.PmRisk,
     "pm_change_request": pmo.PmChangeRequest, "pm_site_log": pmo.PmSiteLog,
     "pm_inspection": pmo.PmInspection, "pm_action": pmo.PmAction,
+    "conversation": messaging.Conversation, "membership": messaging.Membership,
+    "message": messaging.Message, "attachment": messaging.Attachment,
+    "message_action": messaging.MessageAction, "notification_record": messaging.NotificationRecord,
+    "outbox_item": messaging.OutboxItem, "telegram_link": messaging.TelegramLink,
+    "audit_event": messaging.AuditEvent, "message_report": messaging.MessageReport,
+    "msg_profile": messaging.MsgProfile,
 }
 
 
@@ -11213,6 +11960,7 @@ def _tool_group(name: str) -> str:
         ("get_accounting_snapshot", "accounting"), ("get_market_intelligence", "market"),
         ("tools_", "tools"), ("tool_", "tools"),
         ("pmo_", "pmo"), ("pm_", "pmo"),
+        ("msg_", "messaging"), ("messaging_", "messaging"),
         ("image_", "images"), ("rag_", "rag"), ("add_", "hierarchy"),
         ("update_", "hierarchy"), ("delete_", "hierarchy"), ("get_", "hierarchy"),
         ("list_", "hierarchy"), ("search_", "search"),
@@ -11248,6 +11996,7 @@ def _settings_snapshot() -> Dict[str, Any]:
         "commercial": commercial.COMMERCIAL_CONFIG,
         "tools": tools.TOOLS_CONFIG,
         "pmo": pmo.PMO_CONFIG,
+        "messaging": messaging.MESSAGING_CONFIG,
     }
 
 
@@ -11290,6 +12039,13 @@ def portal_health() -> str:
                 "tool_projects": len(tools.projects_db),
                 "pm_projects": len(pmo.projects_db), "pm_tasks": len(pmo.tasks_db),
                 "pm_risks": len(pmo.risks_db), "pm_cost_entries": len(pmo.cost_entries_db),
+                "msg_conversations": len(messaging.conversations_db),
+                "msg_messages": len(messaging.messages_db),
+                "msg_attachments": len(messaging.attachments_db),
+                "msg_notifications": len(messaging.notifications_db),
+                "msg_outbox": len(messaging.outbox_db),
+                "msg_actions": len(messaging.actions_db),
+                "msg_telegram_links": len(messaging.telegram_db),
             },
         }
     )
@@ -11359,7 +12115,7 @@ def portal_settings(action: str = "get", updates: Optional[Dict[str, Any]] = Non
     """Read or edit runtime settings.
 
     ``action='update'`` accepts
-    ``{assumptions|forecast|accounting|auth|agentic|transactions|intelligence|leasing|marketing|commercial|construction|maintenance|tools|pmo: {key: value}}``.
+    ``{assumptions|forecast|accounting|auth|agentic|transactions|intelligence|leasing|marketing|commercial|construction|maintenance|tools|pmo|messaging: {key: value}}``.
     """
     global BASE_PRICE_CAGR, GROWTH_SENSITIVITY, COST_INFLATION_CAGR, DEFAULT_BUILD_YEARS, LAND_COST_SHARE
     if action == "get":
@@ -11417,7 +12173,8 @@ def portal_settings(action: str = "get", updates: Optional[Dict[str, Any]] = Non
                           ("construction", construction.CONSTRUCTION_CONFIG),
                           ("maintenance", maintenance.MAINTENANCE_CONFIG),
                           ("tools", tools.TOOLS_CONFIG),
-                          ("pmo", pmo.PMO_CONFIG)):
+                          ("pmo", pmo.PMO_CONFIG),
+                          ("messaging", messaging.MESSAGING_CONFIG)):
         for key, value in (updates.get(group) or {}).items():
             if key in config:
                 config[key] = value
@@ -11470,6 +12227,7 @@ def global_search(query: str, limit: int = 10) -> str:
         "ai_agents": [], "transactions": [], "rental_units": [], "products": [],
         "tools": [],
         "pmo_projects": [], "pmo_tasks": [], "pmo_risks": [],
+        "msg_conversations": [], "msg_messages": [], "msg_actions": [],
     }
     for c in cities_db:
         if has(c.name, c.state, c.description):
@@ -11574,6 +12332,22 @@ def global_search(query: str, limit: int = 10) -> str:
         if has(rk.title, rk.kind, rk.category, rk.owner, rk.description):
             results["pmo_risks"].append({"id": rk.id, "title": rk.title, "kind": rk.kind,
                                          "score": rk.probability * rk.impact})
+    for cv in messaging.conversations_db:
+        if has(cv.title, cv.topic, cv.channel_key, cv.kind, cv.property_id):
+            results["msg_conversations"].append({"id": cv.id, "title": cv.title, "kind": cv.kind,
+                                                 "channel_key": cv.channel_key, "status": cv.status})
+    for ms in messaging.messages_db:
+        if ms.deleted_at:
+            continue
+        if has(ms.body, ms.author_name):
+            results["msg_messages"].append({"id": ms.id, "conversation_id": ms.conversation_id,
+                                            "author": ms.author_name, "body": ms.body[:160],
+                                            "created_at": ms.created_at})
+    for ac in messaging.actions_db:
+        if has(ac.title, ac.detail, ac.kind, ac.status):
+            results["msg_actions"].append({"id": ac.id, "title": ac.title, "kind": ac.kind,
+                                           "status": ac.status, "owner_id": ac.owner_id,
+                                           "conversation_id": ac.conversation_id})
 
     for key in results:
         results[key] = results[key][:limit]
@@ -11722,6 +12496,7 @@ def portal_statistics() -> str:
                 "portfolio_cpi": pmo.portfolio_dashboard()["portfolio_cpi"],
                 "capabilities": len(pmo.PM_CAPABILITIES),
             },
+            "messaging": messaging.messaging_statistics(),
         }
     )
 
@@ -14532,9 +15307,109 @@ def _seed_pmo() -> None:
                    due_on="2026-06-25", priority="high", meeting="Weekly site meeting")
 
 
+def _seed_messaging() -> None:
+    """Seed the team-messaging wing: profiles, channels, a DM and a property discussion."""
+    if not any(p.key == "messaging" for p in content.pages_db):
+        content.pages_db.append(content.PortalPage(
+            key="messaging", title="Team Messaging", category="services", order=80,
+            nav_label="Messages",
+            subtitle="Conversations tied to properties, plans, customers and tasks",
+            summary="An internal team workspace: direct messages, team channels and a discussion "
+                    "panel on every property record, with e-mail and optional Telegram alerts.",
+            body=[
+                "The Team Messaging wing is the portal's internal communication system. It keeps the "
+                "team's conversations inside Arz-e-Pak and tied to the work itself: direct messages, "
+                "group discussions and channels such as Sales, Property Verification, GIS & Mapping, "
+                "Customer Support and Management, plus an internal discussion panel on every "
+                "property record so a listing, its map, its documents and its follow-up tasks stay "
+                "in one place.",
+                "Messages support threaded replies, @mentions, pins, reactions, search, unread "
+                "counts and read receipts. Files are shared as references — a controlled storage key "
+                "or a link to an existing portal record — and handed out through permission-checked, "
+                "expiring links, so large plans and PDFs never sit inside chat text.",
+                "Any message can be turned into a tracked action: a task, an approval, a property "
+                "verification or a follow-up, with an owner and a deadline. A notification queue "
+                "with per-user, per-category preferences (in-app, e-mail and optional Telegram) keeps "
+                "everyone informed without making e-mail or Telegram the system of record; Telegram "
+                "alerts carry only short text and an authenticated deep link, never confidential "
+                "documents.",
+            ],
+            highlights=[
+                {"label": "Chat", "value": "Internal", "sub": "DMs · channels · property threads"},
+                {"label": "Actions", "value": "Message→task", "sub": "owner + deadline"},
+                {"label": "Alerts", "value": "In-app · e-mail", "sub": "Telegram optional"},
+                {"label": "Control", "value": "Audit", "sub": "roles · retention · moderation"},
+            ],
+            bullets=[
+                "Direct messages, group discussions and named team channels",
+                "A property-linked discussion panel on every listing",
+                "Mentions, replies, pins, search, unread counts and read receipts",
+                "Permission-checked, expiring file links — files stay in controlled storage",
+                "Message → task / approval / verification with owner and deadline",
+                "Notification queue with preferences, quiet hours and an outbox",
+                "Optional Telegram bot for alerts (short text + deep link only)",
+                "Roles, audit trail, access revocation and retention policy",
+            ],
+            tags=["messaging", "chat", "notifications", "telegram", "email", "collaboration"],
+            status="published",
+        ))
+
+    if messaging.profiles_db:
+        return
+
+    team: List[Dict[str, Any]] = []
+    for u in auth.users_db:
+        if u.status not in ("active", "pending"):
+            continue
+        team.append({
+            "user_id": u.id, "display_name": u.name or (u.email or u.id),
+            "role": u.role or "member", "email": u.email, "mobile": u.mobile,
+            "title": (u.roles[0] if u.roles else None),
+        })
+    if not team:
+        team = [
+            {"user_id": "team_admin", "display_name": "Ayesha Khan", "role": "admin",
+             "email": "admin@portal.pk", "handle": "ayesha"},
+            {"user_id": "team_agent", "display_name": "Bilal Ahmed", "role": "agent",
+             "email": "agent@portal.pk", "handle": "bilal"},
+            {"user_id": "team_gis", "display_name": "Sana Tariq", "role": "member",
+             "email": "gis@portal.pk", "handle": "sana"},
+        ]
+
+    property_ids = [p.id for p in properties_db[:3]]
+    messaging.seed_demo(team, property_ids=property_ids)
+
+    admin = next((t["user_id"] for t in team if t["role"] in messaging.ADMIN_ROLES),
+                 team[0]["user_id"])
+    others = [t["user_id"] for t in team if t["user_id"] != admin]
+    sales = next((c for c in messaging.conversations_db if c.channel_key == "sales"), None)
+    if sales and others:
+        messaging.create_action(sales.id, admin, "Prepare the DHA Phase 6 rate list",
+                                kind="task", owner_id=others[0], due_on="2026-07-05",
+                                detail="Prices per marla for 5 and 10 marla files.", announce=False)
+        messaging.create_action(sales.id, admin, "Approve the new listing banner",
+                                kind="approval", owner_id=others[0], announce=False)
+    if others:
+        messaging.telegram_link(others[0], "100200300", username="arzteam",
+                                categories=["mention", "direct", "lead", "approval"])
+        owner = messaging.find_profile(others[0])
+        if owner:
+            owner.presence = "online"
+        messaging.queue_notification(
+            others[0], "lead", title="Three new leads need attention",
+            body="Gulberg Greens and DHA enquiries are waiting for first response.",
+            priority="high",
+        )
+        messaging.queue_notification(
+            others[0], "approval", title="Property verification requires approval",
+            body="Title documents for the Gulberg Greens listing are ready for review.",
+            priority="high",
+        )
+    messaging.dispatch_pending(force=True)
+
+
 def init_sample_data() -> None:
     """Populate the in-memory stores with a realistic Pakistani dataset."""
-
     # ---- Cities ----
     lahore = City(name="Lahore", state="Punjab", latitude=31.5204, longitude=74.3587, description="Cultural heart of Pakistan.")
     karachi = City(name="Karachi", state="Sindh", latitude=24.8607, longitude=67.0011, description="Financial capital and largest city.")
@@ -15196,6 +16071,9 @@ def init_sample_data() -> None:
     # ---- PMO wing (project management, monitoring & tracking) ----
     _seed_pmo()
 
+    # ---- Team messaging & notifications wing ----
+    _seed_messaging()
+
 
 init_sample_data()
 
@@ -15229,12 +16107,14 @@ def main() -> None:
     print("Commercial: 8 products, hybrid pricing, metering, billing, payouts")
     print("Tools     : calculators, GIS/georeferencing, CAD, photo, documents, calendar")
     print("PMO       : project register, CPM scheduling, EVM, cost & risk control, site diary")
+    print("Messaging : internal chat, channels, property threads, notifications, Telegram alerts")
     print(f"Data      : {len(properties_db)} properties, {len(big_projects_db)} big projects, {len(leads_db)} leads")
     print(f"Content   : {len(content.pages_db)} pages, {len(content.stories_db)} stories, {len(content.ads_db)} ads, {len(auth.users_db)} users")
     print(f"Wings     : {len(construction.estimates_db)} build estimates, {len(maintenance.plans_db)} maintenance plans, {len(maintenance.work_orders_db)} work orders")
     print(f"Agentic   : {len(agents.AGENTS)} agents, {len(agents.runs_db)} runs, {len(transactions.transactions_db)} transactions, {len(commercial.PRODUCTS)} products")
     print(f"Toolbox   : {len(tools.TOOL_CATALOG)} tools in {len(tools.TOOL_CATEGORIES)} categories, {len(tools.projects_db)} saved projects")
     print(f"PMO       : {len(pmo.projects_db)} projects, {len(pmo.tasks_db)} tasks, {len(pmo.risks_db)} risks, {len(pmo.cost_entries_db)} cost entries")
+    print(f"Messaging : {len(messaging.conversations_db)} conversations, {len(messaging.messages_db)} messages, {len(messaging.notifications_db)} notifications, {len(messaging.outbox_db)} outbox items")
     print("=" * 60)
     mcp.run()
 

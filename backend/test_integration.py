@@ -1870,6 +1870,9 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         # --- PMO / project management (REST), reusing this already-entered client ---
         run_pmo_rest_checks(client)
 
+        # --- team messaging & notifications (REST), reusing this already-entered client ---
+        run_messaging_rest_checks(client)
+
 
 # ============================================================
 # 1c) Agentic products (MCP): agents, transactions, intelligence,
@@ -3413,6 +3416,531 @@ def run_pmo_rest_checks(client: TestClient) -> None:
 
 
 # ============================================================
+# 1f) Team messaging & notifications (MCP)
+# ============================================================
+
+
+async def run_messaging_checks() -> None:
+    print("\n=== Team Messaging & Notifications (MCP) ===")
+    async with Client(core.mcp) as client:
+        r = json.loads(text_of(await client.call_tool("msg_overview", {})))
+        check("msg: msg_overview", r["counts"]["conversations"] >= 6,
+              str(r["counts"]["conversations"]))
+        check("msg: msg_overview rollout", len(r["rollout"]) == 4, str(r["rollout"]))
+
+        r = json.loads(text_of(await client.call_tool("msg_channels", {})))
+        check("msg: msg_channels", r["count"] == 6 and any(c["key"] == "management" and c["restricted"]
+                                                          for c in r["channels"]), str(r["count"]))
+        r = json.loads(text_of(await client.call_tool("msg_channels", {"channel_key": "gis_mapping"})))
+        check("msg: msg_channels(key)", r["channel"]["name"] == "GIS & Mapping", str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("msg_categories", {})))
+        check("msg: msg_categories", r["count"] == 8, str(r["count"]))
+        r = json.loads(text_of(await client.call_tool("msg_categories", {"category": "mention"})))
+        check("msg: msg_categories(mention)", "telegram" in r["category"]["channels"], str(r))
+
+        r = json.loads(text_of(await client.call_tool("msg_attachment_kinds", {})))
+        check("msg: msg_attachment_kinds", r["count"] == 9, str(r["count"]))
+
+        profs = json.loads(text_of(await client.call_tool("msg_profiles", {})))
+        check("msg: msg_profiles", profs["count"] >= 3, str(profs["count"]))
+        admin_prof = next((p for p in profs["profiles"] if p["role"] in core.messaging.ADMIN_ROLES),
+                          profs["profiles"][0])
+        uid = admin_prof["user_id"]
+        uid2 = next(p["user_id"] for p in profs["profiles"] if p["user_id"] != uid)
+
+        r = json.loads(text_of(await client.call_tool("msg_set_presence",
+                                                      {"user_id": uid, "presence": "online"})))
+        check("msg: msg_set_presence", r["presence"] == "online", str(r.get("error")))
+        r = json.loads(text_of(await client.call_tool("msg_presence_heartbeat", {"user_id": uid})))
+        check("msg: msg_presence_heartbeat", r.get("presence") in ("online", "away", "busy"),
+              str(r.get("error")))
+
+        prefs = json.loads(text_of(await client.call_tool("msg_preferences", {"user_id": uid})))
+        check("msg: msg_preferences", "mention" in prefs["notification_prefs"], str(prefs.get("error")))
+        r = json.loads(text_of(await client.call_tool("msg_set_preferences", {
+            "user_id": uid, "prefs": {"lead": ["in_app"]}, "digest": "hourly"})))
+        check("msg: msg_set_preferences", r["notification_prefs"]["lead"] == ["in_app"]
+              and r["digest"] == "hourly", str(r.get("error")))
+
+        # --- conversations ---
+        dm = json.loads(text_of(await client.call_tool("msg_direct", {"user_a": uid, "user_b": uid2})))
+        check("msg: msg_direct", dm["conversation"]["kind"] == "direct", str(dm.get("error")))
+        dm_id = dm["conversation"]["id"]
+
+        r = json.loads(text_of(await client.call_tool("msg_create_conversation", {
+            "kind": "group", "title": "MCP test group", "created_by": uid,
+            "participants": [uid, uid2]})))
+        group_id = r["conversation"]["id"]
+        check("msg: msg_create_conversation", r["conversation"]["member_count"] == 2, str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("msg_conversations", {"user_id": uid})))
+        check("msg: msg_conversations", r["count"] >= 2, str(r["count"]))
+
+        r = json.loads(text_of(await client.call_tool("msg_conversation", {"conversation_id": group_id,
+                                                                          "user_id": uid})))
+        check("msg: msg_conversation", r["conversation"]["title"] == "MCP test group", str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("msg_conversation_context",
+                                                      {"conversation_id": group_id})))
+        check("msg: msg_conversation_context", "attachments" in r, str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("msg_add_member", {
+            "conversation_id": group_id, "member_id": "mcp_guest", "actor_id": uid, "role": "guest"})))
+        check("msg: msg_add_member", r["created"] is True, str(r.get("error")))
+        r = json.loads(text_of(await client.call_tool("msg_members", {"conversation_id": group_id})))
+        check("msg: msg_members", r["count"] == 3, str(r["count"]))
+        r = json.loads(text_of(await client.call_tool("msg_update_member", {
+            "conversation_id": group_id, "member_id": "mcp_guest", "actor_id": uid, "role": "member"})))
+        check("msg: msg_update_member", r["member"]["role"] == "member", str(r.get("error")))
+        r = json.loads(text_of(await client.call_tool("msg_remove_member", {
+            "conversation_id": group_id, "member_id": "mcp_guest", "actor_id": uid,
+            "reason": "test"})))
+        check("msg: msg_remove_member", r["removed"] is True, str(r.get("error")))
+
+        # --- messages ---
+        r = json.loads(text_of(await client.call_tool("msg_post", {
+            "conversation_id": dm_id, "author_id": uid,
+            "body": "MCP hello - please confirm the rate list.", "mentions": [uid2]})))
+        check("msg: msg_post", r["message"]["mentions"] == [uid2], str(r.get("error")))
+        mid = r["message"]["id"]
+
+        r = json.loads(text_of(await client.call_tool("msg_messages", {
+            "conversation_id": dm_id, "user_id": uid, "limit": 10})))
+        check("msg: msg_messages", r["count"] >= 1, str(r["count"]))
+
+        r = json.loads(text_of(await client.call_tool("msg_message", {"message_id": mid, "user_id": uid})))
+        check("msg: msg_message", r["message"]["id"] == mid, str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("msg_search", {"user_id": uid, "query": "rate list"})))
+        check("msg: msg_search", r["count"] >= 1, str(r["count"]))
+        r = json.loads(text_of(await client.call_tool("msg_search", {"user_id": uid2, "mention": uid2})))
+        check("msg: msg_search(mention)", r["count"] >= 1, str(r["count"]))
+
+        r = json.loads(text_of(await client.call_tool("msg_react", {
+            "message_id": mid, "user_id": uid2, "emoji": "ok"})))
+        check("msg: msg_react", "ok" in r["reactions"], str(r.get("error")))
+        r = json.loads(text_of(await client.call_tool("msg_pin_message", {
+            "message_id": mid, "user_id": uid})))
+        check("msg: msg_pin_message", r["pinned"] is True, str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("msg_edit_message", {
+            "message_id": mid, "user_id": uid, "body": "MCP hello - please confirm the rate list today."})))
+        check("msg: msg_edit_message", r["message"]["edited_at"] is not None, str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("msg_thread", {"message_id": mid, "user_id": uid})))
+        check("msg: msg_thread", r["count"] == 0, str(r["count"]))
+        r = json.loads(text_of(await client.call_tool("msg_read_receipts",
+                                                      {"message_id": mid, "user_id": uid})))
+        check("msg: msg_read_receipts", r["of"] == 1, str(r))
+
+        r = json.loads(text_of(await client.call_tool("msg_mark_read", {"conversation_id": dm_id,
+                                                                       "user_id": uid2})))
+        check("msg: msg_mark_read", "last_read_seq" in r, str(r.get("error")))
+        r = json.loads(text_of(await client.call_tool("msg_unread", {"user_id": uid2})))
+        dm_unread = [c for c in r["conversations"] if c["conversation_id"] == dm_id]
+        check("msg: msg_unread", not dm_unread, str(dm_unread))
+
+        r = json.loads(text_of(await client.call_tool("msg_summarize", {"conversation_id": dm_id,
+                                                                       "user_id": uid})))
+        check("msg: msg_summarize", r["window"] >= 1 and "topics" in r, str(r.get("error")))
+        r = json.loads(text_of(await client.call_tool("msg_action_items", {"conversation_id": dm_id,
+                                                                          "user_id": uid})))
+        check("msg: msg_action_items", r["suggestions"] >= 1, str(r.get("suggestions")))
+        r = json.loads(text_of(await client.call_tool("msg_conversation_digest", {
+            "conversation_id": dm_id, "user_id": uid, "days": 30})))
+        check("msg: msg_conversation_digest", r["messages"] >= 1, str(r.get("error")))
+
+        # --- attachments & expiring links ---
+        r = json.loads(text_of(await client.call_tool("msg_attach", {
+            "conversation_id": dm_id, "uploaded_by": uid, "filename": "site-plan.pdf",
+            "size_bytes": 4096})))
+        att_id = r["attachment"]["id"]
+        check("msg: msg_attach", r["attachment"]["sensitivity"] == "confidential", str(r.get("error")))
+        r = json.loads(text_of(await client.call_tool("msg_attachments", {
+            "conversation_id": dm_id, "user_id": uid})))
+        check("msg: msg_attachments", r["count"] == 1, str(r["count"]))
+        r = json.loads(text_of(await client.call_tool("msg_attachment_link", {
+            "attachment_id": att_id, "user_id": uid, "ttl_minutes": 5})))
+        token = r["token"]
+        check("msg: msg_attachment_link", r["expires_at"] and r["url"].startswith("/messaging/attachments/"),
+              str(r.get("error")))
+        r = json.loads(text_of(await client.call_tool("msg_attachment_resolve", {"token": token,
+                                                                               "user_id": uid})))
+        check("msg: msg_attachment_resolve", r["valid"] is True, str(r.get("error")))
+        r = json.loads(text_of(await client.call_tool("msg_attachment_resolve", {"token": token + "0",
+                                                                               "user_id": uid})))
+        check("msg: msg_attachment_resolve(bad)", r["valid"] is False, str(r))
+
+        # --- actions ---
+        r = json.loads(text_of(await client.call_tool("msg_create_action", {
+            "conversation_id": dm_id, "created_by": uid, "title": "Verify title deed",
+            "kind": "verification", "message_id": mid, "owner_id": uid2, "due_on": "2020-01-01",
+            "create_crm_task": True})))
+        act_id = r["action"]["id"]
+        check("msg: msg_create_action", r["action"]["kind"] == "verification", str(r.get("error")))
+        check("msg: msg_create_action crm", r["action"]["linked_task_id"] is not None, str(r["action"]))
+        r = json.loads(text_of(await client.call_tool("msg_action", {"action_id": act_id, "user_id": uid})))
+        check("msg: msg_action", r["action"]["overdue"] is True, str(r.get("error")))
+        r = json.loads(text_of(await client.call_tool("msg_actions", {"user_id": uid,
+                                                                     "overdue_only": True})))
+        check("msg: msg_actions", r["count"] >= 1 and r["overdue"] >= 1, str(r["count"]))
+        r = json.loads(text_of(await client.call_tool("msg_update_action", {
+            "action_id": act_id, "user_id": uid2, "note": "started"})))
+        check("msg: msg_update_action", len(r["action"]["updates"]) == 1, str(r.get("error")))
+        r = json.loads(text_of(await client.call_tool("msg_complete_action", {
+            "action_id": act_id, "user_id": uid2})))
+        check("msg: msg_complete_action", r["action"]["status"] == "done", str(r.get("error")))
+
+        # --- notifications, outbox, dispatch ---
+        r = json.loads(text_of(await client.call_tool("msg_notifications", {"user_id": uid2})))
+        check("msg: msg_notifications", r["count"] >= 1, str(r["count"]))
+        nid = r["notifications"][0]["id"]
+        r = json.loads(text_of(await client.call_tool("msg_read_notification", {
+            "notification_id": nid, "user_id": uid2})))
+        check("msg: msg_read_notification", r["notification"]["status"] == "read", str(r.get("error")))
+        r = json.loads(text_of(await client.call_tool("msg_dispatch", {"force": True})))
+        check("msg: msg_dispatch", r["scanned"] >= 0, str(r.get("error")))
+        r = json.loads(text_of(await client.call_tool("msg_outbox", {})))
+        check("msg: msg_outbox", r["count"] >= 1 and "email" in r["by_channel"], str(r["by_channel"]))
+        r = json.loads(text_of(await client.call_tool("msg_mark_all_notifications_read",
+                                                      {"user_id": uid2})))
+        check("msg: msg_mark_all_notifications_read", "marked_read" in r, str(r.get("error")))
+        r = json.loads(text_of(await client.call_tool("msg_unread_summary", {"user_id": uid2})))
+        check("msg: msg_unread_summary", "notifications_unread" in r and "open_actions" in r, str(r))
+
+        # --- telegram ---
+        r = json.loads(text_of(await client.call_tool("msg_telegram_link_code", {"user_id": uid2})))
+        code = r["code"]
+        check("msg: msg_telegram_link_code", len(code) >= 4, str(r.get("error")))
+        r = json.loads(text_of(await client.call_tool("msg_telegram_update", {
+            "update": {"message": {"chat": {"id": "777", "username": "mcp"}, "text": f"/start {code}"}}})))
+        check("msg: msg_telegram_update /start", r["action"] == "linked", str(r))
+        r = json.loads(text_of(await client.call_tool("msg_telegram_status", {"user_id": uid2})))
+        check("msg: msg_telegram_status", r["linked"] is True, str(r.get("error")))
+        r = json.loads(text_of(await client.call_tool("msg_telegram_update", {
+            "update": {"message": {"chat": {"id": "777"}, "text": "/digest"}}})))
+        check("msg: msg_telegram_update /digest", r["action"] == "digest", str(r))
+        r = json.loads(text_of(await client.call_tool("msg_telegram_alert", {
+            "user_id": uid2, "text": "A GIS processing job has completed.", "priority": "high"})))
+        check("msg: msg_telegram_alert", r["dispatched"] >= 1 and r["telegram_item"]["channel"] == "telegram",
+              str(r.get("error")))
+        r = json.loads(text_of(await client.call_tool("msg_telegram_links", {})))
+        check("msg: msg_telegram_links", r["count"] >= 1, str(r["count"]))
+        r = json.loads(text_of(await client.call_tool("msg_telegram_unlink", {"user_id": uid2})))
+        check("msg: msg_telegram_unlink", r["unlinked"] is True, str(r.get("error")))
+
+        # --- audit, retention, moderation, stats, portals ---
+        r = json.loads(text_of(await client.call_tool("msg_audit", {"limit": 20})))
+        check("msg: msg_audit", r["count"] >= 1 and r["actions"], str(r["count"]))
+        r = json.loads(text_of(await client.call_tool("msg_retention_report", {})))
+        check("msg: msg_retention_report", "conversations" in r and r["default_retention_days"] > 0, str(r.get("error")))
+        r = json.loads(text_of(await client.call_tool("msg_purge_retention", {"dry_run": True})))
+        check("msg: msg_purge_retention", r["dry_run"] is True and r["purged"] == 0, str(r))
+
+        r = json.loads(text_of(await client.call_tool("msg_report_message", {
+            "message_id": mid, "reporter_id": uid2, "reason": "off_topic"})))
+        rep_id = r["report"]["id"]
+        check("msg: msg_report_message", r["report"]["status"] == "open", str(r.get("error")))
+        r = json.loads(text_of(await client.call_tool("msg_reports", {})))
+        check("msg: msg_reports", r["count"] >= 1, str(r["count"]))
+        r = json.loads(text_of(await client.call_tool("msg_moderate_report", {
+            "report_id": rep_id, "actor_id": uid, "action": "dismiss"})))
+        check("msg: msg_moderate_report", r["report"]["status"] == "dismissed", str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("msg_statistics", {})))
+        check("msg: msg_statistics", r["conversations"] >= 6 and r["messages_live"] >= 1,
+              str(r["conversations"]))
+
+        r = json.loads(text_of(await client.call_tool("msg_delete_message", {
+            "message_id": mid, "user_id": uid, "reason": "cleanup"})))
+        check("msg: msg_delete_message", r["deleted"] is True, str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("msg_property_thread", {
+            "property_id": core.properties_db[0].id, "created_by": uid})))
+        check("msg: msg_property_thread", r["conversation"]["kind"] == "property", str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("msg_create_conversation", {
+            "kind": "channel", "channel_key": "management", "created_by": uid,
+            "participants": [uid]})))
+        mgt_id = r["conversation"]["id"]
+        check("msg: management channel restricted", r["conversation"]["restricted"] is True,
+              str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("msg_revoke_access", {
+            "user_id": uid2, "actor_id": uid, "reason": "left company"})))
+        check("msg: msg_revoke_access", r["conversations_revoked"] >= 1, str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("msg_archive_conversation", {
+            "conversation_id": group_id, "user_id": uid, "archived": True})))
+        check("msg: msg_archive_conversation", r["status"] == "archived", str(r.get("error")))
+        check("msg: management id", mgt_id.startswith("cnv_"), mgt_id)
+
+        r = text_of(await client.call_tool("msg_portal", {}))
+        check("msg: msg_portal", "<html" in r.lower() and "Messaging" in r, r[:80])
+
+
+def run_messaging_rest_checks(client: TestClient) -> None:
+    print("\n=== Team Messaging & Notifications (REST) ===")
+    with _SharedClient(client):
+        r = client.get("/messaging/overview")
+        check("GET /messaging/overview", r.status_code == 200 and r.json()["counts"]["conversations"] >= 1,
+              str(r.status_code))
+
+        r = client.get("/messaging/channels")
+        check("GET /messaging/channels", r.status_code == 200 and r.json()["count"] == 6,
+              str(r.status_code))
+        r = client.get("/messaging/channels/sales")
+        check("GET /messaging/channels/sales", r.status_code == 200
+              and r.json()["channel"]["name"] == "Sales", str(r.status_code))
+        r = client.get("/messaging/categories")
+        check("GET /messaging/categories", r.status_code == 200 and r.json()["count"] == 8,
+              str(r.status_code))
+        r = client.get("/messaging/attachment-kinds")
+        check("GET /messaging/attachment-kinds", r.status_code == 200 and r.json()["count"] == 9,
+              str(r.status_code))
+        r = client.get("/messaging/profiles")
+        check("GET /messaging/profiles", r.status_code == 200 and r.json()["count"] >= 3,
+              str(r.status_code))
+
+        r = client.post("/messaging/presence", json={"user_id": "rest_u1", "presence": "online"})
+        check("POST /messaging/presence", r.status_code == 200 and r.json()["presence"] == "online",
+              str(r.status_code))
+        r = client.post("/messaging/presence/heartbeat", json={"user_id": "rest_u1"})
+        check("POST /messaging/presence/heartbeat", r.status_code == 200, str(r.status_code))
+
+        r = client.get("/messaging/preferences/rest_u1")
+        check("GET /messaging/preferences/{id}", r.status_code == 200
+              and "notification_prefs" in r.json(), str(r.status_code))
+        r = client.put("/messaging/preferences/rest_u1", json={"prefs": {"task": ["in_app"]}, "digest": "daily"})
+        check("PUT /messaging/preferences/{id}", r.status_code == 200
+              and r.json()["notification_prefs"]["task"] == ["in_app"], str(r.status_code))
+
+        r = client.post("/messaging/direct", json={"user_a": "rest_u1", "user_b": "rest_u2"})
+        check("POST /messaging/direct", r.status_code == 200
+              and r.json()["conversation"]["kind"] == "direct", str(r.status_code))
+        dm_id = r.json()["conversation"]["id"]
+
+        r = client.post("/messaging/conversations", json={
+            "kind": "group", "title": "REST group", "created_by": "rest_u1",
+            "participants": ["rest_u1", "rest_u2"]})
+        check("POST /messaging/conversations", r.status_code == 201
+              and r.json()["conversation"]["member_count"] == 2, str(r.status_code))
+        group_id = r.json()["conversation"]["id"]
+
+        r = client.get("/messaging/conversations", params={"user_id": "rest_u1"})
+        check("GET /messaging/conversations", r.status_code == 200 and r.json()["count"] >= 2,
+              str(r.status_code))
+        r = client.get("/messaging/conversations/" + group_id, params={"user_id": "rest_u1"})
+        check("GET /messaging/conversations/{id}", r.status_code == 200
+              and r.json()["conversation"]["id"] == group_id, str(r.status_code))
+        r = client.get("/messaging/conversations/" + group_id + "/context")
+        check("GET /messaging/conversations/{id}/context", r.status_code == 200
+              and "attachments" in r.json(), str(r.status_code))
+
+        r = client.post("/messaging/conversations/" + group_id + "/members",
+                        json={"member_id": "rest_u3", "actor_id": "rest_u1", "role": "member"})
+        check("POST .../members", r.status_code == 200 and r.json()["created"] is True,
+              str(r.status_code))
+        r = client.get("/messaging/conversations/" + group_id + "/members")
+        check("GET .../members", r.status_code == 200 and r.json()["count"] == 3, str(r.status_code))
+        r = client.put("/messaging/conversations/" + group_id + "/members/rest_u3",
+                       json={"actor_id": "rest_u1", "role": "guest"})
+        check("PUT .../members/{id}", r.status_code == 200
+              and r.json()["member"]["role"] == "guest", str(r.status_code))
+        r = client.delete("/messaging/conversations/" + group_id + "/members/rest_u3",
+                          params={"actor_id": "rest_u1", "reason": "test"})
+        check("DELETE .../members/{id}", r.status_code == 200 and r.json()["removed"] is True,
+              str(r.status_code))
+
+        prop_id = core.properties_db[0].id
+        r = client.post("/messaging/property-thread", json={"property_id": prop_id,
+                                                            "created_by": "rest_u1"})
+        check("POST /messaging/property-thread", r.status_code == 200
+              and r.json()["conversation"]["kind"] == "property", str(r.status_code))
+
+        r = client.post("/messaging/conversations/" + dm_id + "/messages",
+                        json={"author_id": "rest_u1", "body": "REST hello, please confirm.",
+                              "mentions": ["rest_u2"]})
+        check("POST .../messages", r.status_code == 201
+              and r.json()["message"]["mentions"] == ["rest_u2"], str(r.status_code))
+        mid = r.json()["message"]["id"]
+
+        r = client.get("/messaging/conversations/" + dm_id + "/messages",
+                       params={"user_id": "rest_u1"})
+        check("GET .../messages", r.status_code == 200 and r.json()["count"] >= 1, str(r.status_code))
+        r = client.get("/messaging/messages/" + mid, params={"user_id": "rest_u1"})
+        check("GET /messaging/messages/{id}", r.status_code == 200
+              and r.json()["message"]["id"] == mid, str(r.status_code))
+        r = client.put("/messaging/messages/" + mid,
+                       json={"user_id": "rest_u1", "body": "REST hello, please confirm today."})
+        check("PUT /messaging/messages/{id}", r.status_code == 200
+              and r.json()["message"]["edited_at"], str(r.status_code))
+        r = client.post("/messaging/messages/" + mid + "/react",
+                        json={"user_id": "rest_u2", "emoji": "ok"})
+        check("POST .../react", r.status_code == 200 and "ok" in r.json()["reactions"],
+              str(r.status_code))
+        r = client.post("/messaging/messages/" + mid + "/pin", json={"user_id": "rest_u1"})
+        check("POST .../pin", r.status_code == 200 and r.json()["pinned"] is True, str(r.status_code))
+        r = client.get("/messaging/messages/" + mid + "/thread", params={"user_id": "rest_u1"})
+        check("GET .../thread", r.status_code == 200 and r.json()["count"] == 0, str(r.status_code))
+        r = client.get("/messaging/messages/" + mid + "/receipts", params={"user_id": "rest_u1"})
+        check("GET .../receipts", r.status_code == 200 and r.json()["of"] == 1, str(r.status_code))
+
+        r = client.get("/messaging/search", params={"user_id": "rest_u1", "query": "hello"})
+        check("GET /messaging/search", r.status_code == 200 and r.json()["count"] >= 1,
+              str(r.status_code))
+        r = client.post("/messaging/conversations/" + dm_id + "/read",
+                        json={"user_id": "rest_u2"})
+        check("POST .../read", r.status_code == 200 and "last_read_seq" in r.json(), str(r.status_code))
+        r = client.get("/messaging/unread/rest_u2")
+        check("GET /messaging/unread/{id}", r.status_code == 200 and r.json()["total"] == 0,
+              str(r.status_code))
+        r = client.get("/messaging/conversations/" + dm_id + "/summary",
+                       params={"user_id": "rest_u1"})
+        check("GET .../summary", r.status_code == 200 and "topics" in r.json(), str(r.status_code))
+        r = client.get("/messaging/conversations/" + dm_id + "/digest",
+                       params={"user_id": "rest_u1"})
+        check("GET .../digest", r.status_code == 200 and r.json()["messages"] >= 1, str(r.status_code))
+        r = client.post("/messaging/conversations/" + dm_id + "/action-items",
+                        json={"user_id": "rest_u1"})
+        check("POST .../action-items", r.status_code == 200 and r.json()["suggestions"] >= 1,
+              str(r.status_code))
+
+        r = client.post("/messaging/conversations/" + dm_id + "/attachments",
+                        json={"uploaded_by": "rest_u1", "filename": "deed.pdf", "size_bytes": 2048})
+        check("POST .../attachments", r.status_code == 201
+              and r.json()["attachment"]["kind"] == "pdf", str(r.status_code))
+        att_id = r.json()["attachment"]["id"]
+        r = client.get("/messaging/conversations/" + dm_id + "/attachments",
+                       params={"user_id": "rest_u1"})
+        check("GET .../attachments", r.status_code == 200 and r.json()["count"] == 1, str(r.status_code))
+        r = client.get("/messaging/attachments/" + att_id + "/link", params={"user_id": "rest_u1"})
+        check("GET .../link", r.status_code == 200 and "token" in r.json(), str(r.status_code))
+        token = r.json()["token"]
+        r = client.get("/messaging/attachments/" + att_id, params={"token": token, "user_id": "rest_u1"})
+        check("GET /messaging/attachments/{id}", r.status_code == 200 and r.json()["valid"] is True,
+              str(r.status_code))
+        r = client.get("/messaging/attachments/" + att_id)
+        check("GET /messaging/attachments/{id} (no token)", r.status_code == 400, str(r.status_code))
+        r = client.get("/messaging/attachments/resolve/" + token, params={"user_id": "rest_u1"})
+        check("GET /messaging/attachments/resolve/{token}", r.status_code == 200
+              and r.json()["valid"] is True, str(r.status_code))
+
+        r = client.post("/messaging/conversations/" + dm_id + "/actions", json={
+            "created_by": "rest_u1", "title": "Verify deed", "owner_id": "rest_u2",
+            "due_on": "2020-01-01", "create_crm_task": True})
+        check("POST .../actions", r.status_code == 201
+              and r.json()["action"]["linked_task_id"], str(r.status_code))
+        act_id = r.json()["action"]["id"]
+        r = client.get("/messaging/actions/" + act_id, params={"user_id": "rest_u1"})
+        check("GET /messaging/actions/{id}", r.status_code == 200
+              and r.json()["action"]["overdue"] is True, str(r.status_code))
+        r = client.get("/messaging/actions", params={"user_id": "rest_u1", "overdue_only": True})
+        check("GET /messaging/actions", r.status_code == 200 and r.json()["count"] >= 1,
+              str(r.status_code))
+        r = client.put("/messaging/actions/" + act_id, json={"user_id": "rest_u2", "note": "started"})
+        check("PUT /messaging/actions/{id}", r.status_code == 200, str(r.status_code))
+        r = client.post("/messaging/actions/" + act_id + "/complete", json={"user_id": "rest_u2"})
+        check("POST /messaging/actions/{id}/complete", r.status_code == 200
+              and r.json()["action"]["status"] == "done", str(r.status_code))
+
+        r = client.post("/messaging/dispatch", json={"force": True})
+        check("POST /messaging/dispatch", r.status_code == 200, str(r.status_code))
+        r = client.get("/messaging/notifications/rest_u2")
+        check("GET /messaging/notifications/{id}", r.status_code == 200 and r.json()["count"] >= 1,
+              str(r.status_code))
+        nid = r.json()["notifications"][0]["id"]
+        r = client.post("/messaging/notifications/" + nid + "/read", params={"user_id": "rest_u2"})
+        check("POST .../notifications/{id}/read", r.status_code == 200
+              and r.json()["notification"]["status"] == "read", str(r.status_code))
+        r = client.post("/messaging/notifications/rest_u2/read-all")
+        check("POST .../read-all", r.status_code == 200 and "marked_read" in r.json(), str(r.status_code))
+        r = client.get("/messaging/outbox")
+        check("GET /messaging/outbox", r.status_code == 200 and r.json()["count"] >= 1,
+              str(r.status_code))
+        r = client.get("/messaging/unread-summary/rest_u2")
+        check("GET /messaging/unread-summary/{id}", r.status_code == 200
+              and "open_actions" in r.json(), str(r.status_code))
+
+        r = client.post("/messaging/telegram/link-code", params={"user_id": "rest_u2"})
+        check("POST /messaging/telegram/link-code", r.status_code == 200 and r.json()["code"],
+              str(r.status_code))
+        code = r.json()["code"]
+        r = client.post("/messaging/telegram/update", json={"update": {"message": {
+            "chat": {"id": "42", "username": "rest"}, "text": "/start " + code}}})
+        check("POST /messaging/telegram/update", r.status_code == 200
+              and r.json()["action"] == "linked", str(r.status_code))
+        r = client.get("/messaging/telegram/status/rest_u2")
+        check("GET /messaging/telegram/status/{id}", r.status_code == 200
+              and r.json()["linked"] is True, str(r.status_code))
+        r = client.get("/messaging/telegram/links")
+        check("GET /messaging/telegram/links", r.status_code == 200 and r.json()["count"] >= 1,
+              str(r.status_code))
+        r = client.post("/messaging/telegram/alert", json={"user_id": "rest_u2",
+                                                           "text": "Your report is ready.",
+                                                           "priority": "high"})
+        check("POST /messaging/telegram/alert", r.status_code == 200
+              and r.json()["telegram_item"]["channel"] == "telegram", str(r.status_code))
+        r = client.post("/messaging/telegram/unlink", params={"user_id": "rest_u2"})
+        check("POST /messaging/telegram/unlink", r.status_code == 200
+              and r.json()["unlinked"] is True, str(r.status_code))
+
+        r = client.get("/messaging/audit")
+        check("GET /messaging/audit", r.status_code == 200 and r.json()["count"] >= 1, str(r.status_code))
+        r = client.get("/messaging/retention")
+        check("GET /messaging/retention", r.status_code == 200 and "conversations" in r.json(),
+              str(r.status_code))
+        r = client.post("/messaging/purge", json={"dry_run": True})
+        check("POST /messaging/purge", r.status_code == 200 and r.json()["purged"] == 0, str(r.status_code))
+        r = client.post("/messaging/reports", json={"message_id": mid, "reporter_id": "rest_u2",
+                                                    "reason": "off_topic"})
+        check("POST /messaging/reports", r.status_code == 201 and r.json()["report"]["status"] == "open",
+              str(r.status_code))
+        rep_id = r.json()["report"]["id"]
+        r = client.get("/messaging/reports")
+        check("GET /messaging/reports", r.status_code == 200 and r.json()["count"] >= 1,
+              str(r.status_code))
+        r = client.post("/messaging/reports/" + rep_id + "/moderate",
+                        json={"actor_id": "rest_u1", "action": "dismiss"})
+        check("POST .../moderate", r.status_code == 200
+              and r.json()["report"]["status"] == "dismissed", str(r.status_code))
+        r = client.get("/messaging/statistics")
+        check("GET /messaging/statistics", r.status_code == 200 and r.json()["conversations"] >= 1,
+              str(r.status_code))
+
+        r = client.get("/messaging/portal")
+        check("GET /messaging/portal", r.status_code == 200 and "Messaging" in r.text, str(r.status_code))
+        r = client.get("/messaging/portal.html", params={"lang": "ur", "theme": "dark"})
+        check("GET /messaging/portal.html (ur/dark)", r.status_code == 200 and 'dir="rtl"' in r.text,
+              str(r.status_code))
+
+        # --- real-time feed ---
+        try:
+            with client.websocket_connect(f"/ws/messaging/{dm_id}?user_id=rest_u1") as ws:
+                ready = ws.receive_json()
+                check("WS /ws/messaging/{id} (ready)", ready["event"] == "ready", str(ready))
+                ws.send_text("unread")
+                nxt = ws.receive_json()
+                check("WS /ws/messaging/{id} (unread)",
+                      nxt["event"] in ("unread", "message.created", "message.updated"), str(nxt))
+        except Exception as exc:  # pragma: no cover - transport failures
+            check("WS /ws/messaging/{id} (ready)", False, repr(exc))
+        try:
+            with client.websocket_connect(f"/ws/messaging/{dm_id}?user_id=nobody") as ws:
+                ws.receive_json()
+            check("WS /ws/messaging/{id} (denied)", False, "expected close")
+        except Exception:
+            check("WS /ws/messaging/{id} (denied)", True)
+
+        r = client.post("/messaging/revoke-access", json={"user_id": "rest_u2",
+                                                          "actor_id": "rest_u1",
+                                                          "reason": "left company"})
+        check("POST /messaging/revoke-access", r.status_code == 200
+              and r.json()["conversations_revoked"] >= 1, str(r.status_code))
+
+
+# ============================================================
 # main
 # ============================================================
 
@@ -3423,6 +3951,7 @@ async def main() -> int:
     await run_products_checks()
     await run_tools_checks()
     await run_pmo_checks()
+    await run_messaging_checks()
     run_fastapi_checks(mcp_lead_id, mcp_layer_id)
 
     print("\n=== Summary ===")

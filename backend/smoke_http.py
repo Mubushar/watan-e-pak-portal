@@ -558,6 +558,99 @@ def main() -> None:
     print("REST /pmo/projects/{id} (delete) ->", r.status_code, "deleted =", r.json().get("deleted"))
     ok &= r.status_code == 200 and r.json().get("deleted") is True
 
+    # ---------------- team messaging & notifications ----------------
+    r = httpx.get(f"{base}/messaging/overview")
+    print("REST /messaging/overview ->", r.status_code,
+          "conversations =", r.json().get("counts", {}).get("conversations"))
+    ok &= r.status_code == 200 and r.json().get("counts", {}).get("conversations", 0) >= 1
+
+    r = httpx.get(f"{base}/messaging/channels")
+    print("REST /messaging/channels ->", r.status_code, "channels =", r.json().get("count"))
+    ok &= r.status_code == 200 and r.json().get("count") == 6
+
+    r = httpx.get(f"{base}/messaging/categories")
+    print("REST /messaging/categories ->", r.status_code, "categories =", r.json().get("count"))
+    ok &= r.status_code == 200 and r.json().get("count") == 8
+
+    r = httpx.post(f"{base}/messaging/direct", json={"user_a": "smoke_a", "user_b": "smoke_b"})
+    print("REST /messaging/direct ->", r.status_code, "kind =",
+          r.json().get("conversation", {}).get("kind"))
+    ok &= r.status_code == 200 and r.json().get("conversation", {}).get("kind") == "direct"
+    smoke_conv = r.json()["conversation"]["id"]
+
+    r = httpx.post(f"{base}/messaging/conversations/{smoke_conv}/messages",
+                   json={"author_id": "smoke_a", "body": "Smoke hello, please confirm.",
+                         "mentions": ["smoke_b"]})
+    print("REST /messaging/.../messages ->", r.status_code,
+          "mentions =", r.json().get("message", {}).get("mentions"))
+    ok &= r.status_code == 201 and r.json().get("message", {}).get("mentions") == ["smoke_b"]
+    smoke_msg = r.json()["message"]["id"]
+
+    r = httpx.get(f"{base}/messaging/conversations/{smoke_conv}/messages",
+                  params={"user_id": "smoke_a"})
+    print("REST /messaging/.../messages (list) ->", r.status_code, "count =", r.json().get("count"))
+    ok &= r.status_code == 200 and r.json().get("count", 0) >= 1
+
+    r = httpx.post(f"{base}/messaging/conversations/{smoke_conv}/attachments",
+                   json={"uploaded_by": "smoke_a", "filename": "plan.pdf", "size_bytes": 1024})
+    print("REST /messaging/.../attachments ->", r.status_code, "kind =",
+          r.json().get("attachment", {}).get("kind"))
+    ok &= r.status_code == 201 and r.json().get("attachment", {}).get("kind") == "pdf"
+    smoke_att = r.json()["attachment"]["id"]
+
+    r = httpx.get(f"{base}/messaging/attachments/{smoke_att}/link", params={"user_id": "smoke_a"})
+    smoke_token = r.json().get("token")
+    print("REST /messaging/attachments/{id}/link ->", r.status_code, "signed =", bool(smoke_token))
+    ok &= r.status_code == 200 and bool(smoke_token)
+
+    r = httpx.get(f"{base}/messaging/attachments/resolve/{smoke_token}", params={"user_id": "smoke_a"})
+    print("REST /messaging/attachments/resolve ->", r.status_code, "valid =", r.json().get("valid"))
+    ok &= r.status_code == 200 and r.json().get("valid") is True
+
+    r = httpx.post(f"{base}/messaging/conversations/{smoke_conv}/actions",
+                   json={"created_by": "smoke_a", "title": "Verify deed", "owner_id": "smoke_b"})
+    print("REST /messaging/.../actions ->", r.status_code, "kind =",
+          r.json().get("action", {}).get("kind"))
+    ok &= r.status_code == 201 and r.json().get("action", {}).get("kind") == "task"
+
+    r = httpx.post(f"{base}/messaging/dispatch", json={"force": True})
+    print("REST /messaging/dispatch ->", r.status_code, "dispatched =", r.json().get("dispatched"))
+    ok &= r.status_code == 200
+
+    r = httpx.get(f"{base}/messaging/outbox")
+    print("REST /messaging/outbox ->", r.status_code, "count =", r.json().get("count"),
+          "channels =", r.json().get("by_channel"))
+    ok &= r.status_code == 200 and r.json().get("count", 0) >= 1
+
+    r = httpx.get(f"{base}/messaging/unread-summary/smoke_b")
+    print("REST /messaging/unread-summary ->", r.status_code, "unread =",
+          r.json().get("conversations_unread"))
+    ok &= r.status_code == 200 and "open_actions" in r.json()
+
+    r = httpx.post(f"{base}/messaging/telegram/link-code", params={"user_id": "smoke_b"})
+    smoke_code = r.json().get("code")
+    print("REST /messaging/telegram/link-code ->", r.status_code, "code =", smoke_code)
+    ok &= r.status_code == 200 and bool(smoke_code)
+
+    r = httpx.post(f"{base}/messaging/telegram/update", json={"update": {"message": {
+        "chat": {"id": "99", "username": "smoke"}, "text": f"/start {smoke_code}"}}})
+    print("REST /messaging/telegram/update ->", r.status_code, "action =", r.json().get("action"))
+    ok &= r.status_code == 200 and r.json().get("action") == "linked"
+
+    r = httpx.post(f"{base}/messaging/telegram/alert",
+                   json={"user_id": "smoke_b", "text": "Your report is ready.", "priority": "high"})
+    print("REST /messaging/telegram/alert ->", r.status_code, "channel =",
+          (r.json().get("telegram_item") or {}).get("channel"))
+    ok &= r.status_code == 200 and (r.json().get("telegram_item") or {}).get("channel") == "telegram"
+
+    r = httpx.get(f"{base}/messaging/portal", params={"lang": "en"})
+    print("REST /messaging/portal ->", r.status_code, "html chars =", len(r.text))
+    ok &= r.status_code == 200 and "Messaging" in r.text
+
+    r = httpx.get(f"{base}/messaging/audit")
+    print("REST /messaging/audit ->", r.status_code, "events =", r.json().get("count"))
+    ok &= r.status_code == 200 and r.json().get("count", 0) >= 1
+
     # --- MCP should expose the same facilities (checked after initialize, below) ---
     r = httpx.post(f"{base}/v1/chat/completions", json={
         "model": "portal-realestate-rag",
@@ -598,7 +691,9 @@ def main() -> None:
                      "get_market_intelligence", "score_seller_intent",
                      "tools_overview", "tool_mortgage_calculator", "tools_portal",
                      "pmo_overview", "pm_create_project", "pm_schedule", "pm_earned_value",
-                     "pm_health", "pm_portfolio", "pm_risk_matrix", "pm_portal"]
+                     "pm_health", "pm_portfolio", "pm_risk_matrix", "pm_portal",
+                     "msg_overview", "msg_post", "msg_unread_summary", "msg_telegram_alert",
+                     "msg_dispatch", "msg_portal"]
     print("MCP  /mcp tools/list ->", r.status_code, "new tools =",
           {t: (t in r.text) for t in mcp_new_tools})
     ok &= r.status_code == 200 and "portal_languages" in r.text and "portal_themes" in r.text

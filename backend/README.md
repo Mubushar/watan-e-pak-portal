@@ -26,6 +26,7 @@ CRM:  Agents ─▶ Leads ─▶ Customers ─▶ Deals ─▶ Tasks / Appointme
 | `maintenance.py` | **Maintenance wing** (no MCP/FastAPI code): maintainable components with service life / replacement cost / criticality, maintenance services & trades with cost bands, a defect catalogue (symptoms, causes, repair, prevention), annual-cost estimation with a category breakdown and a capital-replacement reserve, preventive schedules, multi-year lifecycle reserve studies, condition assessment, repair-vs-replace analysis, warranty terms, inspection checklists, work orders and the value/rent/occupancy impact of maintenance. |
 | `tools.py` | **Tools & Utilities wing** (no MCP/FastAPI code): a **Tools Center** of 25 cards across 6 categories (real-estate calculators, plot & construction studio, GIS/georeferencing & map tools, CAD/plan utilities, photo location & geotagging, document & file conversion, the Pakistan & Islamic calendar, property-document AI, satellite/aerial explorer and a reports/export studio), launch phases 1–3, unit conversion, a dependency-free **GPS EXIF reader/writer**, a pure-Python **text/JPEG→PDF** writer, Georeferencing (affine/similarity/translation) and the DXF inspector/previewer. Where a capability genuinely needs a heavy or licensed dependency (GDAL/PROJ, PyMuPDF, Pillow, Tesseract, DWG/DGN) the tool returns an explicit `requires_optional_dependency` descriptor instead of faking the work. It reuses `accounting`, `construction` and `gis`. |
 | `pmo.py` | **Projects & Monitoring (PMO) wing** (no MCP/FastAPI code): the in-house project-management, monitoring & tracking system — a project register, weighted WBS phases/milestones/tasks, **critical-path scheduling** (forward/backward pass, float, six-day Mon–Sat week), duration-weighted progress with an **S-curve**, full **earned value** (PV/EV/AC, SV/CV, SPI/CPI, EAC/ETC/VAC/TCPI), cost control (baseline → variations → commitments/actuals → forecast), schedule/cost/risk/quality **RAG health** with an exception alert engine, resource loading, a RAID register with a P×I matrix, daily **site diaries**, **change/variation control**, scored inspections, meeting actions, and JSON + printable-HTML project reports. |
+| `messaging.py` | **Team Messaging & Notifications wing** (no MCP/FastAPI code): the in-house communication workspace — direct messages, group discussions, named channels (Sales, Property Verification, GIS & Mapping, Customer Support, Management, Announcements) and a **discussion panel per property record**; threaded replies, `@mentions`, pins, reactions, edits, soft deletes, per-conversation sequence numbers, search, unread counts and read receipts. Files are shared as **references** (controlled storage key or a link to an existing portal record) and handed out through **HMAC-signed, expiring, permission-checked links** — never embedded in the message body. Any message can become a tracked **action** (task / approval / verification / request) with an owner and deadline. A notification **queue** with per-user, per-category preferences (in-app / e-mail / optional Telegram), quiet hours and an **outbox** is drained by an in-process dispatcher. Telegram is opt-in (`/start <code>`, `/stop`, `/mute`, `/unmute`, `/digest`, `/status`) and sanitised — short text plus an authenticated deep link, **no documents**. Includes roles + restricted channels, an audit trail, access revocation for departing staff, retention/deletion policy, message reports with moderation, rules-based conversation summarisation and action-item extraction, and an in-process pub/sub broker feeding the WebSocket. |
 | `agents.py` | **Agentic OS** (no MCP/FastAPI code): the agent catalogue (8 roadmap *product* agents + specialist sub-agents), the eight products with priority (P0–P2), a **run engine** (plan → execute → review → deliver) with human-approval gates and a full audit trail, multi-agent orchestration, "Smart Actions" prioritisation, and move-likelihood / seller-intent scoring. Execution is delegated to a server-supplied `dispatch(tool, ctx)` so the same engine powers MCP *and* REST. |
 | `transactions.py` | **Transactions** (no MCP/FastAPI code): the deal-to-close lifecycle — 10 stages, offer negotiation and counter-offers, contract-term extraction from agreement text, milestone/deadline checklists with RAG status, e-signature tracking by role, and on close a commission + VAT computation with a platform/agent **revenue-share split** returning a *balanced* journal entry and payouts. |
 | `intelligence.py` | **Conversational buyer + seller pricing + investment screener** (no MCP/FastAPI code): natural-language requirement parsing (budgets incl. "crore"/"lakh"/"million", commute caps, bedrooms), weighted multi-factor candidate ranking with reasons, price-anomaly (z-score) scanning, affordability/DTI, an adjusted-comparable CMA with a price range + expected days-on-market, net-proceeds, listing-asset generation, and deal underwriting (cap rate, cash-on-cash, DSCR, after-tax cash flow, IRR/NPV/equity multiple) plus portfolio alerts. |
@@ -174,6 +175,14 @@ uv run python smoke_http.py         # live uvicorn server + real HTTP
   scheduling**, an S-curve and full **earned value**, cost control, schedule/cost/risk/
   quality **RAG health** with alerts, resources, a RAID register, site diaries, variations,
   inspections, actions and a portfolio dashboard (see below).
+* **Team messaging & notifications wing** — the portal's internal communication
+  workspace: direct messages, group discussions, named team channels and a discussion
+  panel on **every property record**, with threads, `@mentions`, pins, reactions,
+  search, unread counts and read receipts. Files are shared as permission-checked,
+  **expiring** links, not embedded; any message can become a tracked **task / approval /
+  verification** with an owner and deadline; and a notification queue with per-category
+  preferences delivers in-app and by e-mail, with an **optional Telegram** bot for
+  alerts (short text + deep link only) — see below.
 * **Agentic OS** — an AI **agent layer** over one shared data layer: 24 agents
   (8 roadmap product agents + specialist sub-agents) with a plan → execute → review →
   deliver **run engine**, human-approval gates, a full audit trail, multi-agent
@@ -1308,10 +1317,137 @@ start "http://127.0.0.1:8000/pmo/portal"
 start "http://127.0.0.1:8000/pmo/report.html?project_id={project_id}"
 ```
 
+## Team Messaging & Notifications wing
+
+An in-house **team communication system** — the internal workspace where the team's
+conversations stay tied to the properties, plans, customers and tasks they are working
+on. E-mail and Telegram are **complementary notification channels**, never the primary
+store of record, exactly as the *Messaging in Portal* brief asks: *keep business
+conversations and records inside Arz-e-Pak; use e-mail for formal communication and
+Telegram for optional alerts or quick coordination.*
+
+The logic lives in `messaging.py` (framework-free, reused by MCP and REST); the WebSocket
+feed rides an in-process pub/sub broker and the REST layer adds `/ws/messaging/{id}`.
+
+**Conversations & members** — direct messages, group discussions, named team channels
+(`sales`, `property_verification`, `gis_mapping`, `customer_support`, `management`,
+`announcements`) and a **property discussion thread per property record**. Membership
+roles are `owner / admin / member / guest`; the **Management** channel is *restricted* to
+admin roles, and portal admins may read public channels they have not joined.
+
+**Messages** — threading (replies), `@mentions` (by handle *or* user id, resolved against
+the conversation's members), pins, emoji reactions, edits (author only, inside a 15-minute
+window), soft deletes, a per-conversation monotonic sequence, search across every
+conversation a user may access, unread counts and optional **read receipts**.
+
+**Secure file sharing** — an attachment is a *reference*: a controlled `storage_key` or a
+`source_url` pointing at an existing portal record, never bytes inside the message. Each
+file carries a `kind`, a size cap and a `sensitivity` (`normal / confidential /
+restricted`; CAD, PDF, spreadsheet, map and archive kinds default to confidential).
+Downloads are handed out through **HMAC-signed, expiring links** minted only after a
+membership + role check and re-verified (signature, expiry, access) on download.
+
+**Actionable messages** — any message (or conversation) can become a tracked action of
+kind `task / approval / verification / request`, with an owner, a deadline, an overdue
+flag, a status lifecycle and an update log. `msg_create_action(create_crm_task=true)` also
+mirrors it into the portal's CRM task list.
+
+**Notifications** — a queue with **per-user, per-category preferences** (`mention`,
+`direct`, `channel`, `property`, `lead`, `approval`, `task`, `system`) across `in_app`,
+`email` and `telegram`, plus **quiet hours** (deferral, with urgent items exempt) and a
+digest preference. `msg_dispatch` renders the per-channel payloads (marking notifications
+sent/deferred/failed) and writes them to an **outbox** — the seam a background worker and a
+real e-mail/Telegram provider plug into.
+
+**Telegram (optional)** — per-user opt-in. `msg_telegram_link_code` mints a single-use
+code a user pastes to the bot as `/start <code>`; `msg_telegram_update` handles inbound
+bot commands (`/start`, `/stop`, `/mute`, `/unmute`, `/digest`, `/status`). Payloads are
+**sanitised**: short text, an authenticated deep link back to the portal, and **never** an
+attachment or confidential document — the guard is `telegram.attach_allowed = false`.
+
+**Governance** — a full audit trail of important actions (access, files, moderation,
+retention), **access revocation** for departing staff (`msg_revoke_access` removes the user
+from every conversation and unlinks Telegram), a **retention/deletion policy** with a
+dry-run purge (pinned messages exempt), and **message reports** with a moderation queue
+(`dismiss`, `delete_message`, `mute_author`, `escalate`).
+
+**Conversation intelligence** — a rules-based extractive summary (`msg_summarize`:
+participants, topics, keywords, salient lines) and action-item extraction
+(`msg_action_items`: imperatives, requests, assignments and questions), with an explicit
+note that prose summarisation routes to the LLM facade. A rolling digest is available per
+conversation over a window.
+
+**MCP tools (prefix `msg_`):** `msg_overview`, `msg_channels`, `msg_categories`,
+`msg_attachment_kinds`, `msg_profiles`, `msg_set_presence`, `msg_presence_heartbeat`,
+`msg_preferences`, `msg_set_preferences`; `msg_create_conversation`, `msg_conversations`,
+`msg_conversation`, `msg_conversation_context`, `msg_archive_conversation`, `msg_members`,
+`msg_add_member`, `msg_remove_member`, `msg_update_member`, `msg_direct`,
+`msg_property_thread`, `msg_revoke_access`; `msg_post`, `msg_messages`, `msg_message`,
+`msg_edit_message`, `msg_delete_message`, `msg_pin_message`, `msg_react`, `msg_thread`,
+`msg_search`, `msg_mark_read`, `msg_unread`, `msg_read_receipts`, `msg_summarize`,
+`msg_action_items`; `msg_attach`, `msg_attachment_link`, `msg_attachment_resolve`,
+`msg_attachments`; `msg_create_action`, `msg_actions`, `msg_action`, `msg_update_action`,
+`msg_complete_action`; `msg_notifications`, `msg_read_notification`,
+`msg_mark_all_notifications_read`, `msg_dispatch`, `msg_outbox`, `msg_unread_summary`;
+`msg_telegram_link_code`, `msg_telegram_link`, `msg_telegram_unlink`, `msg_telegram_links`,
+`msg_telegram_status`, `msg_telegram_update`, `msg_telegram_alert`; `msg_audit`,
+`msg_retention_report`, `msg_purge_retention`, `msg_report_message`, `msg_reports`,
+`msg_moderate_report`, `msg_conversation_digest`, `msg_statistics`, `msg_portal`.
+
+**REST (prefix `/messaging`):** `GET /overview|channels|channels/{key}|categories|categories/{key}|attachment-kinds|profiles`;
+`POST /presence`, `POST /presence/heartbeat`; `GET|PUT /preferences/{user_id}`;
+`GET|POST /conversations`, `GET /conversations/{id}`,
+`GET /conversations/{id}/{context|members|messages|attachments|actions|summary|digest|read}`,
+`POST /conversations/{id}/{archive|members|messages|attachments|actions|action-items|read}`,
+`PUT|DELETE /conversations/{id}/members/{member_id}`; `POST /direct`, `POST /property-thread`,
+`POST /revoke-access`; `GET|PUT|DELETE /messages/{id}`, `POST /messages/{id}/{pin|react}`,
+`GET /messages/{id}/{thread|receipts}`; `GET /search`, `GET /unread/{user_id}`,
+`GET /unread-summary/{user_id}`; `GET /attachments/{id}/link`, `GET /attachments/{id}`,
+`GET /attachments/resolve/{token}`; `GET /actions`, `GET|PUT /actions/{id}`,
+`POST /actions/{id}/complete`; `GET /notifications/{user_id}`,
+`POST /notifications/{notification_id}/read`, `POST /notifications/{user_id}/read-all`,
+`POST /dispatch`, `GET /outbox`; `POST /telegram/link-code|link|unlink|update|alert`,
+`GET /telegram/links|status/{user_id}`; `GET /audit|retention|reports|statistics|portal|portal.html`,
+`POST /purge|reports|reports/{id}/moderate`; `WS /ws/messaging/{conversation_id}`.
+
+**Resources:** `messaging://overview`, `messaging://channels`, `messaging://categories`,
+`messaging://profiles`, `messaging://outbox`, `messaging://audit`, `messaging://reports`,
+`messaging://statistics`; templates `messaging://conversation/{conversation_id}` and
+`messaging://unread/{user_id}`.
+**Prompts:** `messaging_briefing_prompt`, `messaging_thread_digest_prompt`,
+`messaging_escalation_prompt`.
+
+```powershell
+# the workspace, its channels and the busiest conversations
+curl "http://127.0.0.1:8000/messaging/overview"
+curl "http://127.0.0.1:8000/messaging/channels"
+
+# open (or fetch) a 1-to-1 conversation and post to it
+curl -X POST "http://127.0.0.1:8000/messaging/direct" -H "Content-Type: application/json" `
+  -d '{\"user_a\":\"ADMIN_ID\",\"user_b\":\"AGENT_ID\"}'
+curl -X POST "http://127.0.0.1:8000/messaging/conversations/{conversation_id}/messages" `
+  -H "Content-Type: application/json" `
+  -d '{\"author_id\":\"ADMIN_ID\",\"body\":\"Please confirm the DHA rate list\",\"mentions\":[\"AGENT_ID\"]}'
+
+# turn a message into a tracked action, then drain the notification queue
+curl -X POST "http://127.0.0.1:8000/messaging/conversations/{conversation_id}/actions" `
+  -H "Content-Type: application/json" `
+  -d '{\"created_by\":\"ADMIN_ID\",\"title\":\"Verify title deed\",\"kind\":\"verification\",\"owner_id\":\"AGENT_ID\",\"due_on\":\"2026-07-05\",\"create_crm_task\":true}'
+curl -X POST "http://127.0.0.1:8000/messaging/dispatch" -H "Content-Type: application/json" -d '{\"force\":true}'
+curl "http://127.0.0.1:8000/messaging/outbox"
+
+# the messaging dashboard
+start "http://127.0.0.1:8000/messaging/portal"
+```
+
 ## Notes
 
 * Storage is **in-memory** for now (seeded on startup); a PostgreSQL + PostGIS
-  backend is the planned next step (`DatabaseConfig` is the seam).
+  backend is the planned next step (`DatabaseConfig` is the seam). The messaging
+  wing follows the same rule and is explicit about it: in-memory lists are **not**
+  the permanent message store, so every store sits behind a thin seam for a PostgreSQL
+  *messaging* schema (conversations, memberships, messages, attachments, notifications,
+  audit) plus private object storage for the files themselves.
 * The MCP HTTP endpoint has DNS-rebinding protection, so send a `Host` of
   `127.0.0.1`/`localhost` (any real client does).
 * OTPs are **not** delivered anywhere: they are recorded in the in-memory outbox and,

@@ -17,12 +17,14 @@ returns a JSON string, so the REST handlers below simply call them and parse
 the result. That keeps MCP and REST perfectly in sync — no duplicated logic.
 """
 
+import asyncio
 import json
 import os
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi import (Depends, FastAPI, Header, HTTPException, Query, WebSocket,
+                     WebSocketDisconnect)
 from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 
@@ -5279,6 +5281,716 @@ def pmo_portal(lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> 
 def pmo_portal_html(lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
     """Alias of ``/pmo/portal`` that always serves HTML."""
     return HTMLResponse(content=core.pmo_portal(lang=lang, theme=theme))
+
+
+# ==================================================================
+# TEAM MESSAGING & NOTIFICATIONS  (reuses server.py / messaging.py)
+# ==================================================================
+
+
+class MsgPresenceRequest(BaseModel):
+    user_id: str
+    presence: str = "online"
+
+
+class MsgPreferencesRequest(BaseModel):
+    prefs: Optional[Dict[str, List[str]]] = None
+    quiet_hours: Optional[Dict[str, str]] = None
+    digest: Optional[str] = None
+    telegram_opt_in: Optional[bool] = None
+    telegram_categories: Optional[List[str]] = None
+
+
+class MsgConversationRequest(BaseModel):
+    kind: str = "group"
+    title: str = ""
+    created_by: Optional[str] = None
+    participants: Optional[List[str]] = None
+    channel_key: Optional[str] = None
+    property_id: Optional[str] = None
+    topic: Optional[str] = None
+    restricted: Optional[bool] = None
+    roles_allowed: Optional[List[str]] = None
+    retention_days: Optional[int] = None
+    announcement: Optional[str] = None
+
+
+class MsgDirectRequest(BaseModel):
+    user_a: str
+    user_b: str
+
+
+class MsgPropertyThreadRequest(BaseModel):
+    property_id: str
+    created_by: Optional[str] = None
+    title: Optional[str] = None
+
+
+class MsgArchiveRequest(BaseModel):
+    user_id: str
+    archived: bool = True
+
+
+class MsgMemberRequest(BaseModel):
+    member_id: str
+    actor_id: Optional[str] = None
+    role: str = "member"
+
+
+class MsgMemberUpdateRequest(BaseModel):
+    actor_id: Optional[str] = None
+    role: Optional[str] = None
+    muted: Optional[bool] = None
+    pinned: Optional[bool] = None
+    notification_level: Optional[str] = None
+
+
+class MsgRevokeRequest(BaseModel):
+    user_id: str
+    actor_id: Optional[str] = None
+    reason: Optional[str] = None
+
+
+class MsgPostRequest(BaseModel):
+    author_id: str
+    body: str = ""
+    message_type: str = "text"
+    parent_id: Optional[str] = None
+    mentions: Optional[List[str]] = None
+    attachment_ids: Optional[List[str]] = None
+    property_id: Optional[str] = None
+
+
+class MsgEditRequest(BaseModel):
+    user_id: str
+    body: str
+
+
+class MsgReactRequest(BaseModel):
+    user_id: str
+    emoji: str
+
+
+class MsgPinRequest(BaseModel):
+    user_id: str
+    pinned: bool = True
+
+
+class MsgReadRequest(BaseModel):
+    user_id: str
+    up_to_seq: Optional[int] = None
+
+
+class MsgAttachmentRequest(BaseModel):
+    uploaded_by: str
+    filename: str
+    kind: Optional[str] = None
+    size_bytes: int = 0
+    mime: Optional[str] = None
+    storage_key: Optional[str] = None
+    source_url: Optional[str] = None
+    sensitivity: Optional[str] = None
+    linked_type: Optional[str] = None
+    linked_id: Optional[str] = None
+
+
+class MsgActionRequest(BaseModel):
+    created_by: str
+    title: str
+    kind: str = "task"
+    message_id: Optional[str] = None
+    detail: Optional[str] = None
+    owner_id: Optional[str] = None
+    due_on: Optional[str] = None
+    property_id: Optional[str] = None
+    create_crm_task: bool = False
+
+
+class MsgActionUpdateRequest(BaseModel):
+    user_id: str
+    status: Optional[str] = None
+    owner_id: Optional[str] = None
+    due_on: Optional[str] = None
+    note: Optional[str] = None
+
+
+class MsgActionCompleteRequest(BaseModel):
+    user_id: str
+    note: Optional[str] = None
+
+
+class MsgDispatchRequest(BaseModel):
+    user_id: Optional[str] = None
+    limit: int = 200
+    force: bool = False
+
+
+class MsgTelegramLinkRequest(BaseModel):
+    user_id: str
+    chat_id: str
+    username: Optional[str] = None
+    categories: Optional[List[str]] = None
+
+
+class MsgTelegramUpdateRequest(BaseModel):
+    update: Dict[str, Any]
+
+
+class MsgTelegramAlertRequest(BaseModel):
+    user_id: str
+    text: str
+    priority: str = "normal"
+    conversation_id: Optional[str] = None
+    message_id: Optional[str] = None
+
+
+class MsgPurgeRequest(BaseModel):
+    dry_run: bool = True
+    retention_days: Optional[int] = None
+    actor_id: Optional[str] = None
+
+
+class MsgReportRequest(BaseModel):
+    message_id: str
+    reporter_id: str
+    reason: str = "other"
+    detail: Optional[str] = None
+
+
+class MsgModerateRequest(BaseModel):
+    actor_id: str
+    action: str
+    note: Optional[str] = None
+
+
+class MsgActionItemsRequest(BaseModel):
+    user_id: str
+    limit: int = 100
+    create: bool = False
+    owner_default: Optional[str] = None
+
+
+# ---- Messaging: catalog & team directory ----
+
+@app.get("/messaging/overview", tags=["messaging"])
+def messaging_overview() -> Any:
+    """Workspace config, channels, categories, counts and the rollout plan."""
+    return j(core.msg_overview())
+
+
+@app.get("/messaging/channels", tags=["messaging"])
+def messaging_channels(channel_key: Optional[str] = None) -> Any:
+    """Default team channels with purpose and access rules."""
+    return j(core.msg_channels(channel_key))
+
+
+@app.get("/messaging/channels/{channel_key}", tags=["messaging"])
+def messaging_channel(channel_key: str) -> Any:
+    """One team channel by key."""
+    return j(core.msg_channels(channel_key))
+
+
+@app.get("/messaging/categories", tags=["messaging"])
+def messaging_categories(category: Optional[str] = None) -> Any:
+    """Notification categories with delivery channels and urgency."""
+    return j(core.msg_categories(category))
+
+
+@app.get("/messaging/categories/{category}", tags=["messaging"])
+def messaging_category(category: str) -> Any:
+    """One notification category by key."""
+    return j(core.msg_categories(category))
+
+
+@app.get("/messaging/attachment-kinds", tags=["messaging"])
+def messaging_attachment_kinds(kind: Optional[str] = None) -> Any:
+    """Attachment kinds, accepted extensions and default sensitivity."""
+    return j(core.msg_attachment_kinds(kind))
+
+
+@app.get("/messaging/profiles", tags=["messaging"])
+def messaging_profiles(presence: Optional[str] = None, role: Optional[str] = None,
+                       query: Optional[str] = None) -> Any:
+    """Team directory of messaging profiles."""
+    return j(core.msg_profiles(presence=presence, role=role, query=query))
+
+
+@app.post("/messaging/presence", tags=["messaging"])
+def messaging_presence(payload: MsgPresenceRequest) -> Any:
+    """Set a user's presence."""
+    return j(core.msg_set_presence(payload.user_id, payload.presence))
+
+
+@app.post("/messaging/presence/heartbeat", tags=["messaging"])
+def messaging_heartbeat(payload: MsgPresenceRequest) -> Any:
+    """Heartbeat a user's presence."""
+    return j(core.msg_presence_heartbeat(payload.user_id, payload.presence))
+
+
+@app.get("/messaging/preferences/{user_id}", tags=["messaging"])
+def messaging_preferences(user_id: str) -> Any:
+    """A user's notification preferences, quiet hours, digest and Telegram state."""
+    return j(core.msg_preferences(user_id))
+
+
+@app.put("/messaging/preferences/{user_id}", tags=["messaging"])
+def messaging_set_preferences(user_id: str, payload: MsgPreferencesRequest) -> Any:
+    """Update notification preferences."""
+    data = payload.model_dump()
+    return j(core.msg_set_preferences(
+        user_id, prefs=data.get("prefs"), quiet_start=(data.get("quiet_hours") or {}).get("start"),
+        quiet_end=(data.get("quiet_hours") or {}).get("end"), digest=data.get("digest"),
+        telegram_opt_in=data.get("telegram_opt_in"),
+        telegram_categories=data.get("telegram_categories")))
+
+
+# ---- Messaging: conversations & members ----
+
+@app.get("/messaging/conversations", tags=["messaging"])
+def messaging_conversations(user_id: str, kind: Optional[str] = None,
+                            include_archived: bool = False, property_id: Optional[str] = None,
+                            channel_key: Optional[str] = None) -> Any:
+    """List a user's conversations with unread counts."""
+    return j(core.msg_conversations(user_id, kind=kind, include_archived=include_archived,
+                                    property_id=property_id, channel_key=channel_key))
+
+
+@app.post("/messaging/conversations", tags=["messaging"], status_code=201)
+def messaging_create_conversation(payload: MsgConversationRequest) -> Any:
+    """Create a direct / group / channel / property conversation."""
+    return j(core.msg_create_conversation(**payload.model_dump()))
+
+
+@app.get("/messaging/conversations/{conversation_id}", tags=["messaging"])
+def messaging_conversation(conversation_id: str, user_id: str) -> Any:
+    """One conversation with members, pins, unread count and context."""
+    return j(core.msg_conversation(conversation_id, user_id))
+
+
+@app.get("/messaging/conversations/{conversation_id}/context", tags=["messaging"])
+def messaging_conversation_context(conversation_id: str, user_id: Optional[str] = None) -> Any:
+    """What a conversation is tied to (property, pins, actions, attachments)."""
+    return j(core.msg_conversation_context(conversation_id, user_id))
+
+
+@app.post("/messaging/conversations/{conversation_id}/archive", tags=["messaging"])
+def messaging_archive(conversation_id: str, payload: MsgArchiveRequest) -> Any:
+    """Archive or restore a conversation."""
+    return j(core.msg_archive_conversation(conversation_id, payload.user_id, payload.archived))
+
+
+@app.get("/messaging/conversations/{conversation_id}/members", tags=["messaging"])
+def messaging_members(conversation_id: str, user_id: Optional[str] = None) -> Any:
+    """Members of a conversation."""
+    return j(core.msg_members(conversation_id, user_id))
+
+
+@app.post("/messaging/conversations/{conversation_id}/members", tags=["messaging"])
+def messaging_add_member(conversation_id: str, payload: MsgMemberRequest) -> Any:
+    """Add (or re-role) a member."""
+    return j(core.msg_add_member(conversation_id, payload.member_id, actor_id=payload.actor_id,
+                                 role=payload.role))
+
+
+@app.put("/messaging/conversations/{conversation_id}/members/{member_id}", tags=["messaging"])
+def messaging_update_member(conversation_id: str, member_id: str,
+                            payload: MsgMemberUpdateRequest) -> Any:
+    """Update a member's role, mute/pin state or notification level."""
+    return j(core.msg_update_member(conversation_id, member_id, **payload.model_dump()))
+
+
+@app.delete("/messaging/conversations/{conversation_id}/members/{member_id}", tags=["messaging"])
+def messaging_remove_member(conversation_id: str, member_id: str,
+                            actor_id: Optional[str] = None, reason: Optional[str] = None) -> Any:
+    """Remove a member (audited access revocation)."""
+    return j(core.msg_remove_member(conversation_id, member_id, actor_id=actor_id, reason=reason))
+
+
+@app.post("/messaging/direct", tags=["messaging"])
+def messaging_direct(payload: MsgDirectRequest) -> Any:
+    """Find or create the 1-to-1 conversation between two users."""
+    return j(core.msg_direct(payload.user_a, payload.user_b))
+
+
+@app.post("/messaging/property-thread", tags=["messaging"])
+def messaging_property_thread(payload: MsgPropertyThreadRequest) -> Any:
+    """Get or create the internal discussion panel for a property."""
+    return j(core.msg_property_thread(payload.property_id, created_by=payload.created_by,
+                                      title=payload.title))
+
+
+@app.post("/messaging/revoke-access", tags=["messaging"])
+def messaging_revoke_access(payload: MsgRevokeRequest) -> Any:
+    """Revoke a user's access to every conversation and unlink Telegram."""
+    return j(core.msg_revoke_access(payload.user_id, actor_id=payload.actor_id, reason=payload.reason))
+
+
+# ---- Messaging: messages ----
+
+@app.get("/messaging/conversations/{conversation_id}/messages", tags=["messaging"])
+def messaging_messages(conversation_id: str, user_id: str, limit: int = 50,
+                       before_seq: Optional[int] = None, thread_id: Optional[str] = None,
+                       include_deleted: bool = False) -> Any:
+    """Page through a conversation's messages (or one thread)."""
+    return j(core.msg_messages(conversation_id, user_id, limit=limit, before_seq=before_seq,
+                               thread_id=thread_id, include_deleted=include_deleted))
+
+
+@app.post("/messaging/conversations/{conversation_id}/messages", tags=["messaging"],
+          status_code=201)
+def messaging_post(conversation_id: str, payload: MsgPostRequest) -> Any:
+    """Post a message."""
+    return j(core.msg_post(conversation_id, **payload.model_dump()))
+
+
+@app.post("/messaging/conversations/{conversation_id}/read", tags=["messaging"])
+def messaging_mark_read(conversation_id: str, payload: MsgReadRequest) -> Any:
+    """Mark a conversation read up to a sequence number."""
+    return j(core.msg_mark_read(conversation_id, payload.user_id, payload.up_to_seq))
+
+
+@app.get("/messaging/messages/{message_id}", tags=["messaging"])
+def messaging_message(message_id: str, user_id: str) -> Any:
+    """One message with attachments, reactions, receipts and replies."""
+    return j(core.msg_message(message_id, user_id))
+
+
+@app.put("/messaging/messages/{message_id}", tags=["messaging"])
+def messaging_edit_message(message_id: str, payload: MsgEditRequest) -> Any:
+    """Edit a message (author only, within the edit window)."""
+    return j(core.msg_edit_message(message_id, payload.user_id, payload.body))
+
+
+@app.delete("/messaging/messages/{message_id}", tags=["messaging"])
+def messaging_delete_message(message_id: str, user_id: str, reason: Optional[str] = None) -> Any:
+    """Soft-delete a message."""
+    return j(core.msg_delete_message(message_id, user_id, reason))
+
+
+@app.post("/messaging/messages/{message_id}/pin", tags=["messaging"])
+def messaging_pin_message(message_id: str, payload: MsgPinRequest) -> Any:
+    """Pin or unpin a message."""
+    return j(core.msg_pin_message(message_id, payload.user_id, payload.pinned))
+
+
+@app.post("/messaging/messages/{message_id}/react", tags=["messaging"])
+def messaging_react(message_id: str, payload: MsgReactRequest) -> Any:
+    """Toggle an emoji reaction."""
+    return j(core.msg_react(message_id, payload.user_id, payload.emoji))
+
+
+@app.get("/messaging/messages/{message_id}/thread", tags=["messaging"])
+def messaging_thread(message_id: str, user_id: str, limit: int = 100) -> Any:
+    """Threaded replies to a message."""
+    return j(core.msg_thread(message_id, user_id, limit))
+
+
+@app.get("/messaging/messages/{message_id}/receipts", tags=["messaging"])
+def messaging_receipts(message_id: str, user_id: str) -> Any:
+    """Read receipts for a message."""
+    return j(core.msg_read_receipts(message_id, user_id))
+
+
+@app.get("/messaging/search", tags=["messaging"])
+def messaging_search(user_id: str, query: str = "", conversation_id: Optional[str] = None,
+                     property_id: Optional[str] = None, mention: Optional[str] = None,
+                     limit: int = 25) -> Any:
+    """Search messages across every conversation the user may access."""
+    return j(core.msg_search(user_id, query, conversation_id=conversation_id,
+                             property_id=property_id, mention=mention, limit=limit))
+
+
+@app.get("/messaging/unread/{user_id}", tags=["messaging"])
+def messaging_unread(user_id: str) -> Any:
+    """Unread totals overall and per conversation."""
+    return j(core.msg_unread(user_id))
+
+
+@app.get("/messaging/conversations/{conversation_id}/summary", tags=["messaging"])
+def messaging_summary(conversation_id: str, user_id: str, limit: int = 80) -> Any:
+    """Rules-based extractive summary of a conversation."""
+    return j(core.msg_summarize(conversation_id, user_id, limit))
+
+
+@app.get("/messaging/conversations/{conversation_id}/digest", tags=["messaging"])
+def messaging_digest(conversation_id: str, user_id: str, days: int = 7) -> Any:
+    """Recent-activity digest for a conversation."""
+    return j(core.msg_conversation_digest(conversation_id, user_id, days))
+
+
+@app.post("/messaging/conversations/{conversation_id}/action-items", tags=["messaging"])
+def messaging_action_items(conversation_id: str, payload: MsgActionItemsRequest) -> Any:
+    """Extract (and optionally create) action items from a conversation."""
+    return j(core.msg_action_items(conversation_id, payload.user_id, limit=payload.limit,
+                                   create=payload.create, owner_default=payload.owner_default))
+
+
+# ---- Messaging: attachments & expiring links ----
+
+@app.get("/messaging/conversations/{conversation_id}/attachments", tags=["messaging"])
+def messaging_attachments(conversation_id: str, user_id: str, kind: Optional[str] = None,
+                          sensitivity: Optional[str] = None) -> Any:
+    """List a conversation's shared files (references, never embedded content)."""
+    return j(core.msg_attachments(conversation_id, user_id, kind=kind, sensitivity=sensitivity))
+
+
+@app.post("/messaging/conversations/{conversation_id}/attachments", tags=["messaging"],
+          status_code=201)
+def messaging_attach(conversation_id: str, payload: MsgAttachmentRequest) -> Any:
+    """Register a file reference for sharing."""
+    return j(core.msg_attach(conversation_id, **payload.model_dump()))
+
+
+@app.get("/messaging/attachments/{attachment_id}/link", tags=["messaging"])
+def messaging_attachment_link(attachment_id: str, user_id: str,
+                              ttl_minutes: Optional[int] = None) -> Any:
+    """Mint a signed, expiring, permission-checked download link."""
+    return j(core.msg_attachment_link(attachment_id, user_id, ttl_minutes))
+
+
+@app.get("/messaging/attachments/{attachment_id}", tags=["messaging"])
+def messaging_attachment_download(attachment_id: str, token: Optional[str] = None,
+                                  user_id: Optional[str] = None) -> Any:
+    """Resolve an attachment through a signed token (re-checks membership + expiry)."""
+    if not token:
+        raise HTTPException(status_code=400, detail="a signed ?token= is required")
+    return j(core.msg_attachment_resolve(token, user_id))
+
+
+@app.get("/messaging/attachments/resolve/{token}", tags=["messaging"])
+def messaging_attachment_resolve(token: str, user_id: Optional[str] = None) -> Any:
+    """Verify a signed attachment link and return the file reference."""
+    return j(core.msg_attachment_resolve(token, user_id))
+
+
+# ---- Messaging: actions (message -> task / approval / verification) ----
+
+@app.get("/messaging/conversations/{conversation_id}/actions", tags=["messaging"])
+def messaging_conversation_actions(conversation_id: str, user_id: str,
+                                   status: Optional[str] = None) -> Any:
+    """Actions raised inside a conversation."""
+    return j(core.msg_actions(user_id, conversation_id=conversation_id, status=status))
+
+
+@app.post("/messaging/conversations/{conversation_id}/actions", tags=["messaging"],
+          status_code=201)
+def messaging_create_action(conversation_id: str, payload: MsgActionRequest) -> Any:
+    """Turn a message (or conversation) into a tracked action."""
+    return j(core.msg_create_action(conversation_id, **payload.model_dump()))
+
+
+@app.get("/messaging/actions", tags=["messaging"])
+def messaging_actions(user_id: str, conversation_id: Optional[str] = None,
+                      owner_id: Optional[str] = None, status: Optional[str] = None,
+                      kind: Optional[str] = None, overdue_only: bool = False) -> Any:
+    """List tracked actions."""
+    return j(core.msg_actions(user_id, conversation_id=conversation_id, owner_id=owner_id,
+                              status=status, kind=kind, overdue_only=overdue_only))
+
+
+@app.get("/messaging/actions/{action_id}", tags=["messaging"])
+def messaging_action(action_id: str, user_id: str) -> Any:
+    """One tracked action."""
+    return j(core.msg_action(action_id, user_id))
+
+
+@app.put("/messaging/actions/{action_id}", tags=["messaging"])
+def messaging_update_action(action_id: str, payload: MsgActionUpdateRequest) -> Any:
+    """Update an action's status, owner or due date."""
+    return j(core.msg_update_action(action_id, **payload.model_dump()))
+
+
+@app.post("/messaging/actions/{action_id}/complete", tags=["messaging"])
+def messaging_complete_action(action_id: str, payload: MsgActionCompleteRequest) -> Any:
+    """Mark an action done and notify its creator."""
+    return j(core.msg_complete_action(action_id, payload.user_id, payload.note))
+
+
+# ---- Messaging: notifications, outbox & dispatch ----
+
+@app.get("/messaging/notifications/{user_id}", tags=["messaging"])
+def messaging_notifications(user_id: str, unread_only: bool = False,
+                            category: Optional[str] = None, limit: int = 50) -> Any:
+    """A user's notifications with unread count."""
+    return j(core.msg_notifications(user_id, unread_only=unread_only, category=category,
+                                    limit=limit))
+
+
+@app.post("/messaging/notifications/{notification_id}/read", tags=["messaging"])
+def messaging_read_notification(notification_id: str, user_id: str) -> Any:
+    """Mark one notification read."""
+    return j(core.msg_read_notification(notification_id, user_id))
+
+
+@app.post("/messaging/notifications/{user_id}/read-all", tags=["messaging"])
+def messaging_read_all(user_id: str) -> Any:
+    """Mark every notification read for a user."""
+    return j(core.msg_mark_all_notifications_read(user_id))
+
+
+@app.post("/messaging/dispatch", tags=["messaging"])
+def messaging_dispatch(payload: Optional[MsgDispatchRequest] = None) -> Any:
+    """Drain the notification queue into the outbox (background-worker seam)."""
+    data = (payload or MsgDispatchRequest()).model_dump()
+    return j(core.msg_dispatch(**data))
+
+
+@app.get("/messaging/outbox", tags=["messaging"])
+def messaging_outbox(channel: Optional[str] = None, user_id: Optional[str] = None,
+                     limit: int = 100) -> Any:
+    """Delivered notifications with rendered e-mail/Telegram payloads."""
+    return j(core.msg_outbox(channel=channel, user_id=user_id, limit=limit))
+
+
+@app.get("/messaging/unread-summary/{user_id}", tags=["messaging"])
+def messaging_unread_summary(user_id: str) -> Any:
+    """Combined unread picture for a user."""
+    return j(core.msg_unread_summary(user_id))
+
+
+# ---- Messaging: Telegram (optional alert channel) ----
+
+@app.post("/messaging/telegram/link-code", tags=["messaging"])
+def messaging_telegram_link_code(user_id: str) -> Any:
+    """Mint a single-use /start code for linking a Telegram chat."""
+    return j(core.msg_telegram_link_code(user_id))
+
+
+@app.post("/messaging/telegram/link", tags=["messaging"])
+def messaging_telegram_link(payload: MsgTelegramLinkRequest) -> Any:
+    """Opt a user in: bind a Telegram chat id and allowed categories."""
+    return j(core.msg_telegram_link(**payload.model_dump()))
+
+
+@app.post("/messaging/telegram/unlink", tags=["messaging"])
+def messaging_telegram_unlink(user_id: str) -> Any:
+    """Unlink a user's Telegram chat."""
+    return j(core.msg_telegram_unlink(user_id))
+
+
+@app.get("/messaging/telegram/links", tags=["messaging"])
+def messaging_telegram_links(active_only: bool = True) -> Any:
+    """Every Telegram link."""
+    return j(core.msg_telegram_links(active_only))
+
+
+@app.get("/messaging/telegram/status/{user_id}", tags=["messaging"])
+def messaging_telegram_status(user_id: str) -> Any:
+    """WhatsApp-style status for the Telegram channel (link state and categories)."""
+    return j(core.msg_telegram_status(user_id))
+
+
+@app.post("/messaging/telegram/update", tags=["messaging"])
+def messaging_telegram_update(payload: MsgTelegramUpdateRequest) -> Any:
+    """Process one inbound Telegram bot update."""
+    return j(core.msg_telegram_update(payload.update))
+
+
+@app.post("/messaging/telegram/alert", tags=["messaging"])
+def messaging_telegram_alert(payload: MsgTelegramAlertRequest) -> Any:
+    """Queue and dispatch a sanitised Telegram alert."""
+    return j(core.msg_telegram_alert(**payload.model_dump()))
+
+
+# ---- Messaging: audit, retention, moderation & statistics ----
+
+@app.get("/messaging/audit", tags=["messaging"])
+def messaging_audit(limit: int = 100, action: Optional[str] = None,
+                    actor_id: Optional[str] = None, target_type: Optional[str] = None) -> Any:
+    """The messaging audit trail."""
+    return j(core.msg_audit(limit=limit, action=action, actor_id=actor_id, target_type=target_type))
+
+
+@app.get("/messaging/retention", tags=["messaging"])
+def messaging_retention() -> Any:
+    """Per-conversation retention picture."""
+    return j(core.msg_retention_report())
+
+
+@app.post("/messaging/purge", tags=["messaging"])
+def messaging_purge(payload: MsgPurgeRequest) -> Any:
+    """Apply the retention policy (soft-delete past the window; pinned exempt)."""
+    return j(core.msg_purge_retention(**payload.model_dump()))
+
+
+@app.get("/messaging/reports", tags=["messaging"])
+def messaging_reports(status: Optional[str] = None, limit: int = 100) -> Any:
+    """Message reports and their moderation status."""
+    return j(core.msg_reports(status=status, limit=limit))
+
+
+@app.post("/messaging/reports", tags=["messaging"], status_code=201)
+def messaging_report(payload: MsgReportRequest) -> Any:
+    """Report a message (spam, abuse, confidential leak, off-topic)."""
+    return j(core.msg_report_message(**payload.model_dump()))
+
+
+@app.post("/messaging/reports/{report_id}/moderate", tags=["messaging"])
+def messaging_moderate(report_id: str, payload: MsgModerateRequest) -> Any:
+    """Resolve a report: dismiss, delete, mute the author or escalate."""
+    return j(core.msg_moderate_report(report_id, **payload.model_dump()))
+
+
+@app.get("/messaging/statistics", tags=["messaging"])
+def messaging_statistics() -> Any:
+    """Aggregate messaging statistics."""
+    return j(core.msg_statistics())
+
+
+@app.get("/messaging/portal", tags=["messaging"], response_class=HTMLResponse)
+def messaging_portal(lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """The Team Messaging & Notifications page (HTML)."""
+    return HTMLResponse(content=core.messaging_portal_html(lang=lang, theme=theme))
+
+
+@app.get("/messaging/portal.html", tags=["messaging"], response_class=HTMLResponse)
+def messaging_portal_html(lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """Alias of ``/messaging/portal`` that always serves HTML."""
+    return HTMLResponse(content=core.messaging_portal_html(lang=lang, theme=theme))
+
+
+# ---- Messaging: real-time feed (WebSocket) ----
+
+@app.websocket("/ws/messaging/{conversation_id}")
+async def messaging_socket(websocket: WebSocket, conversation_id: str,
+                           user_id: Optional[str] = None) -> None:
+    """Live conversation feed: new messages, edits, reactions, actions and read state.
+
+    The caller must pass ``?user_id=``; access is re-checked on every connection.
+    """
+    conv = core.messaging._get(core.messaging.conversations_db, "id", conversation_id)
+    if conv is None or not core.messaging.can_access(conv, user_id):
+        await websocket.close(code=4403)
+        return
+    await websocket.accept()
+    listener = core.messaging.subscribe(conversation_id)
+
+    async def pump() -> None:
+        while True:
+            try:
+                event = listener.get_nowait()
+            except Exception:
+                event = None
+            if event is not None:
+                await websocket.send_json(event)
+            await asyncio.sleep(0.3)
+
+    pump_task = asyncio.create_task(pump())
+    try:
+        await websocket.send_json({"event": "ready", "conversation_id": conversation_id,
+                                   "user_id": user_id})
+        while True:
+            text = await websocket.receive_text()
+            if text == "ping":
+                await websocket.send_json({"event": "pong"})
+            elif text == "unread":
+                await websocket.send_json({"event": "unread",
+                                           "unread": core.messaging.unread_counts(user_id)})
+    except WebSocketDisconnect:
+        pass
+    finally:
+        pump_task.cancel()
+        core.messaging.unsubscribe(conversation_id, listener)
 
 
 __all__ = ["app"]
