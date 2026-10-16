@@ -62,7 +62,7 @@ export function Logo({ className, light }: { className?: string; light?: boolean
       <img src={BRAND.mark} alt="Arz-e-Pak" className="h-10 w-auto drop-shadow-sm" />
       <span className="leading-none">
         <span className={cn("block font-display text-xl font-extrabold tracking-tight", light ? "text-white" : "text-brand-800 dark:text-white")}>
-          ARZ-E-<span className="text-gradient">PAK</span>
+          Arz-e-<span className="text-gradient">Pak</span>
         </span>
         <span className={cn("block text-[9px] font-semibold uppercase tracking-[.22em]", light ? "text-white/70" : "text-ink-mute dark:text-slate-400")}>AI Real Estate Portal</span>
       </span>

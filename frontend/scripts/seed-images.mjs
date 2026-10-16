@@ -465,7 +465,7 @@ function floorplan(n) {
     s += `<path d="M${px + 10} ${py + ph} a34 34 0 0 1 34 -34" fill="none" stroke="#c99a22" stroke-width="3"/>`;
     x += w; rowH = Math.max(rowH, h);
   }
-  s += `<text x="${ox}" y="${H - 40}" font-family="Outfit, Arial" font-size="26" font-weight="800" fill="#0f5a39">ARZ-E-PAK · Floor Plan ${String.fromCharCode(65 + n)}</text>`;
+  s += `<text x="${ox}" y="${H - 40}" font-family="Outfit, Arial" font-size="26" font-weight="800" fill="#0f5a39">Arz-e-Pak · Floor Plan ${String.fromCharCode(65 + n)}</text>`;
   s += `<g transform="translate(${W - 120} ${H - 110})"><circle r="44" fill="none" stroke="#0f5a39" stroke-width="3"/><path d="M0 -40 L10 0 L0 -8 L-10 0Z" fill="#c99a22"/><text y="-48" text-anchor="middle" font-family="Arial" font-size="16" font-weight="700" fill="#0f5a39">N</text></g>`;
   return svg(s);
 }
@@ -519,9 +519,9 @@ async function brand() {
   const src = (f) => path.join(repo, f);
   const logoEn = src("Arz-e-Pak AI Real Estate Logo English.png");
   const logoUr = src("Arz-e-Pak AI Real Estate Logo Urdue.png");
-  const headEn = src("ARZ-E-PAK Header Image English.png");
-  const headUr = src("ARZ-E-PAK Header Image Urdue.png");
-  const dash = src("ARZ-E-PAK AI Real Estate Dashboard.png");
+  const headEn = src("Arz-e-Pak Header Image English.png");
+  const headUr = src("Arz-e-Pak Header Image Urdue.png");
+  const dash = src("Arz-e-Pak AI Real Estate Dashboard.png");
   const jobs = [];
   if (fs.existsSync(logoEn)) {
     jobs.push(sharp(logoEn).resize(560).webp({ quality: 88 }).toFile(out("brand", "logo-en.webp")));
