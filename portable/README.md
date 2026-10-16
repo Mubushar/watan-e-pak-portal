@@ -55,9 +55,10 @@ cd backend && uv run python main.py          # API on http://127.0.0.1:8000
 cd portable && npm install && npm run dev     # app on http://localhost:5174 (proxies /api)
 ```
 
-Demo OTPs: by default the backend returns the code in the response
-(`PORTAL_AUTH_EXPOSE_OTP=1`). The app shows it in a "Dev mode" hint. Turn this off in
-production and connect a real SMS/e-mail provider.
+**OTP delivery:** until the backend has an SMS/e-mail provider configured, codes are not
+actually sent. The app shows a "Test mode — nothing was sent" hint with the code. To send
+real codes by e-mail (SMTP) and SMS (Twilio, WhatsApp or any HTTP SMS gateway), copy
+`backend/.env.example` to `backend/.env` and fill it in (see Administration Guide §4.4).
 
 ### Desktop (Windows / macOS)
 

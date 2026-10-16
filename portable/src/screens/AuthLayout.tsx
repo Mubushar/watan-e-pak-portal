@@ -81,13 +81,22 @@ export function AuthLayout({ title, subtitle, children, back = true }: { title: 
   );
 }
 
-/** Development helper: the backend returns the code when PORTAL_AUTH_EXPOSE_OTP is on. */
+/** "Sent by SMS" / "e-mail" for toasts. */
+export function channelWord(target: string): string {
+  return target.includes("@") ? "e-mail" : "SMS";
+}
+
+/**
+ * Shown when the server has no SMS / e-mail provider for this channel (test mode):
+ * the backend returns the code instead of delivering it — see backend/delivery.py.
+ */
 export function DevOtpHint({ code, onUse }: { code?: string | null; onUse: (c: string) => void }) {
   if (!code) return null;
   return (
-    <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-dashed border-gold-300 bg-gold-50 px-3 py-2 text-xs text-gold-800 dark:border-gold-500/30 dark:bg-gold-500/10 dark:text-gold-200">
+    <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-dashed border-gold-300 bg-gold-50 px-3 py-2.5 text-xs text-gold-800 dark:border-gold-500/30 dark:bg-gold-500/10 dark:text-gold-200">
       <span>
-        Dev mode — code sent: <b className="font-mono text-sm">{code}</b>
+        <b className="block">Test mode — nothing was sent</b>
+        The server has no SMS/e-mail provider set up yet, so here is your code: <b className="font-mono text-sm">{code}</b>
       </span>
       <button type="button" className="font-semibold underline" onClick={() => onUse(code)}>
         Use it

@@ -158,7 +158,7 @@ scoped to their (revoked) identity.
 | `session_ttl_hours` | 24 | Bearer-token lifetime; refresh to extend. |
 | `password_min_length` | 8 | Minimum password length. |
 | `pbkdf2_iterations` | 120000 | Password hashing strength (PBKDF2). |
-| `expose_otp` | true *(dev)* | **Turn off in production** (`PORTAL_AUTH_EXPOSE_OTP=0`). |
+| `expose_otp` | true *(dev)* | Return codes as `dev_otp`. If `PORTAL_AUTH_EXPOSE_OTP` is unset, this applies only to channels with **no** delivery provider (§4.4). **Set `0` in production.** |
 | `channels` | `sms`, `email` | Delivery channels for OTP. |
 
 ### 4.2 Flows
@@ -169,6 +169,32 @@ scoped to their (revoked) identity.
 * **Refresh / logout** → `POST /auth/refresh`, `POST /auth/logout` (revokes the token).
 * **Password reset** → `POST /auth/password/reset-request` → `POST /auth/password/reset`
   (revokes all sessions); signed-in change via `POST /auth/password/set`.
+
+### 4.4 Delivering OTPs (SMS / WhatsApp / e-mail)
+
+Out of the box **no code is sent anywhere**. Each message goes only to the in-memory
+outbox (`GET /auth/notifications`, status `simulated`), the API returns the code as
+`dev_otp`, and the apps show a *Test mode* hint. To deliver real codes, configure
+`backend/delivery.py` through environment variables or `backend/.env` (template:
+`backend/.env.example`, loaded at startup):
+
+| Channel | Provider | Settings |
+| --- | --- | --- |
+| E-mail | Any SMTP server (Gmail app password, Outlook, Zoho, SendGrid/Mailgun/Brevo SMTP, cPanel) | `PORTAL_SMTP_HOST`, `PORTAL_SMTP_PORT`, `PORTAL_SMTP_USER`, `PORTAL_SMTP_PASSWORD`, `PORTAL_SMTP_FROM`, `PORTAL_SMTP_SECURITY` |
+| Mobile | `PORTAL_SMS_PROVIDER=twilio` | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` or `TWILIO_MESSAGING_SERVICE_SID` |
+| Mobile | `PORTAL_SMS_PROVIDER=whatsapp` (WhatsApp Business Cloud API) | `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `PORTAL_WHATSAPP_OTP_TEMPLATE` (an approved *authentication* template), `PORTAL_WHATSAPP_OTP_LANG`, `PORTAL_WHATSAPP_OTP_BUTTON` |
+| Mobile | `PORTAL_SMS_PROVIDER=webhook` (any HTTP SMS gateway) | `PORTAL_SMS_WEBHOOK_URL`, `PORTAL_SMS_WEBHOOK_METHOD`, `PORTAL_SMS_WEBHOOK_HEADERS`, `PORTAL_SMS_WEBHOOK_BODY` (placeholders `{to}`, `{to_digits}`, `{to_local}`, `{message}`, `{code}`) |
+
+What changes once a channel is configured:
+
+* Its codes are **no longer returned** in API responses. Set `PORTAL_AUTH_EXPOSE_OTP=1`
+  to keep returning them while testing.
+* The outbox stores the message with the code masked, plus `status` (`sent`/`failed`),
+  `provider` and `error`.
+* If delivery fails, the request returns **502** with `code: "delivery_failed"` and the
+  provider's reason. A sign-up whose codes could not be delivered is rolled back, so the
+  person can simply try again.
+* `GET /auth/config` → `delivery` shows which provider each channel uses (no secrets).
 
 ### 4.3 Audit & monitoring
 

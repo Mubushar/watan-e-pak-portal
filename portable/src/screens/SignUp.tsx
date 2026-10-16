@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { SIGNUP_ROLES, useAuth, type Session, type SignupRole } from "@/store/auth";
 import { usePrefs } from "@/store/prefs";
 import { Button, Field, Input, OtpInput, Segmented } from "@/components/ui";
-import { AuthLayout, DevOtpHint, IdentifierInput, identifierValue, ResendButton, useCountdown, validIdentifier, type Channel } from "./AuthLayout";
+import { AuthLayout, channelWord, DevOtpHint, IdentifierInput, identifierValue, ResendButton, useCountdown, validIdentifier, type Channel } from "./AuthLayout";
 
 const ROLE_ICONS: Record<SignupRole, typeof Home> = {
   buyer: Home,
@@ -25,7 +25,14 @@ const ROLE_ICONS: Record<SignupRole, typeof Home> = {
 };
 
 interface SignupResult {
-  verification: { sent_to: string[]; channels: string[]; expires_in_seconds: number; dev_otp?: Record<string, string> | null };
+  verification: {
+    sent_to: string[];
+    channels: string[];
+    expires_in_seconds: number;
+    /** Per identifier: "sent" (real provider) or "simulated" (server test mode). */
+    delivery?: Record<string, "sent" | "simulated">;
+    dev_otp?: Record<string, string> | null;
+  };
 }
 
 type Step = "role" | "details" | "verify";
@@ -63,7 +70,9 @@ export default function SignUp() {
       setSent(r.verification);
       setStep("verify");
       setCooldown(30);
-      toast.success(`Verification code sent to ${r.verification.sent_to.join(" & ")}`);
+      const to = r.verification.sent_to;
+      if (to.some((t) => r.verification.delivery?.[t] === "sent")) toast.success(`Verification code sent by ${to.map(channelWord).join(" & ")} to ${to.join(" & ")}`);
+      else toast.info("Test mode: the server didn't send a real message — use the code shown below.");
     } catch (e) {
       if (e instanceof ApiError && (e.code === "email_taken" || e.code === "mobile_taken")) setTaken(true);
       toast.error((e as Error).message);

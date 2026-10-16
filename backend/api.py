@@ -1157,6 +1157,7 @@ def _auth_result(result: Any) -> Any:
             "cooldown": 429,
             "email_taken": 409,
             "mobile_taken": 409,
+            "delivery_failed": 502,
         }.get(result.get("code"), 400)
         raise HTTPException(status_code=status, detail=result)
     return result

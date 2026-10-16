@@ -209,7 +209,7 @@ export function Logo({ light, compact, className }: { light?: boolean; compact?:
       <img src={BRAND.mark} alt="Arz-e-Pak" className={cn("w-auto drop-shadow-sm", compact ? "h-8" : "h-10")} />
       <span className="leading-none">
         <span className={cn("block font-display font-extrabold tracking-tight", compact ? "text-lg" : "text-xl", light ? "text-white" : "text-brand-800 dark:text-white")}>
-          ARZ-E-<span className="text-gradient">PAK</span>
+          Arz-e-<span className="text-gradient">Pak</span>
         </span>
         {!compact && <span className={cn("block text-[9px] font-semibold uppercase tracking-[.22em]", light ? "text-white/70" : "text-ink-mute dark:text-slate-400")}>AI Real Estate Portal</span>}
       </span>

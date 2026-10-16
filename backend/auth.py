@@ -7,9 +7,11 @@ opaque bearer sessions, password reset and an audit trail.
 
 Design notes
 ------------
-* **Dependency-free.** Only the standard library (``hashlib``/``hmac``/``secrets``)
-  plus Pydantic. No SMS/e-mail provider is required: outbound messages are written
-  to an in-memory *outbox* (``notifications_db``) so the whole flow is testable.
+* **Delivery.** Codes go out through ``delivery.py`` — SMTP e-mail and SMS via
+  Twilio, WhatsApp Cloud API or any HTTP gateway — when those are configured.
+  Every message is also written to an in-memory *outbox* (``notifications_db``);
+  with nothing configured that outbox is the only "delivery" (status
+  ``simulated``), so the whole flow stays testable.
 * **OTP is mandatory for signup.** A new account is created in ``pending`` status
   and only becomes ``active`` (and only then can it log in) once a code from the
   signup challenge is verified.
@@ -17,7 +19,8 @@ Design notes
   normalised to E.164 (a bare ``03xx…`` Pakistani number becomes ``+923xx…``).
 * **Secrets.** Passwords use PBKDF2-HMAC-SHA256 with a per-user salt; OTPs and
   session tokens are random. Codes are stored as salted hashes — the plaintext is
-  only retained when ``PORTAL_AUTH_EXPOSE_OTP`` is on (dev convenience).
+  only retained (and returned as ``dev_otp``) for channels that are *simulated*,
+  or whenever ``PORTAL_AUTH_EXPOSE_OTP`` explicitly says so.
 
 This module holds no MCP or FastAPI code; ``server.py`` exposes it over MCP and
 ``api.py`` reuses the very same functions over REST.
@@ -33,6 +36,8 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field
+
+import delivery
 
 
 # ============================================================
@@ -60,7 +65,8 @@ AUTH_CONFIG: Dict[str, Any] = {
     # Passwords
     "password_min_length": 8,
     "pbkdf2_iterations": 120_000,
-    # Dev convenience: keep the plaintext OTP and return it in responses.
+    # Dev convenience: keep the plaintext OTP and return it in responses. When the
+    # variable is unset, codes are exposed only for channels with no real provider.
     "expose_otp": _env_bool("PORTAL_AUTH_EXPOSE_OTP", True),
     # Channels
     "channels": ["sms", "email"],
@@ -289,7 +295,7 @@ class SessionToken(BaseModel):
 
 
 class Notification(BaseModel):
-    """A simulated outbound SMS / e-mail."""
+    """An outbound SMS / e-mail and how it was delivered."""
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     channel: str = "sms"                # sms | email
@@ -298,6 +304,9 @@ class Notification(BaseModel):
     body: str = ""
     purpose: Optional[str] = None
     otp_id: Optional[str] = None
+    status: str = "simulated"           # simulated | sent | failed
+    provider: str = "simulated"         # smtp | twilio | whatsapp | webhook | simulated
+    error: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.now)
 
 
@@ -441,22 +450,43 @@ def log_event(event: str, identifier: Optional[str] = None, user_id: Optional[st
 # ============================================================
 
 
+def expose_code(channel: str) -> bool:
+    """Return plaintext codes in API responses? An explicit PORTAL_AUTH_EXPOSE_OTP wins;
+    otherwise only for channels without a real provider (dev / demo)."""
+    if os.environ.get("PORTAL_AUTH_EXPOSE_OTP") is not None:
+        return bool(AUTH_CONFIG["expose_otp"])
+    return bool(AUTH_CONFIG["expose_otp"]) and delivery.provider_for(channel) == "simulated"
+
+
+_PURPOSE_TEXT = {"signup": "verify your new account", "login": "sign in", "reset_password": "reset your password"}
+
+
 def _deliver(otp: OtpCode, code: str) -> Notification:
+    minutes = int(AUTH_CONFIG["otp_ttl_seconds"]) // 60
+    action = _PURPOSE_TEXT.get(otp.purpose, otp.purpose)
     if otp.channel == "email":
-        subject = "Your Real Estate Portal verification code"
+        subject = f"{code} is your Arz-e-Pak verification code"
         body = (
-            f"Your one-time code is {code}. It expires in "
-            f"{int(AUTH_CONFIG['otp_ttl_seconds']) // 60} minutes. "
-            f"Purpose: {otp.purpose}."
+            f"Assalam-o-Alaikum,\n\nUse {code} to {action} on Arz-e-Pak. "
+            f"The code expires in {minutes} minutes.\n\n"
+            "If you didn't request this, you can ignore this e-mail.\n\n— Arz-e-Pak AI Real Estate"
         )
+        status, provider, error = delivery.send_email(otp.identifier, subject, body)
     else:
-        subject = "Real Estate Portal"
-        body = f"Portal: your OTP is {code} (valid {int(AUTH_CONFIG['otp_ttl_seconds']) // 60} min)."
+        subject = "Arz-e-Pak"
+        body = f"Arz-e-Pak: {code} is your code to {action}. Valid for {minutes} min. Don't share it."
+        status, provider, error = delivery.send_sms(otp.identifier, body, code)
+    if status == "sent":
+        # The real message carried the code; never keep it readable in the outbox.
+        body = body.replace(code, "•" * len(code))
+        subject = subject.replace(code, "•" * len(code))
     note = Notification(
         channel=otp.channel, recipient=otp.identifier, subject=subject, body=body,
-        purpose=otp.purpose, otp_id=otp.id,
+        purpose=otp.purpose, otp_id=otp.id, status=status, provider=provider, error=error,
     )
     notifications_db.append(note)
+    if status == "failed":
+        log_event("otp_delivery_failed", otp.identifier, otp.user_id, f"{provider}: {error}")
     return note
 
 
@@ -492,14 +522,21 @@ def create_otp(identifier: str, purpose: str = "signup", user: Optional[User] = 
         purpose=purpose,
         user_id=(user or find_user(ident)).id if (user or find_user(ident)) else None,
         code_hash=_hash_otp(ident, code),
-        code=code if AUTH_CONFIG["expose_otp"] else None,
+        code=code if expose_code(channel_for(ident)) else None,
         expires_at=now + timedelta(seconds=int(AUTH_CONFIG["otp_ttl_seconds"])),
         max_attempts=int(AUTH_CONFIG["otp_max_attempts"]),
     )
+    note = _deliver(otp, code)
+    if note.status == "failed":
+        how = "e-mail" if otp.channel == "email" else "SMS"
+        return {
+            "error": f"We couldn't send the code by {how} to {ident} ({note.error}). Please try again later.",
+            "code": "delivery_failed",
+            "channel": otp.channel,
+        }
     otps_db.append(otp)
-    _deliver(otp, code)
-    log_event("otp_sent", ident, otp.user_id, f"purpose={purpose} channel={otp.channel}")
-    return {"otp": otp, "channel": otp.channel}
+    log_event("otp_sent", ident, otp.user_id, f"purpose={purpose} channel={otp.channel} via={note.provider}")
+    return {"otp": otp, "channel": otp.channel, "delivery": note.status}
 
 
 def _otp_hint(otp: OtpCode) -> Dict[str, Any]:
@@ -508,7 +545,9 @@ def _otp_hint(otp: OtpCode) -> Dict[str, Any]:
         "channel": otp.channel,
         "expires_at": otp.expires_at.isoformat(),
         "expires_in_seconds": int(AUTH_CONFIG["otp_ttl_seconds"]),
-        "dev_otp": otp.code if AUTH_CONFIG["expose_otp"] else None,
+        # "sent" = really delivered; "simulated" = no provider configured for this channel.
+        "delivery": "sent" if delivery.provider_for(otp.channel) != "simulated" else "simulated",
+        "dev_otp": otp.code,
     }
 
 
@@ -689,10 +728,15 @@ def signup(email: Optional[str] = None, mobile: Optional[str] = None, password: 
     log_event("signup", email_n or mobile_n, user.id, f"role={role}")
 
     sent: List[Dict[str, Any]] = []
+    failures: List[Dict[str, Any]] = []
     for ident in [x for x in (email_n, mobile_n) if x]:
         issued = create_otp(ident, purpose="signup", user=user, force=True)
-        if "otp" in issued:
-            sent.append(issued)
+        (sent if "otp" in issued else failures).append(issued)
+    if not sent:
+        # Nothing could be delivered: undo the pending account so the person can retry.
+        users_db.remove(user)
+        log_event("signup_rolled_back", email_n or mobile_n, user.id, "verification code not delivered")
+        return failures[0] if failures else {"error": "Could not send a verification code", "code": "delivery_failed"}
 
     return {
         "user": public_user(user),
@@ -702,7 +746,9 @@ def signup(email: Optional[str] = None, mobile: Optional[str] = None, password: 
             "sent_to": [s["otp"].identifier for s in sent],
             "channels": [s["channel"] for s in sent],
             "expires_in_seconds": int(AUTH_CONFIG["otp_ttl_seconds"]),
-            "dev_otp": {s["otp"].identifier: s["otp"].code for s in sent} if AUTH_CONFIG["expose_otp"] else None,
+            "delivery": {s["otp"].identifier: s["delivery"] for s in sent},
+            "failed": [f.get("error") for f in failures],
+            "dev_otp": {s["otp"].identifier: s["otp"].code for s in sent if s["otp"].code} or None,
         },
         "next_step": "Call verify-otp with the identifier and the code to activate the account.",
     }
@@ -915,6 +961,7 @@ def get_config() -> Dict[str, Any]:
     cfg["users"] = len(users_db)
     cfg["active_sessions"] = sum(1 for s in sessions_db if s.is_valid())
     cfg["pending_otps"] = sum(1 for o in otps_db if not o.consumed_at and not o.is_expired())
+    cfg["delivery"] = delivery.summary()
     return cfg
 
 

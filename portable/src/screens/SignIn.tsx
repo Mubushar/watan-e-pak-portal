@@ -12,12 +12,14 @@ import { ApiError, post } from "@/lib/api";
 import { useAuth, type Session } from "@/store/auth";
 import { usePrefs } from "@/store/prefs";
 import { Button, Field, OtpInput, Segmented } from "@/components/ui";
-import { AuthLayout, DevOtpHint, IdentifierInput, identifierValue, ResendButton, useCountdown, validIdentifier, type Channel } from "./AuthLayout";
+import { AuthLayout, channelWord, DevOtpHint, IdentifierInput, identifierValue, ResendButton, useCountdown, validIdentifier, type Channel } from "./AuthLayout";
 
 interface OtpSent {
   sent_to?: string;
   channel?: string;
   dev_otp?: string | null;
+  /** "sent" = delivered by a real provider; "simulated" = server test mode. */
+  delivery?: "sent" | "simulated";
   expires_in_seconds?: number;
 }
 
@@ -44,7 +46,8 @@ export default function SignIn() {
       setSent(r);
       setCode("");
       setCooldown(30);
-      toast.success(`Code sent to ${r.sent_to ?? identifier}`);
+      if (r.dev_otp && r.delivery !== "sent") toast.info("Test mode: the server didn't send a real message — use the code shown below.");
+      else toast.success(`Code sent by ${channelWord(r.sent_to ?? identifier)} to ${r.sent_to ?? identifier}`);
     } catch (e) {
       const retry = e instanceof ApiError ? (e.detail as { retry_after_seconds?: number })?.retry_after_seconds : undefined;
       if (retry) {

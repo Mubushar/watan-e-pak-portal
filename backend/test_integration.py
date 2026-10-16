@@ -1199,6 +1199,11 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         r = client.post("/auth/verify-otp", json={"identifier": ident, "code": (sent.get("dev_otp") or {}).get(ident, "")})
         seller_token = r.json().get("token", "") if r.status_code == 200 else ""
         check("passwordless signup -> token", bool(seller_token), str(r.status_code))
+        check("signup reports delivery (simulated without providers)",
+              sent.get("delivery", {}).get(ident) == "simulated", str(sent.get("delivery")))
+        r = client.get("/auth/config")
+        check("GET /auth/config delivery summary", r.json().get("delivery") == {"email": "simulated", "sms": "simulated"},
+              str(r.json().get("delivery")))
         sh = {"Authorization": f"Bearer {seller_token}"}
 
         r = client.get("/me/listings")
