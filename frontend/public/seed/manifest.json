@@ -1,0 +1,111 @@
+{
+  "generated": "2026-10-16",
+  "properties": {
+    "house": [
+      "/seed/properties/house-1.svg",
+      "/seed/properties/house-2.svg",
+      "/seed/properties/house-3.svg",
+      "/seed/properties/house-4.svg"
+    ],
+    "villa": [
+      "/seed/properties/villa-1.svg",
+      "/seed/properties/villa-2.svg",
+      "/seed/properties/villa-3.svg",
+      "/seed/properties/villa-4.svg"
+    ],
+    "apartment": [
+      "/seed/properties/apartment-1.svg",
+      "/seed/properties/apartment-2.svg",
+      "/seed/properties/apartment-3.svg",
+      "/seed/properties/apartment-4.svg"
+    ],
+    "tower": [
+      "/seed/properties/tower-1.svg",
+      "/seed/properties/tower-2.svg",
+      "/seed/properties/tower-3.svg",
+      "/seed/properties/tower-4.svg"
+    ],
+    "office": [
+      "/seed/properties/office-1.svg",
+      "/seed/properties/office-2.svg",
+      "/seed/properties/office-3.svg",
+      "/seed/properties/office-4.svg"
+    ],
+    "shop": [
+      "/seed/properties/shop-1.svg",
+      "/seed/properties/shop-2.svg",
+      "/seed/properties/shop-3.svg",
+      "/seed/properties/shop-4.svg"
+    ],
+    "plot": [
+      "/seed/properties/plot-1.svg",
+      "/seed/properties/plot-2.svg",
+      "/seed/properties/plot-3.svg",
+      "/seed/properties/plot-4.svg"
+    ],
+    "farmhouse": [
+      "/seed/properties/farmhouse-1.svg",
+      "/seed/properties/farmhouse-2.svg",
+      "/seed/properties/farmhouse-3.svg",
+      "/seed/properties/farmhouse-4.svg"
+    ],
+    "building": [
+      "/seed/properties/building-1.svg",
+      "/seed/properties/building-2.svg",
+      "/seed/properties/building-3.svg",
+      "/seed/properties/building-4.svg"
+    ],
+    "floor": [
+      "/seed/properties/floor-1.svg",
+      "/seed/properties/floor-2.svg",
+      "/seed/properties/floor-3.svg",
+      "/seed/properties/floor-4.svg"
+    ],
+    "space": [
+      "/seed/properties/space-1.svg",
+      "/seed/properties/space-2.svg",
+      "/seed/properties/space-3.svg",
+      "/seed/properties/space-4.svg"
+    ],
+    "mall": [
+      "/seed/properties/mall-1.svg",
+      "/seed/properties/mall-2.svg",
+      "/seed/properties/mall-3.svg",
+      "/seed/properties/mall-4.svg"
+    ]
+  },
+  "interiors": [
+    "/seed/interiors/interior-1.svg",
+    "/seed/interiors/interior-2.svg",
+    "/seed/interiors/interior-3.svg",
+    "/seed/interiors/interior-4.svg",
+    "/seed/interiors/interior-5.svg",
+    "/seed/interiors/interior-6.svg"
+  ],
+  "plans": [
+    "/seed/plans/plan-1.svg",
+    "/seed/plans/plan-2.svg",
+    "/seed/plans/plan-3.svg"
+  ],
+  "cities": {
+    "lahore": "/seed/cities/lahore.svg",
+    "karachi": "/seed/cities/karachi.svg",
+    "islamabad": "/seed/cities/islamabad.svg",
+    "rawalpindi": "/seed/cities/rawalpindi.svg"
+  },
+  "hero": [
+    "/seed/hero/ai-map.webp",
+    "/seed/hero/islamabad-panorama.webp",
+    "/seed/hero/luxury-villa.webp",
+    "/seed/hero/pakistan-landscape.webp"
+  ],
+  "brand": [
+    "/brand/dashboard-concept.webp",
+    "/brand/header-en.webp",
+    "/brand/header-ur.webp",
+    "/brand/logo-en.webp",
+    "/brand/logo-mark.png",
+    "/brand/logo-mark.webp",
+    "/brand/logo-ur.webp"
+  ]
+}
