@@ -16,6 +16,7 @@ import asyncio
 import base64
 import json
 import logging
+import os
 from typing import Any, List, Tuple
 
 from mcp import Client
@@ -1188,6 +1189,60 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
 
         r = client.post("/auth/login", json={"identifier": "admin@portal.pk", "password": "Admin@12345"})
         check("POST /auth/login (seeded admin)", r.status_code == 200, str(r.status_code))
+
+        # --- Portable app: passwordless signup, my listings, photos, CORS, AI helpers ---
+        r = client.post("/auth/signup", json={"mobile": "0333 555 0199", "name": "App Seller", "role": "seller"})
+        sent = (r.json().get("verification") or {}) if r.status_code == 201 else {}
+        check("POST /auth/signup (passwordless)", r.status_code == 201 and len(sent.get("sent_to", [])) == 1,
+              f"{r.status_code} {r.text[:100]}")
+        ident = sent.get("sent_to", [""])[0]
+        r = client.post("/auth/verify-otp", json={"identifier": ident, "code": (sent.get("dev_otp") or {}).get(ident, "")})
+        seller_token = r.json().get("token", "") if r.status_code == 200 else ""
+        check("passwordless signup -> token", bool(seller_token), str(r.status_code))
+        sh = {"Authorization": f"Bearer {seller_token}"}
+
+        r = client.get("/me/listings")
+        check("GET /me/listings (no token -> 401)", r.status_code == 401, str(r.status_code))
+        city_id = client.get("/cities").json()["cities"][0]["id"]
+        r = client.post("/me/listings", headers=sh, json={"title": "App 10 Marla House", "price": 45_000_000,
+                                                          "city_id": city_id, "marla_area": 10})
+        mine = r.json() if r.status_code == 201 else {}
+        check("POST /me/listings (owned)", r.status_code == 201 and bool(mine.get("owner_user_id")), str(r.status_code))
+        r = client.get("/me/listings", headers=sh)
+        check("GET /me/listings", r.status_code == 200 and r.json().get("count") == 1, str(r.status_code))
+        r = client.put(f"/me/listings/{mine.get('id')}", headers=sh, json={"status": "sold"})
+        check("PUT /me/listings/{id}", r.status_code == 200 and r.json().get("status") == "sold", str(r.status_code))
+        buyer_token = client.post("/auth/login", json={"identifier": "bilal@example.com",
+                                                       "password": "Buyer@12345"}).json().get("token", "")
+        r = client.put(f"/me/listings/{mine.get('id')}", headers={"Authorization": f"Bearer {buyer_token}"},
+                       json={"status": "active"})
+        check("PUT /me/listings/{id} (not owner -> 403)", r.status_code == 403, str(r.status_code))
+        r = client.post(f"/me/listings/{mine.get('id')}/photos", headers=sh,
+                        json={"data_url": "data:image/jpeg;base64," + _photo_jpeg_b64(), "is_primary": True})
+        photo = r.json() if r.status_code == 201 else {}
+        check("POST /me/listings/{id}/photos", r.status_code == 201
+              and photo.get("image_urls", [""])[0] == photo.get("url"), str(r.status_code))
+        r = client.get(photo.get("url", "/media/uploads/missing.jpg"))
+        check("GET /media/uploads/{file}", r.status_code == 200 and r.headers["content-type"] == "image/jpeg",
+              str(r.status_code))
+        r = client.post(f"/me/listings/{mine.get('id')}/photos", headers=sh, json={"data_url": "aGVsbG8="})
+        check("POST /me/listings/{id}/photos (not an image -> 415)", r.status_code == 415, str(r.status_code))
+        if photo.get("url"):
+            os.remove(os.path.join(os.path.dirname(os.path.abspath(__file__)), photo["url"].lstrip("/")))
+        r = client.delete(f"/me/listings/{mine.get('id')}", headers=sh)
+        check("DELETE /me/listings/{id}", r.status_code == 200 and r.json().get("deleted") is True, str(r.status_code))
+
+        r = client.options("/me/listings", headers={"Origin": "capacitor://localhost",
+                                                     "Access-Control-Request-Method": "POST",
+                                                     "Access-Control-Request-Headers": "authorization"})
+        check("CORS preflight", r.status_code == 200 and r.headers.get("access-control-allow-origin") == "*",
+              str(r.status_code))
+        r = client.get("/ai/capabilities")
+        check("GET /ai/capabilities", r.status_code == 200 and r.json().get("chat_mode") in ("local", "upstream"),
+              str(r.status_code))
+        if r.json().get("chat_mode") == "local":
+            r = client.post("/ai/transcribe", json={"audio_base64": "AAAA"})
+            check("POST /ai/transcribe (no upstream -> 501)", r.status_code == 501, str(r.status_code))
 
         # --- MCP share the same auth store as REST ---
         r = client.post("/auth/login", json={"identifier": "mcp@portal.test", "password": "Secret@123"})

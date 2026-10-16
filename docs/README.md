@@ -76,10 +76,10 @@ uv run python ..\docs\_gen\gen_docs.py
 
 | Surface | Count |
 | --- | --- |
-| MCP tools | **593** across **30 groups** |
+| MCP tools | **594** across **30 groups** |
 | MCP resources / templates | **112** / **34** |
 | MCP prompts | **31** |
-| REST routes | **618** across **36 tags** |
+| REST routes | **626** across **37 tags** |
 | Portal roles / permissions | **19** / **30** |
 | Agentic agents / products | **24** / **8** |
 

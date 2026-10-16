@@ -1,6 +1,6 @@
 # MCP tool reference
 
-Auto-generated from `server.py` — **593 tools** across **30 groups**. Regenerate with `uv run python docs/_gen/gen_docs.py` from the repository root's `backend/`.
+Auto-generated from `server.py` — **594 tools** across **30 groups**. Regenerate with `uv run python docs/_gen/gen_docs.py` from the repository root's `backend/`.
 
 Legend: `?` = optional parameter. Types are the JSON-Schema types the server advertises to MCP clients.
 
@@ -14,7 +14,7 @@ Legend: `?` = optional parameter. Types are the JSON-Schema types the server adv
 | [accounting](#accounting) | 32 |
 | [crm](#crm) | 28 |
 | [maintenance](#maintenance) | 27 |
-| [hierarchy](#hierarchy) | 24 |
+| [hierarchy](#hierarchy) | 25 |
 | [construction](#construction) | 23 |
 | [commercial](#commercial) | 16 |
 | [transactions](#transactions) | 16 |
@@ -380,7 +380,7 @@ Legend: `?` = optional parameter. Types are the JSON-Schema types the server adv
 
 ## hierarchy
 
-24 tools.
+25 tools.
 
 | Tool | Purpose | Parameters |
 | --- | --- | --- |
@@ -392,7 +392,7 @@ Legend: `?` = optional parameter. Types are the JSON-Schema types the server adv
 | `add_project_floor_plan` | Attach a floor plan to a big project. | `project_id`:string, `floor_plan_url`:string |
 | `add_project_map` | Attach a map/location image to a big project. | `project_id`:string, `map_url`:string |
 | `add_project_multimedia` | Attach multimedia (e.g. video/VR/drone) to a big project. | `project_id`:string, `media_type`:string, `url`:string |
-| `add_property` | Create a property. Areas auto-derive between total_area / marla / kanal. | `title`:string, `price`:number, `city_id`:string, `description`?:optional, `use_type`?:string="residential", `category`?:string="house", `scheme_id`?:optional, `block_zone_area_id`?:optional, `total_area`?:optional, `marla_area`?:optional, `kanal_area`?:optional, `bedrooms`?:optional, `bathrooms`?:optional, `balconies`?:optional, `floors`?:optional, `street_address`?:optional, `plot_number`?:optional, `sector`?:optional, `landmark`?:optional, `latitude`?:optional, `longitude`?:optional, `featured`?:boolean=false, `agent_id`?:optional |
+| `add_property` | Create a property. Areas auto-derive between total_area / marla / kanal. | `title`:string, `price`:number, `city_id`:string, `description`?:optional, `use_type`?:string="residential", `category`?:string="house", `scheme_id`?:optional, `block_zone_area_id`?:optional, `total_area`?:optional, `marla_area`?:optional, `kanal_area`?:optional, `bedrooms`?:optional, `bathrooms`?:optional, `balconies`?:optional, `floors`?:optional, `street_address`?:optional, `plot_number`?:optional, `sector`?:optional, `landmark`?:optional, `latitude`?:optional, `longitude`?:optional, `featured`?:boolean=false, `agent_id`?:optional, `owner_user_id`?:optional |
 | `delete_big_project` | Delete a big project by id. | `project_id`:string |
 | `delete_property` | Delete a property by id. | `property_id`:string |
 | `get_big_project_by_id` | Fetch a big project by id. | `project_id`:string |
@@ -405,6 +405,7 @@ Legend: `?` = optional parameter. Types are the JSON-Schema types the server adv
 | `list_big_projects` | List big projects, filtered by city and/or type. | `city`?:optional, `project_type`?:optional |
 | `list_blocks` | List blocks/zones/areas, optionally filtered by scheme (id or name). | `scheme`?:optional |
 | `list_cities` | List every city in the portal with its coordinates and child counts. | — |
+| `list_owned_properties` | List the properties a portal account has published (newest first). | `owner_user_id`:string, `status`?:optional, `limit`?:integer=100 |
 | `list_schemes` | List housing schemes/societies, optionally filtered by city (id or name). | `city`?:optional |
 | `update_big_project` | Update editable fields of a big project. | `project_id`:string, `name`?:optional, `description`?:optional, `status`?:optional, `floor_count`?:optional, `total_area`?:optional, `total_units`?:optional, `occupancy_rate`?:optional, `developer`?:optional, `completion_date`?:optional, `total_parking_spaces`?:optional, `total_retail_space`?:optional, `total_office_space`?:optional, `total_residential_units`?:optional |
 | `update_property` | Update editable fields of a property (only the provided fields change). | `property_id`:string, `title`?:optional, `description`?:optional, `price`?:optional, `use_type`?:optional, `category`?:optional, `status`?:optional, `bedrooms`?:optional, `bathrooms`?:optional, `total_area`?:optional, `marla_area`?:optional, `kanal_area`?:optional, `latitude`?:optional, `longitude`?:optional, `featured`?:optional |

@@ -181,6 +181,7 @@ class Property(MediaMixin):
     geo_json: Optional[str] = None
 
     agent_id: Optional[str] = None
+    owner_user_id: Optional[str] = None  # portal account that published the listing
     available_from: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
@@ -831,6 +832,7 @@ def add_property(
     longitude: Optional[float] = None,
     featured: bool = False,
     agent_id: Optional[str] = None,
+    owner_user_id: Optional[str] = None,
 ) -> str:
     """Create a property. Areas auto-derive between total_area / marla / kanal."""
     if not find_city(city_id):
@@ -859,10 +861,25 @@ def add_property(
         longitude=longitude,
         featured=featured,
         agent_id=agent_id,
+        owner_user_id=owner_user_id,
     )
     derive_areas(p)
     properties_db.append(p)
     return dump_model(p)
+
+
+@mcp.tool()
+def list_owned_properties(owner_user_id: str, status: Optional[str] = None, limit: int = 100) -> str:
+    """List the properties a portal account has published (newest first)."""
+    owned = [p for p in properties_db if p.owner_user_id == owner_user_id
+             and (not status or p.status.lower() == status.lower())]
+    owned.sort(key=lambda p: p.created_at, reverse=True)
+    payload = []
+    for p in owned[: max(0, limit)]:
+        d = model_dict(p)
+        d["city_name"] = city_name(p.city_id)
+        payload.append(d)
+    return dump({"count": len(owned), "returned": len(payload), "results": payload})
 
 
 @mcp.tool()

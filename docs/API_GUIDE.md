@@ -18,7 +18,7 @@ OpenAI-compatible facade and error handling. For the MCP surface, see the
 | OpenAPI schema | `/openapi.json` |
 | MCP (mounted) | `/mcp` |
 | OpenAI facade | `/v1` |
-| Routes | **618** across **36 tags** |
+| Routes | **626** across **37 tags** |
 
 Every route calls a plain-Python function that the matching MCP tool also calls, so the
 two surfaces are guaranteed equivalent.
@@ -133,6 +133,28 @@ curl "http://127.0.0.1:8000/properties/PROP-0001/compare/PROP-0002"
 curl -X PUT "http://127.0.0.1:8000/properties/PROP-0001/coordinates" `
   -H "Content-Type: application/json" -d '{"latitude":31.52,"longitude":74.35}'
 ```
+
+#### My listings (signed-in account)
+
+Listings created through `/me/listings` are owned by the caller (`owner_user_id`); agents
+are attributed automatically. The portable app (`portable/`) uses these routes.
+
+```powershell
+$H = @{ Authorization = "Bearer $token" }
+# publish
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/me/listings" -Headers $H `
+  -ContentType "application/json" `
+  -Body '{"title":"10 Marla House","price":45000000,"city_id":"<city id>","marla_area":10}'
+# mine / edit / delete
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/me/listings" -Headers $H
+Invoke-RestMethod -Method Put -Uri "http://127.0.0.1:8000/me/listings/<id>" -Headers $H `
+  -ContentType "application/json" -Body '{"status":"sold"}'
+# attach a photo (JPEG/PNG/WebP, base64, max 5 MB) -> served from /media/uploads/<file>
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/me/listings/<id>/photos" -Headers $H `
+  -ContentType "application/json" -Body '{"data_url":"data:image/jpeg;base64,...","is_primary":true}'
+```
+
+Only the owner (or an admin) can edit, delete or add photos to a listing (`403` otherwise).
 
 ### 4.2 GIS
 
@@ -257,6 +279,19 @@ OpenAI-style API.
 * **Proxy mode** — set `PORTAL_LLM_BASE_URL`, `PORTAL_LLM_API_KEY` and
   `PORTAL_LLM_MODEL` to forward to a real OpenAI-compatible LLM (OpenAI, Ollama,
   LM Studio, vLLM, …). Streaming is passed through.
+
+### Assistant helpers
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /ai/capabilities` | Which chat model answers (`local` RAG fallback or `upstream`) and whether server-side speech-to-text is available. |
+| `POST /ai/transcribe` | `{"audio_base64", "mime_type", "language"}` → `{"text"}`. Forwards to the upstream `/audio/transcriptions` (model `PORTAL_STT_MODEL`, default `whisper-1`); `501` without `PORTAL_LLM_BASE_URL`. |
+
+### CORS
+
+The API sends CORS headers so the portable desktop app and separately hosted front ends
+can call it. Auth is a bearer header (no cookies), so the default is `*`; set
+`PORTAL_CORS_ORIGINS` to a comma-separated allow-list to restrict it.
 
 ---
 

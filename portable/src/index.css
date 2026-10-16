@@ -1,0 +1,104 @@
+/*
+ * Component classes below (.btn, .card, .input, .chip …) mirror the web portal's
+ * frontend/src/index.css so the app and the portal look identical. App-only
+ * additions (safe areas, tab bar, sheets) are at the end.
+ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-[#f6f8f6] text-ink antialiased font-sans dark:bg-[#07130d] dark:text-slate-100;
+    overscroll-behavior-y: none;
+  }
+  h1, h2, h3, h4 {
+    @apply font-display tracking-tight;
+  }
+  ::selection {
+    @apply bg-gold-200 text-brand-900;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(15, 90, 57, 0.35) transparent;
+  }
+  /* Urdu text (assistant replies, voice transcripts) renders in Nastaliq. */
+  .urdu {
+    font-family: "Noto Nastaliq Urdu", "Plus Jakarta Sans", serif;
+    line-height: 2.1;
+  }
+}
+
+@layer components {
+  /* ---------- buttons ---------- */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 active:scale-[.98] whitespace-nowrap select-none;
+  }
+  .btn-sm { @apply px-3 py-1.5 text-xs rounded-lg; }
+  .btn-lg { @apply px-6 py-3.5 text-base rounded-2xl; }
+  .btn-primary { @apply bg-brand-700 text-white shadow-soft hover:bg-brand-800 dark:bg-brand-600 dark:hover:bg-brand-500; }
+  .btn-gold { @apply bg-gold-gradient text-brand-950 shadow-glow hover:brightness-105; }
+  .btn-outline { @apply border border-brand-200 bg-white text-brand-800 hover:border-brand-400 hover:bg-brand-50 dark:border-white/15 dark:bg-white/5 dark:text-brand-100 dark:hover:bg-white/10; }
+  .btn-ghost { @apply text-brand-800 hover:bg-brand-50 dark:text-brand-100 dark:hover:bg-white/10; }
+  .btn-soft { @apply bg-brand-50 text-brand-800 hover:bg-brand-100 dark:bg-brand-900/40 dark:text-brand-100 dark:hover:bg-brand-900/70; }
+  .btn-danger { @apply bg-red-600 text-white hover:bg-red-700; }
+  .btn-icon { @apply h-10 w-10 p-0 rounded-xl; }
+
+  /* ---------- surfaces ---------- */
+  .card {
+    @apply rounded-2xl border border-black/5 bg-white shadow-card dark:border-white/10 dark:bg-[#0d1f16];
+  }
+  .card-hover { @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-soft; }
+  .glass {
+    @apply border border-white/40 bg-white/70 backdrop-blur-xl dark:border-white/10 dark:bg-[#0d1f16]/70;
+  }
+  .glass-dark { @apply border border-white/10 bg-brand-950/55 text-white backdrop-blur-xl; }
+  .surface-muted { @apply bg-brand-50/60 dark:bg-white/5; }
+
+  /* ---------- forms ---------- */
+  .label { @apply mb-1.5 block text-xs font-semibold uppercase tracking-wider text-ink-mute dark:text-slate-400; }
+  .input {
+    @apply w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-base text-ink placeholder:text-ink-mute/70 transition focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15 sm:text-sm dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500;
+  }
+  select.input { @apply appearance-none bg-no-repeat pr-9; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%236b7a72' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-position: right .7rem center; }
+
+  /* ---------- misc ---------- */
+  .chip { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold; }
+  .section-eyebrow { @apply text-xs font-bold uppercase tracking-[.2em] text-gold-600 dark:text-gold-300; }
+  .section-title { @apply font-display text-xl font-bold text-brand-900 dark:text-white; }
+  .text-gradient { @apply bg-gold-gradient bg-clip-text text-transparent; }
+  .link { @apply font-semibold text-brand-700 underline-offset-4 hover:underline dark:text-brand-300; }
+  .divider { @apply h-px w-full bg-black/5 dark:bg-white/10; }
+  .scroll-x { @apply flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { scrollbar-width: none; }
+
+  /* ---------- app-only ---------- */
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .mb-safe { margin-bottom: env(safe-area-inset-bottom); }
+  .tabbar-space { padding-bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
+  .screen { @apply mx-auto w-full max-w-3xl px-4; }
+  .seg { @apply flex rounded-xl bg-black/5 p-1 dark:bg-white/10; }
+  .seg > button { @apply flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-ink-mute transition dark:text-slate-400; }
+  .seg > button[aria-pressed="true"] { @apply bg-white text-brand-800 shadow-sm dark:bg-brand-700 dark:text-white; }
+}
+
+/* Desktop window drag region (Electron, macOS hidden title bar). */
+.drag { -webkit-app-region: drag; }
+.no-drag { -webkit-app-region: no-drag; }

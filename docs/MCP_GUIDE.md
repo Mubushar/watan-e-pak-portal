@@ -15,7 +15,7 @@ Everything the portal can do is exposed as MCP:
 
 | MCP surface | Count | Reference |
 | --- | --- | --- |
-| Tools | **593** in 30 groups | [reference/MCP_TOOLS.md](reference/MCP_TOOLS.md) |
+| Tools | **594** in 30 groups | [reference/MCP_TOOLS.md](reference/MCP_TOOLS.md) |
 | Resources (static) | **112** | [reference/MCP_RESOURCES.md](reference/MCP_RESOURCES.md) |
 | Resource templates | **34** | [reference/MCP_RESOURCES.md](reference/MCP_RESOURCES.md) |
 | Prompts | **31** | [reference/MCP_PROMPTS.md](reference/MCP_PROMPTS.md) |

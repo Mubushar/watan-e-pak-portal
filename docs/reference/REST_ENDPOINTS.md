@@ -1,6 +1,6 @@
 # REST endpoint reference
 
-Auto-generated from the FastAPI app — **618 routes** across **37 tags**. Every route calls the same function the MCP tool of the same name calls, so behaviour can never drift.
+Auto-generated from the FastAPI app — **626 routes** across **37 tags**. Every route calls the same function the MCP tool of the same name calls, so behaviour can never drift.
 
 | Tag | Routes |
 | --- | --- |
@@ -15,6 +15,7 @@ Auto-generated from the FastAPI app — **618 routes** across **37 tags**. Every
 | [gis-analysis](#gis-analysis) | 18 |
 | [auth](#auth) | 17 |
 | [commercial](#commercial) | 17 |
+| [properties](#properties) | 17 |
 | [roles](#roles) | 16 |
 | [transactions](#transactions) | 16 |
 | [agents](#agents) | 15 |
@@ -26,20 +27,19 @@ Auto-generated from the FastAPI app — **618 routes** across **37 tags**. Every
 | [leasing](#leasing) | 12 |
 | [portal](#portal) | 12 |
 | [aoi](#aoi) | 11 |
-| [properties](#properties) | 11 |
 | [hierarchy](#hierarchy) | 10 |
 | [big-projects](#big-projects) | 9 |
 | [finance](#finance) | 8 |
 | [routing](#routing) | 8 |
 | [news](#news) | 6 |
 | [other](#other) | 5 |
+| [ai](#ai) | 4 |
 | [broker](#broker) | 4 |
 | [images](#images) | 4 |
 | [memory](#memory) | 4 |
 | [property-intelligence](#property-intelligence) | 4 |
 | [system](#system) | 4 |
 | [ui](#ui) | 3 |
-| [ai](#ai) | 2 |
 | [units](#units) | 1 |
 
 ## accounting
@@ -125,10 +125,12 @@ Auto-generated from the FastAPI app — **618 routes** across **37 tags**. Every
 
 ## ai
 
-2 routes.
+4 routes.
 
 | Method(s) | Path | Purpose |
 | --- | --- | --- |
+| GET | `/ai/capabilities` | What the conversational assistant can use: the chat model and server-side speech-to-text. |
+| POST | `/ai/transcribe` | Speech-to-text for clients without on-device recognition (e.g. the desktop app). |
 | GET | `/rag/search` |  |
 | POST | `/rag/search` |  |
 
@@ -725,10 +727,16 @@ Auto-generated from the FastAPI app — **618 routes** across **37 tags**. Every
 
 ## properties
 
-11 routes.
+17 routes.
 
 | Method(s) | Path | Purpose |
 | --- | --- | --- |
+| GET | `/me/listings` | Listings published by the signed-in account (Bearer token required). |
+| POST | `/me/listings` | Publish a listing owned by the signed-in account. Agents are attributed automatically. |
+| PUT | `/me/listings/{property_id}` | Edit one of your listings, e.g. ``{"status": "sold"}``. |
+| DELETE | `/me/listings/{property_id}` | Remove one of your listings. |
+| POST | `/me/listings/{property_id}/photos` | Attach a photo (JPEG/PNG/WebP, max 5 MB, base64) to one of your listings. |
+| GET | `/media/uploads/{name}` | Serve a photo uploaded through ``/me/listings/{id}/photos``. |
 | GET | `/nearby` |  |
 | GET | `/properties` |  |
 | POST | `/properties` |  |

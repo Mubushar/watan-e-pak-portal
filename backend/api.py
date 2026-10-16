@@ -18,17 +18,22 @@ the result. That keeps MCP and REST perfectly in sync — no duplicated logic.
 """
 
 import asyncio
+import base64
 import json
 import os
+import re
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
 
+import httpx
 from fastapi import (Depends, FastAPI, Header, HTTPException, Query, WebSocket,
                      WebSocketDisconnect)
-from fastapi.responses import HTMLResponse, Response
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel
 
 import server as core
+import openai_facade
 from openai_facade import router as openai_router
 
 # ------------------------------------------------------------------
@@ -61,6 +66,19 @@ app = FastAPI(
 )
 # Register the MCP HTTP route(s) on this app.
 app.router.routes.extend(mcp_http_app.routes)
+
+# Cross-origin access for the portable app (Electron `app://`, Capacitor
+# `capacitor://localhost` / `https://localhost`) and any separately hosted UI.
+# Auth is a bearer header (no cookies), so a wildcard is safe; set
+# PORTAL_CORS_ORIGINS to a comma-separated allow-list to lock it down.
+_cors_origins = [o.strip() for o in os.getenv("PORTAL_CORS_ORIGINS", "*").split(",") if o.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    allow_credentials=False,
+)
 
 # OpenAI-compatible facade (/v1/models, /v1/chat/completions, ...)
 app.include_router(openai_router)
@@ -131,6 +149,7 @@ class PropertyCreate(BaseModel):
 
 class PropertyUpdate(BaseModel):
     title: Optional[str] = None
+    description: Optional[str] = None
     price: Optional[float] = None
     use_type: Optional[str] = None
     category: Optional[str] = None
@@ -378,6 +397,59 @@ def rag_search(query: str, top_k: int = 5) -> Any:
 @app.post("/rag/search", tags=["ai"])
 def rag_search_post(payload: Dict[str, Any]) -> Any:
     return j(core.rag_search(payload.get("query", ""), top_k=int(payload.get("top_k", 5))))
+
+
+STT_MODEL = os.getenv("PORTAL_STT_MODEL", "whisper-1")
+
+
+class TranscribeRequest(BaseModel):
+    audio_base64: str
+    mime_type: str = "audio/webm"
+    language: Optional[str] = None  # ISO-639-1, e.g. "en" or "ur"
+
+
+@app.get("/ai/capabilities", tags=["ai"])
+def ai_capabilities() -> Any:
+    """What the conversational assistant can use: the chat model and server-side speech-to-text."""
+    upstream = bool(openai_facade.UPSTREAM_BASE_URL)
+    return {
+        "chat_mode": "upstream" if upstream else "local",
+        "chat_model": openai_facade.UPSTREAM_MODEL if upstream else openai_facade._LOCAL_MODEL,
+        "transcription": upstream,
+        "transcription_model": STT_MODEL if upstream else None,
+    }
+
+
+@app.post("/ai/transcribe", tags=["ai"])
+async def ai_transcribe(payload: TranscribeRequest) -> Any:
+    """Speech-to-text for clients without on-device recognition (e.g. the desktop app).
+
+    Forwards the audio to the upstream OpenAI-compatible ``/audio/transcriptions``
+    endpoint; needs ``PORTAL_LLM_BASE_URL`` (returns 501 otherwise).
+    """
+    if not openai_facade.UPSTREAM_BASE_URL:
+        raise HTTPException(status_code=501, detail="Server-side transcription needs PORTAL_LLM_BASE_URL")
+    try:
+        audio = base64.b64decode(payload.audio_base64.split(",")[-1], validate=False)
+    except Exception:
+        raise HTTPException(status_code=400, detail="audio_base64 is not valid base64")
+    if not audio:
+        raise HTTPException(status_code=400, detail="Empty audio")
+    ext = payload.mime_type.split("/")[-1].split(";")[0] or "webm"
+    data = {"model": STT_MODEL}
+    if payload.language:
+        data["language"] = payload.language
+    headers = {}
+    if openai_facade.UPSTREAM_API_KEY:
+        headers["Authorization"] = f"Bearer {openai_facade.UPSTREAM_API_KEY}"
+    async with httpx.AsyncClient(timeout=120) as client:
+        upstream = await client.post(
+            f"{openai_facade.UPSTREAM_BASE_URL}/audio/transcriptions",
+            data=data, files={"file": (f"speech.{ext}", audio, payload.mime_type)}, headers=headers,
+        )
+    if upstream.status_code >= 400:
+        raise HTTPException(status_code=502, detail=f"Transcription failed upstream ({upstream.status_code})")
+    return {"text": upstream.json().get("text", "")}
 
 
 @app.get("/memory", tags=["memory"])
@@ -1193,6 +1265,108 @@ def auth_events(limit: int = 50) -> Any:
 def auth_config() -> Any:
     """OTP/session/password policy plus live counters."""
     return j(core.auth_config())
+
+
+# ------------------------------------------------------------------
+# My listings — listings owned by the signed-in account (portable app)
+# ------------------------------------------------------------------
+
+
+def _owned_property(property_id: str, user: Dict[str, Any]) -> Any:
+    """Return the property if the caller owns it (admins may manage any)."""
+    p = core.find_property(property_id)
+    if p is None:
+        raise HTTPException(status_code=404, detail=f"Property not found: {property_id}")
+    is_admin = bool({"super_admin", "admin"} & set(user.get("roles") or []))
+    if p.owner_user_id != user["id"] and not is_admin:
+        raise HTTPException(status_code=403, detail="You can only manage your own listings")
+    return p
+
+
+@app.get("/me/listings", tags=["properties"])
+def my_listings(status: Optional[str] = None, limit: int = 100,
+                user: Dict[str, Any] = Depends(require_user)) -> Any:
+    """Listings published by the signed-in account (Bearer token required)."""
+    return j(core.list_owned_properties(user["id"], status=status, limit=limit))
+
+
+@app.post("/me/listings", tags=["properties"], status_code=201)
+def my_listing_create(payload: PropertyCreate, user: Dict[str, Any] = Depends(require_user)) -> Any:
+    """Publish a listing owned by the signed-in account. Agents are attributed automatically."""
+    data = payload.model_dump(exclude_none=True)
+    data["owner_user_id"] = user["id"]
+    if user.get("agent_id") and not data.get("agent_id"):
+        data["agent_id"] = user["agent_id"]
+    result = j(core.add_property(**data))
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.put("/me/listings/{property_id}", tags=["properties"])
+def my_listing_update(property_id: str, payload: PropertyUpdate,
+                      user: Dict[str, Any] = Depends(require_user)) -> Any:
+    """Edit one of your listings, e.g. ``{"status": "sold"}``."""
+    _owned_property(property_id, user)
+    return j(core.update_property(property_id, **payload.model_dump(exclude_none=True)))
+
+
+@app.delete("/me/listings/{property_id}", tags=["properties"])
+def my_listing_delete(property_id: str, user: Dict[str, Any] = Depends(require_user)) -> Any:
+    """Remove one of your listings."""
+    _owned_property(property_id, user)
+    return j(core.delete_property(property_id))
+
+
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "media", "uploads")
+UPLOAD_MAX_BYTES = 5 * 1024 * 1024
+_IMAGE_SIGNATURES = {b"\xff\xd8\xff": "jpg", b"\x89PNG": "png", b"RIFF": "webp"}
+
+
+class PhotoUpload(BaseModel):
+    data_url: str  # "data:image/jpeg;base64,..." or bare base64
+    is_primary: bool = False
+
+
+@app.post("/me/listings/{property_id}/photos", tags=["properties"], status_code=201)
+def my_listing_add_photo(property_id: str, payload: PhotoUpload,
+                         user: Dict[str, Any] = Depends(require_user)) -> Any:
+    """Attach a photo (JPEG/PNG/WebP, max 5 MB, base64) to one of your listings."""
+    p = _owned_property(property_id, user)
+    encoded = payload.data_url.split(",")[-1]
+    if len(encoded) > UPLOAD_MAX_BYTES * 4 // 3 + 4:
+        raise HTTPException(status_code=413, detail="Photo must be between 1 byte and 5 MB")
+    try:
+        raw = base64.b64decode(encoded, validate=False)
+    except Exception:
+        raise HTTPException(status_code=400, detail="data_url is not valid base64")
+    if not raw or len(raw) > UPLOAD_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Photo must be between 1 byte and 5 MB")
+    ext = next((e for sig, e in _IMAGE_SIGNATURES.items() if raw.startswith(sig)), None)
+    if ext is None or (ext == "webp" and raw[8:12] != b"WEBP"):
+        raise HTTPException(status_code=415, detail="Only JPEG, PNG or WebP photos are accepted")
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    name = f"{core.uuid.uuid4().hex}.{ext}"
+    with open(os.path.join(UPLOAD_DIR, name), "wb") as fh:
+        fh.write(raw)
+    url = f"/media/uploads/{name}"
+    if payload.is_primary:
+        p.image_urls.insert(0, url)
+    else:
+        p.image_urls.append(url)
+    core.image_store("property", p.id, url, is_primary=payload.is_primary)
+    return {"property_id": p.id, "url": url, "image_urls": p.image_urls}
+
+
+@app.get("/media/uploads/{name}", tags=["properties"], include_in_schema=False)
+def uploaded_media(name: str) -> Any:
+    """Serve a photo uploaded through ``/me/listings/{id}/photos``."""
+    if not re.fullmatch(r"[0-9a-f]{32}\.(jpg|png|webp)", name):
+        raise HTTPException(status_code=404, detail="Not found")
+    path = os.path.join(UPLOAD_DIR, name)
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="Not found")
+    return FileResponse(path, headers={"Cache-Control": "public, max-age=31536000, immutable"})
 
 
 # ------------------------------------------------------------------

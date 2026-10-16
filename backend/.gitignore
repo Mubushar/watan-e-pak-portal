@@ -8,3 +8,6 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Listing photos uploaded through the portable app
+media/uploads/
