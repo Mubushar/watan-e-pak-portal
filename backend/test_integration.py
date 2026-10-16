@@ -13,6 +13,7 @@ Run:
 """
 
 import asyncio
+import base64
 import json
 import logging
 from typing import Any, List, Tuple
@@ -1863,6 +1864,12 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         # --- agentic products (REST), reusing this already-entered client ---
         run_products_rest_checks(client)
 
+        # --- tools & utilities (REST), reusing this already-entered client ---
+        run_tools_rest_checks(client)
+
+        # --- PMO / project management (REST), reusing this already-entered client ---
+        run_pmo_rest_checks(client)
+
 
 # ============================================================
 # 1c) Agentic products (MCP): agents, transactions, intelligence,
@@ -2468,6 +2475,944 @@ def run_products_rest_checks(client: TestClient) -> None:
 
 
 # ============================================================
+# 1d) Tools & utilities (MCP)
+# ============================================================
+
+
+def _tiny_jpeg_b64() -> str:
+    """A minimal JPEG (SOI + SOS + EOI) — enough for an EXIF GPS round-trip."""
+    return base64.b64encode(b"\xff\xd8\xff\xda\x00\x08" + b"\x00" * 8 + b"\xff\xd9").decode()
+
+
+def _photo_jpeg_b64() -> str:
+    """A minimal JPEG carrying a real SOF0 (1x1 px) so it can be embedded in a PDF."""
+    sof0 = b"\xff\xc0\x00\x0b\x08\x00\x01\x00\x01\x01\x01\x11\x00"
+    sos = b"\xff\xda\x00\x08\x01\x01\x00\x00\x3f\x00"
+    return base64.b64encode(b"\xff\xd8" + sof0 + sos + b"\x00\x01\x02" + b"\xff\xd9").decode()
+
+
+async def run_tools_checks() -> None:
+    print("\n=== Tools & Utilities (MCP) ===")
+    async with Client(core.mcp) as client:
+        r = json.loads(text_of(await client.call_tool("tools_overview", {})))
+        check("tool: tools_overview", r["counts"]["tools"] == len(core.tools.TOOL_CATALOG)
+              and r["counts"]["categories"] == 6, str(r["counts"]))
+
+        r = json.loads(text_of(await client.call_tool("tools_categories", {})))
+        check("tool: tools_categories", r["count"] == 6, str(r["count"]))
+
+        r = json.loads(text_of(await client.call_tool("tools_catalog", {"category": "calculators"})))
+        check("tool: tools_catalog (calculators)", r["count"] >= 10, str(r["count"]))
+
+        r = json.loads(text_of(await client.call_tool("tool_get", {"key": "georeference"})))
+        check("tool: tool_get", r.get("name") == "Georeference a Plan", str(r.get("name")))
+
+        r = json.loads(text_of(await client.call_tool("tool_calculators", {})))
+        check("tool: tool_calculators", r["count"] == 12, str(r["count"]))
+
+        r = json.loads(text_of(await client.call_tool("tool_mortgage_calculator", {
+            "price": 10000000, "down_payment": 2000000, "annual_rate": 0.12, "years": 15})))
+        check("tool: tool_mortgage_calculator", r.get("monthly_payment", 0) > 0
+              and r.get("down_payment_pct") == 20.0, str(r.get("monthly_payment")))
+
+        r = json.loads(text_of(await client.call_tool("tool_rental_yield", {
+            "price": 10000000, "monthly_rent": 50000})))
+        check("tool: tool_rental_yield", r.get("gross_yield_pct") == 6.0, str(r.get("gross_yield_pct")))
+
+        r = json.loads(text_of(await client.call_tool("tool_transfer_costs", {"price": 10000000})))
+        check("tool: tool_transfer_costs", r.get("total_transfer_cost", 0) > 0, str(r.get("total_transfer_cost")))
+
+        r = json.loads(text_of(await client.call_tool("tool_capital_gains_tax", {
+            "gain": 1000000, "holding_years": 4, "filer": True})))
+        check("tool: tool_capital_gains_tax", r.get("rate_pct") == 5.0, str(r.get("rate_pct")))
+
+        r = json.loads(text_of(await client.call_tool("tool_joint_investment", {
+            "partners": [{"name": "a", "capital": 300}, {"name": "b", "capital": 100}], "total_profit": 400})))
+        check("tool: tool_joint_investment", r["partners"][0]["profit"] == 300.0, str(r["partners"][0]))
+
+        r = json.loads(text_of(await client.call_tool("tool_area_convert", {
+            "value": 1, "from_unit": "kanal", "to_unit": "marla"})))
+        check("tool: tool_area_convert", r["result"]["value"] == 20.0, str(r["result"]))
+
+        r = json.loads(text_of(await client.call_tool("tool_construction_cost", {
+            "covered_area": 2000, "city": "Lahore"})))
+        check("tool: tool_construction_cost", r.get("cost", {}).get("total", 0) > 0, str(list(r)[:5]))
+
+        r = json.loads(text_of(await client.call_tool("tool_crs_catalog", {})))
+        check("tool: tool_crs_catalog", r["count"] == 5, str(r["count"]))
+
+        r = json.loads(text_of(await client.call_tool("tool_map_measure", {
+            "coords": [[31.52, 74.35], [31.53, 74.35], [31.53, 74.36]]})))
+        check("tool: tool_map_measure", r.get("area_sqft", 0) > 0 and r.get("perimeter_m", 0) > 0,
+              str(r.get("area_sqft")))
+
+        r = json.loads(text_of(await client.call_tool("tool_georeference", {"control_points": [
+            {"image": [0, 0], "geo": [31.0, 74.0]}, {"image": [100, 0], "geo": [31.0, 74.001]},
+            {"image": [0, 100], "geo": [31.001, 74.0]}, {"image": [100, 100], "geo": [31.001, 74.001]}]})))
+        check("tool: tool_georeference", r.get("model") == "affine" and r.get("rmse_m", 999) < 15, str(r.get("rmse_m")))
+
+        r = json.loads(text_of(await client.call_tool("tool_export_geodata", {
+            "features": [{"kind": "polygon", "coords": [[31.52, 74.35], [31.53, 74.35], [31.53, 74.36]],
+                         "name": "P"}]})))
+        check("tool: tool_export_geodata", r.get("format") == "geojson" and r.get("features") == 1, str(r.get("format")))
+
+        geo = json.dumps({"type": "FeatureCollection", "features": [
+            {"type": "Feature", "geometry": {"type": "Polygon",
+             "coordinates": [[[74.35, 31.52], [74.35, 31.53], [74.36, 31.53], [74.35, 31.52]]]},
+             "properties": {}}]})
+        r = json.loads(text_of(await client.call_tool("tool_import_geodata", {"text": geo})))
+        check("tool: tool_import_geodata", r.get("count") == 1, str(r.get("count")))
+
+        r = json.loads(text_of(await client.call_tool("tool_locate_nearby", {
+            "origin": [31.5204, 74.3587], "radius_m": 5000})))
+        check("tool: tool_locate_nearby", "nearest" in r, str(r.get("count")))
+
+        r = json.loads(text_of(await client.call_tool("tool_cad_formats", {})))
+        check("tool: tool_cad_formats", r["count"] == 5, str(r["count"]))
+
+        r = json.loads(text_of(await client.call_tool("tool_dxf_preview", {"text":
+            "0\nSECTION\n0\nLINE\n8\nW\n10\n0\n20\n0\n11\n10\n21\n10\n0\nENDSEC\n0\nEOF\n"})))
+        check("tool: tool_dxf_preview", r.get("svg", "").startswith("<svg") and r.get("entity_count") == 1,
+              str(r.get("by_type")))
+
+        jpeg = _tiny_jpeg_b64()
+        r = json.loads(text_of(await client.call_tool("tool_write_photo_gps", {
+            "image_base64": jpeg, "latitude": 31.5204, "longitude": 74.3587, "altitude": 215.5})))
+        check("tool: tool_write_photo_gps", r.get("written") is True, str(r.get("error")))
+        tagged = r.get("image_base64")
+
+        r = json.loads(text_of(await client.call_tool("tool_read_photo_gps", {"image_base64": tagged})))
+        check("tool: tool_read_photo_gps", abs(r.get("latitude", 0) - 31.5204) < 1e-5
+              and abs(r.get("longitude", 0) - 74.3587) < 1e-5, str(r))
+
+        r = json.loads(text_of(await client.call_tool("tool_text_to_pdf", {"title": "T", "lines": ["a", "b"]})))
+        check("tool: tool_text_to_pdf", r.get("pdf_base64", "").startswith("JVBER") and r.get("pages") == 1,
+              str(r.get("pages")))
+
+        r = json.loads(text_of(await client.call_tool("tool_pdf_info", {"pdf_base64": r["pdf_base64"]})))
+        check("tool: tool_pdf_info", r.get("pages") == 1, str(r.get("pages")))
+
+        r = json.loads(text_of(await client.call_tool("tool_document_tools", {})))
+        check("tool: tool_document_tools", r["count"] >= 10, str(r["count"]))
+
+        r = json.loads(text_of(await client.call_tool("tool_hijri_from_gregorian", {"on": "2024-04-10"})))
+        check("tool: tool_hijri_from_gregorian", r.get("hijri_month_name") == "Shawwal", str(r.get("hijri")))
+
+        r = json.loads(text_of(await client.call_tool("tool_gregorian_from_hijri", {
+            "year": 1445, "month": 10, "day": 1})))
+        check("tool: tool_gregorian_from_hijri", r.get("gregorian") == "2024-04-10", str(r.get("gregorian")))
+
+        r = json.loads(text_of(await client.call_tool("tool_pakistan_holidays", {"year": 2026})))
+        check("tool: tool_pakistan_holidays", r["count"] > 5, str(r["count"]))
+
+        r = json.loads(text_of(await client.call_tool("tool_calendar_ics", {
+            "events": [{"date": "2026-08-14", "title": "Independence Day"}]})))
+        check("tool: tool_calendar_ics", "BEGIN:VCALENDAR" in r.get("ics", "") and r.get("events") == 1,
+              str(r.get("events")))
+
+        r = json.loads(text_of(await client.call_tool("tool_milestone_calendar", {
+            "start_date": "2026-01-01", "covered_area": 2000})))
+        check("tool: tool_milestone_calendar", r.get("total_days", 0) > 0 and len(r.get("events", [])) > 0,
+              str(r.get("handover_date")))
+
+        r = json.loads(text_of(await client.call_tool("tool_property_comparison", {"properties": [
+            {"name": "A", "price": 10000000, "area_sqft": 1000, "monthly_rent": 50000},
+            {"name": "B", "price": 12000000, "area_sqft": 1200, "monthly_rent": 70000}]})))
+        check("tool: tool_property_comparison", r.get("count") == 2 and r.get("best_yield") in ("A", "B"), str(r))
+
+        r = json.loads(text_of(await client.call_tool("tool_rows_to_csv", {"rows": [{"a": 1, "b": 2}]})))
+        check("tool: tool_rows_to_csv", r.get("csv", "").startswith("a,b"), str(r.get("csv"))[:40])
+
+        r = json.loads(text_of(await client.call_tool("tool_rows_to_markdown", {"rows": [{"a": 1, "b": 2}]})))
+        check("tool: tool_rows_to_markdown", "| a | b |" in r.get("markdown", ""), "")
+
+        r = json.loads(text_of(await client.call_tool("tool_save_project", {
+            "name": "mcp-proj", "tool": "mortgage", "inputs": {}})))
+        STATE["proj_id"] = r.get("id")
+        check("tool: tool_save_project", bool(STATE["proj_id"]), str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("tool_projects", {})))
+        check("tool: tool_projects", any(p["id"] == STATE["proj_id"] for p in r.get("projects", [])),
+              str(r.get("count")))
+
+        r = json.loads(text_of(await client.call_tool("tool_project_delete", {"project_id": STATE["proj_id"]})))
+        check("tool: tool_project_delete", r.get("deleted") is True, str(r))
+
+        html = text_of(await client.call_tool("tools_portal", {"lang": "en"}))
+        check("tool: tools_portal (HTML)", "Tools" in html and "tc-grid" in html and len(html) > 5000,
+              f"chars={len(html)}")
+
+        r = json.loads(text_of(await client.call_tool("portal_settings", {"action": "get"})))
+        check("tool: portal_settings includes tools", "tools" in r, str(list(r)[:6]))
+
+
+# ============================================================
+# 1e) Tools & utilities (REST)
+# ============================================================
+
+
+def run_tools_rest_checks(client: TestClient) -> None:
+    print("\n=== Tools & Utilities (REST) ===")
+    with _SharedClient(client):
+        r = client.get("/tools/overview")
+        check("GET /tools/overview", r.status_code == 200
+              and r.json()["counts"]["tools"] == len(core.tools.TOOL_CATALOG), str(r.status_code))
+
+        r = client.get("/tools/categories")
+        check("GET /tools/categories", r.status_code == 200 and r.json()["count"] == 6, str(r.status_code))
+
+        r = client.get("/tools/catalog", params={"category": "gis"})
+        check("GET /tools/catalog?category=gis", r.status_code == 200 and r.json()["count"] >= 5, str(r.status_code))
+
+        r = client.get("/tools/catalog/mortgage")
+        check("GET /tools/catalog/{key}", r.status_code == 200 and r.json()["name"] == "Mortgage Calculator",
+              str(r.status_code))
+
+        r = client.get("/tools/convert/area", params={"value": 10, "from_unit": "marla", "to_unit": "sqft"})
+        check("GET /tools/convert/area", r.status_code == 200 and r.json()["result"]["value"] == 2722.5,
+              str(r.status_code))
+
+        r = client.get("/tools/convert/area-table", params={"value": 1, "from_unit": "kanal"})
+        check("GET /tools/convert/area-table", r.status_code == 200 and r.json()["conversions"]["marla"] == 20.0,
+              str(r.status_code))
+
+        r = client.get("/tools/plot/dimensions", params={"area": 10, "from_unit": "marla"})
+        check("GET /tools/plot/dimensions", r.status_code == 200 and r.json()["area_sqft"] > 0, str(r.status_code))
+
+        r = client.get("/tools/plot/studio", params={"value": 10, "covered_area": 2000})
+        check("GET /tools/plot/studio", r.status_code == 200 and r.json()["diagram_svg"].startswith("<svg"),
+              str(r.status_code))
+
+        r = client.get("/tools/calculators")
+        check("GET /tools/calculators", r.status_code == 200 and r.json()["count"] == 12, str(r.status_code))
+
+        r = client.post("/tools/calculators/mortgage", json={"price": 10000000, "down_payment": 2000000,
+                                                             "annual_rate": 0.12, "years": 15})
+        check("POST /tools/calculators/mortgage", r.status_code == 200 and r.json()["monthly_payment"] > 0,
+              str(r.status_code))
+
+        r = client.post("/tools/calculators/installment", json={"price": 10000000, "down_payment": 2000000,
+                                                                "months": 36})
+        check("POST /tools/calculators/installment", r.status_code == 200 and r.json()["monthly_installment"] > 0,
+              str(r.status_code))
+
+        r = client.post("/tools/calculators/rental-yield", json={"price": 10000000, "monthly_rent": 50000})
+        check("POST /tools/calculators/rental-yield", r.status_code == 200 and r.json()["gross_yield_pct"] == 6.0,
+              str(r.status_code))
+
+        r = client.post("/tools/calculators/appreciation", json={"current_value": 1000000, "cagr": 0.1, "years": 5})
+        check("POST /tools/calculators/appreciation", r.status_code == 200 and len(r.json()["series"]) == 6,
+              str(r.status_code))
+
+        r = client.post("/tools/calculators/price-per-unit", json={"price": 10000000, "area": 1000})
+        check("POST /tools/calculators/price-per-unit", r.status_code == 200
+              and r.json()["price_per_sqft"] == 10000.0, str(r.status_code))
+
+        r = client.post("/tools/calculators/transfer-costs", json={"price": 10000000})
+        check("POST /tools/calculators/transfer-costs", r.status_code == 200
+              and r.json()["total_transfer_cost"] > 0, str(r.status_code))
+
+        r = client.post("/tools/calculators/commission", json={"price": 10000000})
+        check("POST /tools/calculators/commission", r.status_code == 200 and r.json()["commission"] == 200000.0,
+              str(r.status_code))
+
+        r = client.post("/tools/calculators/capital-gains", json={"gain": 1000000, "holding_years": 4})
+        check("POST /tools/calculators/capital-gains", r.status_code == 200 and r.json()["rate_pct"] == 5.0,
+              str(r.status_code))
+
+        r = client.post("/tools/calculators/joint-investment", json={"partners": [
+            {"name": "a", "capital": 300}, {"name": "b", "capital": 100}], "total_profit": 400})
+        check("POST /tools/calculators/joint-investment", r.status_code == 200
+              and r.json()["partners"][0]["profit"] == 300.0, str(r.status_code))
+
+        r = client.post("/tools/calculators/rent-vs-buy", json={"price": 10000000, "monthly_rent": 40000})
+        check("POST /tools/calculators/rent-vs-buy", r.status_code == 200 and r.json()["projected_value"] > 0,
+              str(r.status_code))
+
+        r = client.post("/tools/calculators/construction-cost", json={"covered_area": 2000, "city": "Lahore"})
+        check("POST /tools/calculators/construction-cost", r.status_code == 200
+              and r.json()["cost"]["total"] > 0, str(r.status_code))
+
+        r = client.post("/tools/calculators/material-quantities", json={"covered_area": 2000})
+        check("POST /tools/calculators/material-quantities", r.status_code == 200, str(r.status_code))
+
+        r = client.post("/tools/calculators/build-timeline", json={"covered_area": 2000})
+        check("POST /tools/calculators/build-timeline", r.status_code == 200 and r.json()["total_days"] > 0,
+              str(r.status_code))
+
+        r = client.get("/tools/gis/crs")
+        check("GET /tools/gis/crs", r.status_code == 200 and r.json()["count"] == 5, str(r.status_code))
+
+        r = client.post("/tools/gis/measure", json={"coords": [[31.52, 74.35], [31.53, 74.35], [31.53, 74.36]]})
+        check("POST /tools/gis/measure", r.status_code == 200 and r.json()["area_sqft"] > 0, str(r.status_code))
+
+        r = client.post("/tools/gis/polygon-area", json={"coords": [[31.52, 74.35], [31.53, 74.35], [31.53, 74.36]],
+                                                         "unit": "marla"})
+        check("POST /tools/gis/polygon-area", r.status_code == 200 and r.json()["value"] > 0, str(r.status_code))
+
+        r = client.post("/tools/gis/georeference", json={"control_points": [
+            {"image": [0, 0], "geo": [31.0, 74.0]}, {"image": [100, 0], "geo": [31.0, 74.001]},
+            {"image": [0, 100], "geo": [31.001, 74.0]}]})
+        check("POST /tools/gis/georeference", r.status_code == 200 and r.json()["model"] == "affine",
+              str(r.status_code))
+
+        r = client.post("/tools/gis/transform", json={"matrix": {"a": 0.00001, "b": 0.0, "c": 74.0,
+                                                                 "d": 0.0, "e": 0.00001, "f": 31.0},
+                                                      "x": 50, "y": 100})
+        check("POST /tools/gis/transform", r.status_code == 200 and "lat" in r.json(), str(r.status_code))
+
+        r = client.post("/tools/gis/aerial-compare", json={"scenes": [{"date": "2020-01-01", "resolution_m": 0.5},
+                                                                      {"date": "2024-01-01", "resolution_m": 0.3}]})
+        check("POST /tools/gis/aerial-compare", r.status_code == 200 and r.json()["count"] == 2, str(r.status_code))
+
+        r = client.post("/tools/gis/export", json={"features": [{"kind": "polygon", "coords": [
+            [31.52, 74.35], [31.53, 74.35], [31.53, 74.36]]}]})
+        check("POST /tools/gis/export", r.status_code == 200 and r.json()["format"] == "geojson", str(r.status_code))
+
+        r = client.post("/tools/gis/import", json={"text": json.dumps({"type": "FeatureCollection", "features": [
+            {"type": "Feature", "geometry": {"type": "Point", "coordinates": [74.3587, 31.5204]},
+             "properties": {}}]})})
+        check("POST /tools/gis/import", r.status_code == 200 and r.json()["count"] == 1, str(r.status_code))
+
+        r = client.post("/tools/gis/nearby", json={"origin": [31.5204, 74.3587], "radius_m": 5000})
+        check("POST /tools/gis/nearby", r.status_code == 200 and "nearest" in r.json(), str(r.status_code))
+
+        r = client.get("/tools/cad/formats")
+        check("GET /tools/cad/formats", r.status_code == 200 and r.json()["count"] == 5, str(r.status_code))
+
+        r = client.post("/tools/cad/inspect", json={"filename": "plan.dwg",
+                                                    "head_base64": base64.b64encode(b"AC1018xxxx").decode()})
+        check("POST /tools/cad/inspect", r.status_code == 200 and r.json()["detected_format"] == "DWG",
+              str(r.status_code))
+
+        r = client.post("/tools/cad/dxf-preview", json={"text":
+            "0\nSECTION\n0\nLINE\n8\nW\n10\n0\n20\n0\n11\n10\n21\n10\n0\nENDSEC\n0\nEOF\n"})
+        check("POST /tools/cad/dxf-preview", r.status_code == 200 and r.json()["svg"].startswith("<svg"),
+              str(r.status_code))
+
+        r = client.post("/tools/cad/compare-revisions", json={"a_entities": [{"type": "line",
+                                                                             "points": [[0, 0], [10, 10]]}],
+                                                              "b_entities": []})
+        check("POST /tools/cad/compare-revisions", r.status_code == 200 and r.json()["removed"] == 1,
+              str(r.status_code))
+
+        r = client.post("/tools/cad/layout-sheet", json={"title": "Plot 12", "plot_length_ft": 50,
+                                                         "plot_width_ft": 30})
+        check("POST /tools/cad/layout-sheet", r.status_code == 200 and r.json()["svg"].startswith("<svg"),
+              str(r.status_code))
+
+        jpeg = _tiny_jpeg_b64()
+        r = client.post("/tools/photo/write-gps", json={"image_base64": jpeg, "latitude": 31.5204,
+                                                        "longitude": 74.3587})
+        check("POST /tools/photo/write-gps", r.status_code == 200 and r.json()["written"] is True, str(r.status_code))
+        tagged = r.json()["image_base64"]
+
+        r = client.post("/tools/photo/read-gps", json={"image_base64": tagged})
+        check("POST /tools/photo/read-gps", r.status_code == 200 and abs(r.json()["latitude"] - 31.5204) < 1e-5,
+              str(r.status_code))
+
+        r = client.post("/tools/photo/geotag-batch", json={"photos": [{"name": "a", "image_base64": jpeg},
+                                                                      {"name": "b", "image_base64": jpeg}],
+                                                           "latitude": 31.52, "longitude": 74.35})
+        check("POST /tools/photo/geotag-batch", r.status_code == 200 and r.json()["tagged"] == 2, str(r.status_code))
+
+        r = client.post("/tools/photo/report", json={"photos": [{"name": "a", "latitude": 31.52, "longitude": 74.35,
+                                                                 "timestamp": "2026-05-01T10:00:00"}]})
+        check("POST /tools/photo/report", r.status_code == 200 and r.json()["count"] == 1, str(r.status_code))
+
+        r = client.get("/tools/photo/privacy-check", params={"latitude": 31.5204, "longitude": 74.3587})
+        check("GET /tools/photo/privacy-check", r.status_code == 200 and "recommendation" in r.json(),
+              str(r.status_code))
+
+        r = client.post("/tools/documents/text-to-pdf", json={"title": "T", "lines": ["a", "b"]})
+        check("POST /tools/documents/text-to-pdf", r.status_code == 200
+              and r.json()["pdf_base64"].startswith("JVBER"), str(r.status_code))
+        pdf = r.json()["pdf_base64"]
+
+        r = client.post("/tools/documents/images-to-pdf", json={"images": [{"name": "p.jpg",
+                                                                           "image_base64": _photo_jpeg_b64()}]})
+        check("POST /tools/documents/images-to-pdf", r.status_code == 200 and r.json()["pages"] == 1,
+              str(r.text)[:120])
+
+        r = client.post("/tools/documents/brochure", json={"title": "Villa", "subtitle": "DHA",
+                                                           "sections": [{"heading": "Overview",
+                                                                         "lines": ["3 bed"]}]})
+        check("POST /tools/documents/brochure", r.status_code == 200
+              and r.json()["pdf_base64"].startswith("JVBER"), str(r.status_code))
+
+        r = client.post("/tools/documents/pdf-info", json={"pdf_base64": pdf})
+        check("POST /tools/documents/pdf-info", r.status_code == 200 and r.json()["pages"] == 1, str(r.status_code))
+
+        r = client.get("/tools/documents/resize-plan", params={"width": 3000, "height": 2000})
+        check("GET /tools/documents/resize-plan", r.status_code == 200 and r.json()["needed"] is True,
+              str(r.status_code))
+
+        r = client.get("/tools/calendar/hijri", params={"on": "2024-03-12"})
+        check("GET /tools/calendar/hijri", r.status_code == 200 and r.json()["hijri_year"] == 1445, str(r.status_code))
+
+        r = client.get("/tools/calendar/gregorian", params={"year": 1445, "month": 10, "day": 1})
+        check("GET /tools/calendar/gregorian", r.status_code == 200 and r.json()["gregorian"] == "2024-04-10",
+              str(r.status_code))
+
+        r = client.get("/tools/calendar/occasions", params={"year": 2026})
+        check("GET /tools/calendar/occasions", r.status_code == 200 and r.json()["count"] > 0, str(r.status_code))
+
+        r = client.get("/tools/calendar/holidays", params={"year": 2026})
+        check("GET /tools/calendar/holidays", r.status_code == 200 and r.json()["count"] > 5, str(r.status_code))
+
+        r = client.post("/tools/calendar/ics", json={"events": [{"date": "2026-08-14", "title": "Independence Day"}]})
+        check("POST /tools/calendar/ics", r.status_code == 200 and "BEGIN:VCALENDAR" in r.json()["ics"],
+              str(r.status_code))
+
+        r = client.post("/tools/calendar/reminders", json={"events": [{"title": "Possession",
+                                                                       "date": "2026-12-31", "type": "possession"}]})
+        check("POST /tools/calendar/reminders", r.status_code == 200 and r.json()["count"] == 1, str(r.status_code))
+
+        r = client.post("/tools/calendar/milestones", json={"start_date": "2026-01-01", "covered_area": 2000})
+        check("POST /tools/calendar/milestones", r.status_code == 200 and r.json()["total_days"] > 0,
+              str(r.status_code))
+
+        r = client.post("/tools/calendar/possession", json={"start_date": "2026-01-01", "total_price": 10000000,
+                                                            "down_payment": 2000000, "months": 24})
+        check("POST /tools/calendar/possession", r.status_code == 200 and r.json()["installments"] == 24,
+              str(r.status_code))
+
+        r = client.post("/tools/reports/comparison", json={"properties": [
+            {"name": "A", "price": 10000000, "area_sqft": 1000, "monthly_rent": 50000}]})
+        check("POST /tools/reports/comparison", r.status_code == 200 and r.json()["best_value"] == "A",
+              str(r.status_code))
+
+        r = client.post("/tools/reports/investment-summary", json={"initial_investment": 1000000,
+                                                                   "annual_cash_flow": 100000, "hold_years": 5,
+                                                                   "terminal_value": 1500000})
+        check("POST /tools/reports/investment-summary", r.status_code == 200, str(r.status_code))
+
+        r = client.post("/tools/reports/plot-inventory", json={"properties": [{"name": "P", "area_sqft": 2722.5,
+                                                                               "price": 5000000}]})
+        check("POST /tools/reports/plot-inventory", r.status_code == 200 and r.json()["count"] == 1, str(r.status_code))
+
+        r = client.post("/tools/reports/csv", json={"rows": [{"a": 1, "b": 2}]})
+        check("POST /tools/reports/csv", r.status_code == 200 and r.json()["csv"].startswith("a,b"), str(r.status_code))
+
+        r = client.post("/tools/reports/markdown", json={"rows": [{"a": 1, "b": 2}]})
+        check("POST /tools/reports/markdown", r.status_code == 200 and "| a | b |" in r.json()["markdown"],
+              str(r.status_code))
+
+        r = client.get("/tools/projects")
+        check("GET /tools/projects", r.status_code == 200 and r.json()["count"] >= 1, str(r.status_code))
+
+        r = client.post("/tools/projects", json={"name": "rest-proj", "tool": "rental_yield", "inputs": {}})
+        check("POST /tools/projects", r.status_code == 200 and r.json().get("id"), str(r.status_code))
+        pid = r.json()["id"]
+
+        r = client.get("/tools/projects/" + pid)
+        check("GET /tools/projects/{id}", r.status_code == 200 and r.json()["id"] == pid, str(r.status_code))
+
+        r = client.delete("/tools/projects/" + pid)
+        check("DELETE /tools/projects/{id}", r.status_code == 200 and r.json()["deleted"] is True, str(r.status_code))
+
+        r = client.get("/tools/portal")
+        check("GET /tools/portal (HTML)", r.status_code == 200 and "Tools" in r.text and "tc-grid" in r.text,
+              str(r.status_code))
+
+        r = client.get("/tools/portal.html", params={"lang": "ur", "theme": "dark"})
+        check("GET /tools/portal.html (ur/dark)", r.status_code == 200 and 'dir="rtl"' in r.text, str(r.status_code))
+
+
+# ============================================================
+# 1f) PMO / project management (MCP)
+# ============================================================
+
+
+async def run_pmo_checks() -> None:
+    print("\n=== PMO / Project Management (MCP) ===")
+    async with Client(core.mcp) as client:
+        r = json.loads(text_of(await client.call_tool("pmo_overview", {})))
+        check("pmo: pmo_overview", r["counts"]["projects"] >= 1 and r["counts"]["tasks"] >= 16,
+              str(r["counts"]["projects"]))
+
+        r = json.loads(text_of(await client.call_tool("pmo_capabilities", {})))
+        check("pmo: pmo_capabilities", r["count"] >= 15, str(r["count"]))
+
+        r = json.loads(text_of(await client.call_tool("pm_project_types", {})))
+        check("pmo: pm_project_types", r["count"] == 8, str(r["count"]))
+
+        r = json.loads(text_of(await client.call_tool("pm_phase_templates",
+                                                      {"project_type": "construction"})))
+        check("pmo: pm_phase_templates", len(r["phases"]) == 9, str(len(r.get("phases", []))))
+
+        r = json.loads(text_of(await client.call_tool("pm_projects", {})))
+        check("pmo: pm_projects (seeded)", r["count"] >= 1, str(r["count"]))
+
+        r = json.loads(text_of(await client.call_tool("pm_create_project", {
+            "name": "MCP Test Block", "project_type": "construction", "city": "Lahore",
+            "budget": 120000000, "contract_value": 138000000, "start_date": "2026-03-02",
+            "status": "active"})))
+        STATE["pm_id"] = r["project"]["id"]
+        check("pmo: pm_create_project", r["created"] and r["phases"] == 9 and r["tasks"] == 16,
+              str(r.get("error") or r.get("tasks")))
+        pid = STATE["pm_id"]
+
+        r = json.loads(text_of(await client.call_tool("pm_project", {"project_id": pid})))
+        check("pmo: pm_project", r["project"]["id"] == pid and r["task_count"] == 16,
+              str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("pm_phases", {"project_id": pid})))
+        check("pmo: pm_phases", r["count"] == 9 and r["phases"][0]["weight_pct"] > 0, str(r["count"]))
+
+        r = json.loads(text_of(await client.call_tool("pm_milestones", {"project_id": pid})))
+        check("pmo: pm_milestones (seeded)", r["count"] == 3, str(r["count"]))
+
+        r = json.loads(text_of(await client.call_tool("pm_add_milestone", {
+            "project_id": pid, "name": "Slab-1 complete", "planned_date": "2026-05-01",
+            "billable_amount": 5000000})))
+        check("pmo: pm_add_milestone", r["created"], str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("pm_tasks", {"project_id": pid})))
+        check("pmo: pm_tasks", r["count"] == 16 and "planned_start" in r["tasks"][0], str(r["count"]))
+        STATE["pm_task"] = r["tasks"][0]["id"]
+
+        r = json.loads(text_of(await client.call_tool("pm_add_task", {
+            "project_id": pid, "name": "Handover snag list", "duration_days": 5})))
+        check("pmo: pm_add_task", r["created"], str(r.get("error")))
+        extra_task = r["task"]["id"]
+
+        r = json.loads(text_of(await client.call_tool("pm_task", {"task_id": STATE["pm_task"]})))
+        check("pmo: pm_task", "planned_start" in r and "float_days" in r, str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("pm_update_task", {
+            "task_id": STATE["pm_task"], "updates": {"progress_pct": 60, "status": "in_progress"}})))
+        check("pmo: pm_update_task", r["task"]["progress_pct"] == 60.0, str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("pm_schedule", {"project_id": pid})))
+        check("pmo: pm_schedule", r["start"] == "2026-03-02" and r["duration_days"] > 100
+              and len(r["critical_path"]) > 0, str(r.get("duration_days")))
+
+        r = json.loads(text_of(await client.call_tool("pm_critical_path", {"project_id": pid})))
+        check("pmo: pm_critical_path", r["critical_count"] > 0, str(r.get("critical_count")))
+
+        r = json.loads(text_of(await client.call_tool("pm_gantt", {"project_id": pid})))
+        check("pmo: pm_gantt", len(r["rows"]) == 17, str(len(r.get("rows", []))))
+
+        r = json.loads(text_of(await client.call_tool("pm_add_resource", {
+            "name": "Engr. MCP", "role": "site_engineer", "day_rate": 16000})))
+        check("pmo: pm_add_resource", r["created"], str(r.get("error")))
+        ress = r["resource"]["id"]
+
+        r = json.loads(text_of(await client.call_tool("pm_resources", {})))
+        check("pmo: pm_resources", r["count"] >= 1, str(r["count"]))
+
+        r = json.loads(text_of(await client.call_tool("pm_assign", {
+            "task_id": STATE["pm_task"], "resource_id": ress, "units_pct": 70})))
+        check("pmo: pm_assign", r["created"], str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("pm_resource_load", {"project_id": pid})))
+        check("pmo: pm_resource_load", r["count"] >= 1, str(r["count"]))
+
+        r = json.loads(text_of(await client.call_tool("pm_add_cost", {
+            "project_id": pid, "amount": 30000000, "category": "structure", "kind": "actual"})))
+        check("pmo: pm_add_cost", r["created"], str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("pm_costs", {"project_id": pid})))
+        check("pmo: pm_costs", r["count"] == 1 and r["total"] == 30000000.0, str(r["total"]))
+
+        r = json.loads(text_of(await client.call_tool("pm_record_progress", {
+            "project_id": pid, "percent": 22.0, "note": "Kick-off", "by": "PM"})))
+        check("pmo: pm_record_progress", r["recorded"], str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("pm_progress", {"project_id": pid})))
+        check("pmo: pm_progress", 0 < r["actual_pct"] < 100 and "history" in r, str(r["actual_pct"]))
+
+        r = json.loads(text_of(await client.call_tool("pm_earned_value", {"project_id": pid})))
+        check("pmo: pm_earned_value", r["EV"] > 0 and r["PV"] > 0 and r["SPI"] is not None,
+              str({k: r.get(k) for k in ("EV", "PV", "SPI", "CPI")}))
+
+        r = json.loads(text_of(await client.call_tool("pm_cost_status", {"project_id": pid})))
+        check("pmo: pm_cost_status", r["actual_cost"] == 30000000.0
+              and r["revised_budget"] == 120000000.0, str(r.get("revised_budget")))
+
+        r = json.loads(text_of(await client.call_tool("pm_s_curve", {"project_id": pid})))
+        check("pmo: pm_s_curve", len(r["weeks"]) > 4, str(len(r.get("weeks", []))))
+
+        r = json.loads(text_of(await client.call_tool("pm_health", {"project_id": pid})))
+        check("pmo: pm_health", r["overall"] in ("green", "amber", "red")
+              and set(r["bands"]) == {"schedule", "cost", "risk", "quality"}, str(r.get("overall")))
+
+        r = json.loads(text_of(await client.call_tool("pm_alerts", {"project_id": pid})))
+        check("pmo: pm_alerts", "alerts" in r, str(r.get("count")))
+
+        r = json.loads(text_of(await client.call_tool("pm_kpi", {"project_id": pid})))
+        check("pmo: pm_kpi", r["health"] in ("green", "amber", "red"), str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("pm_monitoring", {"project_id": pid})))
+        check("pmo: pm_monitoring", r["project"]["id"] == pid and "evm" in r, str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("pm_portfolio", {})))
+        check("pmo: pm_portfolio", r["projects"] >= 2 and "by_health" in r, str(r["projects"]))
+
+        r = json.loads(text_of(await client.call_tool("pm_add_risk", {
+            "project_id": pid, "title": "Currency risk", "probability": 4, "impact": 4,
+            "category": "finance"})))
+        check("pmo: pm_add_risk", r["created"] and r["risk"]["band"] == "extreme", str(r["risk"].get("band")))
+        risk_id = r["risk"]["id"]
+
+        r = json.loads(text_of(await client.call_tool("pm_risks", {"project_id": pid})))
+        check("pmo: pm_risks", r["count"] == 1, str(r["count"]))
+
+        r = json.loads(text_of(await client.call_tool("pm_update_risk", {
+            "risk_id": risk_id, "updates": {"status": "mitigating"}})))
+        check("pmo: pm_update_risk", r["risk"]["status"] == "mitigating", str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("pm_risk_matrix", {"project_id": pid})))
+        check("pmo: pm_risk_matrix", r["count"] == 1 and "cells" in r, str(r["count"]))
+
+        r = json.loads(text_of(await client.call_tool("pm_log_site", {
+            "project_id": pid, "work_done": "Excavation", "manpower": 20, "weather": "Clear"})))
+        check("pmo: pm_log_site", r["created"], str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("pm_site_logs", {"project_id": pid})))
+        check("pmo: pm_site_logs", r["count"] == 1 and r["manpower_total"] == 20, str(r["count"]))
+
+        r = json.loads(text_of(await client.call_tool("pm_site_report", {"project_id": pid})))
+        check("pmo: pm_site_report", r["project_id"] == pid and "health" in r, str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("pm_raise_change", {
+            "project_id": pid, "title": "Extra basement", "cost_impact": 9000000,
+            "schedule_impact_days": 20})))
+        check("pmo: pm_raise_change", r["created"], str(r.get("error")))
+        change_id = r["change"]["id"]
+
+        r = json.loads(text_of(await client.call_tool("pm_changes", {"project_id": pid})))
+        check("pmo: pm_changes", r["count"] == 1, str(r["count"]))
+
+        r = json.loads(text_of(await client.call_tool("pm_decide_change", {
+            "change_id": change_id, "approve": True, "by": "Sponsor"})))
+        check("pmo: pm_decide_change", r["change"]["status"] == "approved"
+              and r["project_budget"] == 129000000.0, str(r.get("project_budget")))
+
+        r = json.loads(text_of(await client.call_tool("pm_add_inspection", {
+            "project_id": pid, "title": "Frame inspection", "checklist": [
+                {"item": "Concrete grade", "result": "pass"},
+                {"item": "Cover", "result": "fail", "note": "missing"}]})))
+        check("pmo: pm_add_inspection", r["created"] and r["quality_index"] == 50.0,
+              str(r.get("quality_index")))
+
+        r = json.loads(text_of(await client.call_tool("pm_inspections", {"project_id": pid})))
+        check("pmo: pm_inspections", r["count"] == 1 and r["quality_index"]["score"] == 50.0,
+              str(r["count"]))
+
+        r = json.loads(text_of(await client.call_tool("pm_add_action", {
+            "project_id": pid, "title": "Fix cover blocks", "owner": "QA"})))
+        check("pmo: pm_add_action", r["created"], str(r.get("error")))
+        action_id = r["action"]["id"]
+
+        r = json.loads(text_of(await client.call_tool("pm_actions", {"project_id": pid})))
+        check("pmo: pm_actions", r["count"] == 1, str(r["count"]))
+
+        r = json.loads(text_of(await client.call_tool("pm_close_action", {"action_id": action_id})))
+        check("pmo: pm_close_action", r["action"]["status"] == "done", str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("pm_project_report", {"project_id": pid})))
+        check("pmo: pm_project_report", r["project"]["id"] == pid and "evm" in r and "cost" in r,
+              str(r.get("error")))
+
+        html = text_of(await client.call_tool("pm_report_html", {"project_id": pid}))
+        check("pmo: pm_report_html", "<html" in html.lower() and len(html) > 4000,
+              f"chars={len(html)}")
+
+        html = text_of(await client.call_tool("pm_portal", {"lang": "en"}))
+        check("pmo: pm_portal (HTML)", "PMO" in html and "Project register" in html
+              and len(html) > 5000, f"chars={len(html)}")
+
+        est = json.loads(text_of(await client.call_tool("tools_overview", {})))
+        est_id = core.construction.estimates_db[0].id
+        r = json.loads(text_of(await client.call_tool("pm_from_estimate", {
+            "estimate_id": est_id, "name": "Imported delivery"})))
+        check("pmo: pm_from_estimate", r["created"] and r["project"]["budget"] > 0, str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("pm_apply_template", {"project_id": pid})))
+        check("pmo: pm_apply_template", r["tasks_created"] == 0 and r["total_tasks"] >= 16,
+              str(r.get("total_tasks")))
+
+        r = json.loads(text_of(await client.call_tool("pm_delete_task", {"task_id": extra_task})))
+        check("pmo: pm_delete_task", r["deleted"] is True, str(r.get("error")))
+
+        r = json.loads(text_of(await client.call_tool("portal_settings", {"action": "get"})))
+        check("pmo: portal_settings includes pmo", "pmo" in r, str(list(r)[:6]))
+
+        r = json.loads(text_of(await client.call_tool("pm_delete_project", {"project_id": pid})))
+        check("pmo: pm_delete_project", r["deleted"] is True, str(r.get("error")))
+
+
+# ============================================================
+# 1g) PMO / project management (REST)
+# ============================================================
+
+
+def run_pmo_rest_checks(client: TestClient) -> None:
+    print("\n=== PMO / Project Management (REST) ===")
+    with _SharedClient(client):
+        r = client.get("/pmo/overview")
+        check("GET /pmo/overview", r.status_code == 200 and r.json()["counts"]["projects"] >= 1,
+              str(r.status_code))
+
+        r = client.get("/pmo/capabilities")
+        check("GET /pmo/capabilities", r.status_code == 200 and r.json()["count"] >= 15,
+              str(r.status_code))
+
+        r = client.get("/pmo/project-types")
+        check("GET /pmo/project-types", r.status_code == 200 and r.json()["count"] == 8,
+              str(r.status_code))
+
+        r = client.get("/pmo/phase-templates", params={"project_type": "construction"})
+        check("GET /pmo/phase-templates", r.status_code == 200 and len(r.json()["phases"]) == 9,
+              str(r.status_code))
+
+        r = client.post("/pmo/projects", json={"name": "REST Block", "project_type": "construction",
+                                               "budget": 80000000, "city": "Karachi",
+                                               "start_date": "2026-04-01", "status": "active"})
+        check("POST /pmo/projects", r.status_code == 200 and r.json()["created"]
+              and r.json()["tasks"] == 16, str(r.status_code))
+        pid = r.json()["project"]["id"]
+
+        r = client.get("/pmo/projects")
+        check("GET /pmo/projects", r.status_code == 200 and r.json()["count"] >= 2, str(r.status_code))
+
+        r = client.get("/pmo/projects/" + pid)
+        check("GET /pmo/projects/{id}", r.status_code == 200 and r.json()["project"]["id"] == pid,
+              str(r.status_code))
+
+        r = client.put("/pmo/projects/" + pid, json={"updates": {"priority": "high", "budget": 85000000}})
+        check("PUT /pmo/projects/{id}", r.status_code == 200
+              and r.json()["updated"]["budget"] == 85000000.0, str(r.status_code))
+
+        r = client.get("/pmo/projects/" + pid + "/dashboard")
+        check("GET /pmo/projects/{id}/dashboard", r.status_code == 200 and "evm" in r.json(),
+              str(r.status_code))
+
+        r = client.get("/pmo/projects/" + pid + "/report")
+        check("GET /pmo/projects/{id}/report", r.status_code == 200 and "schedule" in r.json(),
+              str(r.status_code))
+
+        r = client.get("/pmo/projects/" + pid + "/phases")
+        check("GET /pmo/projects/{id}/phases", r.status_code == 200 and r.json()["count"] == 9,
+              str(r.status_code))
+
+        r = client.post("/pmo/projects/" + pid + "/phases", json={"name": "Custom", "weight": 5})
+        check("POST /pmo/projects/{id}/phases", r.status_code == 200 and r.json()["created"],
+              str(r.status_code))
+
+        r = client.get("/pmo/projects/" + pid + "/milestones")
+        check("GET /pmo/projects/{id}/milestones", r.status_code == 200 and r.json()["count"] == 3,
+              str(r.status_code))
+
+        r = client.post("/pmo/projects/" + pid + "/milestones", json={"name": "Piling done",
+                                                                     "planned_date": "2026-06-01"})
+        check("POST /pmo/projects/{id}/milestones", r.status_code == 200 and r.json()["created"],
+              str(r.status_code))
+
+        r = client.get("/pmo/projects/" + pid + "/tasks")
+        check("GET /pmo/projects/{id}/tasks", r.status_code == 200 and r.json()["count"] == 16,
+              str(r.status_code))
+        tid = r.json()["tasks"][0]["id"]
+
+        r = client.post("/pmo/projects/" + pid + "/tasks", json={"name": "Extra task",
+                                                                "duration_days": 4})
+        check("POST /pmo/projects/{id}/tasks", r.status_code == 200 and r.json()["created"],
+              str(r.status_code))
+        extra = r.json()["task"]["id"]
+
+        r = client.get("/pmo/tasks/" + tid)
+        check("GET /pmo/tasks/{id}", r.status_code == 200 and "planned_start" in r.json(),
+              str(r.status_code))
+
+        r = client.put("/pmo/tasks/" + tid, json={"updates": {"progress_pct": 45}})
+        check("PUT /pmo/tasks/{id}", r.status_code == 200
+              and r.json()["task"]["progress_pct"] == 45.0, str(r.status_code))
+
+        r = client.get("/pmo/projects/" + pid + "/schedule")
+        check("GET /pmo/projects/{id}/schedule", r.status_code == 200
+              and r.json()["duration_days"] > 100, str(r.status_code))
+
+        r = client.get("/pmo/projects/" + pid + "/critical-path")
+        check("GET /pmo/projects/{id}/critical-path", r.status_code == 200
+              and r.json()["critical_count"] > 0, str(r.status_code))
+
+        r = client.get("/pmo/projects/" + pid + "/gantt")
+        check("GET /pmo/projects/{id}/gantt", r.status_code == 200 and len(r.json()["rows"]) == 17,
+              str(r.status_code))
+
+        r = client.post("/pmo/projects/" + pid + "/costs", json={"amount": 12000000,
+                                                                "category": "structure"})
+        check("POST /pmo/projects/{id}/costs", r.status_code == 200 and r.json()["created"],
+              str(r.status_code))
+
+        r = client.get("/pmo/projects/" + pid + "/costs")
+        check("GET /pmo/projects/{id}/costs", r.status_code == 200 and r.json()["total"] == 12000000.0,
+              str(r.status_code))
+
+        r = client.post("/pmo/projects/" + pid + "/progress", json={"percent": 15, "note": "start"})
+        check("POST /pmo/projects/{id}/progress", r.status_code == 200 and r.json()["recorded"],
+              str(r.status_code))
+
+        r = client.get("/pmo/projects/" + pid + "/progress")
+        check("GET /pmo/projects/{id}/progress", r.status_code == 200 and "history" in r.json(),
+              str(r.status_code))
+
+        r = client.get("/pmo/projects/" + pid + "/earned-value")
+        check("GET /pmo/projects/{id}/earned-value", r.status_code == 200 and "SPI" in r.json(),
+              str(r.status_code))
+
+        r = client.get("/pmo/projects/" + pid + "/cost-status")
+        check("GET /pmo/projects/{id}/cost-status", r.status_code == 200
+              and r.json()["actual_cost"] == 12000000.0, str(r.status_code))
+
+        r = client.get("/pmo/projects/" + pid + "/s-curve")
+        check("GET /pmo/projects/{id}/s-curve", r.status_code == 200 and len(r.json()["weeks"]) > 4,
+              str(r.status_code))
+
+        r = client.get("/pmo/projects/" + pid + "/health")
+        check("GET /pmo/projects/{id}/health", r.status_code == 200
+              and r.json()["overall"] in ("green", "amber", "red"), str(r.status_code))
+
+        r = client.get("/pmo/projects/" + pid + "/kpi")
+        check("GET /pmo/projects/{id}/kpi", r.status_code == 200 and "health" in r.json(),
+              str(r.status_code))
+
+        r = client.get("/pmo/projects/" + pid + "/monitoring")
+        check("GET /pmo/projects/{id}/monitoring", r.status_code == 200 and "evm" in r.json(),
+              str(r.status_code))
+
+        r = client.post("/pmo/projects/" + pid + "/risks", json={"title": "REST risk",
+                                                                "probability": 3, "impact": 4})
+        check("POST /pmo/projects/{id}/risks", r.status_code == 200 and r.json()["created"],
+              str(r.status_code))
+        risk_id = r.json()["risk"]["id"]
+
+        r = client.get("/pmo/projects/" + pid + "/risks")
+        check("GET /pmo/projects/{id}/risks", r.status_code == 200 and r.json()["count"] == 1,
+              str(r.status_code))
+
+        r = client.put("/pmo/risks/" + risk_id, json={"updates": {"status": "mitigating"}})
+        check("PUT /pmo/risks/{id}", r.status_code == 200
+              and r.json()["risk"]["status"] == "mitigating", str(r.status_code))
+
+        r = client.get("/pmo/projects/" + pid + "/risk-matrix")
+        check("GET /pmo/projects/{id}/risk-matrix", r.status_code == 200 and "cells" in r.json(),
+              str(r.status_code))
+
+        r = client.get("/pmo/risks")
+        check("GET /pmo/risks", r.status_code == 200 and r.json()["count"] >= 1, str(r.status_code))
+
+        r = client.post("/pmo/projects/" + pid + "/site-logs", json={"work_done": "Piling",
+                                                                    "manpower": 30})
+        check("POST /pmo/projects/{id}/site-logs", r.status_code == 200 and r.json()["created"],
+              str(r.status_code))
+
+        r = client.get("/pmo/projects/" + pid + "/site-logs")
+        check("GET /pmo/projects/{id}/site-logs", r.status_code == 200
+              and r.json()["manpower_total"] == 30, str(r.status_code))
+
+        r = client.get("/pmo/projects/" + pid + "/site-report")
+        check("GET /pmo/projects/{id}/site-report", r.status_code == 200
+              and r.json()["project_id"] == pid, str(r.status_code))
+
+        r = client.post("/pmo/projects/" + pid + "/changes", json={"title": "REST change",
+                                                                  "cost_impact": 3000000,
+                                                                  "schedule_impact_days": 10})
+        check("POST /pmo/projects/{id}/changes", r.status_code == 200 and r.json()["created"],
+              str(r.status_code))
+        change_id = r.json()["change"]["id"]
+
+        r = client.get("/pmo/projects/" + pid + "/changes")
+        check("GET /pmo/projects/{id}/changes", r.status_code == 200 and r.json()["count"] == 1,
+              str(r.status_code))
+
+        r = client.post("/pmo/changes/" + change_id + "/decide", json={"approve": True, "by": "Sponsor"})
+        check("POST /pmo/changes/{id}/decide", r.status_code == 200
+              and r.json()["change"]["status"] == "approved"
+              and r.json()["project_budget"] == 88000000.0, str(r.json().get("project_budget")))
+
+        r = client.post("/pmo/projects/" + pid + "/inspections", json={"title": "REST insp",
+            "checklist": [{"item": "a", "result": "pass"}, {"item": "b", "result": "pass"}]})
+        check("POST /pmo/projects/{id}/inspections", r.status_code == 200
+              and r.json()["quality_index"] == 100.0, str(r.status_code))
+
+        r = client.get("/pmo/projects/" + pid + "/inspections")
+        check("GET /pmo/projects/{id}/inspections", r.status_code == 200
+              and r.json()["count"] == 1, str(r.status_code))
+
+        r = client.post("/pmo/projects/" + pid + "/actions", json={"title": "REST action",
+                                                                  "owner": "QA"})
+        check("POST /pmo/projects/{id}/actions", r.status_code == 200 and r.json()["created"],
+              str(r.status_code))
+        action_id = r.json()["action"]["id"]
+
+        r = client.get("/pmo/projects/" + pid + "/actions")
+        check("GET /pmo/projects/{id}/actions", r.status_code == 200 and r.json()["count"] == 1,
+              str(r.status_code))
+
+        r = client.post("/pmo/actions/" + action_id + "/close")
+        check("POST /pmo/actions/{id}/close", r.status_code == 200
+              and r.json()["action"]["status"] == "done", str(r.status_code))
+
+        r = client.get("/pmo/actions")
+        check("GET /pmo/actions", r.status_code == 200 and r.json()["count"] >= 1, str(r.status_code))
+
+        r = client.post("/pmo/resources", json={"name": "REST resource", "role": "foreman"})
+        check("POST /pmo/resources", r.status_code == 200 and r.json()["created"], str(r.status_code))
+        res_id = r.json()["resource"]["id"]
+
+        r = client.get("/pmo/resources")
+        check("GET /pmo/resources", r.status_code == 200 and r.json()["count"] >= 1, str(r.status_code))
+
+        r = client.post("/pmo/allocations", json={"task_id": tid, "resource_id": res_id,
+                                                  "units_pct": 50})
+        check("POST /pmo/allocations", r.status_code == 200 and r.json()["created"], str(r.status_code))
+
+        r = client.get("/pmo/resource-load", params={"project_id": pid})
+        check("GET /pmo/resource-load", r.status_code == 200 and r.json()["count"] >= 1,
+              str(r.status_code))
+
+        r = client.get("/pmo/alerts", params={"project_id": pid})
+        check("GET /pmo/alerts", r.status_code == 200 and "alerts" in r.json(), str(r.status_code))
+
+        r = client.get("/pmo/portfolio")
+        check("GET /pmo/portfolio", r.status_code == 200 and r.json()["projects"] >= 2,
+              str(r.status_code))
+
+        est_id = core.construction.estimates_db[0].id
+        r = client.post("/pmo/from-estimate/" + est_id, params={"name": "REST import"})
+        check("POST /pmo/from-estimate/{id}", r.status_code == 200 and r.json()["created"],
+              str(r.status_code))
+
+        r = client.post("/pmo/projects/" + pid + "/apply-template")
+        check("POST /pmo/projects/{id}/apply-template", r.status_code == 200
+              and r.json()["tasks_created"] == 0 and r.json()["total_tasks"] >= 16,
+              str(r.status_code))
+
+        r = client.delete("/pmo/tasks/" + extra)
+        check("DELETE /pmo/tasks/{id}", r.status_code == 200 and r.json()["deleted"] is True,
+              str(r.status_code))
+
+        r = client.get("/pmo/portal")
+        check("GET /pmo/portal (HTML)", r.status_code == 200 and "PMO" in r.text
+              and "Project register" in r.text, str(r.status_code))
+
+        r = client.get("/pmo/portal.html", params={"lang": "ur", "theme": "dark"})
+        check("GET /pmo/portal.html (ur/dark)", r.status_code == 200 and 'dir="rtl"' in r.text,
+              str(r.status_code))
+
+        r = client.get("/pmo/report.html", params={"project_id": pid})
+        check("GET /pmo/report.html", r.status_code == 200 and "<html" in r.text.lower(),
+              str(r.status_code))
+
+        r = client.delete("/pmo/projects/" + pid)
+        check("DELETE /pmo/projects/{id}", r.status_code == 200 and r.json()["deleted"] is True,
+              str(r.status_code))
+
+
+# ============================================================
 # main
 # ============================================================
 
@@ -2476,6 +3421,8 @@ async def main() -> int:
     mcp_lead_id, mcp_layer_id = await run_mcp_checks()
     await run_wing_checks()
     await run_products_checks()
+    await run_tools_checks()
+    await run_pmo_checks()
     run_fastapi_checks(mcp_lead_id, mcp_layer_id)
 
     print("\n=== Summary ===")

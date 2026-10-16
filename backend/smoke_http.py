@@ -474,6 +474,90 @@ def main() -> None:
           r.json().get("band"))
     ok &= r.status_code == 200 and "band" in r.json()
 
+    # --- tools & utilities wing ---
+    r = httpx.get(f"{base}/tools/overview")
+    print("REST /tools/overview ->", r.status_code, "tools =", r.json().get("counts", {}).get("tools"),
+          "categories =", r.json().get("counts", {}).get("categories"))
+    ok &= r.status_code == 200 and r.json().get("counts", {}).get("tools", 0) >= 20
+
+    r = httpx.post(f"{base}/tools/calculators/mortgage", json={"price": 10_000_000,
+                                                               "down_payment": 2_000_000,
+                                                               "annual_rate": 0.12, "years": 15})
+    print("REST /tools/calculators/mortgage ->", r.status_code, "monthly =",
+          r.json().get("monthly_payment"))
+    ok &= r.status_code == 200 and r.json().get("monthly_payment", 0) > 0
+
+    r = httpx.get(f"{base}/tools/convert/area", params={"value": 10, "from_unit": "marla",
+                                                        "to_unit": "sqft"})
+    print("REST /tools/convert/area ->", r.status_code, "sqft =", r.json().get("result", {}).get("value"))
+    ok &= r.status_code == 200 and r.json().get("result", {}).get("value", 0) > 0
+
+    r = httpx.get(f"{base}/tools/gis/crs")
+    print("REST /tools/gis/crs ->", r.status_code, "systems =", r.json().get("count"))
+    ok &= r.status_code == 200 and r.json().get("count", 0) >= 5
+
+    r = httpx.get(f"{base}/tools/portal", params={"lang": "en"})
+    print("REST /tools/portal ->", r.status_code, "html chars =", len(r.text))
+    ok &= r.status_code == 200 and "Tools" in r.text and "tc-grid" in r.text
+
+    # --- PMO wing (project management, monitoring & tracking) ---
+    r = httpx.get(f"{base}/pmo/overview")
+    print("REST /pmo/overview ->", r.status_code, "projects =",
+          r.json().get("counts", {}).get("projects"), "tasks =", r.json().get("counts", {}).get("tasks"))
+    ok &= r.status_code == 200 and r.json().get("counts", {}).get("projects", 0) >= 1
+
+    r = httpx.get(f"{base}/pmo/projects")
+    seeded_pm = r.json().get("projects", [{}])[0].get("id") if r.status_code == 200 else None
+    print("REST /pmo/projects ->", r.status_code, "count =", r.json().get("count"),
+          "health =", r.json().get("projects", [{}])[0].get("health"))
+    ok &= r.status_code == 200 and r.json().get("count", 0) >= 1
+
+    r = httpx.post(f"{base}/pmo/projects", json={"name": "Smoke Site", "project_type": "construction",
+                                                "budget": 60_000_000, "start_date": "2026-05-04",
+                                                "status": "active"})
+    new_pm = (r.json().get("project") or {}).get("id") if r.status_code == 200 else None
+    print("REST /pmo/projects (create) ->", r.status_code, "id =", bool(new_pm),
+          "tasks =", r.json().get("tasks"))
+    ok &= r.status_code == 200 and bool(new_pm) and r.json().get("tasks") == 16
+
+    r = httpx.get(f"{base}/pmo/projects/{new_pm}/schedule")
+    print("REST /pmo/projects/{id}/schedule ->", r.status_code, "duration =",
+          r.json().get("duration_days"), "critical =", len(r.json().get("critical_path", [])))
+    ok &= r.status_code == 200 and r.json().get("duration_days", 0) > 0
+    ok &= len(r.json().get("critical_path", [])) > 0
+
+    r = httpx.get(f"{base}/pmo/projects/{new_pm}/earned-value")
+    print("REST /pmo/projects/{id}/earned-value ->", r.status_code, "EV =", r.json().get("EV"),
+          "SPI =", r.json().get("SPI"))
+    ok &= r.status_code == 200 and "EV" in r.json()
+
+    r = httpx.get(f"{base}/pmo/projects/{new_pm}/health")
+    print("REST /pmo/projects/{id}/health ->", r.status_code, "overall =", r.json().get("overall"),
+          "bands =", r.json().get("bands"))
+    ok &= r.status_code == 200 and r.json().get("overall") in ("green", "amber", "red")
+
+    r = httpx.get(f"{base}/pmo/portfolio")
+    print("REST /pmo/portfolio ->", r.status_code, "projects =", r.json().get("projects"),
+          "SPI =", r.json().get("portfolio_spi"))
+    ok &= r.status_code == 200 and r.json().get("projects", 0) >= 2
+
+    r = httpx.get(f"{base}/pmo/alerts")
+    print("REST /pmo/alerts ->", r.status_code, "alerts =", r.json().get("count"),
+          "red =", r.json().get("red"))
+    ok &= r.status_code == 200 and "alerts" in r.json()
+
+    r = httpx.get(f"{base}/pmo/portal", params={"lang": "en"})
+    print("REST /pmo/portal ->", r.status_code, "html chars =", len(r.text))
+    ok &= r.status_code == 200 and "PMO" in r.text and "Project register" in r.text
+
+    r = httpx.get(f"{base}/pmo/report.html", params={"project_id": seeded_pm, "lang": "en"})
+    print("REST /pmo/report.html ->", r.status_code, "html chars =", len(r.text))
+    ok &= r.status_code == 200 and "<html" in r.text.lower()
+
+    r = httpx.delete(f"{base}/pmo/projects/{new_pm}")
+    print("REST /pmo/projects/{id} (delete) ->", r.status_code, "deleted =", r.json().get("deleted"))
+    ok &= r.status_code == 200 and r.json().get("deleted") is True
+
     # --- MCP should expose the same facilities (checked after initialize, below) ---
     r = httpx.post(f"{base}/v1/chat/completions", json={
         "model": "portal-realestate-rag",
@@ -511,7 +595,10 @@ def main() -> None:
                      "commercial_products", "agentic_portal", "commercial_portal",
                      "search_contacts", "get_commission_projection", "analyze_property_gis",
                      "create_listing_draft", "get_gis_score", "get_accounting_snapshot",
-                     "get_market_intelligence", "score_seller_intent"]
+                     "get_market_intelligence", "score_seller_intent",
+                     "tools_overview", "tool_mortgage_calculator", "tools_portal",
+                     "pmo_overview", "pm_create_project", "pm_schedule", "pm_earned_value",
+                     "pm_health", "pm_portfolio", "pm_risk_matrix", "pm_portal"]
     print("MCP  /mcp tools/list ->", r.status_code, "new tools =",
           {t: (t in r.text) for t in mcp_new_tools})
     ok &= r.status_code == 200 and "portal_languages" in r.text and "portal_themes" in r.text

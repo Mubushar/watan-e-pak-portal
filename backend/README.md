@@ -24,6 +24,8 @@ CRM:  Agents ─▶ Leads ─▶ Customers ─▶ Deals ─▶ Tasks / Appointme
 | `accounting.py` | Double-entry accounting + investment maths (no MCP/FastAPI code): chart of accounts, journal, invoices, payments, expenses, leases/rent roll, budgets, trial balance, P&L, balance sheet, cash flow, ratios, NPV/IRR/payback, cap rate, mortgage amortisation and ROI analysis. |
 | `construction.py` | **Construction wing** (no MCP/FastAPI code): building types, 17 construction techniques/systems, 24 materials with live rates, BOQ element rates + rate analysis, an element-wise cost estimator (with preliminaries, contingency, consultancy, margin and escalation), phase timelines, material take-off, technique comparison, a build-quality → value/rent/payback impact model, site advisory (soil / seismic / height / budget), building codes & guidelines, the NOC/approval workflow, QA checklists and HSE rules. |
 | `maintenance.py` | **Maintenance wing** (no MCP/FastAPI code): maintainable components with service life / replacement cost / criticality, maintenance services & trades with cost bands, a defect catalogue (symptoms, causes, repair, prevention), annual-cost estimation with a category breakdown and a capital-replacement reserve, preventive schedules, multi-year lifecycle reserve studies, condition assessment, repair-vs-replace analysis, warranty terms, inspection checklists, work orders and the value/rent/occupancy impact of maintenance. |
+| `tools.py` | **Tools & Utilities wing** (no MCP/FastAPI code): a **Tools Center** of 25 cards across 6 categories (real-estate calculators, plot & construction studio, GIS/georeferencing & map tools, CAD/plan utilities, photo location & geotagging, document & file conversion, the Pakistan & Islamic calendar, property-document AI, satellite/aerial explorer and a reports/export studio), launch phases 1–3, unit conversion, a dependency-free **GPS EXIF reader/writer**, a pure-Python **text/JPEG→PDF** writer, Georeferencing (affine/similarity/translation) and the DXF inspector/previewer. Where a capability genuinely needs a heavy or licensed dependency (GDAL/PROJ, PyMuPDF, Pillow, Tesseract, DWG/DGN) the tool returns an explicit `requires_optional_dependency` descriptor instead of faking the work. It reuses `accounting`, `construction` and `gis`. |
+| `pmo.py` | **Projects & Monitoring (PMO) wing** (no MCP/FastAPI code): the in-house project-management, monitoring & tracking system — a project register, weighted WBS phases/milestones/tasks, **critical-path scheduling** (forward/backward pass, float, six-day Mon–Sat week), duration-weighted progress with an **S-curve**, full **earned value** (PV/EV/AC, SV/CV, SPI/CPI, EAC/ETC/VAC/TCPI), cost control (baseline → variations → commitments/actuals → forecast), schedule/cost/risk/quality **RAG health** with an exception alert engine, resource loading, a RAID register with a P×I matrix, daily **site diaries**, **change/variation control**, scored inspections, meeting actions, and JSON + printable-HTML project reports. |
 | `agents.py` | **Agentic OS** (no MCP/FastAPI code): the agent catalogue (8 roadmap *product* agents + specialist sub-agents), the eight products with priority (P0–P2), a **run engine** (plan → execute → review → deliver) with human-approval gates and a full audit trail, multi-agent orchestration, "Smart Actions" prioritisation, and move-likelihood / seller-intent scoring. Execution is delegated to a server-supplied `dispatch(tool, ctx)` so the same engine powers MCP *and* REST. |
 | `transactions.py` | **Transactions** (no MCP/FastAPI code): the deal-to-close lifecycle — 10 stages, offer negotiation and counter-offers, contract-term extraction from agreement text, milestone/deadline checklists with RAG status, e-signature tracking by role, and on close a commission + VAT computation with a platform/agent **revenue-share split** returning a *balanced* journal entry and payouts. |
 | `intelligence.py` | **Conversational buyer + seller pricing + investment screener** (no MCP/FastAPI code): natural-language requirement parsing (budgets incl. "crore"/"lakh"/"million", commute caps, bedrooms), weighted multi-factor candidate ranking with reasons, price-anomaly (z-score) scanning, affordability/DTI, an adjusted-comparable CMA with a price range + expected days-on-market, net-proceeds, listing-asset generation, and deal underwriting (cap rate, cash-on-cash, DSCR, after-tax cash flow, IRR/NPV/equity multiple) plus portfolio alerts. |
@@ -162,6 +164,16 @@ uv run python smoke_http.py         # live uvicorn server + real HTTP
   catalogue, annual-cost and reserve studies, preventive schedules, condition assessment,
   repair-vs-replace, warranties and work orders, plus the value/rent/occupancy impact of
   maintenance (see below).
+* **Tools & Utilities wing** — a professional **Tools Center** of 25 tools in 6 categories
+  (finance/ROI calculators, plot & construction studio, GIS measurement/georeferencing,
+  CAD/plan utilities, photo geotagging, document conversion, the Pakistan & Islamic
+  calendar and a reports/export studio), plus a dependency-free **GPS EXIF** reader/writer
+  (see below).
+* **Projects & Monitoring (PMO) wing** — the in-house running **project-management,
+  monitoring & tracking** system: a project register, weighted WBS, **critical-path
+  scheduling**, an S-curve and full **earned value**, cost control, schedule/cost/risk/
+  quality **RAG health** with alerts, resources, a RAID register, site diaries, variations,
+  inspections, actions and a portfolio dashboard (see below).
 * **Agentic OS** — an AI **agent layer** over one shared data layer: 24 agents
   (8 roadmap product agents + specialist sub-agents) with a plan → execute → review →
   deliver **run engine**, human-approval gates, a full audit trail, multi-agent
@@ -1153,6 +1165,147 @@ Open an area-of-interest report (analysis + POI + outlook + ticker) and its map:
 # replace {aoi_id} — list areas first with: curl http://127.0.0.1:8000/aoi
 start "http://127.0.0.1:8000/aoi/{aoi_id}/report"
 start "http://127.0.0.1:8000/aoi/{aoi_id}/map"
+```
+
+## Tools & Utilities wing
+
+The **Tools & Utilities** center (`tools.py`) turns the portal into a working professional
+toolkit. It registers **25 tool cards in 6 categories**, each tagged with a launch
+**phase (1–3)**, and is exposed over both protocols. Everything runs on the same engine —
+the MCP tools and the REST endpoints return identical results.
+
+| Category | What it holds |
+| --- | --- |
+| Property & finance calculators | mortgage / installment, rental yield, appreciation projection, price-per-unit, transfer costs, agent commission, capital-gains tax, joint investment, construction cost, material quantities, build timeline, rent-vs-buy |
+| Measurement & units | Marla (standard **272.25 sqft** and small **225 sqft**), Kanal, SqFt, SqYd, Sqm, Acre, plus length conversion |
+| Plot & construction studio | plot sub-division/dimensions and a self-contained **SVG** plot diagram |
+| GIS, georeferencing & maps | CRS catalogue, map measurement, polygon area, **georeferencing** (affine / similarity / translation, least-squares), point transform, aerial before/after compare, GeoJSON/KML import-export, nearby lookup |
+| CAD & plan utilities | CAD format catalogue, **DXF inspect / parse / preview**, entity→SVG, revision compare, printable layout sheet |
+| Photos, documents & calendar | photo **GPS EXIF** read/write (dependency-free) & geotagging batch, text→PDF and JPEG→PDF writers, brochure builder, PDF info, conversion guides, Hijri/Gregorian conversion, Islamic occasions, **Pakistan holidays**, ICS export, reminders |
+| Reports & export | property comparison, investment summary, plot inventory, CSV and Markdown serialisers |
+
+**MCP tools (69):** `tools_overview`, `tools_categories`, `tools_catalog`, `tool_get`,
+`tool_calculators`, `tool_mortgage_calculator`, `tool_installment_plan`, `tool_rental_yield`,
+`tool_appreciation`, `tool_price_per_unit`, `tool_transfer_costs`, `tool_agent_commission`,
+`tool_capital_gains_tax`, `tool_joint_investment`, `tool_rent_vs_buy`,
+`tool_construction_cost`, `tool_material_quantities`, `tool_build_timeline`,
+`tool_area_convert`, `tool_area_table`, `tool_area_units`, `tool_length_convert`,
+`tool_plot_dimensions`, `tool_plot_studio`, `tool_plot_diagram`, `tool_crs_catalog`,
+`tool_map_measure`, `tool_polygon_area`, `tool_georeference`, `tool_transform_point`,
+`tool_aerial_compare`, `tool_export_geodata`, `tool_import_geodata`, `tool_locate_nearby`,
+`tool_cad_formats`, `tool_cad_inspect`, `tool_dxf_preview`, `tool_compare_revisions`,
+`tool_printable_layout`, `tool_read_photo_gps`, `tool_write_photo_gps`,
+`tool_photo_geotag_batch`, `tool_photo_report`, `tool_geo_privacy_check`,
+`tool_document_tools`, `tool_convert_guide`, `tool_text_to_pdf`, `tool_images_to_pdf`,
+`tool_brochure_pdf`, `tool_pdf_info`, `tool_image_resize_plan`, `tool_hijri_from_gregorian`,
+`tool_gregorian_from_hijri`, `tool_islamic_occasions`, `tool_pakistan_holidays`,
+`tool_calendar_ics`, `tool_property_reminders`, `tool_milestone_calendar`,
+`tool_possession_schedule`, `tool_property_comparison`, `tool_investment_summary`,
+`tool_plot_inventory`, `tool_rows_to_csv`, `tool_rows_to_markdown`, `tool_save_project`,
+`tool_projects`, `tool_project_get`, `tool_project_delete`, `tools_portal`.
+
+**REST (prefix `/tools`):** `GET /overview`, `/categories`, `/catalog`, `/catalog/{key}`,
+`/area-units`, `/convert/area`, `/convert/area-table`, `/convert/length`;
+`GET /plot/dimensions|studio|diagram`; `GET /calculators` and
+`POST /calculators/{mortgage|installment|rental-yield|appreciation|price-per-unit|transfer-costs|commission|capital-gains|joint-investment|rent-vs-buy|construction-cost|material-quantities|build-timeline}`;
+`GET /gis/crs` and `POST /gis/{measure|polygon-area|georeference|transform|aerial-compare|export|import|nearby}`;
+`GET /cad/formats` and `POST /cad/{inspect|dxf-preview|compare-revisions|layout-sheet}`;
+`POST /photo/{read-gps|write-gps|geotag-batch|report}` and `GET /photo/privacy-check`;
+`GET /documents/tools|convert-guide|resize-plan` and
+`POST /documents/{text-to-pdf|images-to-pdf|brochure|pdf-info}`;
+`GET /calendar/{hijri|gregorian|occasions|holidays}` and
+`POST /calendar/{ics|reminders|milestones|possession}`;
+`POST /reports/{comparison|investment-summary|plot-inventory|csv|markdown}`;
+`GET|POST /projects`, `GET|DELETE /projects/{project_id}`;
+`GET /tools/portal` and `/tools/portal.html`.
+
+**Resources:** `tools://overview`, `tools://categories`, `tools://catalog`, `tools://units`,
+`tools://crs`, `tools://calculators`; templates `tools://tool/{key}`,
+`tools://calendar/{year}`, `tools://holidays/{year}`.
+**Prompts:** `tools_calculator_prompt`, `tools_gis_prompt`.
+
+```powershell
+# a mortgage calculation over MCP or REST
+curl -X POST "http://127.0.0.1:8000/tools/calculators/mortgage" `
+  -H "Content-Type: application/json" `
+  -d '{\"price\":10000000,\"down_payment\":2000000,\"annual_rate\":0.12,\"years\":15}'
+
+# units, georeferencing and the Tools Center page
+curl "http://127.0.0.1:8000/tools/convert/area?value=10&from_unit=marla&to_unit=sqft"
+start "http://127.0.0.1:8000/tools/portal?lang=ur&theme=dark"
+```
+
+## Projects & Monitoring (PMO) wing
+
+The **PMO** wing (`pmo.py`) is the in-house **project-management, monitoring and tracking**
+system for the projects the portal itself delivers. It sits on top of the *construction*
+wing (which estimates) and hands over to the *maintenance* wing: an estimate can create a
+delivery project (`pm_from_estimate`), actuals flow from accounting-style cost entries, and
+site work produces snag/inspection records at handover.
+
+* **Register** — projects with type, sponsor/client, city, scheme, manager, baseline budget &
+  dates, contract value, status, priority and tags.
+* **WBS** — weighted phases, payment milestones (optionally task-linked & billable) and tasks
+  with durations, finish-to-start predecessors and assignees.
+* **Scheduling** — a forward/backward pass over the task network on a **six-day (Mon–Sat)
+  working week** giving ES/EF, LS/LF, **total float**, the **critical path**, cycle detection
+  and a Gantt structure.
+* **Progress & earned value** — duration-weighted completion, a planned-vs-actual **S-curve**,
+  and **PV, EV, AC, SV, CV, SPI, CPI, EAC, ETC, VAC, TCPI**.
+* **Cost control** — baseline → approved variations → **revised budget**, commitments,
+  actuals by category, forecast-to-complete and variance at completion.
+* **Monitoring** — schedule/cost/risk/quality **RAG health** with an overall verdict, an
+  **exception alert engine** (overdue tasks, slipping milestones, cost/schedule pressure,
+  high risks, overdue actions, stale progress) and a **portfolio dashboard** with rolled-up
+  SPI/CPI.
+* **Resources** — team & trade resources with day rates and capacity, task allocations and a
+  utilisation / **over-allocation** view.
+* **Governance** — a **RAID** register with a probability × impact matrix, daily **site
+  diaries** and a daily site report, **change/variation control** with cost & schedule impact
+  (approval moves the revised budget), scored **inspections** (a quality index) and meeting
+  **action items**.
+
+**MCP tools (58):** `pmo_overview`, `pmo_capabilities`, `pm_project_types`,
+`pm_phase_templates`, `pm_create_project`, `pm_projects`, `pm_project`, `pm_update_project`,
+`pm_delete_project`, `pm_project_dashboard`, `pm_from_estimate`, `pm_apply_template`,
+`pm_add_phase`, `pm_phases`, `pm_add_milestone`, `pm_milestones`, `pm_add_task`, `pm_tasks`,
+`pm_task`, `pm_update_task`, `pm_delete_task`, `pm_schedule`, `pm_critical_path`, `pm_gantt`,
+`pm_add_cost`, `pm_costs`, `pm_record_progress`, `pm_progress`, `pm_earned_value`,
+`pm_cost_status`, `pm_s_curve`, `pm_add_resource`, `pm_resources`, `pm_assign`,
+`pm_resource_load`, `pm_health`, `pm_alerts`, `pm_kpi`, `pm_monitoring`, `pm_portfolio`,
+`pm_add_risk`, `pm_risks`, `pm_update_risk`, `pm_risk_matrix`, `pm_log_site`, `pm_site_logs`,
+`pm_site_report`, `pm_raise_change`, `pm_changes`, `pm_decide_change`, `pm_add_inspection`,
+`pm_inspections`, `pm_add_action`, `pm_actions`, `pm_close_action`, `pm_project_report`,
+`pm_report_html`, `pm_portal`.
+
+**REST (prefix `/pmo`):** `GET /overview|capabilities|project-types|phase-templates`;
+`GET|POST /projects`, `GET|PUT|DELETE /projects/{project_id}`,
+`GET /projects/{project_id}/{dashboard|report|phases|milestones|tasks|schedule|critical-path|gantt|costs|progress|earned-value|cost-status|s-curve|health|kpi|monitoring|risks|risk-matrix|site-logs|site-report|changes|inspections|actions}`,
+`POST /projects/{project_id}/{phases|milestones|tasks|costs|progress|risks|site-logs|changes|inspections|actions|apply-template}`,
+`POST /from-estimate/{estimate_id}`; `GET|PUT|DELETE /tasks/{task_id}`;
+`GET|POST /resources`, `POST /allocations`, `GET /resource-load`; `GET /alerts`, `/portfolio`,
+`GET /risks`, `PUT /risks/{risk_id}`; `POST /changes/{change_id}/decide`; `GET /actions`,
+`POST /actions/{action_id}/close`; `GET /report.html`, `/portal`, `/portal.html`.
+
+**Resources:** `pmo://overview`, `pmo://capabilities`, `pmo://project-types`,
+`pmo://phase-templates`, `pmo://projects`, `pmo://portfolio`, `pmo://risk-matrix`; template
+`pmo://project/{project_id}`.
+**Prompts:** `pm_project_kickoff_prompt`, `pm_weekly_review_prompt`, `pm_risk_review_prompt`.
+
+```powershell
+# the portfolio dashboard and the seeded project's health
+curl "http://127.0.0.1:8000/pmo/portfolio"
+curl "http://127.0.0.1:8000/pmo/projects/PRJ-0001/health"
+
+# create a project (seeds phases + WBS), then read its critical path and earned value
+curl -X POST "http://127.0.0.1:8000/pmo/projects" -H "Content-Type: application/json" `
+  -d '{\"name\":\"Clifton Heights\",\"project_type\":\"construction\",\"city\":\"Karachi\",\"budget\":480000000,\"start_date\":\"2026-01-05\",\"status\":\"active\"}'
+curl "http://127.0.0.1:8000/pmo/projects/{project_id}/critical-path"
+curl "http://127.0.0.1:8000/pmo/projects/{project_id}/earned-value"
+
+# the PMO dashboard page and a printable project status report
+start "http://127.0.0.1:8000/pmo/portal"
+start "http://127.0.0.1:8000/pmo/report.html?project_id={project_id}"
 ```
 
 ## Notes

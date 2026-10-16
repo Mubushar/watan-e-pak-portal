@@ -58,6 +58,8 @@ import intelligence
 import leasing
 import maintenance
 import marketing
+import pmo
+import tools
 import transactions
 
 # ============================================================
@@ -4846,6 +4848,140 @@ def fastapi_info() -> str:
                 "GET  /property-intelligence/accounting-snapshot/{property_id}",
                 "GET  /property-intelligence/market-intelligence",
                 "GET  /property-intelligence/seller-intent/{contact_id}",
+                "--- tools & utilities ---",
+                "GET  /tools/overview",
+                "GET  /tools/categories",
+                "GET  /tools/catalog",
+                "GET  /tools/catalog/{key}",
+                "GET  /tools/area-units",
+                "GET  /tools/convert/area",
+                "GET  /tools/convert/area-table",
+                "GET  /tools/convert/length",
+                "GET  /tools/plot/dimensions",
+                "GET  /tools/plot/studio",
+                "GET  /tools/plot/diagram",
+                "GET  /tools/calculators",
+                "POST /tools/calculators/mortgage",
+                "POST /tools/calculators/installment",
+                "POST /tools/calculators/rental-yield",
+                "POST /tools/calculators/appreciation",
+                "POST /tools/calculators/price-per-unit",
+                "POST /tools/calculators/transfer-costs",
+                "POST /tools/calculators/commission",
+                "POST /tools/calculators/capital-gains",
+                "POST /tools/calculators/joint-investment",
+                "POST /tools/calculators/rent-vs-buy",
+                "POST /tools/calculators/construction-cost",
+                "POST /tools/calculators/material-quantities",
+                "POST /tools/calculators/build-timeline",
+                "GET  /tools/gis/crs",
+                "POST /tools/gis/measure",
+                "POST /tools/gis/polygon-area",
+                "POST /tools/gis/georeference",
+                "POST /tools/gis/transform",
+                "POST /tools/gis/aerial-compare",
+                "POST /tools/gis/export",
+                "POST /tools/gis/import",
+                "POST /tools/gis/nearby",
+                "GET  /tools/cad/formats",
+                "POST /tools/cad/inspect",
+                "POST /tools/cad/dxf-preview",
+                "POST /tools/cad/compare-revisions",
+                "POST /tools/cad/layout-sheet",
+                "POST /tools/photo/read-gps",
+                "POST /tools/photo/write-gps",
+                "POST /tools/photo/geotag-batch",
+                "POST /tools/photo/report",
+                "GET  /tools/photo/privacy-check",
+                "GET  /tools/documents/tools",
+                "GET  /tools/documents/convert-guide",
+                "POST /tools/documents/text-to-pdf",
+                "POST /tools/documents/images-to-pdf",
+                "POST /tools/documents/brochure",
+                "POST /tools/documents/pdf-info",
+                "GET  /tools/documents/resize-plan",
+                "GET  /tools/calendar/hijri",
+                "GET  /tools/calendar/gregorian",
+                "GET  /tools/calendar/occasions",
+                "GET  /tools/calendar/holidays",
+                "POST /tools/calendar/ics",
+                "POST /tools/calendar/reminders",
+                "POST /tools/calendar/milestones",
+                "POST /tools/calendar/possession",
+                "POST /tools/reports/comparison",
+                "POST /tools/reports/investment-summary",
+                "POST /tools/reports/plot-inventory",
+                "POST /tools/reports/csv",
+                "POST /tools/reports/markdown",
+                "GET  /tools/projects",
+                "POST /tools/projects",
+                "GET  /tools/projects/{project_id}",
+                "DELETE /tools/projects/{project_id}",
+                "GET  /tools/portal",
+                "GET  /tools/portal.html",
+                "--- pmo (project management) ---",
+                "GET  /pmo/overview",
+                "GET  /pmo/capabilities",
+                "GET  /pmo/project-types",
+                "GET  /pmo/phase-templates",
+                "GET  /pmo/projects",
+                "POST /pmo/projects",
+                "GET  /pmo/projects/{project_id}",
+                "PUT  /pmo/projects/{project_id}",
+                "DELETE /pmo/projects/{project_id}",
+                "GET  /pmo/projects/{project_id}/dashboard",
+                "GET  /pmo/projects/{project_id}/report",
+                "GET  /pmo/projects/{project_id}/phases",
+                "POST /pmo/projects/{project_id}/phases",
+                "GET  /pmo/projects/{project_id}/milestones",
+                "POST /pmo/projects/{project_id}/milestones",
+                "GET  /pmo/projects/{project_id}/tasks",
+                "POST /pmo/projects/{project_id}/tasks",
+                "GET  /pmo/projects/{project_id}/schedule",
+                "GET  /pmo/projects/{project_id}/critical-path",
+                "GET  /pmo/projects/{project_id}/gantt",
+                "GET  /pmo/projects/{project_id}/costs",
+                "POST /pmo/projects/{project_id}/costs",
+                "GET  /pmo/projects/{project_id}/progress",
+                "POST /pmo/projects/{project_id}/progress",
+                "GET  /pmo/projects/{project_id}/earned-value",
+                "GET  /pmo/projects/{project_id}/cost-status",
+                "GET  /pmo/projects/{project_id}/s-curve",
+                "GET  /pmo/projects/{project_id}/health",
+                "GET  /pmo/projects/{project_id}/kpi",
+                "GET  /pmo/projects/{project_id}/monitoring",
+                "GET  /pmo/projects/{project_id}/risks",
+                "POST /pmo/projects/{project_id}/risks",
+                "GET  /pmo/projects/{project_id}/risk-matrix",
+                "GET  /pmo/projects/{project_id}/site-logs",
+                "POST /pmo/projects/{project_id}/site-logs",
+                "GET  /pmo/projects/{project_id}/site-report",
+                "GET  /pmo/projects/{project_id}/changes",
+                "POST /pmo/projects/{project_id}/changes",
+                "GET  /pmo/projects/{project_id}/inspections",
+                "POST /pmo/projects/{project_id}/inspections",
+                "GET  /pmo/projects/{project_id}/actions",
+                "POST /pmo/projects/{project_id}/actions",
+                "POST /pmo/projects/{project_id}/apply-template",
+                "POST /pmo/from-estimate/{estimate_id}",
+                "GET  /pmo/tasks/{task_id}",
+                "PUT  /pmo/tasks/{task_id}",
+                "DELETE /pmo/tasks/{task_id}",
+                "GET  /pmo/resources",
+                "POST /pmo/resources",
+                "POST /pmo/allocations",
+                "GET  /pmo/resource-load",
+                "GET  /pmo/alerts",
+                "GET  /pmo/portfolio",
+                "GET  /pmo/risks",
+                "PUT  /pmo/risks/{risk_id}",
+                "GET  /pmo/changes/{change_id}/decide",
+                "POST /pmo/changes/{change_id}/decide",
+                "GET  /pmo/actions",
+                "POST /pmo/actions/{action_id}/close",
+                "GET  /pmo/report.html",
+                "GET  /pmo/portal",
+                "GET  /pmo/portal.html",
             ],
         }
     )
@@ -7610,6 +7746,1329 @@ def prompt_maintenance_incident(symptom: str = "damp patch on ceiling after rain
 
 
 # ============================================================
+# ============ TOOLS & UTILITIES WING (calculators · GIS) ======
+# ====== georeferencing · CAD · phototools · documents =========
+# ====== Pakistan & Islamic calendar · reports/export ==========
+# ============================================================
+#
+# The Tools Center turns the portal into a professional utility suite. Every
+# tool is a pure-Python function in `tools.py` (standard library only), reusing
+# `accounting` (mortgage/ROI), `construction` (build cost) and `gis` (measure,
+# GeoJSON/KML, maps), and is exposed over MCP here and over REST in api.py.
+
+
+def _tools_center_html() -> str:
+    """A searchable, category-filtered grid of tool cards for the Tools Center."""
+    cards = [
+        {"key": t["key"], "name": t["name"], "category": t["category"],
+         "cat_label": tools.TOOL_CATEGORIES.get(t["category"], t["category"]),
+         "phase": t["phase"], "blurb": t["blurb"], "tool": t["mcp_tool"]}
+        for t in tools.TOOL_CATALOG
+    ]
+    cats = [{"key": "all", "label": "All Tools"}] + [
+        {"key": c["key"], "label": c["label"]} for c in tools.tool_categories()["categories"]
+    ]
+    sel = ("padding:6px 10px;border:1px solid var(--line);background:var(--surface);"
+           "color:var(--ink);border-radius:6px")
+    return (
+        '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px">'
+        f'<input id="tc-search" placeholder="Search tools…" style="{sel};min-width:240px">'
+        '<span id="tc-cats" style="display:inline-flex;flex-wrap:wrap;gap:6px"></span>'
+        '</div>'
+        '<div id="tc-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));'
+        'gap:12px"></div>'
+        '<div id="tc-empty" style="display:none;color:var(--muted);padding:12px">No tools match.</div>'
+        '<p style="color:var(--muted);font-size:12px;margin-top:12px">Every card maps to an MCP tool and '
+        'a matching REST endpoint — one engine powers both. Phase shows the roadmap launch order '
+        '(1 = quick win, 2 = GIS workspace, 3 = professional/AI).</p>'
+        '<script>(function(){var T=' + json.dumps(cards) + ',C=' + json.dumps(cats) + ';'
+        'var grid=document.getElementById("tc-grid"),empty=document.getElementById("tc-empty");'
+        'var search=document.getElementById("tc-search");var active="all";'
+        'function card(x){var d=document.createElement("div");'
+        'd.style.cssText="border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--surface)";'
+        'd.innerHTML="<div style=\\"font-weight:700;margin-bottom:4px\\">"+x.name+"</div>"'
+        '+ "<div style=\\"color:var(--muted);font-size:12px;min-height:34px\\">"+x.blurb+"</div>"'
+        '+ "<div style=\\"margin-top:8px;font-size:11px;color:var(--muted)\\">"+x.cat_label+" · phase "+x.phase+"</div>"'
+        '+ "<code style=\\"font-size:11px\\">"+x.tool+"</code>";return d;}'
+        'function render(){var q=search.value.toLowerCase();grid.innerHTML="";var n=0;'
+        'T.forEach(function(x){if(active!=="all"&&x.category!==active)return;'
+        'if(q&&(x.name+" "+x.blurb).toLowerCase().indexOf(q)<0)return;grid.appendChild(card(x));n++;});'
+        'empty.style.display=n?"none":"block";}'
+        'var bar=document.getElementById("tc-cats");C.forEach(function(c,i){var b=document.createElement("button");'
+        'b.textContent=c.label+" ("+(c.key==="all"?T.length:T.filter(function(x){return x.category===c.key;}).length)+")";'
+        'b.style.cssText="cursor:pointer;padding:6px 10px;border-radius:999px;border:1px solid var(--line);'
+        'background:var(--surface);color:var(--ink);font-size:12px";if(i===0){active="all";b.style.fontWeight="700";}'
+        'b.onclick=function(){active=c.key;render();};bar.appendChild(b);});'
+        'search.addEventListener("input",render);render();})();</script>'
+    )
+
+
+def _tools_calculator_html() -> str:
+    """A self-contained area converter + mortgage quick-calculator."""
+    payload = {"units": tools.AREA_UNITS,
+               "sqft_per": {u: tools._sqft_per(u) for u in tools.AREA_UNITS},
+               "marla_standards": {k: v["marla_sqft"] for k, v in tools.MARLA_STANDARDS.items()}}
+    sel = ("padding:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);"
+           "border-radius:6px")
+    return (
+        '<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">'
+        f'<label>Area value<br><input id="tc-val" type="number" value="10" min="0" style="{sel};width:120px"></label>'
+        f'<label>From unit<br><select id="tc-from" style="{sel}"></select></label>'
+        f'<label>Marla standard<br><select id="tc-std" style="{sel}"></select></label>'
+        '</div>'
+        '<h3 id="tc-areal" style="margin:14px 0 2px">…</h3>'
+        '<div id="tc-aread" style="color:var(--muted);font-size:13px"></div>'
+        '<hr style="border:none;border-top:1px solid var(--line);margin:18px 0">'
+        '<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">'
+        f'<label>Price (PKR)<br><input id="tc-price" type="number" value="10000000" min="0" style="{sel};width:150px"></label>'
+        f'<label>Down payment<br><input id="tc-down" type="number" value="2000000" min="0" style="{sel};width:140px"></label>'
+        f'<label>Rate %/yr<br><input id="tc-rate" type="number" value="12" step="0.1" style="{sel};width:100px"></label>'
+        f'<label>Years<br><input id="tc-years" type="number" value="15" min="1" style="{sel};width:90px"></label>'
+        '</div>'
+        '<h3 id="tc-mort" style="margin:14px 0 2px">…</h3>'
+        '<div id="tc-mortd" style="color:var(--muted);font-size:13px"></div>'
+        '<script>(function(){var D=' + json.dumps(payload) + ';'
+        'function opt(el,obj,sel){Object.keys(obj).forEach(function(k){var o=document.createElement("option");'
+        'o.value=k;o.textContent=k;el.appendChild(o);});el.value=sel;}'
+        'var f=document.getElementById("tc-from"),s=document.getElementById("tc-std");'
+        'opt(f,D.units,"marla");opt(s,{standard:"standard (272.25)",small:"small (225)"},"standard");'
+        'function fmt(n){return (Math.round(n*1000)/1000).toLocaleString();}'
+        'function area(){var v=+document.getElementById("tc-val").value||0;'
+        'var m=D.marla_standards[s.value==="small"?"small":"standard"];'
+        'var per=Object.assign({},D.sqft_per,{marla:m,kanal:m*20});'
+        'var sqft=v*per[f.value];var parts=[];D.units.forEach(function(u){parts.push(u+" "+fmt(sqft/per[u]));});'
+        'document.getElementById("tc-areal").textContent=sqft.toLocaleString()+" sqft";'
+        'document.getElementById("tc-aread").textContent=parts.join("  ·  ");}'
+        'function mort(){var p=+document.getElementById("tc-price").value||0,'
+        'd=+document.getElementById("tc-down").value||0,r=(+document.getElementById("tc-rate").value||0)/100,'
+        'y=+document.getElementById("tc-years").value||1;var L=Math.max(0,p-d),n=y*12,i=r/12;'
+        'var pay=i?L*i/(1-Math.pow(1+i,-n)):L/n;var total=pay*n;'
+        'document.getElementById("tc-mort").textContent="Rs "+Math.round(pay).toLocaleString()+" / month";'
+        'document.getElementById("tc-mortd").textContent="Loan "+Math.round(L).toLocaleString()+"  ·  total interest "+'
+        'Math.round(total-L).toLocaleString()+"  ·  total paid "+Math.round(total).toLocaleString();}'
+        '["tc-val","tc-from","tc-std"].forEach(function(id){var e=document.getElementById(id);'
+        'e.addEventListener("input",area);e.addEventListener("change",area);});'
+        '["tc-price","tc-down","tc-rate","tc-years"].forEach(function(id){document.getElementById(id).addEventListener("input",mort);});'
+        'area();mort();})();</script>'
+    )
+
+
+# ---------- Calculators ----------
+
+
+@mcp.tool()
+def tool_area_units() -> str:
+    """Area units and marla standards supported by the converters."""
+    return dump(tools.area_units())
+
+
+@mcp.tool()
+def tool_area_convert(value: float, from_unit: str = "sqft", to_unit: str = "marla",
+                      marla_sqft: float = 272.25) -> str:
+    """Convert between sqft / sqyd / sqm / marla / kanal / acre / hectare."""
+    return dump(tools.convert_area(value, from_unit, to_unit, marla_sqft))
+
+
+@mcp.tool()
+def tool_area_table(value: float, from_unit: str = "sqft", marla_sqft: float = 272.25) -> str:
+    """Show an area in every supported unit at once."""
+    return dump(tools.convert_area_all(value, from_unit, marla_sqft))
+
+
+@mcp.tool()
+def tool_length_convert(value: float, from_unit: str = "ft", to_unit: str = "m") -> str:
+    """Convert between feet, inches, yards, metres, centimetres and kilometres."""
+    return dump(tools.convert_length(value, from_unit, to_unit))
+
+
+@mcp.tool()
+def tool_plot_dimensions(area: float, from_unit: str = "marla", ratio: float = 2.0,
+                         marla_sqft: float = 272.25) -> str:
+    """Length / width / perimeter / diagonal of a rectangular plot from its area."""
+    return dump(tools.plot_dimensions(area, from_unit, ratio, marla_sqft))
+
+
+@mcp.tool()
+def tool_mortgage_calculator(price: float, down_payment: float = 0.0,
+                             annual_rate: Optional[float] = None, years: Optional[int] = None,
+                             payments_per_year: int = 12) -> str:
+    """Home-loan monthly installment, total interest and full amortisation schedule."""
+    return dump(tools.mortgage_calculator(price, down_payment, annual_rate, years, payments_per_year))
+
+
+@mcp.tool()
+def tool_installment_plan(price: float, down_payment: float = 0.0, months: int = 36,
+                          annual_markup: float = 0.0) -> str:
+    """Developer-style installment plan: down payment, markup and monthly amount."""
+    return dump(tools.installment_plan(price, down_payment, months, annual_markup))
+
+
+@mcp.tool()
+def tool_rental_yield(price: float, monthly_rent: float, annual_costs: float = 0.0,
+                      vacancy_rate: float = 0.0) -> str:
+    """Gross and net rental yield with payback period and cap rate."""
+    return dump(tools.rental_yield(price, monthly_rent, annual_costs, vacancy_rate))
+
+
+@mcp.tool()
+def tool_appreciation(current_value: float, cagr: float = 0.08, years: int = 10,
+                      monthly_rent: float = 0.0, rent_growth: float = 0.05) -> str:
+    """Property appreciation and investment-growth projection with scenario bands."""
+    return dump(tools.appreciation_projection(current_value, cagr, years, monthly_rent, rent_growth))
+
+
+@mcp.tool()
+def tool_price_per_unit(price: float, area: float, from_unit: str = "sqft",
+                        marla_sqft: float = 272.25) -> str:
+    """Price per sqft / sqyd / sqm / marla for a listing."""
+    return dump(tools.price_per_unit(price, area, from_unit, marla_sqft))
+
+
+@mcp.tool()
+def tool_transfer_costs(price: float, province: str = "punjab", filer: bool = True,
+                        rate_overrides: Optional[Dict[str, float]] = None) -> str:
+    """Stamp duty, CVT, registration, mutation and withholding on a property transfer."""
+    return dump(tools.transfer_costs(price, province, filer, rate_overrides))
+
+
+@mcp.tool()
+def tool_agent_commission(price: float, rate: Optional[float] = None, include_vat: bool = True) -> str:
+    """Agent commission on a sale, with optional output VAT."""
+    return dump(tools.agent_commission(price, rate, include_vat))
+
+
+@mcp.tool()
+def tool_capital_gains_tax(gain: float, holding_years: float, filer: bool = True) -> str:
+    """Capital-gains tax on a disposal, by holding period and filer status."""
+    return dump(tools.capital_gains_tax(gain, holding_years, filer))
+
+
+@mcp.tool()
+def tool_joint_investment(partners: List[Dict[str, Any]], total_profit: float,
+                          months: float = 12.0) -> str:
+    """Split a profit between partners pro-rata to capital, with each partner's ROI."""
+    return dump(tools.joint_investment(partners, total_profit, months))
+
+
+@mcp.tool()
+def tool_rent_vs_buy(price: float, monthly_rent: float, down_payment_pct: float = 0.20,
+                     annual_rate: Optional[float] = None, years: Optional[int] = None,
+                     cagr: float = 0.08, rent_growth: float = 0.05, hold_years: int = 10) -> str:
+    """Compare buying against renting over a holding period."""
+    return dump(tools.rent_vs_buy(price, monthly_rent, down_payment_pct, annual_rate, years,
+                                  cagr, rent_growth, hold_years))
+
+
+@mcp.tool()
+def tool_construction_cost(covered_area: float, floors: int = 1, building_type: str = "house",
+                           quality_tier: str = "standard", system: str = "rcc_frame",
+                           city: Optional[str] = None, plot_area: Optional[float] = None,
+                           escalation_years: float = 0.0) -> str:
+    """Construction-cost estimate (delegates to the construction wing's engine)."""
+    return dump(tools.construction_cost(covered_area, floors, building_type, quality_tier, system,
+                                        city, plot_area, escalation_years))
+
+
+@mcp.tool()
+def tool_material_quantities(covered_area: float, quality_tier: str = "standard",
+                             building_type: str = "house") -> str:
+    """Approximate material take-off (delegates to the construction wing)."""
+    return dump(tools.material_quantities(covered_area, quality_tier, building_type))
+
+
+@mcp.tool()
+def tool_build_timeline(covered_area: float, floors: int = 1, building_type: str = "house",
+                        system: str = "rcc_frame") -> str:
+    """Phase-weighted construction timeline (delegates to the construction wing)."""
+    return dump(tools.build_timeline(covered_area, floors, building_type, system))
+
+
+@mcp.tool()
+def tool_calculators() -> str:
+    """The calculators offered by the Tools Center, with their inputs and engines."""
+    return dump(tools.calculator_catalog())
+
+
+# ---------- GIS · georeferencing · map tools ----------
+
+
+@mcp.tool()
+def tool_crs_catalog() -> str:
+    """Common coordinate reference systems with guidance on which to measure in."""
+    return dump(tools.crs_catalog())
+
+
+@mcp.tool()
+def tool_map_measure(coords: List[List[float]], marla_sqft: float = 272.25) -> str:
+    """Distance, perimeter, area, centroid and bbox for a set of [lat, lon] points."""
+    return dump(tools.map_measure(coords, marla_sqft))
+
+
+@mcp.tool()
+def tool_polygon_area(coords: List[List[float]], unit: str = "sqft",
+                      marla_sqft: float = 272.25) -> str:
+    """Area of a polygon from its [lat, lon] coordinates, in the requested unit."""
+    return dump(tools.polygon_area_tool(coords, unit, marla_sqft))
+
+
+@mcp.tool()
+def tool_georeference(control_points: List[Dict[str, Any]]) -> str:
+    """Fit an image-pixel → WGS84 transform from control points (affine/similarity)."""
+    return dump(tools.georeference(control_points))
+
+
+@mcp.tool()
+def tool_transform_point(matrix: Dict[str, float], x: float, y: float, to_geo: bool = True) -> str:
+    """Apply a georeference matrix (px→geo forward, or geo→px with to_geo=False)."""
+    return dump(tools.transform_point(matrix, x, y, to_geo))
+
+
+@mcp.tool()
+def tool_aerial_compare(scenes: List[Dict[str, Any]]) -> str:
+    """Compare dated aerial/satellite scenes: order, resolution and change."""
+    return dump(tools.aerial_compare(scenes))
+
+
+@mcp.tool()
+def tool_export_geodata(features: List[Dict[str, Any]], fmt: str = "geojson",
+                        name: str = "export") -> str:
+    """Export points/lines/polygons as GeoJSON or KML."""
+    return dump(tools.export_geodata(features, fmt, name))
+
+
+@mcp.tool()
+def tool_import_geodata(text: str) -> str:
+    """Parse GeoJSON or KML text into [lat, lon] coordinate lists."""
+    return dump(tools.import_geodata(text))
+
+
+@mcp.tool()
+def tool_locate_nearby(origin: List[float], radius_m: float = 2000.0,
+                       category: Optional[str] = None, limit: int = 20) -> str:
+    """Locate POIs within a radius of an origin [lat, lon], nearest first."""
+    return dump(tools.locate_nearby(origin, [model_dict(p) for p in pois_db], radius_m, category, limit))
+
+
+@mcp.tool()
+def tool_plot_studio(value: float, from_unit: str = "marla", ratio: float = 2.0,
+                     covered_area: Optional[float] = None, quality_tier: str = "standard",
+                     building_type: str = "house", marla_sqft: float = 272.25) -> str:
+    """One-shot plot brief: all-unit conversion, dimensions, diagram and optional build cost."""
+    return dump(tools.plot_studio(value, from_unit, ratio, covered_area, quality_tier,
+                                  building_type, marla_sqft))
+
+
+@mcp.tool()
+def tool_plot_diagram(length_ft: float, width_ft: float, label: str = "Plot",
+                      marla_sqft: float = 272.25) -> str:
+    """A printable SVG diagram of a rectangular plot with its dimensions and area."""
+    return dump(tools.plot_diagram_svg(length_ft, width_ft, label, marla_sqft))
+
+
+# ---------- CAD · plan utilities ----------
+
+
+@mcp.tool()
+def tool_cad_formats() -> str:
+    """Supported drawing formats and what each can actually preview/convert."""
+    return dump(tools.cad_formats())
+
+
+@mcp.tool()
+def tool_cad_inspect(filename: str = "", head_base64: Optional[str] = None,
+                     size_bytes: int = 0) -> str:
+    """Detect a drawing's format from its name/first bytes and report capabilities."""
+    return dump(tools.cad_inspect(filename, head_base64, size_bytes))
+
+
+@mcp.tool()
+def tool_dxf_preview(text: str, width: int = 800, height: int = 600) -> str:
+    """Parse an ASCII DXF and render it to SVG (line/polyline/circle/text)."""
+    return dump(tools.dxf_preview(text, width, height))
+
+
+@mcp.tool()
+def tool_compare_revisions(a_entities: List[Dict[str, Any]], b_entities: List[Dict[str, Any]]) -> str:
+    """Compare two revisions of a plan: counts, extents and added/removed items."""
+    return dump(tools.compare_revisions(a_entities, b_entities))
+
+
+@mcp.tool()
+def tool_printable_layout(title: str, plot_length_ft: float, plot_width_ft: float,
+                          orientation: str = "portrait") -> str:
+    """A printable plot-layout sheet (SVG) with a title block and scale bar."""
+    return dump(tools.printable_layout_sheet(title, plot_length_ft, plot_width_ft, orientation))
+
+
+# ---------- Photo location & geotagging ----------
+
+
+@mcp.tool()
+def tool_read_photo_gps(image_base64: str) -> str:
+    """Read GPS coordinates, altitude and time from a JPEG's EXIF metadata."""
+    return dump(tools.read_photo_gps(image_base64))
+
+
+@mcp.tool()
+def tool_write_photo_gps(image_base64: str, latitude: float, longitude: float,
+                         altitude: Optional[float] = None, timestamp: Optional[str] = None) -> str:
+    """Embed/replace GPS coordinates in a JPEG's EXIF (returns new base64 bytes)."""
+    return dump(tools.write_photo_gps(image_base64, latitude, longitude, altitude, timestamp))
+
+
+@mcp.tool()
+def tool_photo_geotag_batch(photos: List[Dict[str, Any]], latitude: float, longitude: float,
+                            altitude: Optional[float] = None) -> str:
+    """Geotag several photos with the same coordinate."""
+    return dump(tools.photo_geotag_batch(photos, latitude, longitude, altitude))
+
+
+@mcp.tool()
+def tool_photo_report(photos: List[Dict[str, Any]], title: str = "Site photo report",
+                      lang: str = "en", theme: str = "auto") -> str:
+    """A property photo report: markers, summary table and an embeddable map."""
+    return dump(tools.photo_report(photos, title, lang, theme))
+
+
+@mcp.tool()
+def tool_geo_privacy_check(latitude: float, longitude: float) -> str:
+    """Advise on sharing precise residential coordinates (opt-in, fuzzing)."""
+    return dump(tools.geo_privacy_check(latitude, longitude))
+
+
+# ---------- Document & file conversion ----------
+
+
+@mcp.tool()
+def tool_text_to_pdf(title: str, lines: List[str], page_size: str = "a4") -> str:
+    """Create a simple text/listings PDF (dependency-free)."""
+    return dump(tools.text_to_pdf(title, lines, page_size))
+
+
+@mcp.tool()
+def tool_images_to_pdf(images: List[Dict[str, Any]], page_size: str = "a4") -> str:
+    """Combine JPEG images into a PDF (native, no re-encoding)."""
+    return dump(tools.images_to_pdf(images, page_size))
+
+
+@mcp.tool()
+def tool_brochure_pdf(title: str, subtitle: str = "",
+                      sections: Optional[List[Dict[str, Any]]] = None) -> str:
+    """Build a branded text brochure PDF from a list of sections."""
+    return dump(tools.brochure_pdf(title, subtitle, sections))
+
+
+@mcp.tool()
+def tool_pdf_info(pdf_base64: str) -> str:
+    """Basic PDF inspection: page count and declared size."""
+    return dump(tools.pdf_info(pdf_base64))
+
+
+@mcp.tool()
+def tool_image_resize_plan(width: int, height: int, max_width: int = 1600,
+                           max_height: int = 1600) -> str:
+    """Compute a contain-fit resize target without touching the pixels."""
+    return dump(tools.image_resize_plan(width, height, max_width, max_height))
+
+
+@mcp.tool()
+def tool_convert_guide(kind: str) -> str:
+    """Explain what a heavier conversion needs (and why), plus upload-safety notes."""
+    return dump(tools.convert_guide(kind))
+
+
+@mcp.tool()
+def tool_document_tools() -> str:
+    """The document/conversion tools and whether each is native or needs a dependency."""
+    return dump(tools.document_tools())
+
+
+# ---------- Pakistan & Islamic calendar ----------
+
+
+@mcp.tool()
+def tool_hijri_from_gregorian(on: str) -> str:
+    """Convert a Gregorian date (YYYY-MM-DD) to the predicted Hijri date."""
+    return dump(tools.hijri_from_gregorian(on))
+
+
+@mcp.tool()
+def tool_gregorian_from_hijri(year: int, month: int, day: int) -> str:
+    """Convert a Hijri date to the predicted Gregorian date."""
+    return dump(tools.gregorian_from_hijri(year, month, day))
+
+
+@mcp.tool()
+def tool_islamic_occasions(year: int) -> str:
+    """The main Islamic occasions inside a Gregorian year (predicted)."""
+    return dump(tools.islamic_occasions(year))
+
+
+@mcp.tool()
+def tool_pakistan_holidays(year: int) -> str:
+    """Pakistan public holidays for a year: fixed national days + predicted Islamic ones."""
+    return dump(tools.pakistan_holidays(year))
+
+
+@mcp.tool()
+def tool_calendar_ics(events: List[Dict[str, Any]], calendar_name: str = "Arz-e-Pak") -> str:
+    """Render events as a downloadable iCalendar (.ics) feed."""
+    return dump(tools.calendar_ics(events, calendar_name))
+
+
+@mcp.tool()
+def tool_property_reminders(events: List[Dict[str, Any]], lead_days: int = 7) -> str:
+    """Turn dated property events into reminders (possession, installments, expiries)."""
+    return dump(tools.property_reminders(events, lead_days))
+
+
+@mcp.tool()
+def tool_milestone_calendar(start_date: str, covered_area: float = 1000.0, floors: int = 1,
+                            building_type: str = "house", system: str = "rcc_frame") -> str:
+    """Date-stamp a construction timeline into a milestone calendar (+ .ics)."""
+    return dump(tools.milestone_calendar(start_date, covered_area, floors, building_type, system))
+
+
+@mcp.tool()
+def tool_possession_schedule(start_date: str, total_price: float, down_payment: float = 0.0,
+                             months: int = 24, frequency: str = "monthly") -> str:
+    """A booking + installment + possession payment schedule with due dates (+ .ics)."""
+    return dump(tools.possession_schedule(start_date, total_price, down_payment, months, frequency))
+
+
+# ---------- Reports & export studio ----------
+
+
+@mcp.tool()
+def tool_property_comparison(properties: List[Dict[str, Any]]) -> str:
+    """Side-by-side comparison of listings with derived price/sqft and yield."""
+    return dump(tools.property_comparison(properties))
+
+
+@mcp.tool()
+def tool_investment_summary(initial_investment: float, annual_cash_flow: float = 0.0,
+                            hold_years: int = 10, terminal_value: float = 0.0,
+                            loan_amount: float = 0.0, loan_rate: Optional[float] = None) -> str:
+    """Investment summary built on the accounting ROI engine (with scenarios)."""
+    return dump(tools.investment_summary(initial_investment, annual_cash_flow, hold_years,
+                                         terminal_value, loan_amount, loan_rate))
+
+
+@mcp.tool()
+def tool_plot_inventory(properties: List[Dict[str, Any]], marla_sqft: float = 272.25) -> str:
+    """Plot inventory: area in sqft / marla / kanal with price per unit."""
+    return dump(tools.plot_inventory(properties, marla_sqft))
+
+
+@mcp.tool()
+def tool_rows_to_csv(rows: List[Dict[str, Any]], columns: Optional[List[str]] = None) -> str:
+    """Serialise rows of dicts to CSV text."""
+    return dump(tools.rows_to_csv(rows, columns))
+
+
+@mcp.tool()
+def tool_rows_to_markdown(rows: List[Dict[str, Any]], columns: Optional[List[str]] = None) -> str:
+    """Serialise rows of dicts to a Markdown table."""
+    return dump(tools.rows_to_markdown(rows, columns))
+
+
+# ---------- Tools Center: catalog, saved projects, portal page ----------
+
+
+@mcp.tool()
+def tools_overview() -> str:
+    """Counts by category and phase, the native/optional split and the wing configuration."""
+    return dump(tools.tools_overview())
+
+
+@mcp.tool()
+def tools_categories() -> str:
+    """The Tools Center categories and how many tools each holds."""
+    return dump(tools.tool_categories())
+
+
+@mcp.tool()
+def tools_catalog(category: Optional[str] = None, phase: Optional[int] = None) -> str:
+    """The tool cards, optionally filtered by category or launch phase."""
+    rows = tools.tools_by_category(category, phase)
+    return dump({"count": len(rows), "category": category, "phase": phase, "tools": rows})
+
+
+@mcp.tool()
+def tool_get(key: str) -> str:
+    """One tool card by key (e.g. ``mortgage``, ``georeference``, ``calendar``)."""
+    return dump(tools.tool_view(key))
+
+
+@mcp.tool()
+def tool_save_project(name: str, tool: str, inputs: Optional[Dict[str, Any]] = None,
+                      outputs: Optional[Dict[str, Any]] = None, notes: Optional[str] = None) -> str:
+    """Save a tool run as a reusable project (personalised tools)."""
+    rec = tools.save_project(name, tool, inputs, outputs, notes)
+    return dump(model_dict(rec))
+
+
+@mcp.tool()
+def tool_projects(tool: Optional[str] = None) -> str:
+    """List saved tool projects, optionally filtered by tool key."""
+    rows = [model_dict(p) for p in tools.list_projects(tool)]
+    return dump({"count": len(rows), "projects": rows})
+
+
+@mcp.tool()
+def tool_project_get(project_id: str) -> str:
+    """One saved tool project by id."""
+    rec = tools.find_project(project_id)
+    if not rec:
+        return dump({"error": f"Unknown project: {project_id}"})
+    return dump(model_dict(rec))
+
+
+@mcp.tool()
+def tool_project_delete(project_id: str) -> str:
+    """Delete a saved tool project."""
+    return dump({"deleted": tools.delete_project(project_id), "project_id": project_id})
+
+
+@mcp.tool()
+def tools_portal(lang: str = "en", theme: str = "auto") -> str:
+    """Render the **Tools & Utilities** page (HTML): a searchable Tools Center, live
+    calculators, unit/CRS/CAD reference tables and the Pakistan & Islamic calendar —
+    bilingual and themed."""
+    ov = tools.tools_overview()
+    c = ov["counts"]
+    calc_rows = [[x["name"], ", ".join(x["inputs"]), x["engine"]]
+                 for x in tools.calculator_catalog()["calculators"]]
+    unit_rows = [[u, f"{tools._sqft_per(u):,.4f}", f"{tools._sqft_per(u, 225.0):,.4f}"]
+                 for u in tools.AREA_UNITS]
+    crs_rows = [[f"EPSG:{s['epsg']}", s["name"], s["units"], s["use"]] for s in tools.crs_catalog()["systems"]]
+    cad_rows = [[f["format"], ", ".join(f["ext"]), f["preview"], f["convert"], f["layers"]]
+                for f in tools.CAD_FORMATS]
+    year = datetime.now().year
+    hol = tools.pakistan_holidays(year)
+    hol_rows = [[h["date"], h["name"], h["type"], "predicted" if h.get("predicted") else "fixed"]
+                for h in hol["holidays"]]
+    occ = tools.islamic_occasions(year)
+    occ_rows = [[o["date"], o["name"], o["hijri"]] for o in occ["occasions"]]
+    sections: List[Dict[str, Any]] = [
+        {"kind": "cards", "heading": "Tools Center at a glance", "items": [
+            ["Tools", c["tools"], f"{c['categories']} categories"],
+            ["Calculators", c["calculators"], "finance & property"],
+            ["Phases", len(ov["by_phase"]), "quick win → professional"],
+            ["CRS systems", c["crs_systems"], "for accurate area"],
+            ["Saved projects", c["saved_projects"], "personalised tools"]]},
+        {"kind": "text", "heading": "About this wing", "text": (
+            "The Tools & Utilities center is the portal's professional toolkit: property "
+            "calculators, a plot & construction studio, GIS measurement and georeferencing, "
+            "CAD/plan utilities, photo geotagging, document conversion, the Pakistan & Islamic "
+            "calendar and a reports/export studio. Everything runs on one shared engine — the "
+            "same MCP tools and REST endpoints return identical results. Where a capability "
+            "genuinely needs a heavy or licensed dependency, the tool says so rather than "
+            "faking the work.")},
+        {"kind": "html", "heading": "Browse tools", "html": _tools_center_html()},
+        {"kind": "html", "heading": "Live calculators", "html": _tools_calculator_html()},
+        {"kind": "table", "heading": "Calculators",
+         "columns": ["Tool", "Inputs", "Engine"], "rows": calc_rows},
+        {"kind": "table", "heading": "Area units (sqft per unit; standard & small marla)",
+         "columns": ["Unit", "Standard marla", "Small marla (225)"], "rows": unit_rows},
+        {"kind": "table", "heading": "Coordinate reference systems",
+         "columns": ["CRS", "Name", "Units", "Use"], "rows": crs_rows},
+        {"kind": "table", "heading": "CAD & drawing formats",
+         "columns": ["Format", "Extensions", "Preview", "Convert", "Layers"], "rows": cad_rows},
+        {"kind": "table", "heading": f"Islamic occasions {year} (predicted)",
+         "columns": ["Date", "Occasion", "Hijri"], "rows": occ_rows},
+        {"kind": "table", "heading": f"Pakistan holidays {year}",
+         "columns": ["Date", "Holiday", "Type", "Status"], "rows": hol_rows},
+    ]
+    ads = content.ad_section(slot="sidebar", category="services", lang=lang)
+    if ads.get("count"):
+        sections.append(ads)
+    return gis.build_report_html(title="Tools & Utilities",
+                                 subtitle="Calculate · map · convert · manage property",
+                                 sections=sections, ticker_html=_portal_ticker(lang),
+                                 lang=lang, theme=theme)
+
+
+@mcp.resource("tools://overview", name="Tools overview",
+              description="Counts, categories and configuration for the Tools Center.")
+def res_tools_overview() -> str:
+    return tools_overview()
+
+
+@mcp.resource("tools://categories", name="Tool categories",
+              description="The Tools Center categories and their tool counts.")
+def res_tools_categories() -> str:
+    return tools_categories()
+
+
+@mcp.resource("tools://catalog", name="Tool catalog",
+              description="Every tool card in the Tools Center.")
+def res_tools_catalog() -> str:
+    return tools_catalog()
+
+
+@mcp.resource("tools://tool/{key}", name="Tool", description="One tool card by key.")
+def res_tools_tool(key: str) -> str:
+    return tool_get(key)
+
+
+@mcp.resource("tools://units", name="Area & length units",
+              description="Area units, marla standards and length units.")
+def res_tools_units() -> str:
+    return dump({"area": tools.area_units(), "length_feet_per_unit": tools.FEET_PER_UNIT})
+
+
+@mcp.resource("tools://crs", name="Coordinate reference systems",
+              description="Common CRS with measurement guidance.")
+def res_tools_crs() -> str:
+    return tool_crs_catalog()
+
+
+@mcp.resource("tools://calculators", name="Calculators",
+              description="The calculators offered by the Tools Center.")
+def res_tools_calculators() -> str:
+    return tool_calculators()
+
+
+@mcp.resource("tools://calendar/{year}", name="Islamic occasions",
+              description="Predicted Islamic occasions inside a Gregorian year.")
+def res_tools_calendar(year: str) -> str:
+    return tool_islamic_occasions(int(year))
+
+
+@mcp.resource("tools://holidays/{year}", name="Pakistan holidays",
+              description="Pakistan public holidays for a year.")
+def res_tools_holidays(year: str) -> str:
+    return tool_pakistan_holidays(int(year))
+
+
+@mcp.prompt(name="tools_calculator_prompt",
+            description="Pick and run the right property calculator for a question.")
+def prompt_tools_calculator(question: str = "What is the monthly payment on a 1 crore loan?",
+                            city: str = "Lahore") -> str:
+    return (
+        "You are a property-finance assistant for Pakistan.\n"
+        f"Question: '{question}' in {city}.\n"
+        "1. Choose the calculator with tool_calculators (mortgage, rental yield, transfer "
+        "costs, capital gains, commission, joint investment, appreciation).\n"
+        "2. Call the matching tool_* function; use tool_area_convert for units and "
+        "tool_transfer_costs/tool_capital_gains_tax for statutory costs.\n"
+        "3. Present the result with the assumptions, and flag that statutory rates are "
+        "indicative and must be confirmed with the district office."
+    )
+
+
+@mcp.prompt(name="tools_gis_prompt",
+            description="Measure a plot/plan and export it for a survey workflow.")
+def prompt_tools_gis(plan: str = "scanned housing-scheme plan", target: str = "a 10 marla plot") -> str:
+    return (
+        "You are a GIS/survey assistant.\n"
+        f"Task: align and measure {target} from {plan}.\n"
+        "1. tool_georeference with control points to fit a pixel→WGS84 transform.\n"
+        "2. tool_map_measure / tool_polygon_area for distance, perimeter and area in "
+        "sqft/marla/kanal; tool_crs_catalog to pick the right CRS for area.\n"
+        "3. tool_export_geodata to GeoJSON or KML, and tool_plot_studio for a printable diagram.\n"
+        "4. State the RMSE/quality and the licensing/ownership caveats about imagery."
+    )
+
+
+# ============================================================
+# ============ PMO WING (project management · monitoring · tracking) ======
+# ============================================================
+#
+# The in-house running project-management, monitoring and tracking system.
+# ``pmo.py`` is framework-free; these thin MCP tools and the ``/pmo/...`` REST
+# routes in ``api.py`` share the very same functions.
+
+
+def _pmo_bar_svg(rows: List[Dict[str, Any]]) -> str:
+    """A compact horizontal progress-bar chart for the projects."""
+    if not rows:
+        return '<p style="color:var(--muted)">No projects yet.</p>'
+    bar_w = 260
+    out = ["<div style='display:flex;flex-direction:column;gap:8px'>"]
+    for r in rows:
+        pct = float(r.get("progress_pct") or 0.0)
+        health = r.get("health", "green")
+        color = pmo.RAG_COLORS.get(health, "#1b9e4b")
+        filled = bar_w * max(0.0, min(100.0, pct)) / 100.0
+        out.append(
+            "<div style='display:flex;align-items:center;gap:10px;font-size:13px'>"
+            f"<div style='width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>{r.get('name','')}</div>"
+            f"<svg width='{bar_w}' height='14'><rect width='{bar_w}' height='14' rx='3' fill='#e5e7eb'/>"
+            f"<rect width='{filled:.1f}' height='14' rx='3' fill='{color}'/></svg>"
+            f"<span style='width:44px;text-align:right'>{pct:.0f}%</span>"
+            f"<span style='width:120px;color:var(--muted)'>{health.upper()} · {r.get('status','')}</span>"
+            "</div>")
+    out.append("</div>")
+    return "".join(out)
+
+
+def pmo_portal(lang: str = "en", theme: str = "auto") -> str:
+    """The Project Management & Monitoring (PMO) page as HTML."""
+    ov = pmo.pmo_overview()
+    dash = pmo.portfolio_dashboard()
+    alerts = pmo.alerts()
+    proj_rows = [[r["code"], r["name"], r["status"], r["project_type"], r["city"] or "",
+                  f"{r['progress_pct']:.0f}%", r["health"].upper(),
+                  pmo.format_pkr(r["budget"]), pmo.format_pkr(r["actual_cost"]),
+                  str(r["SPI"]), str(r["CPI"])] for r in dash["rows"]]
+    cap_rows = [[c["name"], c["category"], c["blurb"]] for c in pmo.PM_CAPABILITIES]
+    alert_rows = [[a["level"].upper(), a["project"], a["kind"], a["message"]] for a in alerts["alerts"][:20]]
+
+    sections = [
+        {"kind": "cards", "heading": "Portfolio", "items": [
+            ("Projects", str(dash["projects"]), "in the register"),
+            ("Revised budget", pmo.format_pkr(dash["financials"]["total_budget"]), "all projects"),
+            ("Actual cost", pmo.format_pkr(dash["financials"]["total_actual"]), "spent"),
+            ("Portfolio SPI", str(dash["portfolio_spi"]), "schedule index"),
+            ("Portfolio CPI", str(dash["portfolio_cpi"]), "cost index"),
+            ("Open alerts", str(alerts["count"]), f"{alerts['red']} red · {alerts['amber']} amber"),
+        ]},
+        {"kind": "html", "heading": "Progress", "html": _pmo_bar_svg(dash["rows"])},
+        {"kind": "table", "heading": "Project register",
+         "columns": ["Code", "Project", "Status", "Type", "City", "Progress", "Health",
+                     "Budget", "Actual", "SPI", "CPI"],
+         "rows": proj_rows},
+        {"kind": "table", "heading": "What the PMO does",
+         "columns": ["Capability", "Group", "What it does"], "rows": cap_rows},
+        {"kind": "table", "heading": "Open alerts & exceptions",
+         "columns": ["Level", "Project", "Kind", "Message"], "rows": alert_rows},
+        {"kind": "text", "heading": "Method",
+         "text": "Scheduling runs a forward/backward pass over the task network on a six-day "
+                 "(Mon–Sat) working week to give float and the critical path; progress is "
+                 "duration-weighted and earned value follows the standard PV/EV/AC definitions. "
+                 + ov["disclaimer"]},
+    ]
+    ads = content.ad_section(slot="sidebar", category="services", lang=lang)
+    if ads.get("count"):
+        sections.append(ads)
+    return gis.build_report_html(title="Projects & Monitoring (PMO)",
+                                 subtitle="Plan · schedule · track · control",
+                                 sections=sections, ticker_html=_portal_ticker(lang),
+                                 lang=lang, theme=theme)
+
+
+@mcp.tool()
+def pmo_overview() -> str:
+    """Counts, breakdowns and configuration for the whole PMO (project management) wing."""
+    return dump(pmo.pmo_overview())
+
+
+@mcp.tool()
+def pmo_capabilities() -> str:
+    """The PMO capabilities grouped by category (planning, tracking, monitoring, governance)."""
+    return dump(pmo.capabilities())
+
+
+@mcp.tool()
+def pm_project_types() -> str:
+    """The supported project types, statuses and priorities."""
+    return dump(pmo.project_types())
+
+
+@mcp.tool()
+def pm_phase_templates(project_type: Optional[str] = None) -> str:
+    """Default weighted phase templates by project type (or all templates)."""
+    return dump(pmo.phase_templates(project_type))
+
+
+@mcp.tool()
+def pm_create_project(
+    name: str, project_type: str = "construction", description: Optional[str] = None,
+    city: Optional[str] = None, scheme: Optional[str] = None, client: Optional[str] = None,
+    manager_id: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None,
+    budget: float = 0.0, contract_value: float = 0.0, priority: str = "medium",
+    status: str = "planning", tags: Optional[List[str]] = None, with_template: bool = True,
+) -> str:
+    """Register a project (optionally seeding its weighted phases and WBS template)."""
+    return dump(pmo.create_project(
+        name, project_type=project_type, description=description, city=city, scheme=scheme,
+        client=client, manager_id=manager_id, start_date=start_date, end_date=end_date,
+        budget=budget, contract_value=contract_value, priority=priority, status=status,
+        tags=tags, with_template=with_template))
+
+
+@mcp.tool()
+def pm_projects(status: Optional[str] = None, project_type: Optional[str] = None,
+                 city: Optional[str] = None, manager_id: Optional[str] = None,
+                 priority: Optional[str] = None, limit: int = 50) -> str:
+    """List projects with progress and health (filter by status, type, city, manager, priority)."""
+    return dump(pmo.list_projects(status=status, project_type=project_type, city=city,
+                                  manager_id=manager_id, priority=priority, limit=limit))
+
+
+@mcp.tool()
+def pm_project(project_id: str) -> str:
+    """One project by id or code, with phase/task/milestone counts."""
+    return dump(pmo.get_project(project_id))
+
+
+@mcp.tool()
+def pm_update_project(project_id: str, updates: Dict[str, Any]) -> str:
+    """Update a project's fields (name, status, priority, budget, dates, client, tags …)."""
+    return dump(pmo.update_project(project_id, **(updates or {})))
+
+
+@mcp.tool()
+def pm_delete_project(project_id: str) -> str:
+    """Delete a project and everything that belongs to it (tasks, costs, risks, logs …)."""
+    return dump(pmo.delete_project(project_id))
+
+
+@mcp.tool()
+def pm_project_dashboard(project_id: str) -> str:
+    """The full project-controls snapshot: health, KPI, progress, cost, EVM, alerts and risks."""
+    return dump(pmo.monitoring_snapshot(project_id))
+
+
+@mcp.tool()
+def pm_from_estimate(estimate_id: str, name: Optional[str] = None, city: Optional[str] = None,
+                      start_date: Optional[str] = None, contract_value: Optional[float] = None) -> str:
+    """Create a delivery project from a saved Construction-wing estimate (budget = build cost)."""
+    return dump(pmo.import_construction_estimate(
+        estimate_id, name=name, city=city, start_date=start_date, contract_value=contract_value))
+
+
+@mcp.tool()
+def pm_apply_template(project_id: str, project_type: Optional[str] = None) -> str:
+    """Seed a project's weighted phases and a task work-breakdown from its type template."""
+    return dump(pmo.apply_template(project_id, project_type))
+
+
+@mcp.tool()
+def pm_add_phase(project_id: str, name: str, key: Optional[str] = None, weight: float = 0.0,
+                  order: Optional[int] = None, planned_start: Optional[str] = None,
+                  planned_end: Optional[str] = None) -> str:
+    """Add a weighted phase to a project's work-breakdown."""
+    return dump(pmo.add_phase(project_id, name, key=key, weight=weight, order=order,
+                              planned_start=planned_start, planned_end=planned_end))
+
+
+@mcp.tool()
+def pm_phases(project_id: str) -> str:
+    """List a project's phases with normalised weights and progress."""
+    return dump(pmo.list_phases(project_id))
+
+
+@mcp.tool()
+def pm_add_milestone(project_id: str, name: str, planned_date: Optional[str] = None,
+                      phase_key: Optional[str] = None, task_id: Optional[str] = None,
+                      weight: float = 1.0, billable_amount: float = 0.0,
+                      notes: Optional[str] = None) -> str:
+    """Add a milestone (optionally linked to a task and a billable amount)."""
+    return dump(pmo.add_milestone(project_id, name, planned_date=planned_date, phase_key=phase_key,
+                                  task_id=task_id, weight=weight, billable_amount=billable_amount,
+                                  notes=notes))
+
+
+@mcp.tool()
+def pm_milestones(project_id: str, status: Optional[str] = None) -> str:
+    """List a project's milestones with forecast dates and slip."""
+    return dump(pmo.list_milestones(project_id, status=status))
+
+
+@mcp.tool()
+def pm_add_task(project_id: str, name: str, phase_key: Optional[str] = None,
+                 duration_days: int = 1, predecessors: Optional[List[str]] = None,
+                 assignee_id: Optional[str] = None, weight: float = 0.0,
+                 cost_budget: float = 0.0, priority: str = "medium",
+                 wbs: Optional[str] = None, notes: Optional[str] = None) -> str:
+    """Add a task (duration in working days, finish-to-start predecessors)."""
+    return dump(pmo.add_task(project_id, name, phase_key=phase_key, duration_days=duration_days,
+                             predecessors=predecessors, assignee_id=assignee_id, weight=weight,
+                             cost_budget=cost_budget, priority=priority, wbs=wbs, notes=notes))
+
+
+@mcp.tool()
+def pm_tasks(project_id: str, phase_key: Optional[str] = None, status: Optional[str] = None,
+              assignee_id: Optional[str] = None) -> str:
+    """List tasks with their scheduled start/finish, float and critical flag."""
+    return dump(pmo.list_tasks(project_id, phase_key=phase_key, status=status, assignee_id=assignee_id))
+
+
+@mcp.tool()
+def pm_task(task_id: str) -> str:
+    """One task by id, with its scheduled start/finish, float and critical flag."""
+    t = pmo.find_task(task_id)
+    if not t:
+        return dump({"error": f"Unknown task: {task_id}"})
+    sched = {r["id"]: r for r in pmo.build_schedule(t.project_id).get("tasks", [])}
+    row = pmo._m(t)
+    row.update({k: sched.get(t.id, {}).get(k) for k in
+                ("planned_start", "planned_finish", "late_start", "late_finish",
+                 "float_days", "is_critical")})
+    return dump(row)
+
+
+@mcp.tool()
+def pm_update_task(task_id: str, updates: Dict[str, Any]) -> str:
+    """Update a task (progress %, status, dates, duration, assignee, cost …)."""
+    return dump(pmo.update_task(task_id, **(updates or {})))
+
+
+@mcp.tool()
+def pm_delete_task(task_id: str) -> str:
+    """Delete a task and its resource allocations."""
+    return dump(pmo.delete_task(task_id))
+
+
+@mcp.tool()
+def pm_schedule(project_id: str, start_date: Optional[str] = None) -> str:
+    """Run the forward/backward pass: ES/EF, LS/LF, total float and the critical path."""
+    return dump(pmo.build_schedule(project_id, start_date=start_date))
+
+
+@mcp.tool()
+def pm_critical_path(project_id: str) -> str:
+    """The critical path (zero-float chain) with its entries and the project duration."""
+    return dump(pmo.critical_path(project_id))
+
+
+@mcp.tool()
+def pm_gantt(project_id: str) -> str:
+    """Gantt-ready rows (phase, task, start, finish, progress, critical) for a project."""
+    return dump(pmo.gantt(project_id))
+
+
+@mcp.tool()
+def pm_add_cost(project_id: str, amount: float, category: str = "other",
+                 description: str = "", kind: str = "actual", date: Optional[str] = None,
+                 vendor: Optional[str] = None, invoice_ref: Optional[str] = None,
+                 recorded_by: Optional[str] = None) -> str:
+    """Record a committed or actual cost entry against a project."""
+    return dump(pmo.add_cost(project_id, amount, category=category, description=description,
+                             kind=kind, date=date, vendor=vendor, invoice_ref=invoice_ref,
+                             recorded_by=recorded_by))
+
+
+@mcp.tool()
+def pm_costs(project_id: str, kind: Optional[str] = None, category: Optional[str] = None) -> str:
+    """List a project's cost entries (filter by kind/category)."""
+    return dump(pmo.list_costs(project_id, kind=kind, category=category))
+
+
+@mcp.tool()
+def pm_record_progress(project_id: str, percent: float, note: Optional[str] = None,
+                        by: Optional[str] = None, manpower: int = 0,
+                        weather: Optional[str] = None, on: Optional[str] = None) -> str:
+    """Record a dated progress update for a project."""
+    return dump(pmo.record_progress(project_id, percent, note=note, by=by, manpower=manpower,
+                                    weather=weather, on=on))
+
+
+@mcp.tool()
+def pm_progress(project_id: str) -> str:
+    """Current actual vs planned (duration-weighted) completion for a project."""
+    return dump({**pmo.project_progress(project_id), "history": pmo.progress_history(project_id)})
+
+
+@mcp.tool()
+def pm_earned_value(project_id: str, as_of: Optional[str] = None) -> str:
+    """Earned-value analysis: PV, EV, AC, SV, CV, SPI, CPI, EAC, ETC, VAC and TCPI."""
+    return dump(pmo.earned_value(project_id, as_of=as_of))
+
+
+@mcp.tool()
+def pm_cost_status(project_id: str) -> str:
+    """Cost control: baseline, approved variations, revised budget, commitments, actuals and forecast."""
+    return dump(pmo.cost_status(project_id))
+
+
+@mcp.tool()
+def pm_s_curve(project_id: str, weeks: int = 52) -> str:
+    """The planned-vs-actual S-curve (weekly cumulative completion) for a project."""
+    return dump(pmo.s_curve(project_id, weeks=weeks))
+
+
+@mcp.tool()
+def pm_add_resource(name: str, role: str = "engineer", trade: Optional[str] = None,
+                     day_rate: float = 0.0, capacity_pct: float = 100.0,
+                     skills: Optional[List[str]] = None, contact: Optional[str] = None) -> str:
+    """Register a team/trade resource with a day rate and capacity."""
+    return dump(pmo.add_resource(name, role=role, trade=trade, day_rate=day_rate,
+                                 capacity_pct=capacity_pct, skills=skills, contact=contact))
+
+
+@mcp.tool()
+def pm_resources(trade: Optional[str] = None, active_only: bool = False) -> str:
+    """List resources (filter by trade; optionally active only)."""
+    return dump(pmo.list_resources(trade=trade, active_only=active_only))
+
+
+@mcp.tool()
+def pm_assign(task_id: str, resource_id: str, units_pct: float = 100.0,
+               notes: Optional[str] = None) -> str:
+    """Assign a resource to a task at a percentage of their capacity."""
+    return dump(pmo.assign(task_id, resource_id, units_pct=units_pct, notes=notes))
+
+
+@mcp.tool()
+def pm_resource_load(project_id: Optional[str] = None, window_start: Optional[str] = None,
+                      window_end: Optional[str] = None) -> str:
+    """Planned resource utilisation over a window, with over-allocation flags."""
+    return dump(pmo.resource_load(project_id=project_id, window_start=window_start,
+                                  window_end=window_end))
+
+
+@mcp.tool()
+def pm_health(project_id: str) -> str:
+    """Schedule/cost/risk/quality RAG status and an overall health verdict."""
+    return dump(pmo.project_health(project_id))
+
+
+@mcp.tool()
+def pm_alerts(project_id: Optional[str] = None) -> str:
+    """Exception-based alerts for one project or the whole portfolio."""
+    return dump(pmo.alerts(project_id))
+
+
+@mcp.tool()
+def pm_kpi(project_id: str) -> str:
+    """The KPI scorecard for a project."""
+    return dump(pmo.kpi(project_id))
+
+
+@mcp.tool()
+def pm_monitoring(project_id: str) -> str:
+    """Alias of the project-controls snapshot (health, KPI, progress, cost, EVM, alerts)."""
+    return dump(pmo.monitoring_snapshot(project_id))
+
+
+@mcp.tool()
+def pm_portfolio() -> str:
+    """Rolled-up dashboard across every running project with portfolio SPI/CPI."""
+    return dump(pmo.portfolio_dashboard())
+
+
+@mcp.tool()
+def pm_add_risk(project_id: str, title: str, kind: str = "risk", probability: int = 3,
+                 impact: int = 3, description: Optional[str] = None, category: Optional[str] = None,
+                 owner: Optional[str] = None, mitigation: Optional[str] = None,
+                 due_on: Optional[str] = None) -> str:
+    """Add a RAID item (risk/issue/assumption/dependency) with probability and impact (1–5)."""
+    return dump(pmo.add_risk(project_id, title, kind=kind, probability=probability, impact=impact,
+                             description=description, category=category, owner=owner,
+                             mitigation=mitigation, due_on=due_on))
+
+
+@mcp.tool()
+def pm_risks(project_id: Optional[str] = None, kind: Optional[str] = None,
+              status: Optional[str] = None, min_score: int = 0) -> str:
+    """List RAID items with their score and band (sorted by score)."""
+    return dump(pmo.list_risks(project_id=project_id, kind=kind, status=status, min_score=min_score))
+
+
+@mcp.tool()
+def pm_update_risk(risk_id: str, updates: Dict[str, Any]) -> str:
+    """Update a RAID item (probability, impact, status, owner, mitigation …)."""
+    return dump(pmo.update_risk(risk_id, **(updates or {})))
+
+
+@mcp.tool()
+def pm_risk_matrix(project_id: Optional[str] = None) -> str:
+    """The probability × impact risk matrix with the placed RAID items."""
+    return dump(pmo.risk_matrix(project_id))
+
+
+@mcp.tool()
+def pm_log_site(project_id: str, date: Optional[str] = None, weather: Optional[str] = None,
+                 manpower: int = 0, equipment: Optional[List[str]] = None,
+                 work_done: Optional[str] = None, issues: Optional[str] = None,
+                 safety_incidents: int = 0, visitors: Optional[str] = None,
+                 photos: Optional[List[str]] = None, by: Optional[str] = None) -> str:
+    """Record a daily site diary entry (weather, manpower, plant, work, safety)."""
+    return dump(pmo.log_site_day(project_id, date=date, weather=weather, manpower=manpower,
+                                 equipment=equipment, work_done=work_done, issues=issues,
+                                 safety_incidents=safety_incidents, visitors=visitors,
+                                 photos=photos, by=by))
+
+
+@mcp.tool()
+def pm_site_logs(project_id: str, limit: int = 30) -> str:
+    """List a project's site diary entries."""
+    return dump(pmo.list_site_logs(project_id, limit=limit))
+
+
+@mcp.tool()
+def pm_site_report(project_id: str, on: Optional[str] = None) -> str:
+    """A daily site report: the diary entry, progress, health and open alerts."""
+    return dump(pmo.site_report(project_id, on=on))
+
+
+@mcp.tool()
+def pm_raise_change(project_id: str, title: str, description: Optional[str] = None,
+                     reason: Optional[str] = None, cost_impact: float = 0.0,
+                     schedule_impact_days: int = 0, requested_by: Optional[str] = None,
+                     status: str = "submitted") -> str:
+    """Raise a variation / change request with cost and schedule impact."""
+    return dump(pmo.raise_change(project_id, title, description=description, reason=reason,
+                                 cost_impact=cost_impact, schedule_impact_days=schedule_impact_days,
+                                 requested_by=requested_by, status=status))
+
+
+@mcp.tool()
+def pm_changes(project_id: str, status: Optional[str] = None) -> str:
+    """List a project's change requests with the approved cost/schedule impact."""
+    return dump(pmo.list_changes(project_id, status=status))
+
+
+@mcp.tool()
+def pm_decide_change(change_id: str, approve: bool = True, by: Optional[str] = None,
+                      note: Optional[str] = None) -> str:
+    """Approve or reject a change request (approval moves the project's revised budget)."""
+    return dump(pmo.decide_change(change_id, approve=approve, by=by, note=note))
+
+
+@mcp.tool()
+def pm_add_inspection(project_id: str, title: str,
+                       checklist: Optional[List[Dict[str, Any]]] = None,
+                       phase_key: Optional[str] = None, area: Optional[str] = None,
+                       inspector: Optional[str] = None, date: Optional[str] = None,
+                       status: str = "open", notes: Optional[str] = None) -> str:
+    """Record a stage inspection with a pass/fail checklist; updates the quality index."""
+    return dump(pmo.add_inspection(project_id, title, checklist=checklist, phase_key=phase_key,
+                                   area=area, inspector=inspector, date=date, status=status,
+                                   notes=notes))
+
+
+@mcp.tool()
+def pm_inspections(project_id: str, status: Optional[str] = None) -> str:
+    """List a project's inspections and the aggregated quality index."""
+    return dump(pmo.list_inspections(project_id, status=status))
+
+
+@mcp.tool()
+def pm_add_action(project_id: str, title: str, owner: Optional[str] = None,
+                   due_on: Optional[str] = None, priority: str = "medium",
+                   meeting: Optional[str] = None, notes: Optional[str] = None) -> str:
+    """Add a meeting action item with an owner and due date."""
+    return dump(pmo.add_action(project_id, title, owner=owner, due_on=due_on, priority=priority,
+                               meeting=meeting, notes=notes))
+
+
+@mcp.tool()
+def pm_actions(project_id: Optional[str] = None, status: Optional[str] = None) -> str:
+    """List action items (optionally for one project / one status)."""
+    return dump(pmo.list_actions(project_id=project_id, status=status))
+
+
+@mcp.tool()
+def pm_close_action(action_id: str, status: str = "done") -> str:
+    """Close (or reopen) a meeting action item."""
+    return dump(pmo.close_action(action_id, status=status))
+
+
+@mcp.tool()
+def pm_project_report(project_id: str) -> str:
+    """A full project status report as structured data (schedule, cost, EVM, risks, alerts)."""
+    return dump(pmo.project_report(project_id))
+
+
+@mcp.tool()
+def pm_report_html(project_id: str, lang: str = "en", theme: str = "auto") -> str:
+    """A printable project status report as (themed, bilingual) HTML."""
+    return pmo.report_html(project_id, lang=lang, theme=theme)
+
+
+@mcp.tool()
+def pm_portal(lang: str = "en", theme: str = "auto") -> str:
+    """The Projects & Monitoring (PMO) page as HTML: register, capabilities and alerts."""
+    return pmo_portal(lang=lang, theme=theme)
+
+
+@mcp.resource("pmo://overview", name="PMO overview",
+              description="Counts, breakdowns and configuration for the PMO wing.")
+def res_pmo_overview() -> str:
+    return pmo_overview()
+
+
+@mcp.resource("pmo://capabilities", name="PMO capabilities",
+              description="The project-management capabilities by category.")
+def res_pmo_capabilities() -> str:
+    return pmo_capabilities()
+
+
+@mcp.resource("pmo://project-types", name="Project types",
+              description="Supported project types, statuses and priorities.")
+def res_pmo_project_types() -> str:
+    return pm_project_types()
+
+
+@mcp.resource("pmo://phase-templates", name="Phase templates",
+              description="Default weighted phase templates by project type.")
+def res_pmo_phase_templates() -> str:
+    return pm_phase_templates()
+
+
+@mcp.resource("pmo://projects", name="Project register",
+              description="Every project with progress and health.")
+def res_pmo_projects() -> str:
+    return pm_projects()
+
+
+@mcp.resource("pmo://project/{project_id}", name="Project",
+              description="One project with its counts and full status report.")
+def res_pmo_project(project_id: str) -> str:
+    return pm_project_report(project_id)
+
+
+@mcp.resource("pmo://portfolio", name="Portfolio dashboard",
+              description="The rolled-up portfolio dashboard.")
+def res_pmo_portfolio() -> str:
+    return pm_portfolio()
+
+
+@mcp.resource("pmo://risk-matrix", name="Risk matrix",
+              description="The portfolio-wide probability × impact risk matrix.")
+def res_pmo_risk_matrix() -> str:
+    return pm_risk_matrix()
+
+
+@mcp.prompt(name="pm_project_kickoff_prompt",
+            description="Kick off a new build/development project in the PMO.")
+def prompt_pm_kickoff(name: str = "New apartment block", city: str = "Lahore",
+                       budget: float = 250000000.0) -> str:
+    return (
+        "You are a project controls manager for a Pakistani developer.\n"
+        f"Project to set up: '{name}' in {city}, budget approx {pmo.format_pkr(budget)}.\n"
+        "1. pm_project_types + pm_phase_templates to choose the type and phases.\n"
+        "2. pm_create_project (with_template=true) then pm_resources / pm_assign to staff it.\n"
+        "3. pm_schedule to obtain the critical path, pm_milestones to set payment milestones.\n"
+        "4. Report the plan: duration, critical path, phase weights and the milestone schedule."
+    )
+
+
+@mcp.prompt(name="pm_weekly_review_prompt",
+            description="Run the weekly project-controls review for a project.")
+def prompt_pm_weekly(project_id: str = "", focus: str = "schedule and cost") -> str:
+    return (
+        "You are running the weekly project-controls review"
+        + (f" for project {project_id}" if project_id else "") + ".\n"
+        f"Focus: {focus}.\n"
+        "1. pm_monitoring (or pm_project_dashboard) for health, EVM and the S-curve.\n"
+        "2. pm_alerts for exceptions; pm_tasks(status='blocked') and overdue milestones.\n"
+        "3. pm_risk_matrix for top risks; pm_inspections for quality holds.\n"
+        "4. Produce minutes: RAG status, variances (SV/CV, SPI/CPI), top 5 actions with owners."
+    )
+
+
+@mcp.prompt(name="pm_risk_review_prompt",
+            description="Review and reprioritise the RAID register for a project.")
+def prompt_pm_risk(project_id: str = "", horizon_days: int = 30) -> str:
+    return (
+        "You are the risk manager.\n"
+        + (f"Project: {project_id}.\n" if project_id else "Scope: whole portfolio.\n")
+        + f"Horizon: next {horizon_days} days.\n"
+        "1. pm_risks and pm_risk_matrix to score the register (P×I).\n"
+        "2. For every high/extreme item propose a mitigation, an owner and a due date "
+        "(pm_update_risk).\n"
+        "3. Convert accepted risks into schedule/cost contingency (pm_raise_change) and, where "
+        "needed, into action items (pm_add_action)."
+    )
+
+
+# ============================================================
 # ====== AGENTIC OS · TRANSACTIONS · INTELLIGENCE ============
 # ====== LEASING · MARKETING · COMMERCIALIZATION =============
 # ============================================================
@@ -9727,7 +11186,12 @@ MODEL_REGISTRY: Dict[str, Any] = {
     "marketing_lead": marketing.MarketingLead, "lead_route": marketing.LeadRoute,
     "content_asset": marketing.ContentAsset, "campaign": marketing.Campaign,
     "subscription": commercial.Subscription, "meter_event": commercial.MeterEvent,
-    "payout": commercial.Payout,
+    "payout": commercial.Payout, "tool_project": tools.SavedToolProject,
+    "pm_project": pmo.PMProject, "pm_task": pmo.PmTask, "pm_phase": pmo.PmPhase,
+    "pm_milestone": pmo.PmMilestone, "pm_resource": pmo.PmResource,
+    "pm_cost_entry": pmo.PmCostEntry, "pm_risk": pmo.PmRisk,
+    "pm_change_request": pmo.PmChangeRequest, "pm_site_log": pmo.PmSiteLog,
+    "pm_inspection": pmo.PmInspection, "pm_action": pmo.PmAction,
 }
 
 
@@ -9747,6 +11211,8 @@ def _tool_group(name: str) -> str:
         ("get_commission_projection", "crm"), ("create_listing_draft", "intelligence"),
         ("analyze_property_gis", "gis"), ("get_gis_score", "gis"),
         ("get_accounting_snapshot", "accounting"), ("get_market_intelligence", "market"),
+        ("tools_", "tools"), ("tool_", "tools"),
+        ("pmo_", "pmo"), ("pm_", "pmo"),
         ("image_", "images"), ("rag_", "rag"), ("add_", "hierarchy"),
         ("update_", "hierarchy"), ("delete_", "hierarchy"), ("get_", "hierarchy"),
         ("list_", "hierarchy"), ("search_", "search"),
@@ -9780,6 +11246,8 @@ def _settings_snapshot() -> Dict[str, Any]:
         "leasing": leasing.LEASING_CONFIG,
         "marketing": marketing.MARKETING_CONFIG,
         "commercial": commercial.COMMERCIAL_CONFIG,
+        "tools": tools.TOOLS_CONFIG,
+        "pmo": pmo.PMO_CONFIG,
     }
 
 
@@ -9819,6 +11287,9 @@ def portal_health() -> str:
                 "content_assets": len(marketing.assets_db),
                 "subscriptions": len(commercial.subscriptions_db),
                 "meter_events": len(commercial.meter_events_db),
+                "tool_projects": len(tools.projects_db),
+                "pm_projects": len(pmo.projects_db), "pm_tasks": len(pmo.tasks_db),
+                "pm_risks": len(pmo.risks_db), "pm_cost_entries": len(pmo.cost_entries_db),
             },
         }
     )
@@ -9888,7 +11359,7 @@ def portal_settings(action: str = "get", updates: Optional[Dict[str, Any]] = Non
     """Read or edit runtime settings.
 
     ``action='update'`` accepts
-    ``{assumptions|forecast|accounting|auth|agentic|transactions|intelligence|leasing|marketing|commercial|construction|maintenance: {key: value}}``.
+    ``{assumptions|forecast|accounting|auth|agentic|transactions|intelligence|leasing|marketing|commercial|construction|maintenance|tools|pmo: {key: value}}``.
     """
     global BASE_PRICE_CAGR, GROWTH_SENSITIVITY, COST_INFLATION_CAGR, DEFAULT_BUILD_YEARS, LAND_COST_SHARE
     if action == "get":
@@ -9944,7 +11415,9 @@ def portal_settings(action: str = "get", updates: Optional[Dict[str, Any]] = Non
                           ("marketing", marketing.MARKETING_CONFIG),
                           ("commercial", commercial.COMMERCIAL_CONFIG),
                           ("construction", construction.CONSTRUCTION_CONFIG),
-                          ("maintenance", maintenance.MAINTENANCE_CONFIG)):
+                          ("maintenance", maintenance.MAINTENANCE_CONFIG),
+                          ("tools", tools.TOOLS_CONFIG),
+                          ("pmo", pmo.PMO_CONFIG)):
         for key, value in (updates.get(group) or {}).items():
             if key in config:
                 config[key] = value
@@ -9980,7 +11453,7 @@ def portal_audit_log(limit: int = 50) -> str:
 
 @mcp.tool()
 def global_search(query: str, limit: int = 10) -> str:
-    """Federated search across the whole portal: hierarchy, projects, POIs, AOIs, news and CRM."""
+    """Federated search across the whole portal: hierarchy, projects, POIs, AOIs, news, CRM and tools."""
     q = (query or "").strip().lower()
     if not q:
         return dump({"error": "query is required"})
@@ -9995,6 +11468,8 @@ def global_search(query: str, limit: int = 10) -> str:
         "construction_techniques": [], "construction_materials": [], "construction_guidelines": [],
         "maintenance_components": [], "maintenance_services": [], "maintenance_defects": [],
         "ai_agents": [], "transactions": [], "rental_units": [], "products": [],
+        "tools": [],
+        "pmo_projects": [], "pmo_tasks": [], "pmo_risks": [],
     }
     for c in cities_db:
         if has(c.name, c.state, c.description):
@@ -10080,6 +11555,25 @@ def global_search(query: str, limit: int = 10) -> str:
         if has(pr["key"], pr["name"], pr["segment"], pr["positioning"], " ".join(pr["pricing_models"])):
             results["products"].append({"key": pr["key"], "name": pr["name"],
                                         "priority": pr["priority"], "segment": pr["segment"]})
+    for tl in tools.TOOL_CATALOG:
+        if has(tl["key"], tl["name"], tl["blurb"], tl["category"],
+               tools.TOOL_CATEGORIES.get(tl["category"], "")):
+            results["tools"].append({"key": tl["key"], "name": tl["name"],
+                                     "category": tl["category"], "phase": tl["phase"],
+                                     "tool": tl["mcp_tool"]})
+    for pr in pmo.projects_db:
+        if has(pr.code, pr.name, pr.project_type, pr.city, pr.scheme, pr.client, pr.status):
+            results["pmo_projects"].append({"id": pr.id, "code": pr.code, "name": pr.name,
+                                            "status": pr.status, "type": pr.project_type})
+    for pt in pmo.tasks_db:
+        if has(pt.name, pt.wbs, pt.phase_key):
+            results["pmo_tasks"].append({"id": pt.id, "name": pt.name, "wbs": pt.wbs,
+                                         "project_id": pt.project_id, "status": pt.status,
+                                         "progress_pct": pt.progress_pct})
+    for rk in pmo.risks_db:
+        if has(rk.title, rk.kind, rk.category, rk.owner, rk.description):
+            results["pmo_risks"].append({"id": rk.id, "title": rk.title, "kind": rk.kind,
+                                         "score": rk.probability * rk.impact})
 
     for key in results:
         results[key] = results[key][:limit]
@@ -10199,6 +11693,34 @@ def portal_statistics() -> str:
                 "pricing_models": sorted(commercial.PRICING_MODELS),
                 "by_priority": {p: sum(1 for x in commercial.PRODUCTS if x["priority"] == p)
                                 for p in ("P0", "P1", "P2")},
+            },
+            "tools": {
+                "tools": len(tools.TOOL_CATALOG),
+                "categories": len(tools.TOOL_CATEGORIES),
+                "calculators": len(tools.calculator_catalog()["calculators"]),
+                "crs_systems": len(tools.crs_catalog()["systems"]),
+                "cad_formats": len(tools.CAD_FORMATS),
+                "area_units": len(tools.AREA_UNITS),
+                "saved_projects": len(tools.projects_db),
+                "by_phase": tools.tools_overview()["by_phase"],
+            },
+            "pmo": {
+                "projects": len(pmo.projects_db),
+                "active": sum(1 for p in pmo.projects_db if p.status == "active"),
+                "phases": len(pmo.phases_db), "milestones": len(pmo.milestones_db),
+                "tasks": len(pmo.tasks_db), "resources": len(pmo.resources_db),
+                "allocations": len(pmo.allocations_db),
+                "cost_entries": len(pmo.cost_entries_db),
+                "progress_updates": len(pmo.progress_updates_db),
+                "risks": len(pmo.risks_db),
+                "high_risks": sum(1 for r in pmo.risks_db if r.probability * r.impact >= 10),
+                "site_logs": len(pmo.site_logs_db),
+                "change_requests": len(pmo.change_requests_db),
+                "inspections": len(pmo.inspections_db), "actions": len(pmo.actions_db),
+                "by_health": pmo.portfolio_dashboard()["by_health"],
+                "portfolio_spi": pmo.portfolio_dashboard()["portfolio_spi"],
+                "portfolio_cpi": pmo.portfolio_dashboard()["portfolio_cpi"],
+                "capabilities": len(pmo.PM_CAPABILITIES),
             },
         }
     )
@@ -12847,6 +14369,169 @@ def _seed_agentic_os() -> None:
                          dispatch=_agent_tool_dispatch, context={}, approve=True)
 
 
+def _seed_tools() -> None:
+    """Seed the Tools & Utilities wing: a nav page and one saved example project."""
+    if not any(p.key == "tools" for p in content.pages_db):
+        content.pages_db.append(content.PortalPage(
+            key="tools", title="Tools & Utilities", category="services", order=78,
+            nav_label="Tools", subtitle="Calculators · GIS · CAD · photo · documents · calendar",
+            summary="Free professional property tools: calculators, mapping, conversion and the "
+                    "Pakistan & Islamic calendar.",
+            body=[
+                "The Tools & Utilities center turns the portal from a listings site into a "
+                "working professional toolkit. It offers property and finance calculators, a "
+                "plot & construction studio, GIS measurement and georeferencing, CAD/plan "
+                "utilities, photo geotagging, document conversion, the Pakistan & Islamic "
+                "calendar and a reports/export studio.",
+                "Every tool runs on the same engine in the MCP server and the REST API, so the "
+                "answers are identical whichever way you call them. Tools that genuinely need "
+                "a heavy or licensed dependency (GDAL, PyMuPDF, Tesseract, DWG conversion) say "
+                "so instead of pretending to do the work.",
+            ],
+            highlights=[
+                {"label": "Calculators", "value": "12+", "sub": "finance & property"},
+                {"label": "Mapping", "value": "GIS", "sub": "measure & georeference"},
+                {"label": "Photo GPS", "value": "EXIF", "sub": "read & write, dependency-free"},
+                {"label": "Calendar", "value": "Hijri", "sub": "Pakistan holidays + .ics"},
+            ],
+            bullets=[
+                "Convert marla / kanal / sqft / sqm with the right standard",
+                "Estimate mortgage, transfer costs, CGT and commission",
+                "Measure a plot on the map or from surveyed coordinates",
+                "Export GeoJSON, KML, PDF brochures and CSV",
+            ],
+            tags=["tools", "calculators", "gis", "calendar", "documents"],
+            status="published",
+        ))
+    if not tools.projects_db:
+        tools.save_project(
+            name="Sample: 10 marla mortgage", tool="mortgage",
+            inputs={"price": 10000000, "down_payment": 2000000, "annual_rate": 0.12, "years": 15},
+            outputs=tools.mortgage_calculator(10000000, 2000000, 0.12, 15),
+            notes="Seeded example so the Tools Center shows a recent tool.")
+
+
+def _seed_pmo() -> None:
+    """Seed the PMO wing: a nav page and one running example project."""
+    if not any(p.key == "pmo" for p in content.pages_db):
+        content.pages_db.append(content.PortalPage(
+            key="pmo", title="Projects & Monitoring", category="services", order=79,
+            nav_label="Projects", subtitle="Plan · schedule · track · control — in-house PMO",
+            summary="Run the portal's own projects: WBS, critical path, earned value, cost and "
+                    "risk control, site diaries and a live RAG dashboard.",
+            body=[
+                "The Projects & Monitoring (PMO) wing is the in-house project-management, "
+                "monitoring and tracking system for the developments the portal itself delivers. "
+                "It keeps a project register and a weighted work-breakdown, then runs a "
+                "forward/backward scheduling pass over the task network to produce float, the "
+                "critical path and a Gantt plan on a six-day (Mon–Sat) working week.",
+                "Progress is duration-weighted and earned value follows the standard definitions "
+                "(PV, EV, AC, SV, CV, SPI, CPI, EAC, ETC, VAC, TCPI), so cost and schedule "
+                "performance are always visible. A monitoring layer turns that into schedule, "
+                "cost, risk and quality RAG status with an exception-based alert engine and a "
+                "portfolio dashboard.",
+                "Around the core sit the controls a project office actually runs on: a RAID "
+                "register with a probability × impact matrix, daily site diaries, variation "
+                "requests with cost and schedule impact, stage inspections scored into a quality "
+                "index, meeting action items, resource loading and full status reports as JSON "
+                "or printable HTML.",
+            ],
+            highlights=[
+                {"label": "Projects", "value": "Register", "sub": "portfolio dashboard"},
+                {"label": "Scheduling", "value": "CPM", "sub": "float + critical path"},
+                {"label": "Control", "value": "EVM", "sub": "SPI · CPI · EAC"},
+                {"label": "Monitoring", "value": "RAG", "sub": "alerts & KPIs"},
+            ],
+            bullets=[
+                "Project register with budget, dates, sponsor and manager",
+                "Critical-path scheduling and Gantt structure",
+                "Earned value, S-curve and cost control",
+                "RAID register, site diary, variations and inspections",
+                "Health RAG, alerts and portfolio dashboard",
+            ],
+            tags=["projects", "pmo", "monitoring", "scheduling", "earned-value"],
+            status="published",
+        ))
+
+    if pmo.projects_db:
+        return
+    res = pmo.create_project(
+        "Gulberg Heights — 24 Apartments", project_type="construction", city="Lahore",
+        scheme="Gulberg Greens", client="Al-Faisal Developers", description="G+7 residential block, 24 units.",
+        start_date="2026-01-05", end_date="2026-12-31", budget=480_000_000,
+        contract_value=560_000_000, priority="high", status="active",
+    )
+    pid = res["project"]["id"]
+    pmo.update_project(pid, baseline_end="2026-12-31", notes="Demo project seeded by the portal.")
+
+    pm = pmo.add_resource("Engr. Bilal Ahmed", role="project_manager", day_rate=30000)["resource"]
+    se = pmo.add_resource("Engr. Sana Khan", role="site_engineer", day_rate=18000)["resource"]
+    mason = pmo.add_resource("Rashid & crew", role="foreman", trade="masonry", day_rate=9500,
+                             capacity_pct=100)["resource"]
+    pmo.add_resource("Imran Steel Fixers", role="subcontractor", trade="steel", day_rate=0,
+                     capacity_pct=100)
+    pmo.update_project(pid, manager_id=pm["id"])
+
+    tasks = pmo.tasks_for(pid)
+    if tasks:
+        pmo.assign(tasks[0].id, pm["id"], units_pct=60)
+        pmo.assign(tasks[6].id, se["id"], units_pct=80)
+        pmo.assign(tasks[8].id, se["id"], units_pct=40)
+        pmo.assign(tasks[9].id, mason["id"], units_pct=100)
+        # Progress is driven by the plan so the demo shows a credible S-curve.
+        today = pmo._today().isoformat()
+        upcoming = 0
+        for row in pmo.build_schedule(pid)["tasks"]:
+            if row["planned_finish"] < today:
+                pmo.update_task(row["id"], progress_pct=100, status="done",
+                                actual_start=row["planned_start"], actual_finish=row["planned_finish"])
+            elif upcoming < 2:
+                pmo.update_task(row["id"], progress_pct=40, status="in_progress",
+                                actual_start=row["planned_start"])
+                upcoming += 1
+
+    pmo.add_cost(pid, 92_000_000, category="substructure", description="Foundation & raft",
+                 kind="actual", vendor="Sirbuland Contractors")
+    pmo.add_cost(pid, 250_000_000, category="structure", description="RCC frame, all floors",
+                 kind="actual", vendor="Sirbuland Contractors")
+    pmo.add_cost(pid, 100_000_000, category="mep", description="MEP rough-in & services",
+                 kind="actual", vendor="Zeeshan Electro-Mechanical")
+    pmo.add_cost(pid, 34_000_000, category="finishes", description="Finishes package PO",
+                 kind="committed", vendor="Master Tiles & Sanitary")
+    pmo.record_progress(pid, 34.0, note="Frame to 4th floor slab cast", by="Engr. Bilal Ahmed",
+                        manpower=68, weather="Dry, 32°C")
+
+    pmo.add_risk(pid, "Steel price escalation", probability=4, impact=4, category="cost",
+                 owner="Engr. Bilal Ahmed", mitigation="Lock monthly rates with the supplier.",
+                 due_on="2026-05-30")
+    pmo.add_risk(pid, "Monsoon delays to external works", probability=3, impact=3,
+                 category="weather", owner="Engr. Sana Khan",
+                 mitigation="Front-load external drainage before June.")
+    pmo.add_risk(pid, "Approval of revised façade", probability=2, impact=4, kind="issue",
+                 category="approvals", owner="Design team")
+
+    pmo.log_site_day(pid, date="2026-06-15", weather="Clear, 38°C", manpower=68,
+                     equipment=["Tower crane", "Concrete pump", "Excavator"],
+                     work_done="5th-floor slab shuttering and steel fixing; column kickers cast.",
+                     issues="Cement delivery delayed by 3 hours.", safety_incidents=0,
+                     visitors="Client consultant", by="Engr. Sana Khan")
+
+    pmo.raise_change(pid, "Add basement car-parking", description="Client request for 18 extra bays.",
+                     reason="Buyer demand", cost_impact=41_000_000, schedule_impact_days=35,
+                     requested_by="Al-Faisal Developers", status="submitted")
+
+    pmo.add_inspection(pid, "5th-floor frame inspection", phase_key="superstructure",
+                       area="structural_frame", inspector="Engr. Sana Khan", checklist=[
+                           {"item": "Concrete grade as per design", "result": "pass"},
+                           {"item": "Reinforcement cover & spacing", "result": "fail",
+                            "note": "Cover blocks missing at 3 columns"},
+                           {"item": "Shuttering tightness & alignment", "result": "pass"},
+                           {"item": "Curing arrangement", "result": "pass"},
+                       ])
+    pmo.add_action(pid, "Fix cover blocks and re-inspect 5th floor", owner="Engr. Sana Khan",
+                   due_on="2026-06-25", priority="high", meeting="Weekly site meeting")
+
+
 def init_sample_data() -> None:
     """Populate the in-memory stores with a realistic Pakistani dataset."""
 
@@ -13505,6 +15190,12 @@ def init_sample_data() -> None:
     # ---- Agentic OS, transactions, leasing, marketing, commercialization ----
     _seed_agentic_os()
 
+    # ---- Tools & Utilities wing ----
+    _seed_tools()
+
+    # ---- PMO wing (project management, monitoring & tracking) ----
+    _seed_pmo()
+
 
 init_sample_data()
 
@@ -13536,10 +15227,14 @@ def main() -> None:
     print("Leasing   : 24/7 inquiry handling, screening, renewals, rent floor")
     print("Marketing : lead engine, routing, re-engagement, content, campaigns")
     print("Commercial: 8 products, hybrid pricing, metering, billing, payouts")
+    print("Tools     : calculators, GIS/georeferencing, CAD, photo, documents, calendar")
+    print("PMO       : project register, CPM scheduling, EVM, cost & risk control, site diary")
     print(f"Data      : {len(properties_db)} properties, {len(big_projects_db)} big projects, {len(leads_db)} leads")
     print(f"Content   : {len(content.pages_db)} pages, {len(content.stories_db)} stories, {len(content.ads_db)} ads, {len(auth.users_db)} users")
     print(f"Wings     : {len(construction.estimates_db)} build estimates, {len(maintenance.plans_db)} maintenance plans, {len(maintenance.work_orders_db)} work orders")
     print(f"Agentic   : {len(agents.AGENTS)} agents, {len(agents.runs_db)} runs, {len(transactions.transactions_db)} transactions, {len(commercial.PRODUCTS)} products")
+    print(f"Toolbox   : {len(tools.TOOL_CATALOG)} tools in {len(tools.TOOL_CATEGORIES)} categories, {len(tools.projects_db)} saved projects")
+    print(f"PMO       : {len(pmo.projects_db)} projects, {len(pmo.tasks_db)} tasks, {len(pmo.risks_db)} risks, {len(pmo.cost_entries_db)} cost entries")
     print("=" * 60)
     mcp.run()
 

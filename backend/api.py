@@ -4046,4 +4046,1239 @@ def score_seller_intent(contact_id: str, equity_pct: Optional[float] = None,
                                       life_event=life_event, fsbo_signal=fsbo_signal))
 
 
+# ==================================================================
+# TOOLS & UTILITIES WING
+# ==================================================================
+
+
+class ToolsMortgageRequest(BaseModel):
+    price: float
+    down_payment: float = 0.0
+    annual_rate: Optional[float] = None
+    years: Optional[int] = None
+    payments_per_year: int = 12
+
+
+class ToolsInstallmentRequest(BaseModel):
+    price: float
+    down_payment: float = 0.0
+    months: int = 36
+    annual_markup: float = 0.0
+
+
+class ToolsRentalYieldRequest(BaseModel):
+    price: float
+    monthly_rent: float
+    annual_costs: float = 0.0
+    vacancy_rate: float = 0.0
+
+
+class ToolsAppreciationRequest(BaseModel):
+    current_value: float
+    cagr: float = 0.08
+    years: int = 10
+    monthly_rent: float = 0.0
+    rent_growth: float = 0.05
+
+
+class ToolsPricePerUnitRequest(BaseModel):
+    price: float
+    area: float
+    from_unit: str = "sqft"
+    marla_sqft: float = 272.25
+
+
+class ToolsTransferRequest(BaseModel):
+    price: float
+    province: str = "punjab"
+    filer: bool = True
+    rate_overrides: Optional[Dict[str, float]] = None
+
+
+class ToolsCommissionRequest(BaseModel):
+    price: float
+    rate: Optional[float] = None
+    include_vat: bool = True
+
+
+class ToolsCgtRequest(BaseModel):
+    gain: float
+    holding_years: float
+    filer: bool = True
+
+
+class ToolsJointInvestmentRequest(BaseModel):
+    partners: List[Dict[str, Any]]
+    total_profit: float
+    months: float = 12.0
+
+
+class ToolsRentVsBuyRequest(BaseModel):
+    price: float
+    monthly_rent: float
+    down_payment_pct: float = 0.20
+    annual_rate: Optional[float] = None
+    years: Optional[int] = None
+    cagr: float = 0.08
+    rent_growth: float = 0.05
+    hold_years: int = 10
+
+
+class ToolsConstructionRequest(BaseModel):
+    covered_area: float
+    floors: int = 1
+    building_type: str = "house"
+    quality_tier: str = "standard"
+    system: str = "rcc_frame"
+    city: Optional[str] = None
+    plot_area: Optional[float] = None
+    escalation_years: float = 0.0
+
+
+class ToolsMaterialRequest(BaseModel):
+    covered_area: float
+    quality_tier: str = "standard"
+    building_type: str = "house"
+
+
+class ToolsTimelineRequest(BaseModel):
+    covered_area: float
+    floors: int = 1
+    building_type: str = "house"
+    system: str = "rcc_frame"
+
+
+class ToolsMeasureRequest(BaseModel):
+    coords: List[List[float]]
+    marla_sqft: float = 272.25
+
+
+class ToolsPolygonAreaRequest(BaseModel):
+    coords: List[List[float]]
+    unit: str = "sqft"
+    marla_sqft: float = 272.25
+
+
+class ToolsGeoreferenceRequest(BaseModel):
+    control_points: List[Dict[str, Any]]
+
+
+class ToolsTransformRequest(BaseModel):
+    matrix: Dict[str, float]
+    x: float
+    y: float
+    to_geo: bool = True
+
+
+class ToolsAerialRequest(BaseModel):
+    scenes: List[Dict[str, Any]]
+
+
+class ToolsExportRequest(BaseModel):
+    features: List[Dict[str, Any]]
+    fmt: str = "geojson"
+    name: str = "export"
+
+
+class ToolsImportRequest(BaseModel):
+    text: str
+
+
+class ToolsNearbyRequest(BaseModel):
+    origin: List[float]
+    radius_m: float = 2000.0
+    category: Optional[str] = None
+    limit: int = 20
+
+
+class ToolsCadInspectRequest(BaseModel):
+    filename: str = ""
+    head_base64: Optional[str] = None
+    size_bytes: int = 0
+
+
+class ToolsDxfRequest(BaseModel):
+    text: str
+    width: int = 800
+    height: int = 600
+
+
+class ToolsRevisionsRequest(BaseModel):
+    a_entities: List[Dict[str, Any]]
+    b_entities: List[Dict[str, Any]]
+
+
+class ToolsLayoutRequest(BaseModel):
+    title: str
+    plot_length_ft: float
+    plot_width_ft: float
+    orientation: str = "portrait"
+
+
+class ToolsGpsReadRequest(BaseModel):
+    image_base64: str
+
+
+class ToolsGpsWriteRequest(BaseModel):
+    image_base64: str
+    latitude: float
+    longitude: float
+    altitude: Optional[float] = None
+    timestamp: Optional[str] = None
+
+
+class ToolsGeotagBatchRequest(BaseModel):
+    photos: List[Dict[str, Any]]
+    latitude: float
+    longitude: float
+    altitude: Optional[float] = None
+
+
+class ToolsPhotoReportRequest(BaseModel):
+    photos: List[Dict[str, Any]]
+    title: str = "Site photo report"
+
+
+class ToolsTextPdfRequest(BaseModel):
+    title: str
+    lines: List[str]
+    page_size: str = "a4"
+
+
+class ToolsImagesPdfRequest(BaseModel):
+    images: List[Dict[str, Any]]
+    page_size: str = "a4"
+
+
+class ToolsBrochureRequest(BaseModel):
+    title: str
+    subtitle: str = ""
+    sections: Optional[List[Dict[str, Any]]] = None
+
+
+class ToolsPdfInfoRequest(BaseModel):
+    pdf_base64: str
+
+
+class ToolsIcsRequest(BaseModel):
+    events: List[Dict[str, Any]]
+    calendar_name: str = "Arz-e-Pak"
+
+
+class ToolsRemindersRequest(BaseModel):
+    events: List[Dict[str, Any]]
+    lead_days: int = 7
+
+
+class ToolsMilestonesRequest(BaseModel):
+    start_date: str
+    covered_area: float = 1000.0
+    floors: int = 1
+    building_type: str = "house"
+    system: str = "rcc_frame"
+
+
+class ToolsPossessionRequest(BaseModel):
+    start_date: str
+    total_price: float
+    down_payment: float = 0.0
+    months: int = 24
+    frequency: str = "monthly"
+
+
+class ToolsComparisonRequest(BaseModel):
+    properties: List[Dict[str, Any]]
+
+
+class ToolsInvestmentRequest(BaseModel):
+    initial_investment: float
+    annual_cash_flow: float = 0.0
+    hold_years: int = 10
+    terminal_value: float = 0.0
+    loan_amount: float = 0.0
+    loan_rate: Optional[float] = None
+
+
+class ToolsInventoryRequest(BaseModel):
+    properties: List[Dict[str, Any]]
+    marla_sqft: float = 272.25
+
+
+class ToolsRowsRequest(BaseModel):
+    rows: List[Dict[str, Any]]
+    columns: Optional[List[str]] = None
+
+
+class ToolsProjectRequest(BaseModel):
+    name: str
+    tool: str
+    inputs: Optional[Dict[str, Any]] = None
+    outputs: Optional[Dict[str, Any]] = None
+    notes: Optional[str] = None
+
+
+@app.get("/tools/overview", tags=["tools"])
+def tools_overview() -> Any:
+    """Counts by category and phase for the Tools Center, plus configuration."""
+    return j(core.tools_overview())
+
+
+@app.get("/tools/categories", tags=["tools"])
+def tools_categories() -> Any:
+    """The Tools Center categories and their tool counts."""
+    return j(core.tools_categories())
+
+
+@app.get("/tools/catalog", tags=["tools"])
+def tools_catalog(category: Optional[str] = None, phase: Optional[int] = None) -> Any:
+    """The tool cards, optionally filtered by category or launch phase."""
+    return j(core.tools_catalog(category=category, phase=phase))
+
+
+@app.get("/tools/catalog/{key}", tags=["tools"])
+def tool_get(key: str) -> Any:
+    """One tool card by key (e.g. ``mortgage``, ``georeference``, ``calendar``)."""
+    return j(core.tool_get(key))
+
+
+@app.get("/tools/area-units", tags=["tools"])
+def tool_area_units() -> Any:
+    """Area units and marla standards supported by the converters."""
+    return j(core.tool_area_units())
+
+
+@app.get("/tools/convert/area", tags=["tools"])
+def tool_area_convert(value: float, from_unit: str = "sqft", to_unit: str = "marla",
+                      marla_sqft: float = 272.25) -> Any:
+    """Convert between sqft / sqyd / sqm / marla / kanal / acre / hectare."""
+    return j(core.tool_area_convert(value, from_unit=from_unit, to_unit=to_unit,
+                                    marla_sqft=marla_sqft))
+
+
+@app.get("/tools/convert/area-table", tags=["tools"])
+def tool_area_table(value: float, from_unit: str = "sqft", marla_sqft: float = 272.25) -> Any:
+    """Show an area in every supported unit at once."""
+    return j(core.tool_area_table(value, from_unit=from_unit, marla_sqft=marla_sqft))
+
+
+@app.get("/tools/convert/length", tags=["tools"])
+def tool_length_convert(value: float, from_unit: str = "ft", to_unit: str = "m") -> Any:
+    """Convert between feet, inches, yards, metres, centimetres and kilometres."""
+    return j(core.tool_length_convert(value, from_unit=from_unit, to_unit=to_unit))
+
+
+@app.get("/tools/plot/dimensions", tags=["tools"])
+def tool_plot_dimensions(area: float, from_unit: str = "marla", ratio: float = 2.0,
+                         marla_sqft: float = 272.25) -> Any:
+    """Length / width / perimeter / diagonal of a rectangular plot from its area."""
+    return j(core.tool_plot_dimensions(area, from_unit=from_unit, ratio=ratio,
+                                       marla_sqft=marla_sqft))
+
+
+@app.get("/tools/plot/studio", tags=["tools"])
+def tool_plot_studio(value: float, from_unit: str = "marla", ratio: float = 2.0,
+                     covered_area: Optional[float] = None, quality_tier: str = "standard",
+                     building_type: str = "house", marla_sqft: float = 272.25) -> Any:
+    """One-shot plot brief: conversion, dimensions, diagram and optional build cost."""
+    return j(core.tool_plot_studio(value, from_unit=from_unit, ratio=ratio,
+                                   covered_area=covered_area, quality_tier=quality_tier,
+                                   building_type=building_type, marla_sqft=marla_sqft))
+
+
+@app.get("/tools/plot/diagram", tags=["tools"])
+def tool_plot_diagram(length_ft: float, width_ft: float, label: str = "Plot",
+                      marla_sqft: float = 272.25) -> Any:
+    """A printable SVG diagram of a rectangular plot with dimensions and area."""
+    return j(core.tool_plot_diagram(length_ft, width_ft, label=label, marla_sqft=marla_sqft))
+
+
+@app.get("/tools/calculators", tags=["tools"])
+def tool_calculators() -> Any:
+    """The calculators offered by the Tools Center, with their inputs and engines."""
+    return j(core.tool_calculators())
+
+
+@app.post("/tools/calculators/mortgage", tags=["tools"])
+def tool_mortgage_calculator(payload: ToolsMortgageRequest) -> Any:
+    """Home-loan monthly installment, total interest and full amortisation schedule."""
+    return j(core.tool_mortgage_calculator(**payload.model_dump()))
+
+
+@app.post("/tools/calculators/installment", tags=["tools"])
+def tool_installment_plan(payload: ToolsInstallmentRequest) -> Any:
+    """Developer-style installment plan: down payment, markup and monthly amount."""
+    return j(core.tool_installment_plan(**payload.model_dump()))
+
+
+@app.post("/tools/calculators/rental-yield", tags=["tools"])
+def tool_rental_yield(payload: ToolsRentalYieldRequest) -> Any:
+    """Gross and net rental yield with payback period and cap rate."""
+    return j(core.tool_rental_yield(**payload.model_dump()))
+
+
+@app.post("/tools/calculators/appreciation", tags=["tools"])
+def tool_appreciation(payload: ToolsAppreciationRequest) -> Any:
+    """Property appreciation and investment-growth projection with scenario bands."""
+    return j(core.tool_appreciation(**payload.model_dump()))
+
+
+@app.post("/tools/calculators/price-per-unit", tags=["tools"])
+def tool_price_per_unit(payload: ToolsPricePerUnitRequest) -> Any:
+    """Price per sqft / sqyd / sqm / marla for a listing."""
+    return j(core.tool_price_per_unit(**payload.model_dump()))
+
+
+@app.post("/tools/calculators/transfer-costs", tags=["tools"])
+def tool_transfer_costs(payload: ToolsTransferRequest) -> Any:
+    """Stamp duty, CVT, registration, mutation and withholding on a transfer."""
+    return j(core.tool_transfer_costs(**payload.model_dump()))
+
+
+@app.post("/tools/calculators/commission", tags=["tools"])
+def tool_agent_commission(payload: ToolsCommissionRequest) -> Any:
+    """Agent commission on a sale, with optional output VAT."""
+    return j(core.tool_agent_commission(**payload.model_dump()))
+
+
+@app.post("/tools/calculators/capital-gains", tags=["tools"])
+def tool_capital_gains_tax(payload: ToolsCgtRequest) -> Any:
+    """Capital-gains tax on a disposal, by holding period and filer status."""
+    return j(core.tool_capital_gains_tax(**payload.model_dump()))
+
+
+@app.post("/tools/calculators/joint-investment", tags=["tools"])
+def tool_joint_investment(payload: ToolsJointInvestmentRequest) -> Any:
+    """Split a profit between partners pro-rata to capital, with each partner's ROI."""
+    return j(core.tool_joint_investment(**payload.model_dump()))
+
+
+@app.post("/tools/calculators/rent-vs-buy", tags=["tools"])
+def tool_rent_vs_buy(payload: ToolsRentVsBuyRequest) -> Any:
+    """Compare buying against renting over a holding period."""
+    return j(core.tool_rent_vs_buy(**payload.model_dump()))
+
+
+@app.post("/tools/calculators/construction-cost", tags=["tools"])
+def tool_construction_cost(payload: ToolsConstructionRequest) -> Any:
+    """Construction-cost estimate (delegates to the construction wing's engine)."""
+    return j(core.tool_construction_cost(**payload.model_dump()))
+
+
+@app.post("/tools/calculators/material-quantities", tags=["tools"])
+def tool_material_quantities(payload: ToolsMaterialRequest) -> Any:
+    """Approximate material take-off (delegates to the construction wing)."""
+    return j(core.tool_material_quantities(**payload.model_dump()))
+
+
+@app.post("/tools/calculators/build-timeline", tags=["tools"])
+def tool_build_timeline(payload: ToolsTimelineRequest) -> Any:
+    """Phase-weighted construction timeline (delegates to the construction wing)."""
+    return j(core.tool_build_timeline(**payload.model_dump()))
+
+
+@app.get("/tools/gis/crs", tags=["tools"])
+def tool_crs_catalog() -> Any:
+    """Common coordinate reference systems with measurement guidance."""
+    return j(core.tool_crs_catalog())
+
+
+@app.post("/tools/gis/measure", tags=["tools"])
+def tool_map_measure(payload: ToolsMeasureRequest) -> Any:
+    """Distance, perimeter, area, centroid and bbox for [lat, lon] points."""
+    return j(core.tool_map_measure(**payload.model_dump()))
+
+
+@app.post("/tools/gis/polygon-area", tags=["tools"])
+def tool_polygon_area(payload: ToolsPolygonAreaRequest) -> Any:
+    """Area of a polygon from its [lat, lon] coordinates, in the requested unit."""
+    return j(core.tool_polygon_area(**payload.model_dump()))
+
+
+@app.post("/tools/gis/georeference", tags=["tools"])
+def tool_georeference(payload: ToolsGeoreferenceRequest) -> Any:
+    """Fit an image-pixel → WGS84 transform from control points (affine/similarity)."""
+    return j(core.tool_georeference(**payload.model_dump()))
+
+
+@app.post("/tools/gis/transform", tags=["tools"])
+def tool_transform_point(payload: ToolsTransformRequest) -> Any:
+    """Apply a georeference matrix (px→geo forward, or geo→px with to_geo=False)."""
+    return j(core.tool_transform_point(**payload.model_dump()))
+
+
+@app.post("/tools/gis/aerial-compare", tags=["tools"])
+def tool_aerial_compare(payload: ToolsAerialRequest) -> Any:
+    """Compare dated aerial/satellite scenes: order, resolution and change."""
+    return j(core.tool_aerial_compare(**payload.model_dump()))
+
+
+@app.post("/tools/gis/export", tags=["tools"])
+def tool_export_geodata(payload: ToolsExportRequest) -> Any:
+    """Export points/lines/polygons as GeoJSON or KML."""
+    return j(core.tool_export_geodata(**payload.model_dump()))
+
+
+@app.post("/tools/gis/import", tags=["tools"])
+def tool_import_geodata(payload: ToolsImportRequest) -> Any:
+    """Parse GeoJSON or KML text into [lat, lon] coordinate lists."""
+    return j(core.tool_import_geodata(**payload.model_dump()))
+
+
+@app.post("/tools/gis/nearby", tags=["tools"])
+def tool_locate_nearby(payload: ToolsNearbyRequest) -> Any:
+    """Locate POIs within a radius of an origin [lat, lon], nearest first."""
+    return j(core.tool_locate_nearby(**payload.model_dump()))
+
+
+@app.get("/tools/cad/formats", tags=["tools"])
+def tool_cad_formats() -> Any:
+    """Supported drawing formats and what each can actually preview/convert."""
+    return j(core.tool_cad_formats())
+
+
+@app.post("/tools/cad/inspect", tags=["tools"])
+def tool_cad_inspect(payload: ToolsCadInspectRequest) -> Any:
+    """Detect a drawing's format from its name/first bytes and report capabilities."""
+    return j(core.tool_cad_inspect(**payload.model_dump()))
+
+
+@app.post("/tools/cad/dxf-preview", tags=["tools"])
+def tool_dxf_preview(payload: ToolsDxfRequest) -> Any:
+    """Parse an ASCII DXF and render it to SVG (line/polyline/circle/text)."""
+    return j(core.tool_dxf_preview(**payload.model_dump()))
+
+
+@app.post("/tools/cad/compare-revisions", tags=["tools"])
+def tool_compare_revisions(payload: ToolsRevisionsRequest) -> Any:
+    """Compare two revisions of a plan: counts, extents and added/removed items."""
+    return j(core.tool_compare_revisions(**payload.model_dump()))
+
+
+@app.post("/tools/cad/layout-sheet", tags=["tools"])
+def tool_printable_layout(payload: ToolsLayoutRequest) -> Any:
+    """A printable plot-layout sheet (SVG) with a title block and scale bar."""
+    return j(core.tool_printable_layout(**payload.model_dump()))
+
+
+@app.post("/tools/photo/read-gps", tags=["tools"])
+def tool_read_photo_gps(payload: ToolsGpsReadRequest) -> Any:
+    """Read GPS coordinates, altitude and time from a JPEG's EXIF metadata."""
+    return j(core.tool_read_photo_gps(**payload.model_dump()))
+
+
+@app.post("/tools/photo/write-gps", tags=["tools"])
+def tool_write_photo_gps(payload: ToolsGpsWriteRequest) -> Any:
+    """Embed/replace GPS coordinates in a JPEG's EXIF (returns new base64 bytes)."""
+    return j(core.tool_write_photo_gps(**payload.model_dump()))
+
+
+@app.post("/tools/photo/geotag-batch", tags=["tools"])
+def tool_photo_geotag_batch(payload: ToolsGeotagBatchRequest) -> Any:
+    """Geotag several photos with the same coordinate."""
+    return j(core.tool_photo_geotag_batch(**payload.model_dump()))
+
+
+@app.post("/tools/photo/report", tags=["tools"])
+def tool_photo_report(payload: ToolsPhotoReportRequest) -> Any:
+    """A property photo report: markers, summary table and an embeddable map."""
+    return j(core.tool_photo_report(**payload.model_dump()))
+
+
+@app.get("/tools/photo/privacy-check", tags=["tools"])
+def tool_geo_privacy_check(latitude: float, longitude: float) -> Any:
+    """Advise on sharing precise residential coordinates (opt-in, fuzzing)."""
+    return j(core.tool_geo_privacy_check(latitude, longitude))
+
+
+@app.get("/tools/documents/tools", tags=["tools"])
+def tool_document_tools() -> Any:
+    """The document/conversion tools and whether each is native or needs a dependency."""
+    return j(core.tool_document_tools())
+
+
+@app.get("/tools/documents/convert-guide", tags=["tools"])
+def tool_convert_guide(kind: str) -> Any:
+    """Explain what a heavier conversion needs (and why), plus upload-safety notes."""
+    return j(core.tool_convert_guide(kind))
+
+
+@app.post("/tools/documents/text-to-pdf", tags=["tools"])
+def tool_text_to_pdf(payload: ToolsTextPdfRequest) -> Any:
+    """Create a simple text/listings PDF (dependency-free)."""
+    return j(core.tool_text_to_pdf(**payload.model_dump()))
+
+
+@app.post("/tools/documents/images-to-pdf", tags=["tools"])
+def tool_images_to_pdf(payload: ToolsImagesPdfRequest) -> Any:
+    """Combine JPEG images into a PDF (native, no re-encoding)."""
+    return j(core.tool_images_to_pdf(**payload.model_dump()))
+
+
+@app.post("/tools/documents/brochure", tags=["tools"])
+def tool_brochure_pdf(payload: ToolsBrochureRequest) -> Any:
+    """Build a branded text brochure PDF from a list of sections."""
+    return j(core.tool_brochure_pdf(**payload.model_dump()))
+
+
+@app.post("/tools/documents/pdf-info", tags=["tools"])
+def tool_pdf_info(payload: ToolsPdfInfoRequest) -> Any:
+    """Basic PDF inspection: page count and declared size."""
+    return j(core.tool_pdf_info(**payload.model_dump()))
+
+
+@app.get("/tools/documents/resize-plan", tags=["tools"])
+def tool_image_resize_plan(width: int, height: int, max_width: int = 1600,
+                           max_height: int = 1600) -> Any:
+    """Compute a contain-fit resize target without touching the pixels."""
+    return j(core.tool_image_resize_plan(width, height, max_width=max_width, max_height=max_height))
+
+
+@app.get("/tools/calendar/hijri", tags=["tools"])
+def tool_hijri_from_gregorian(on: str) -> Any:
+    """Convert a Gregorian date (YYYY-MM-DD) to the predicted Hijri date."""
+    return j(core.tool_hijri_from_gregorian(on))
+
+
+@app.get("/tools/calendar/gregorian", tags=["tools"])
+def tool_gregorian_from_hijri(year: int, month: int, day: int) -> Any:
+    """Convert a Hijri date to the predicted Gregorian date."""
+    return j(core.tool_gregorian_from_hijri(year, month, day))
+
+
+@app.get("/tools/calendar/occasions", tags=["tools"])
+def tool_islamic_occasions(year: int) -> Any:
+    """The main Islamic occasions inside a Gregorian year (predicted)."""
+    return j(core.tool_islamic_occasions(year))
+
+
+@app.get("/tools/calendar/holidays", tags=["tools"])
+def tool_pakistan_holidays(year: int) -> Any:
+    """Pakistan public holidays for a year: fixed national days + predicted Islamic ones."""
+    return j(core.tool_pakistan_holidays(year))
+
+
+@app.post("/tools/calendar/ics", tags=["tools"])
+def tool_calendar_ics(payload: ToolsIcsRequest) -> Any:
+    """Render events as a downloadable iCalendar (.ics) feed."""
+    return j(core.tool_calendar_ics(**payload.model_dump()))
+
+
+@app.post("/tools/calendar/reminders", tags=["tools"])
+def tool_property_reminders(payload: ToolsRemindersRequest) -> Any:
+    """Turn dated property events into reminders (possession, installments, expiries)."""
+    return j(core.tool_property_reminders(**payload.model_dump()))
+
+
+@app.post("/tools/calendar/milestones", tags=["tools"])
+def tool_milestone_calendar(payload: ToolsMilestonesRequest) -> Any:
+    """Date-stamp a construction timeline into a milestone calendar (+ .ics)."""
+    return j(core.tool_milestone_calendar(**payload.model_dump()))
+
+
+@app.post("/tools/calendar/possession", tags=["tools"])
+def tool_possession_schedule(payload: ToolsPossessionRequest) -> Any:
+    """A booking + installment + possession payment schedule with due dates (+ .ics)."""
+    return j(core.tool_possession_schedule(**payload.model_dump()))
+
+
+@app.post("/tools/reports/comparison", tags=["tools"])
+def tool_property_comparison(payload: ToolsComparisonRequest) -> Any:
+    """Side-by-side comparison of listings with derived price/sqft and yield."""
+    return j(core.tool_property_comparison(**payload.model_dump()))
+
+
+@app.post("/tools/reports/investment-summary", tags=["tools"])
+def tool_investment_summary(payload: ToolsInvestmentRequest) -> Any:
+    """Investment summary built on the accounting ROI engine (with scenarios)."""
+    return j(core.tool_investment_summary(**payload.model_dump()))
+
+
+@app.post("/tools/reports/plot-inventory", tags=["tools"])
+def tool_plot_inventory(payload: ToolsInventoryRequest) -> Any:
+    """Plot inventory: area in sqft / marla / kanal with price per unit."""
+    return j(core.tool_plot_inventory(**payload.model_dump()))
+
+
+@app.post("/tools/reports/csv", tags=["tools"])
+def tool_rows_to_csv(payload: ToolsRowsRequest) -> Any:
+    """Serialise rows of dicts to CSV text."""
+    return j(core.tool_rows_to_csv(**payload.model_dump()))
+
+
+@app.post("/tools/reports/markdown", tags=["tools"])
+def tool_rows_to_markdown(payload: ToolsRowsRequest) -> Any:
+    """Serialise rows of dicts to a Markdown table."""
+    return j(core.tool_rows_to_markdown(**payload.model_dump()))
+
+
+@app.get("/tools/projects", tags=["tools"])
+def tool_projects(tool: Optional[str] = None) -> Any:
+    """List saved tool projects, optionally filtered by tool key."""
+    return j(core.tool_projects(tool=tool))
+
+
+@app.post("/tools/projects", tags=["tools"])
+def tool_save_project(payload: ToolsProjectRequest) -> Any:
+    """Save a tool run as a reusable project (personalised tools)."""
+    return j(core.tool_save_project(**payload.model_dump()))
+
+
+@app.get("/tools/projects/{project_id}", tags=["tools"])
+def tool_project_get(project_id: str) -> Any:
+    """One saved tool project by id."""
+    return j(core.tool_project_get(project_id))
+
+
+@app.delete("/tools/projects/{project_id}", tags=["tools"])
+def tool_project_delete(project_id: str) -> Any:
+    """Delete a saved tool project."""
+    return j(core.tool_project_delete(project_id))
+
+
+@app.get("/tools/portal", tags=["tools"], response_class=HTMLResponse)
+def tools_portal(lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """The Tools & Utilities page (HTML): Tools Center, calculators, reference tables."""
+    return HTMLResponse(content=core.tools_portal(lang=lang, theme=theme))
+
+
+@app.get("/tools/portal.html", tags=["tools"], response_class=HTMLResponse)
+def tools_portal_html(lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """Alias of ``/tools/portal`` that always serves HTML."""
+    return HTMLResponse(content=core.tools_portal(lang=lang, theme=theme))
+
+
+# ==================================================================
+# PMO WING (project management, monitoring & tracking)
+# ==================================================================
+
+
+class PmoProjectRequest(BaseModel):
+    name: str
+    project_type: str = "construction"
+    description: Optional[str] = None
+    city: Optional[str] = None
+    scheme: Optional[str] = None
+    client: Optional[str] = None
+    manager_id: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    budget: float = 0.0
+    contract_value: float = 0.0
+    priority: str = "medium"
+    status: str = "planning"
+    tags: Optional[List[str]] = None
+    with_template: bool = True
+
+
+class PmoUpdatesRequest(BaseModel):
+    updates: Dict[str, Any]
+
+
+class PmoPhaseRequest(BaseModel):
+    name: str
+    key: Optional[str] = None
+    weight: float = 0.0
+    order: Optional[int] = None
+    planned_start: Optional[str] = None
+    planned_end: Optional[str] = None
+
+
+class PmoMilestoneRequest(BaseModel):
+    name: str
+    planned_date: Optional[str] = None
+    phase_key: Optional[str] = None
+    task_id: Optional[str] = None
+    weight: float = 1.0
+    billable_amount: float = 0.0
+    notes: Optional[str] = None
+
+
+class PmoTaskRequest(BaseModel):
+    name: str
+    phase_key: Optional[str] = None
+    duration_days: int = 1
+    predecessors: Optional[List[str]] = None
+    assignee_id: Optional[str] = None
+    weight: float = 0.0
+    cost_budget: float = 0.0
+    priority: str = "medium"
+    wbs: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class PmoCostRequest(BaseModel):
+    amount: float
+    category: str = "other"
+    description: str = ""
+    kind: str = "actual"
+    date: Optional[str] = None
+    vendor: Optional[str] = None
+    invoice_ref: Optional[str] = None
+    recorded_by: Optional[str] = None
+
+
+class PmoProgressRequest(BaseModel):
+    percent: float
+    note: Optional[str] = None
+    by: Optional[str] = None
+    manpower: int = 0
+    weather: Optional[str] = None
+    on: Optional[str] = None
+
+
+class PmoResourceRequest(BaseModel):
+    name: str
+    role: str = "engineer"
+    trade: Optional[str] = None
+    day_rate: float = 0.0
+    capacity_pct: float = 100.0
+    skills: Optional[List[str]] = None
+    contact: Optional[str] = None
+
+
+class PmoAssignRequest(BaseModel):
+    task_id: str
+    resource_id: str
+    units_pct: float = 100.0
+    notes: Optional[str] = None
+
+
+class PmoRiskRequest(BaseModel):
+    title: str
+    kind: str = "risk"
+    probability: int = 3
+    impact: int = 3
+    description: Optional[str] = None
+    category: Optional[str] = None
+    owner: Optional[str] = None
+    mitigation: Optional[str] = None
+    due_on: Optional[str] = None
+
+
+class PmoSiteLogRequest(BaseModel):
+    date: Optional[str] = None
+    weather: Optional[str] = None
+    manpower: int = 0
+    equipment: Optional[List[str]] = None
+    work_done: Optional[str] = None
+    issues: Optional[str] = None
+    safety_incidents: int = 0
+    visitors: Optional[str] = None
+    photos: Optional[List[str]] = None
+    by: Optional[str] = None
+
+
+class PmoChangeRequest(BaseModel):
+    title: str
+    description: Optional[str] = None
+    reason: Optional[str] = None
+    cost_impact: float = 0.0
+    schedule_impact_days: int = 0
+    requested_by: Optional[str] = None
+    status: str = "submitted"
+
+
+class PmoChangeDecisionRequest(BaseModel):
+    approve: bool = True
+    by: Optional[str] = None
+    note: Optional[str] = None
+
+
+class PmoInspectionRequest(BaseModel):
+    title: str
+    checklist: Optional[List[Dict[str, Any]]] = None
+    phase_key: Optional[str] = None
+    area: Optional[str] = None
+    inspector: Optional[str] = None
+    date: Optional[str] = None
+    status: str = "open"
+    notes: Optional[str] = None
+
+
+class PmoActionRequest(BaseModel):
+    title: str
+    owner: Optional[str] = None
+    due_on: Optional[str] = None
+    priority: str = "medium"
+    meeting: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@app.get("/pmo/overview", tags=["pmo"])
+def pmo_overview() -> Any:
+    """Counts, breakdowns and configuration for the PMO wing."""
+    return j(core.pmo_overview())
+
+
+@app.get("/pmo/capabilities", tags=["pmo"])
+def pmo_capabilities() -> Any:
+    """The PMO capabilities grouped by category."""
+    return j(core.pmo_capabilities())
+
+
+@app.get("/pmo/project-types", tags=["pmo"])
+def pmo_project_types() -> Any:
+    """The supported project types, statuses and priorities."""
+    return j(core.pm_project_types())
+
+
+@app.get("/pmo/phase-templates", tags=["pmo"])
+def pmo_phase_templates(project_type: Optional[str] = Query(default=None)) -> Any:
+    """Default weighted phase templates by project type."""
+    return j(core.pm_phase_templates(project_type))
+
+
+@app.get("/pmo/projects", tags=["pmo"])
+def pmo_projects(status: Optional[str] = None, project_type: Optional[str] = None,
+                 city: Optional[str] = None, manager_id: Optional[str] = None,
+                 priority: Optional[str] = None, limit: int = 50) -> Any:
+    """List projects with progress and health."""
+    return j(core.pm_projects(status=status, project_type=project_type, city=city,
+                              manager_id=manager_id, priority=priority, limit=limit))
+
+
+@app.post("/pmo/projects", tags=["pmo"])
+def pmo_create_project(payload: PmoProjectRequest) -> Any:
+    """Register a project (optionally seeding its phases and WBS template)."""
+    return j(core.pm_create_project(**payload.model_dump()))
+
+
+@app.post("/pmo/from-estimate/{estimate_id}", tags=["pmo"])
+def pmo_from_estimate(estimate_id: str, name: Optional[str] = None, city: Optional[str] = None,
+                      start_date: Optional[str] = None, contract_value: Optional[float] = None) -> Any:
+    """Create a delivery project from a saved Construction-wing estimate."""
+    return j(core.pm_from_estimate(estimate_id, name=name, city=city, start_date=start_date,
+                                   contract_value=contract_value))
+
+
+@app.get("/pmo/projects/{project_id}", tags=["pmo"])
+def pmo_project(project_id: str) -> Any:
+    """One project by id or code, with its counts."""
+    return j(core.pm_project(project_id))
+
+
+@app.put("/pmo/projects/{project_id}", tags=["pmo"])
+def pmo_update_project(project_id: str, payload: PmoUpdatesRequest) -> Any:
+    """Update a project's fields."""
+    return j(core.pm_update_project(project_id, payload.updates or {}))
+
+
+@app.delete("/pmo/projects/{project_id}", tags=["pmo"])
+def pmo_delete_project(project_id: str) -> Any:
+    """Delete a project and everything that belongs to it."""
+    return j(core.pm_delete_project(project_id))
+
+
+@app.get("/pmo/projects/{project_id}/dashboard", tags=["pmo"])
+def pmo_project_dashboard(project_id: str) -> Any:
+    """The full project-controls snapshot."""
+    return j(core.pm_project_dashboard(project_id))
+
+
+@app.get("/pmo/projects/{project_id}/report", tags=["pmo"])
+def pmo_project_report(project_id: str) -> Any:
+    """A full project status report as structured data."""
+    return j(core.pm_project_report(project_id))
+
+
+@app.post("/pmo/projects/{project_id}/apply-template", tags=["pmo"])
+def pmo_apply_template(project_id: str, project_type: Optional[str] = None) -> Any:
+    """Seed the project's phases and WBS from its type template."""
+    return j(core.pm_apply_template(project_id, project_type))
+
+
+@app.get("/pmo/projects/{project_id}/phases", tags=["pmo"])
+def pmo_phases(project_id: str) -> Any:
+    """List the project's phases."""
+    return j(core.pm_phases(project_id))
+
+
+@app.post("/pmo/projects/{project_id}/phases", tags=["pmo"])
+def pmo_add_phase(project_id: str, payload: PmoPhaseRequest) -> Any:
+    """Add a phase to the project."""
+    return j(core.pm_add_phase(project_id, **payload.model_dump()))
+
+
+@app.get("/pmo/projects/{project_id}/milestones", tags=["pmo"])
+def pmo_milestones(project_id: str, status: Optional[str] = None) -> Any:
+    """List the project's milestones."""
+    return j(core.pm_milestones(project_id, status=status))
+
+
+@app.post("/pmo/projects/{project_id}/milestones", tags=["pmo"])
+def pmo_add_milestone(project_id: str, payload: PmoMilestoneRequest) -> Any:
+    """Add a milestone."""
+    return j(core.pm_add_milestone(project_id, **payload.model_dump()))
+
+
+@app.get("/pmo/projects/{project_id}/tasks", tags=["pmo"])
+def pmo_tasks(project_id: str, phase_key: Optional[str] = None, status: Optional[str] = None,
+              assignee_id: Optional[str] = None) -> Any:
+    """List the project's tasks with schedule data."""
+    return j(core.pm_tasks(project_id, phase_key=phase_key, status=status, assignee_id=assignee_id))
+
+
+@app.post("/pmo/projects/{project_id}/tasks", tags=["pmo"])
+def pmo_add_task(project_id: str, payload: PmoTaskRequest) -> Any:
+    """Add a task."""
+    return j(core.pm_add_task(project_id, **payload.model_dump()))
+
+
+@app.get("/pmo/tasks/{task_id}", tags=["pmo"])
+def pmo_task(task_id: str) -> Any:
+    """One task by id."""
+    return j(core.pm_task(task_id))
+
+
+@app.put("/pmo/tasks/{task_id}", tags=["pmo"])
+def pmo_update_task(task_id: str, payload: PmoUpdatesRequest) -> Any:
+    """Update a task."""
+    return j(core.pm_update_task(task_id, payload.updates or {}))
+
+
+@app.delete("/pmo/tasks/{task_id}", tags=["pmo"])
+def pmo_delete_task(task_id: str) -> Any:
+    """Delete a task."""
+    return j(core.pm_delete_task(task_id))
+
+
+@app.get("/pmo/projects/{project_id}/schedule", tags=["pmo"])
+def pmo_schedule(project_id: str, start_date: Optional[str] = None) -> Any:
+    """The forward/backward schedule with float and the critical path."""
+    return j(core.pm_schedule(project_id, start_date=start_date))
+
+
+@app.get("/pmo/projects/{project_id}/critical-path", tags=["pmo"])
+def pmo_critical_path(project_id: str) -> Any:
+    """The critical path for the project."""
+    return j(core.pm_critical_path(project_id))
+
+
+@app.get("/pmo/projects/{project_id}/gantt", tags=["pmo"])
+def pmo_gantt(project_id: str) -> Any:
+    """Gantt-ready rows for the project."""
+    return j(core.pm_gantt(project_id))
+
+
+@app.get("/pmo/projects/{project_id}/costs", tags=["pmo"])
+def pmo_costs(project_id: str, kind: Optional[str] = None, category: Optional[str] = None) -> Any:
+    """List the project's cost entries."""
+    return j(core.pm_costs(project_id, kind=kind, category=category))
+
+
+@app.post("/pmo/projects/{project_id}/costs", tags=["pmo"])
+def pmo_add_cost(project_id: str, payload: PmoCostRequest) -> Any:
+    """Record a cost entry against the project."""
+    return j(core.pm_add_cost(project_id, **payload.model_dump()))
+
+
+@app.get("/pmo/projects/{project_id}/progress", tags=["pmo"])
+def pmo_progress(project_id: str) -> Any:
+    """The project's actual vs planned completion, with history."""
+    return j(core.pm_progress(project_id))
+
+
+@app.post("/pmo/projects/{project_id}/progress", tags=["pmo"])
+def pmo_record_progress(project_id: str, payload: PmoProgressRequest) -> Any:
+    """Record a dated progress update."""
+    return j(core.pm_record_progress(project_id, **payload.model_dump()))
+
+
+@app.get("/pmo/projects/{project_id}/earned-value", tags=["pmo"])
+def pmo_earned_value(project_id: str, as_of: Optional[str] = None) -> Any:
+    """The earned-value analysis (PV/EV/AC/SPI/CPI/EAC …)."""
+    return j(core.pm_earned_value(project_id, as_of=as_of))
+
+
+@app.get("/pmo/projects/{project_id}/cost-status", tags=["pmo"])
+def pmo_cost_status(project_id: str) -> Any:
+    """The cost-control status."""
+    return j(core.pm_cost_status(project_id))
+
+
+@app.get("/pmo/projects/{project_id}/s-curve", tags=["pmo"])
+def pmo_s_curve(project_id: str, weeks: int = 52) -> Any:
+    """The planned-vs-actual S-curve."""
+    return j(core.pm_s_curve(project_id, weeks=weeks))
+
+
+@app.get("/pmo/projects/{project_id}/health", tags=["pmo"])
+def pmo_health(project_id: str) -> Any:
+    """The project's RAG health."""
+    return j(core.pm_health(project_id))
+
+
+@app.get("/pmo/projects/{project_id}/kpi", tags=["pmo"])
+def pmo_kpi(project_id: str) -> Any:
+    """The project's KPI scorecard."""
+    return j(core.pm_kpi(project_id))
+
+
+@app.get("/pmo/projects/{project_id}/monitoring", tags=["pmo"])
+def pmo_monitoring(project_id: str) -> Any:
+    """The project-controls monitoring snapshot."""
+    return j(core.pm_monitoring(project_id))
+
+
+@app.get("/pmo/projects/{project_id}/risks", tags=["pmo"])
+def pmo_project_risks(project_id: str, kind: Optional[str] = None, status: Optional[str] = None,
+                      min_score: int = 0) -> Any:
+    """List the project's RAID items."""
+    return j(core.pm_risks(project_id, kind=kind, status=status, min_score=min_score))
+
+
+@app.post("/pmo/projects/{project_id}/risks", tags=["pmo"])
+def pmo_add_risk(project_id: str, payload: PmoRiskRequest) -> Any:
+    """Add a RAID item."""
+    return j(core.pm_add_risk(project_id, **payload.model_dump()))
+
+
+@app.get("/pmo/projects/{project_id}/risk-matrix", tags=["pmo"])
+def pmo_risk_matrix(project_id: Optional[str] = None) -> Any:
+    """The probability × impact risk matrix."""
+    return j(core.pm_risk_matrix(project_id))
+
+
+@app.get("/pmo/projects/{project_id}/site-logs", tags=["pmo"])
+def pmo_site_logs(project_id: str, limit: int = 30) -> Any:
+    """List the project's site diary entries."""
+    return j(core.pm_site_logs(project_id, limit=limit))
+
+
+@app.post("/pmo/projects/{project_id}/site-logs", tags=["pmo"])
+def pmo_log_site(project_id: str, payload: PmoSiteLogRequest) -> Any:
+    """Record a site diary entry."""
+    return j(core.pm_log_site(project_id, **payload.model_dump()))
+
+
+@app.get("/pmo/projects/{project_id}/site-report", tags=["pmo"])
+def pmo_site_report(project_id: str, on: Optional[str] = None) -> Any:
+    """A daily site report."""
+    return j(core.pm_site_report(project_id, on=on))
+
+
+@app.get("/pmo/projects/{project_id}/changes", tags=["pmo"])
+def pmo_changes(project_id: str, status: Optional[str] = None) -> Any:
+    """List the project's change requests."""
+    return j(core.pm_changes(project_id, status=status))
+
+
+@app.post("/pmo/projects/{project_id}/changes", tags=["pmo"])
+def pmo_raise_change(project_id: str, payload: PmoChangeRequest) -> Any:
+    """Raise a change request."""
+    return j(core.pm_raise_change(project_id, **payload.model_dump()))
+
+
+@app.post("/pmo/changes/{change_id}/decide", tags=["pmo"])
+def pmo_decide_change(change_id: str, payload: PmoChangeDecisionRequest) -> Any:
+    """Approve or reject a change request."""
+    return j(core.pm_decide_change(change_id, **payload.model_dump()))
+
+
+@app.get("/pmo/projects/{project_id}/inspections", tags=["pmo"])
+def pmo_inspections(project_id: str, status: Optional[str] = None) -> Any:
+    """List the project's inspections and quality index."""
+    return j(core.pm_inspections(project_id, status=status))
+
+
+@app.post("/pmo/projects/{project_id}/inspections", tags=["pmo"])
+def pmo_add_inspection(project_id: str, payload: PmoInspectionRequest) -> Any:
+    """Record an inspection."""
+    return j(core.pm_add_inspection(project_id, **payload.model_dump()))
+
+
+@app.get("/pmo/projects/{project_id}/actions", tags=["pmo"])
+def pmo_project_actions(project_id: str, status: Optional[str] = None) -> Any:
+    """List the project's action items."""
+    return j(core.pm_actions(project_id=project_id, status=status))
+
+
+@app.post("/pmo/projects/{project_id}/actions", tags=["pmo"])
+def pmo_add_action(project_id: str, payload: PmoActionRequest) -> Any:
+    """Add an action item."""
+    return j(core.pm_add_action(project_id, **payload.model_dump()))
+
+
+@app.get("/pmo/resources", tags=["pmo"])
+def pmo_resources(trade: Optional[str] = None, active_only: bool = False) -> Any:
+    """List resources."""
+    return j(core.pm_resources(trade=trade, active_only=active_only))
+
+
+@app.post("/pmo/resources", tags=["pmo"])
+def pmo_add_resource(payload: PmoResourceRequest) -> Any:
+    """Register a resource."""
+    return j(core.pm_add_resource(**payload.model_dump()))
+
+
+@app.post("/pmo/allocations", tags=["pmo"])
+def pmo_assign(payload: PmoAssignRequest) -> Any:
+    """Assign a resource to a task."""
+    return j(core.pm_assign(**payload.model_dump()))
+
+
+@app.get("/pmo/resource-load", tags=["pmo"])
+def pmo_resource_load(project_id: Optional[str] = None, window_start: Optional[str] = None,
+                      window_end: Optional[str] = None) -> Any:
+    """Planned resource utilisation with over-allocation flags."""
+    return j(core.pm_resource_load(project_id=project_id, window_start=window_start,
+                                   window_end=window_end))
+
+
+@app.get("/pmo/alerts", tags=["pmo"])
+def pmo_alerts(project_id: Optional[str] = None) -> Any:
+    """Exception-based alerts for one project or the portfolio."""
+    return j(core.pm_alerts(project_id))
+
+
+@app.get("/pmo/portfolio", tags=["pmo"])
+def pmo_portfolio() -> Any:
+    """The rolled-up portfolio dashboard."""
+    return j(core.pm_portfolio())
+
+
+@app.get("/pmo/risks", tags=["pmo"])
+def pmo_risks(project_id: Optional[str] = None, kind: Optional[str] = None,
+              status: Optional[str] = None, min_score: int = 0) -> Any:
+    """List RAID items across the portfolio."""
+    return j(core.pm_risks(project_id=project_id, kind=kind, status=status, min_score=min_score))
+
+
+@app.put("/pmo/risks/{risk_id}", tags=["pmo"])
+def pmo_update_risk(risk_id: str, payload: PmoUpdatesRequest) -> Any:
+    """Update a RAID item."""
+    return j(core.pm_update_risk(risk_id, payload.updates or {}))
+
+
+@app.get("/pmo/actions", tags=["pmo"])
+def pmo_actions(project_id: Optional[str] = None, status: Optional[str] = None) -> Any:
+    """List action items."""
+    return j(core.pm_actions(project_id=project_id, status=status))
+
+
+@app.post("/pmo/actions/{action_id}/close", tags=["pmo"])
+def pmo_close_action(action_id: str, status: str = "done") -> Any:
+    """Close a meeting action item."""
+    return j(core.pm_close_action(action_id, status=status))
+
+
+@app.get("/pmo/report.html", tags=["pmo"], response_class=HTMLResponse)
+def pmo_report_html(project_id: str, lang: str = Depends(ui_lang),
+                    theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """A printable project status report (HTML)."""
+    return HTMLResponse(content=core.pm_report_html(project_id, lang=lang, theme=theme))
+
+
+@app.get("/pmo/portal", tags=["pmo"], response_class=HTMLResponse)
+def pmo_portal(lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """The Projects & Monitoring (PMO) page (HTML)."""
+    return HTMLResponse(content=core.pmo_portal(lang=lang, theme=theme))
+
+
+@app.get("/pmo/portal.html", tags=["pmo"], response_class=HTMLResponse)
+def pmo_portal_html(lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """Alias of ``/pmo/portal`` that always serves HTML."""
+    return HTMLResponse(content=core.pmo_portal(lang=lang, theme=theme))
+
+
 __all__ = ["app"]
