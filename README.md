@@ -1,0 +1,90 @@
+# Arz-e-Pak AI Real Estate Portal
+
+A hierarchical Pakistani real-estate platform — property & scheme hierarchy, GIS/mapping,
+CRM, accounting, construction, maintenance, project management (PMO), team messaging and
+an agentic-AI layer — exposed over **two protocols that share one engine**:
+
+* **MCP** (Model Context Protocol) — tools, resources and prompts for AI agents.
+* **REST** (FastAPI) — a normal HTTP/JSON API with Swagger docs, WebSockets and an
+  OpenAI-compatible facade.
+
+Every capability is implemented **once** as a plain-Python function in `backend/` and then
+*exposed* twice: as an MCP tool and as a REST route. The two layers call the same function,
+so behaviour can never drift between them.
+
+```
+City ─▶ Scheme / Society ─▶ Block / Zone / Area ─▶ Property
+CRM:  Agents ─▶ Leads ─▶ Customers ─▶ Deals ─▶ Tasks
+```
+
+---
+
+## Quick start
+
+```powershell
+cd backend
+uv sync                     # fastapi, uvicorn[standard], httpx, mcp[cli]
+uv run python main.py
+# REST docs -> http://127.0.0.1:8000/docs
+# MCP       -> http://127.0.0.1:8000/mcp   (Streamable HTTP)
+# OpenAI    -> http://127.0.0.1:8000/v1    (models / chat / embeddings)
+```
+
+Then sign in with a seeded demo account (`admin@portal.pk` / `Admin@12345`) — see the
+[User Manual](docs/USER_MANUAL.md#22-demo-accounts-seeded).
+
+---
+
+## Documentation
+
+Start at [`docs/README.md`](docs/README.md). The full set:
+
+| Document | Audience |
+| --- | --- |
+| [User Manual](docs/USER_MANUAL.md) | Brokers, agents, staff and end users. |
+| [Administration Guide](docs/ADMINISTRATION_GUIDE.md) | Admins, DevOps, IT. |
+| [MCP Guide](docs/MCP_GUIDE.md) | Integration engineers and AI builders. |
+| [API Guide](docs/API_GUIDE.md) | Backend/frontend engineers. |
+| [Agentic AI Guide](docs/AGENTIC_AI_GUIDE.md) | AI engineers and product owners. |
+| [Messaging Guide](docs/MESSAGING_GUIDE.md) | Everyone using team messaging. |
+| [Testing Guide](docs/TESTING_GUIDE.md) | Developers and QA. |
+
+The backend's own reference (module-by-module, with examples for every wing) is
+[`backend/README.md`](backend/README.md). Auto-generated reference catalogs — MCP tools,
+resources, prompts, REST endpoints, agents, messaging catalogs and settings — live in
+[`docs/reference/`](docs/reference/) and are produced from the live code by
+`docs/_gen/gen_docs.py`.
+
+---
+
+## Surface at a glance
+
+| Surface | Count |
+| --- | --- |
+| MCP tools | 593 across 30 groups |
+| MCP resources / templates / prompts | 112 / 34 / 31 |
+| REST routes | 618 across 36 tags |
+| Roles / permissions | 19 / 30 |
+| Agentic agents / products | 24 / 8 |
+
+---
+
+## Repository layout
+
+```
+backend/     single source of truth: server.py (MCP) + api.py (FastAPI) + framework-free
+             domain modules (gis, accounting, crm, construction, maintenance, tools, pmo,
+             messaging, agents, transactions, intelligence, leasing, marketing, …)
+docs/        manuals + generated reference (this documentation set)
+docs/_gen/   gen_docs.py — regenerates docs/reference/*.md from the live code
+```
+
+## Testing
+
+```powershell
+cd backend
+uv run python test_integration.py    # in-process MCP + REST assertions
+uv run python smoke_http.py          # live HTTP smoke on :8011
+```
+
+See the [Testing Guide](docs/TESTING_GUIDE.md).

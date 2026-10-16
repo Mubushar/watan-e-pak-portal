@@ -12,6 +12,24 @@ City ─▶ Housing Scheme / Society ─▶ Block / Zone / Area ─▶ Property
 CRM:  Agents ─▶ Leads ─▶ Customers ─▶ Deals ─▶ Tasks / Appointments / Interactions
 ```
 
+## Documentation
+
+Full manuals live in [`../docs/`](../docs/README.md). The documentation set is:
+
+| Document | Audience |
+| --- | --- |
+| [User Manual](../docs/USER_MANUAL.md) | Brokers, agents, staff and end users — pages and daily workflows. |
+| [Administration Guide](../docs/ADMINISTRATION_GUIDE.md) | Deployment, configuration, RBAC, security, data/storage, monitoring, runbook. |
+| [MCP Guide](../docs/MCP_GUIDE.md) | Connecting MCP clients and driving every tool/resource/prompt. |
+| [API Guide](../docs/API_GUIDE.md) | The REST API, WebSockets and the OpenAI-compatible facade. |
+| [Agentic AI Guide](../docs/AGENTIC_AI_GUIDE.md) | The Agentic OS: products, agents, run engine and approval gates. |
+| [Messaging Guide](../docs/MESSAGING_GUIDE.md) | The messaging + notifications system end to end. |
+| [Testing Guide](../docs/TESTING_GUIDE.md) | Running and extending the test suites. |
+
+Auto-generated references (regenerate with `uv run python ..\docs\_gen\gen_docs.py`) live in
+`../docs/reference/` — tools, resources, prompts, REST endpoints, agents, messaging
+catalogs and settings — and never drift from the code.
+
 ## Files
 
 | File | Purpose |
