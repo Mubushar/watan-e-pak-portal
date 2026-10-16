@@ -1,0 +1,4049 @@
+"""
+Real Estate Portal — FastAPI layer
+==================================
+
+Exposes the same business logic defined in `server.py` over REST, and mounts the
+MCP server at `/mcp` (Streamable HTTP) so a single process serves BOTH protocols
+from one shared in-memory data store.
+
+Run:
+    uv run python main.py          # -> http://127.0.0.1:8000/docs
+    uv run uvicorn api:app --reload
+
+Notes
+-----
+Every `@mcp.tool()` function in server.py is a normal Python function that
+returns a JSON string, so the REST handlers below simply call them and parse
+the result. That keeps MCP and REST perfectly in sync — no duplicated logic.
+"""
+
+import json
+import os
+from contextlib import asynccontextmanager
+from typing import Any, Dict, List, Optional
+
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi.responses import HTMLResponse, Response
+from pydantic import BaseModel
+
+import server as core
+from openai_facade import router as openai_router
+
+# ------------------------------------------------------------------
+# Expose the MCP Streamable HTTP app at exactly /mcp and start its session manager
+# (we add its routes directly instead of `mount()` so the path is /mcp, not /mcp/)
+#
+# Stateless mode is ON by default: this is a tool-only server, and stateless HTTP
+# works with clients that do not carry the Mcp-Session-Id header (the common
+# "Missing session ID" failure). Set PORTAL_MCP_STATELESS=0 to require sessions.
+# ------------------------------------------------------------------
+
+MCP_STATELESS = os.getenv("PORTAL_MCP_STATELESS", "1").strip().lower() not in ("0", "false", "no", "off")
+
+mcp_http_app = core.mcp.streamable_http_app(streamable_http_path="/mcp", stateless_http=MCP_STATELESS)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # A mounted sub-app's lifespan is NOT executed by Starlette, so we run the
+    # MCP session manager here ourselves.
+    async with core.mcp.session_manager.run():
+        yield
+
+
+app = FastAPI(
+    title="Real Estate Portal API",
+    version=core.SERVER_VERSION,
+    description="REST + MCP (at /mcp) for the hierarchical real-estate portal.",
+    lifespan=lifespan,
+)
+# Register the MCP HTTP route(s) on this app.
+app.router.routes.extend(mcp_http_app.routes)
+
+# OpenAI-compatible facade (/v1/models, /v1/chat/completions, ...)
+app.include_router(openai_router)
+
+
+def j(raw: str) -> Any:
+    """Parse the JSON string returned by a server.py business function."""
+    return json.loads(raw)
+
+
+# ------------------------------------------------------------------
+# Dual-language + theme resolution for every HTML surface
+# ------------------------------------------------------------------
+
+
+def _resolve_lang(lang: Optional[str], accept_language: Optional[str]) -> str:
+    """Explicit ``?lang=`` wins, then ``Accept-Language``, then the default."""
+    valid = set(core.gis.language_codes())
+    candidates: List[str] = []
+    if lang:
+        candidates.append(lang)
+    if accept_language:
+        candidates += [part.split(";")[0].strip() for part in accept_language.split(",")]
+    for candidate in candidates:
+        code = (candidate or "").split("-")[0].split("_")[0].strip().lower()
+        if code in valid:
+            return code
+    return core.gis.DEFAULT_LANGUAGE
+
+
+def ui_lang(
+    lang: Optional[str] = Query(default=None, description="UI language code, e.g. en or ur"),
+    accept_language: Optional[str] = Header(default=None, alias="Accept-Language"),
+) -> str:
+    """Dependency: resolve the UI language for an HTML response."""
+    return _resolve_lang(lang, accept_language)
+
+
+def ui_theme(theme: Optional[str] = Query(default=None, description="UI theme: auto | light | dark")) -> str:
+    """Dependency: resolve the UI theme for an HTML response."""
+    return core.gis.normalize_theme(theme)
+
+
+# ------------------------------------------------------------------
+# Request models
+# ------------------------------------------------------------------
+
+
+class PropertyCreate(BaseModel):
+    title: str
+    price: float
+    city_id: str
+    description: Optional[str] = None
+    use_type: str = "residential"
+    category: str = "house"
+    scheme_id: Optional[str] = None
+    block_zone_area_id: Optional[str] = None
+    total_area: Optional[float] = None
+    marla_area: Optional[float] = None
+    kanal_area: Optional[float] = None
+    bedrooms: Optional[int] = None
+    bathrooms: Optional[int] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    featured: bool = False
+    agent_id: Optional[str] = None
+
+
+class PropertyUpdate(BaseModel):
+    title: Optional[str] = None
+    price: Optional[float] = None
+    use_type: Optional[str] = None
+    category: Optional[str] = None
+    status: Optional[str] = None
+    bedrooms: Optional[int] = None
+    bathrooms: Optional[int] = None
+    marla_area: Optional[float] = None
+    kanal_area: Optional[float] = None
+    total_area: Optional[float] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    featured: Optional[bool] = None
+
+
+class LeadCreate(BaseModel):
+    name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    source: str = "website"
+    interest_use_type: Optional[str] = None
+    interest_category: Optional[str] = None
+    budget_min: Optional[float] = None
+    budget_max: Optional[float] = None
+    city_id: Optional[str] = None
+    scheme_id: Optional[str] = None
+    assigned_agent_id: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class DealCreate(BaseModel):
+    title: str
+    amount: float
+    lead_id: Optional[str] = None
+    customer_id: Optional[str] = None
+    property_id: Optional[str] = None
+    agent_id: Optional[str] = None
+    stage: str = "prospecting"
+    probability: int = 20
+    expected_close_date: Optional[str] = None
+
+
+class TaskCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    assigned_agent_id: Optional[str] = None
+    related_type: Optional[str] = None
+    related_id: Optional[str] = None
+    due_date: Optional[str] = None
+    priority: str = "medium"
+
+
+class MemoryStore(BaseModel):
+    operation: str
+    key: Optional[str] = None
+    value: Optional[str] = None
+
+
+# ------------------------------------------------------------------
+# System
+# ------------------------------------------------------------------
+
+
+@app.get("/", tags=["system"])
+def root() -> Dict[str, Any]:
+    return {
+        "service": "Real Estate Portal",
+        "version": core.SERVER_VERSION,
+        "rest_docs": "/docs",
+        "mcp_endpoint": "/mcp",
+        "note": "REST and MCP share the same in-memory store.",
+    }
+
+
+@app.get("/health", tags=["system"])
+def health() -> Any:
+    return j(core.health_check())
+
+
+@app.get("/info", tags=["system"])
+def info() -> Any:
+    return j(core.server_info())
+
+
+@app.get("/fastapi-info", tags=["system"])
+def fastapi_info() -> Any:
+    return j(core.fastapi_info())
+
+
+# ------------------------------------------------------------------
+# Properties
+# ------------------------------------------------------------------
+
+
+@app.get("/properties", tags=["properties"])
+def list_properties(limit: int = 50) -> Any:
+    return j(core.search_properties(limit=limit))
+
+
+@app.get("/search", tags=["properties"])
+def search(
+    city: Optional[str] = None,
+    use_type: Optional[str] = None,
+    category: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    bedrooms: Optional[int] = None,
+    min_marla: Optional[float] = None,
+    max_marla: Optional[float] = None,
+    featured: Optional[bool] = None,
+    limit: int = 20,
+) -> Any:
+    return j(
+        core.search_properties(
+            city=city,
+            use_type=use_type,
+            category=category,
+            min_price=min_price,
+            max_price=max_price,
+            bedrooms=bedrooms,
+            min_marla=min_marla,
+            max_marla=max_marla,
+            featured=featured,
+            limit=limit,
+        )
+    )
+
+
+@app.get("/nearby", tags=["properties"])
+def nearby(
+    lat: float = Query(...),
+    lon: float = Query(...),
+    radius_km: float = 5.0,
+    use_type: Optional[str] = None,
+    limit: int = 20,
+) -> Any:
+    return j(
+        core.search_nearby_properties(
+            latitude=lat, longitude=lon, radius_km=radius_km, use_type=use_type, limit=limit
+        )
+    )
+
+
+@app.get("/properties/{property_id}", tags=["properties"])
+def get_property(property_id: str) -> Any:
+    result = j(core.get_property_by_id(property_id))
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
+@app.post("/properties", tags=["properties"], status_code=201)
+def create_property(payload: PropertyCreate) -> Any:
+    result = j(core.add_property(**payload.model_dump(exclude_none=True)))
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.put("/properties/{property_id}", tags=["properties"])
+def update_property(property_id: str, payload: PropertyUpdate) -> Any:
+    result = j(
+        core.update_property(property_id, **payload.model_dump(exclude_none=True))
+    )
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
+@app.delete("/properties/{property_id}", tags=["properties"])
+def delete_property(property_id: str) -> Any:
+    result = j(core.delete_property(property_id))
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
+@app.get("/properties/{property_id}/compare/{other_id}", tags=["properties"])
+def compare_properties(property_id: str, other_id: str) -> Any:
+    return j(core.get_property_distance(property_id, other_id))
+
+
+@app.get("/properties/{property_id}/images", tags=["properties"])
+def property_images(property_id: str) -> Any:
+    return j(core.image_list("property", property_id))
+
+
+@app.get("/properties/{property_id}/investment", tags=["properties"])
+def property_investment(property_id: str) -> Any:
+    return j(core.investment_analysis(property_id))
+
+
+# ------------------------------------------------------------------
+# Hierarchy
+# ------------------------------------------------------------------
+
+
+@app.get("/cities", tags=["hierarchy"])
+def cities() -> Any:
+    return j(core.list_cities())
+
+
+@app.get("/schemes", tags=["hierarchy"])
+def schemes(city: Optional[str] = None) -> Any:
+    return j(core.list_schemes(city=city))
+
+
+@app.get("/hierarchy", tags=["hierarchy"])
+def hierarchy() -> Any:
+    return j(core.get_hierarchy())
+
+
+@app.get("/cities/{city}/insights", tags=["hierarchy"])
+def city_insights(city: str) -> Any:
+    return j(core.market_insights(city))
+
+
+# ------------------------------------------------------------------
+# Big projects
+# ------------------------------------------------------------------
+
+
+@app.get("/bigprojects", tags=["big-projects"])
+def bigprojects(city: Optional[str] = None, project_type: Optional[str] = None) -> Any:
+    return j(core.list_big_projects(city=city, project_type=project_type))
+
+
+@app.get("/bigprojects/{project_id}", tags=["big-projects"])
+def bigproject(project_id: str) -> Any:
+    result = j(core.get_big_project_by_id(project_id))
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
+# ------------------------------------------------------------------
+# RAG / memory / units
+# ------------------------------------------------------------------
+
+
+@app.get("/rag/search", tags=["ai"])
+def rag_search(query: str, top_k: int = 5) -> Any:
+    return j(core.rag_search(query, top_k=top_k))
+
+
+@app.post("/rag/search", tags=["ai"])
+def rag_search_post(payload: Dict[str, Any]) -> Any:
+    return j(core.rag_search(payload.get("query", ""), top_k=int(payload.get("top_k", 5))))
+
+
+@app.get("/memory", tags=["memory"])
+def memory() -> Any:
+    return j(core.get_memory_analytics())
+
+
+@app.post("/memory", tags=["memory"])
+def memory_store(payload: MemoryStore) -> Any:
+    return j(core.memory_store(payload.operation, payload.key, payload.value))
+
+
+@app.get("/units/convert", tags=["units"])
+def unit_convert(value: float, from_unit: str, to_unit: str) -> Any:
+    result = j(core.convert_area(value, from_unit, to_unit))
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+# ------------------------------------------------------------------
+# CRM
+# ------------------------------------------------------------------
+
+
+@app.get("/crm/dashboard", tags=["crm"])
+def crm_dashboard() -> Any:
+    return j(core.crm_dashboard())
+
+
+@app.get("/crm/agents", tags=["crm"])
+def crm_agents(active_only: bool = False) -> Any:
+    return j(core.crm_list_agents(active_only=active_only))
+
+
+@app.get("/crm/leads", tags=["crm"])
+def crm_leads(
+    status: Optional[str] = None,
+    agent_id: Optional[str] = None,
+    city: Optional[str] = None,
+    min_score: Optional[int] = None,
+) -> Any:
+    return j(core.crm_list_leads(status=status, agent_id=agent_id, city=city, min_score=min_score))
+
+
+@app.post("/crm/leads", tags=["crm"], status_code=201)
+def crm_create_lead(payload: LeadCreate) -> Any:
+    return j(core.crm_add_lead(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/crm/leads/{lead_id}", tags=["crm"])
+def crm_get_lead(lead_id: str) -> Any:
+    result = j(core.crm_get_lead(lead_id))
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
+@app.post("/crm/leads/{lead_id}/convert", tags=["crm"])
+def crm_convert_lead(lead_id: str, customer_type: str = "buyer") -> Any:
+    result = j(core.crm_convert_lead(lead_id, customer_type=customer_type))
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
+@app.get("/crm/customers", tags=["crm"])
+def crm_customers(type: Optional[str] = None) -> Any:
+    return j(core.crm_list_customers(type=type))
+
+
+@app.get("/crm/deals", tags=["crm"])
+def crm_deals(stage: Optional[str] = None, agent_id: Optional[str] = None) -> Any:
+    return j(core.crm_list_deals(stage=stage, agent_id=agent_id))
+
+
+@app.post("/crm/deals", tags=["crm"], status_code=201)
+def crm_create_deal(payload: DealCreate) -> Any:
+    result = j(core.crm_create_deal(**payload.model_dump(exclude_none=True)))
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.get("/crm/pipeline", tags=["crm"])
+def crm_pipeline() -> Any:
+    return j(core.crm_pipeline_summary())
+
+
+@app.get("/crm/tasks", tags=["crm"])
+def crm_tasks(status: Optional[str] = None, agent_id: Optional[str] = None) -> Any:
+    return j(core.crm_list_tasks(status=status, agent_id=agent_id))
+
+
+@app.post("/crm/tasks", tags=["crm"], status_code=201)
+def crm_create_task(payload: TaskCreate) -> Any:
+    result = j(core.crm_add_task(**payload.model_dump(exclude_none=True)))
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.get("/crm/appointments", tags=["crm"])
+def crm_appointments(status: Optional[str] = None) -> Any:
+    return j(core.crm_list_appointments(status=status))
+
+
+# ------------------------------------------------------------------
+# GIS (base maps, layers, master plans, spatial queries, export)
+# ------------------------------------------------------------------
+
+
+class GeoLayerCreate(BaseModel):
+    name: str
+    entity_type: str
+    entity_id: str
+    geojson: Dict[str, Any]
+    layer_type: str = "master_plan"
+    description: Optional[str] = None
+    base_map: Optional[str] = None
+    style: Optional[Dict[str, Any]] = None
+    z_index: int = 0
+    image_url: Optional[str] = None
+    source_url: Optional[str] = None
+
+
+class GeoLayerUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    base_map: Optional[str] = None
+    visible: Optional[bool] = None
+    opacity: Optional[float] = None
+    z_index: Optional[int] = None
+    style: Optional[Dict[str, Any]] = None
+    geojson: Optional[Dict[str, Any]] = None
+
+
+class MasterPlanCreate(BaseModel):
+    entity_type: str
+    entity_id: str
+    name: str
+    north: float
+    south: float
+    east: float
+    west: float
+    image_url: Optional[str] = None
+    source_url: Optional[str] = None
+    base_map: Optional[str] = None
+    description: Optional[str] = None
+    layer_type: str = "master_plan"
+    style: Optional[Dict[str, Any]] = None
+
+
+class PolygonQuery(BaseModel):
+    coordinates: List[List[float]]
+    limit: int = 50
+
+
+@app.get("/gis/base-maps", tags=["gis"])
+def gis_base_maps() -> Any:
+    return j(core.gis_list_base_maps())
+
+
+@app.get("/gis/base-maps/{base_map_id}", tags=["gis"])
+def gis_base_map(base_map_id: str) -> Any:
+    result = j(core.gis_get_base_map(base_map_id))
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
+@app.get("/gis/layers", tags=["gis"])
+def gis_layers(
+    entity_type: Optional[str] = None,
+    entity_id: Optional[str] = None,
+    layer_type: Optional[str] = None,
+) -> Any:
+    return j(core.gis_list_layers(entity_type=entity_type, entity_id=entity_id, layer_type=layer_type))
+
+
+@app.post("/gis/layers", tags=["gis"], status_code=201)
+def gis_add_layer(payload: GeoLayerCreate) -> Any:
+    result = j(core.gis_add_layer(**payload.model_dump(exclude_none=True)))
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.get("/gis/layers/{layer_id}", tags=["gis"])
+def gis_get_layer(layer_id: str) -> Any:
+    result = j(core.gis_get_layer(layer_id))
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
+@app.put("/gis/layers/{layer_id}", tags=["gis"])
+def gis_update_layer(layer_id: str, payload: GeoLayerUpdate) -> Any:
+    result = j(core.gis_update_layer(layer_id, **payload.model_dump(exclude_none=True)))
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
+@app.delete("/gis/layers/{layer_id}", tags=["gis"])
+def gis_delete_layer(layer_id: str) -> Any:
+    return j(core.gis_delete_layer(layer_id))
+
+
+@app.get("/gis/master-plans", tags=["gis"])
+def gis_master_plans(entity_type: Optional[str] = None, entity_id: Optional[str] = None) -> Any:
+    return j(core.gis_list_master_plans(entity_type=entity_type, entity_id=entity_id))
+
+
+@app.post("/gis/master-plans", tags=["gis"], status_code=201)
+def gis_add_master_plan(payload: MasterPlanCreate) -> Any:
+    result = j(core.gis_add_master_plan(**payload.model_dump(exclude_none=True)))
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.get("/gis/properties-in-bounds", tags=["gis"])
+def gis_properties_in_bounds(south: float, west: float, north: float, east: float, limit: int = 50) -> Any:
+    result = j(core.gis_properties_in_bounds(south=south, west=west, north=north, east=east, limit=limit))
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.post("/gis/properties-in-polygon", tags=["gis"])
+def gis_properties_in_polygon(payload: PolygonQuery) -> Any:
+    result = j(core.gis_properties_in_polygon(coordinates=payload.coordinates, limit=payload.limit))
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.get("/gis/area", tags=["gis"])
+def gis_area(coordinates: str) -> Any:
+    """Polygon area. `coordinates` is JSON: [[lat,lon], ...]."""
+    try:
+        coords = json.loads(coordinates)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid coordinates JSON: {exc}")
+    return j(core.gis_polygon_area(coords))
+
+
+@app.get("/gis/centroid", tags=["gis"])
+def gis_centroid(coordinates: str) -> Any:
+    """Polygon centroid. `coordinates` is JSON: [[lat,lon], ...]."""
+    try:
+        coords = json.loads(coordinates)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid coordinates JSON: {exc}")
+    return j(core.gis_polygon_centroid(coords))
+
+
+@app.get("/gis/bearing", tags=["gis"])
+def gis_bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> Any:
+    return j(core.gis_bearing(lat1, lon1, lat2, lon2))
+
+
+@app.get("/gis/distance-matrix", tags=["gis"])
+def gis_distance_matrix(lat: float, lon: float, property_ids: str) -> Any:
+    """Distances from a point to properties. `property_ids` is comma-separated."""
+    ids = [p.strip() for p in property_ids.split(",") if p.strip()]
+    return j(core.gis_distance_matrix(lat, lon, ids))
+
+
+@app.get("/gis/export/geojson/{entity_type}/{entity_id}", tags=["gis"])
+def gis_export_geojson(entity_type: str, entity_id: str) -> Any:
+    return j(core.gis_export_geojson(entity_type, entity_id))
+
+
+@app.get("/gis/export/kml/{entity_type}/{entity_id}", tags=["gis"])
+def gis_export_kml(entity_type: str, entity_id: str) -> Response:
+    kml = core.gis_export_kml(entity_type, entity_id)
+    return Response(
+        content=kml,
+        media_type="application/vnd.google-earth.kml+xml",
+        headers={"Content-Disposition": f'attachment; filename="{entity_type}-{entity_id}.kml"'},
+    )
+
+
+@app.get("/gis/map/{entity_type}/{entity_id}", tags=["gis"], response_class=HTMLResponse)
+def gis_entity_map(
+    entity_type: str,
+    entity_id: str,
+    base_map: Optional[str] = None,
+    include_properties: bool = True,
+    include_news: bool = False,
+    lang: str = Depends(ui_lang),
+    theme: str = Depends(ui_theme),
+) -> HTMLResponse:
+    """Interactive Leaflet map with a base-map switcher and the entity's overlays.
+
+    ``include_news=true`` pins a scrolling real-estate news ticker to the top.
+    ``lang`` (``en``/``ur``, RTL supported) and ``theme`` (``auto``/``light``/``dark``)
+    localise and re-skin the UI; the language also defaults from ``Accept-Language``.
+    """
+    html = core.gis_map_preview(
+        entity_type, entity_id, base_map=base_map, include_properties=include_properties,
+        include_news=include_news, lang=lang, theme=theme,
+    )
+    return HTMLResponse(content=html)
+
+
+@app.get("/gis/map", tags=["gis"], response_class=HTMLResponse)
+def gis_point_map(
+    lat: float = Query(..., description="Latitude of the map centre"),
+    lon: float = Query(..., description="Longitude of the map centre"),
+    zoom: int = 14,
+    base_map: Optional[str] = None,
+    include_properties: bool = False,
+    include_poi: bool = False,
+    title: str = "Real Estate Portal",
+    lang: str = Depends(ui_lang),
+    theme: str = Depends(ui_theme),
+) -> HTMLResponse:
+    """Interactive Leaflet map centred on a point (all base maps available in the switcher).
+
+    ``include_properties=true`` and ``include_poi=true`` also plot nearby listings and
+    points of interest within a 2 km radius. Shares one implementation with the
+    ``gis_point_map`` MCP tool.
+    """
+    html = core.gis_point_map(
+        latitude=lat, longitude=lon, zoom=zoom, base_map=base_map,
+        include_properties=include_properties, include_poi=include_poi, title=title,
+        lang=lang, theme=theme, radius_km=2.0,
+    )
+    return HTMLResponse(content=html)
+
+
+# ------------------------------------------------------------------
+# GIS analysis (buffers, features, cost, population, economics, reports)
+# ------------------------------------------------------------------
+
+
+class BufferGeometryQuery(BaseModel):
+    geometry: Dict[str, Any]
+    distance_m: float
+    segments: int = 48
+
+
+class BufferLayerCreate(BaseModel):
+    entity_type: str
+    entity_id: str
+    name: str
+    distance_m: float
+    source_layer_id: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    coordinates: Optional[List[List[float]]] = None
+    style: Optional[Dict[str, Any]] = None
+    layer_type: str = "buffer"
+
+
+class PolygonAnalysisQuery(BaseModel):
+    coordinates: List[List[float]]
+    name: str = "Custom area"
+    total_units: Optional[int] = None
+
+
+@app.get("/gis/analysis/assumptions", tags=["gis-analysis"])
+def gis_assumptions() -> Any:
+    return j(core.gis_analysis_assumptions())
+
+
+@app.post("/gis/buffer", tags=["gis-analysis"])
+def gis_buffer(payload: BufferGeometryQuery) -> Any:
+    result = j(core.gis_buffer_geometry(payload.geometry, payload.distance_m, payload.segments))
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.get("/gis/buffer/point", tags=["gis-analysis"])
+def gis_buffer_point(latitude: float, longitude: float, radius_m: float, segments: int = 72) -> Any:
+    return j(core.gis_buffer_point(latitude, longitude, radius_m, segments))
+
+
+@app.post("/gis/buffers", tags=["gis-analysis"], status_code=201)
+def gis_add_buffer(payload: BufferLayerCreate) -> Any:
+    result = j(core.gis_add_buffer_layer(**payload.model_dump(exclude_none=True)))
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.get("/gis/ring-analysis", tags=["gis-analysis"])
+def gis_ring_analysis(
+    lat: float = Query(...),
+    lon: float = Query(...),
+    radii_km: str = "1,3,5",
+    use_type: Optional[str] = None,
+) -> Any:
+    """Concentric-ring accessibility analysis. `radii_km` is comma-separated."""
+    radii = [float(r) for r in radii_km.split(",") if r.strip()]
+    return j(core.gis_ring_analysis(lat, lon, radii, use_type=use_type))
+
+
+@app.post("/gis/polygon-analysis", tags=["gis-analysis"])
+def gis_polygon_analysis(payload: PolygonAnalysisQuery) -> Any:
+    result = j(core.gis_polygon_analysis(payload.coordinates, payload.name, payload.total_units))
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.get("/gis/analysis/{entity_type}/{entity_id}", tags=["gis-analysis"])
+def gis_area_analysis(entity_type: str, entity_id: str) -> Any:
+    return j(core.gis_area_analysis(entity_type, entity_id))
+
+
+@app.get("/gis/analysis/{entity_type}/{entity_id}/cost", tags=["gis-analysis"])
+def gis_development_cost(entity_type: str, entity_id: str) -> Any:
+    return j(core.gis_development_cost(entity_type, entity_id))
+
+
+@app.get("/gis/analysis/{entity_type}/{entity_id}/population", tags=["gis-analysis"])
+def gis_population_estimate(entity_type: str, entity_id: str) -> Any:
+    return j(core.gis_population_estimate(entity_type, entity_id))
+
+
+@app.get("/gis/analysis/{entity_type}/{entity_id}/economic-impact", tags=["gis-analysis"])
+def gis_economic_impact(entity_type: str, entity_id: str) -> Any:
+    return j(core.gis_economic_impact(entity_type, entity_id))
+
+
+@app.get("/gis/features/{scope_type}/{scope_id}", tags=["gis-analysis"])
+def gis_feature_table(scope_type: str, scope_id: str, metric: str = "population") -> Any:
+    result = j(core.gis_feature_table(scope_type, scope_id, metric))
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.get("/gis/thematic/{scope_type}/{scope_id}", tags=["gis-analysis"], response_class=HTMLResponse)
+def gis_thematic_map(
+    scope_type: str,
+    scope_id: str,
+    metric: str = "population",
+    palette: str = "blues",
+    classes: int = 5,
+    base_map: Optional[str] = None,
+    lang: str = Depends(ui_lang),
+    theme: str = Depends(ui_theme),
+) -> HTMLResponse:
+    """Choropleth (thematic) map HTML for a metric across a city's schemes or a scheme's blocks."""
+    html = core.gis_thematic_map(scope_type, scope_id, metric, palette, classes, base_map, lang=lang, theme=theme)
+    return HTMLResponse(content=html)
+
+
+@app.get("/gis/report/{entity_type}/{entity_id}", tags=["gis-analysis"], response_class=HTMLResponse)
+def gis_report(
+    entity_type: str,
+    entity_id: str,
+    include_map: bool = True,
+    include_outlook: bool = False,
+    include_news: bool = False,
+    years: int = 5,
+    lang: str = Depends(ui_lang),
+    theme: str = Depends(ui_theme),
+) -> HTMLResponse:
+    """Printable HTML analysis report (area, valuation, population, cost, economics).
+
+    ``include_outlook=true`` adds cost/development + multi-factor predictions;
+    ``include_news=true`` embeds the real-estate news ticker.
+    """
+    html = core.gis_area_report(
+        entity_type, entity_id, include_map=include_map,
+        include_outlook=include_outlook, include_news=include_news, years=years,
+        lang=lang, theme=theme,
+    )
+    return HTMLResponse(content=html)
+
+
+@app.get("/gis/analysis/{entity_type}/{entity_id}/cost-development", tags=["gis-analysis"])
+def gis_cost_development(entity_type: str, entity_id: str, sale_uplift: float = 0.0, build_years: int = 3) -> Any:
+    return j(core.gis_cost_development_analysis(entity_type, entity_id, sale_uplift=sale_uplift, build_years=build_years))
+
+
+@app.get("/gis/analysis/{entity_type}/{entity_id}/factors", tags=["gis-analysis"])
+def gis_market_factors(entity_type: str, entity_id: str) -> Any:
+    return j(core.gis_market_factors(entity_type, entity_id))
+
+
+@app.get("/gis/analysis/{entity_type}/{entity_id}/forecast", tags=["gis-analysis"])
+def gis_forecast(entity_type: str, entity_id: str, years: int = 5) -> Any:
+    return j(core.gis_forecast(entity_type, entity_id, years=years))
+
+
+@app.get("/gis/analysis/{entity_type}/{entity_id}/scenarios", tags=["gis-analysis"])
+def gis_scenarios(entity_type: str, entity_id: str, years: int = 5) -> Any:
+    return j(core.gis_scenario_analysis(entity_type, entity_id, years=years))
+
+
+@app.get("/gis/outlook/{entity_type}/{entity_id}", tags=["gis-analysis"], response_class=HTMLResponse)
+def gis_outlook_report(
+    entity_type: str,
+    entity_id: str,
+    years: int = 5,
+    include_map: bool = True,
+    include_news: bool = True,
+    lang: str = Depends(ui_lang),
+    theme: str = Depends(ui_theme),
+) -> HTMLResponse:
+    """Full investment-outlook report: cost/development, predictions, risks and a news ticker."""
+    html = core.gis_outlook_report(entity_type, entity_id, years=years, include_map=include_map,
+                                   include_news=include_news, lang=lang, theme=theme)
+    return HTMLResponse(content=html)
+
+
+# ------------------------------------------------------------------
+# News ticker (real-estate market intelligence)
+# ------------------------------------------------------------------
+
+
+class NewsCreate(BaseModel):
+    title: str
+    source: str
+    category: str = "market"
+    sentiment: str = "neutral"
+    impact_score: float = 0.0
+    channel_type: str = "news"
+    summary: Optional[str] = None
+    url: Optional[str] = None
+    city_id: Optional[str] = None
+    scheme_id: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+
+@app.get("/news", tags=["news"])
+def news(
+    category: Optional[str] = None,
+    city: Optional[str] = None,
+    scheme: Optional[str] = None,
+    sentiment: Optional[str] = None,
+    channel_type: Optional[str] = None,
+    days: Optional[int] = None,
+    limit: int = 50,
+) -> Any:
+    return j(core.news_list(category=category, city=city, scheme=scheme, sentiment=sentiment,
+                            channel_type=channel_type, days=days, limit=limit))
+
+
+@app.post("/news", tags=["news"], status_code=201)
+def news_create(payload: NewsCreate) -> Any:
+    result = j(core.news_add(**payload.model_dump(exclude_none=True)))
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.get("/news/channels", tags=["news"])
+def news_channels() -> Any:
+    return j(core.news_channels())
+
+
+@app.get("/news/impact", tags=["news"])
+def news_impact(city: Optional[str] = None, scheme: Optional[str] = None, days: int = 120) -> Any:
+    return j(core.news_impact(city=city, scheme=scheme, days=days))
+
+
+@app.get("/news/ticker", tags=["news"])
+def news_ticker(
+    category: Optional[str] = None,
+    city: Optional[str] = None,
+    scheme: Optional[str] = None,
+    limit: int = 25,
+    speed_seconds: float = 70.0,
+    lang: str = Depends(ui_lang),
+) -> Any:
+    """Scrolling ticker as an embeddable HTML fragment (text/html)."""
+    html = core.news_ticker(category=category, city=city, scheme=scheme, limit=limit,
+                            speed_seconds=speed_seconds, lang=lang)
+    return Response(content=html, media_type="text/html")
+
+
+@app.get("/news/ticker.html", tags=["news"], response_class=HTMLResponse)
+def news_ticker_page(
+    category: Optional[str] = None,
+    city: Optional[str] = None,
+    scheme: Optional[str] = None,
+    limit: int = 25,
+    speed_seconds: float = 70.0,
+    lang: str = Depends(ui_lang),
+    theme: str = Depends(ui_theme),
+) -> HTMLResponse:
+    """Standalone page hosting the ticker (handy for an iframe embed)."""
+    fragment = core.news_ticker(category=category, city=city, scheme=scheme, limit=limit,
+                                speed_seconds=speed_seconds, lang=lang)
+    language = core.gis.get_language(lang)
+    page = (
+        f"<!DOCTYPE html><html lang=\"{language['code']}\" dir=\"{language['dir']}\"><head>"
+        "<meta charset=\"utf-8\" />"
+        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />"
+        "<title>Real Estate News Ticker</title>"
+        f"{core.gis.theme_style(theme)}"
+        f"<style>body{{margin:0;background:var(--bg, #0f172a);font-family:{language['font_stack']}}}</style>"
+        f"</head><body>{fragment}</body></html>"
+    )
+    return HTMLResponse(content=page)
+
+
+# ------------------------------------------------------------------
+# Dual-language + theme facilities
+# ------------------------------------------------------------------
+
+
+@app.get("/i18n/languages", tags=["ui"])
+def i18n_languages() -> Any:
+    """Languages available for maps, reports and the ticker (code, name, direction)."""
+    return j(core.portal_languages())
+
+
+@app.get("/i18n/strings/{lang}", tags=["ui"])
+def i18n_strings(lang: str) -> Any:
+    """Localisation dictionary for one language (English source -> translation)."""
+    return j(core.portal_strings(lang))
+
+
+@app.get("/ui/themes", tags=["ui"])
+def ui_themes() -> Any:
+    """Available UI themes and the CSS custom properties each one sets."""
+    return j(core.portal_themes())
+
+
+# ------------------------------------------------------------------
+# Authentication (email / mobile + OTP-verified signup)
+# ------------------------------------------------------------------
+
+
+class SignupRequest(BaseModel):
+    email: Optional[str] = None
+    mobile: Optional[str] = None
+    password: Optional[str] = None
+    name: Optional[str] = None
+    role: str = "user"
+
+
+class OtpVerifyRequest(BaseModel):
+    identifier: str
+    code: str
+    purpose: str = "signup"
+
+
+class LoginRequest(BaseModel):
+    identifier: str
+    password: str
+
+
+class IdentifierRequest(BaseModel):
+    identifier: str
+
+
+class ResetPasswordRequest(BaseModel):
+    identifier: str
+    code: str
+    new_password: str
+
+
+class SetPasswordRequest(BaseModel):
+    new_password: str
+    current_password: Optional[str] = None
+
+
+def _bearer_token(authorization: Optional[str]) -> Optional[str]:
+    if not authorization:
+        return None
+    token = authorization.strip()
+    return token[7:].strip() if token.lower().startswith("bearer ") else token
+
+
+def require_user(authorization: Optional[str] = Header(default=None, description="Bearer <token>")) -> Dict[str, Any]:
+    """FastAPI guard: rejects the request unless a valid bearer token is supplied."""
+    user = core.auth.current_user(_bearer_token(authorization))
+    if user is None:
+        raise HTTPException(
+            status_code=401, detail="Missing or invalid bearer token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return core.auth.public_user(user)
+
+
+def _auth_result(result: Any) -> Any:
+    """Translate an auth error dict into an HTTP error (otherwise pass through)."""
+    if isinstance(result, dict) and result.get("error"):
+        status = {
+            "invalid_credentials": 401,
+            "unauthenticated": 401,
+            "otp_required": 403,
+            "suspended": 403,
+            "no_otp": 404,
+            "no_user": 404,
+            "expired": 400,
+            "invalid": 400,
+            "invalid_email": 422,
+            "invalid_mobile": 422,
+            "identifier_required": 422,
+            "weak_password": 422,
+            "locked": 429,
+            "rate_limited": 429,
+            "cooldown": 429,
+            "email_taken": 409,
+            "mobile_taken": 409,
+        }.get(result.get("code"), 400)
+        raise HTTPException(status_code=status, detail=result)
+    return result
+
+
+@app.post("/auth/signup", tags=["auth"], status_code=201)
+def auth_signup(payload: SignupRequest) -> Any:
+    """Register with an email and/or mobile number. The account stays *pending*
+    until the OTP we send is verified with `/auth/verify-otp`."""
+    return _auth_result(j(core.auth_signup(**payload.model_dump(exclude_none=True))))
+
+
+@app.post("/auth/verify-otp", tags=["auth"])
+def auth_verify_otp(payload: OtpVerifyRequest) -> Any:
+    """Verify a signup/login/reset OTP. Activating a signup returns a bearer token."""
+    return _auth_result(j(core.auth_verify_otp(payload.identifier, payload.code, purpose=payload.purpose)))
+
+
+@app.post("/auth/resend-otp", tags=["auth"])
+def auth_resend_otp(payload: OtpVerifyRequest) -> Any:
+    """Re-send a verification code (cooldown + hourly cap apply)."""
+    return _auth_result(j(core.auth_resend_otp(payload.identifier, purpose=payload.purpose)))
+
+
+@app.post("/auth/login", tags=["auth"])
+def auth_login(payload: LoginRequest) -> Any:
+    """Password login. Returns `401` for bad credentials and `403` for unverified accounts."""
+    return _auth_result(j(core.auth_login(payload.identifier, payload.password)))
+
+
+@app.post("/auth/otp/request", tags=["auth"])
+def auth_request_otp(payload: IdentifierRequest) -> Any:
+    """Start a passwordless login by sending an OTP."""
+    return _auth_result(j(core.auth_request_otp(payload.identifier)))
+
+
+@app.post("/auth/otp/verify", tags=["auth"])
+def auth_verify_login_otp(payload: OtpVerifyRequest) -> Any:
+    """Complete a passwordless login with the OTP."""
+    return _auth_result(j(core.auth_verify_login_otp(payload.identifier, payload.code)))
+
+
+@app.post("/auth/password/reset-request", tags=["auth"])
+def auth_request_password_reset(payload: IdentifierRequest) -> Any:
+    """Send a password-reset code."""
+    return _auth_result(j(core.auth_request_password_reset(payload.identifier)))
+
+
+@app.post("/auth/password/reset", tags=["auth"])
+def auth_reset_password(payload: ResetPasswordRequest) -> Any:
+    """Reset a password with the reset code (revokes all sessions)."""
+    return _auth_result(j(core.auth_reset_password(payload.identifier, payload.code, payload.new_password)))
+
+
+@app.post("/auth/password/set", tags=["auth"])
+def auth_set_password(payload: SetPasswordRequest, authorization: Optional[str] = Header(default=None)) -> Any:
+    """Set or change the password of the signed-in user (Bearer token required)."""
+    return _auth_result(j(core.auth_set_password(_bearer_token(authorization) or "", payload.new_password,
+                                                  payload.current_password)))
+
+
+@app.get("/auth/me", tags=["auth"])
+def auth_me(user: Dict[str, Any] = Depends(require_user)) -> Any:
+    """Return the authenticated account (Bearer token required)."""
+    return {"authenticated": True, "user": user}
+
+
+@app.post("/auth/logout", tags=["auth"])
+def auth_logout(user: Dict[str, Any] = Depends(require_user), authorization: Optional[str] = Header(default=None)) -> Any:
+    """Revoke the bearer token."""
+    return _auth_result(j(core.auth_logout(_bearer_token(authorization) or "")))
+
+
+@app.post("/auth/refresh", tags=["auth"])
+def auth_refresh(user: Dict[str, Any] = Depends(require_user), authorization: Optional[str] = Header(default=None)) -> Any:
+    """Exchange a valid token for a fresh one."""
+    return _auth_result(j(core.auth_refresh(_bearer_token(authorization) or "")))
+
+
+@app.get("/auth/users", tags=["auth"])
+def auth_users(role: Optional[str] = None, status: Optional[str] = None,
+               user: Dict[str, Any] = Depends(require_user)) -> Any:
+    """List accounts (Bearer token required)."""
+    return _auth_result(j(core.auth_list_users(role=role, status=status)))
+
+
+@app.get("/auth/otps", tags=["auth"])
+def auth_otps(identifier: Optional[str] = None, purpose: Optional[str] = None, limit: int = 25) -> Any:
+    """Dev view of outstanding verification codes (plaintext only when exposed)."""
+    return j(core.auth_list_otps(identifier=identifier, purpose=purpose, limit=limit))
+
+
+@app.get("/auth/notifications", tags=["auth"])
+def auth_notifications(channel: Optional[str] = None, limit: int = 25) -> Any:
+    """The simulated SMS/e-mail outbox."""
+    return j(core.auth_notifications(channel=channel, limit=limit))
+
+
+@app.get("/auth/events", tags=["auth"])
+def auth_events(limit: int = 50) -> Any:
+    """Authentication audit trail."""
+    return j(core.auth_events(limit=limit))
+
+
+@app.get("/auth/config", tags=["auth"])
+def auth_config() -> Any:
+    """OTP/session/password policy plus live counters."""
+    return j(core.auth_config())
+
+
+# ------------------------------------------------------------------
+# Hierarchy: create/read parity for every hierarchy MCP tool
+# ------------------------------------------------------------------
+
+
+class CityCreate(BaseModel):
+    name: str
+    state: Optional[str] = None
+    country: str = "Pakistan"
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    description: Optional[str] = None
+
+
+@app.post("/cities", tags=["hierarchy"], status_code=201)
+def add_city(payload: CityCreate) -> Any:
+    """Add a city."""
+    return j(core.add_city(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/cities/{city}", tags=["hierarchy"])
+def get_city_details(city: str) -> Any:
+    """Full details for a city (by id or name): schemes, properties and value."""
+    return j(core.get_city_details(city))
+
+
+@app.get("/cities/{city}/coordinates", tags=["hierarchy"])
+def get_city_coordinates(city: str) -> Any:
+    """Latitude/longitude of a city (by id or name)."""
+    return j(core.get_city_coordinates(city))
+
+
+@app.post("/schemes", tags=["hierarchy"], status_code=201)
+def add_housing_scheme(payload: Dict[str, Any]) -> Any:
+    """Add a housing scheme / society."""
+    return j(core.add_housing_scheme(**payload))
+
+
+@app.get("/blocks", tags=["hierarchy"])
+def list_blocks(scheme: Optional[str] = None) -> Any:
+    """List blocks / zones / areas, optionally filtered by scheme."""
+    return j(core.list_blocks(scheme=scheme))
+
+
+@app.post("/blocks", tags=["hierarchy"], status_code=201)
+def add_block_zone_area(payload: Dict[str, Any]) -> Any:
+    """Add a block / zone / area to a scheme."""
+    return j(core.add_block_zone_area(**payload))
+
+
+class CoordinatesUpdate(BaseModel):
+    latitude: float
+    longitude: float
+
+
+@app.put("/properties/{property_id}/coordinates", tags=["properties"])
+def set_property_coordinates(property_id: str, payload: CoordinatesUpdate) -> Any:
+    """Set (or correct) the coordinates of a property."""
+    return j(core.set_property_coordinates(property_id, payload.latitude, payload.longitude))
+
+
+@app.get("/distance", tags=["gis"])
+def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> Any:
+    """Great-circle distance between two points (km)."""
+    return j(core.calculate_distance(lat1, lon1, lat2, lon2))
+
+
+# ------------------------------------------------------------------
+# Big projects: create/update/delete + media parity
+# ------------------------------------------------------------------
+
+
+@app.post("/bigprojects", tags=["big-projects"], status_code=201)
+def add_big_project(payload: Dict[str, Any]) -> Any:
+    """Add a big project (mall / tower / mixed-use / compound / plaza / office complex)."""
+    return j(core.add_big_project(**payload))
+
+
+@app.put("/bigprojects/{project_id}", tags=["big-projects"])
+def update_big_project(project_id: str, payload: Dict[str, Any]) -> Any:
+    """Update a big project."""
+    return j(core.update_big_project(project_id, **payload))
+
+
+@app.delete("/bigprojects/{project_id}", tags=["big-projects"])
+def delete_big_project(project_id: str) -> Any:
+    """Delete a big project."""
+    return j(core.delete_big_project(project_id))
+
+
+@app.post("/bigprojects/{project_id}/amenities", tags=["big-projects"], status_code=201)
+def add_project_amenity(project_id: str, payload: Dict[str, Any]) -> Any:
+    """Add an amenity to a big project (``{"amenity": "..."}``)."""
+    return j(core.add_project_amenity(project_id, payload.get("amenity", "")))
+
+
+@app.post("/bigprojects/{project_id}/floor-plans", tags=["big-projects"], status_code=201)
+def add_project_floor_plan(project_id: str, payload: Dict[str, Any]) -> Any:
+    """Attach a floor plan (``{"floor_plan_url": "..."}``)."""
+    return j(core.add_project_floor_plan(project_id, payload.get("floor_plan_url", "")))
+
+
+@app.post("/bigprojects/{project_id}/maps", tags=["big-projects"], status_code=201)
+def add_project_map(project_id: str, payload: Dict[str, Any]) -> Any:
+    """Attach a map image (``{"map_url": "..."}``)."""
+    return j(core.add_project_map(project_id, payload.get("map_url", "")))
+
+
+@app.post("/bigprojects/{project_id}/multimedia", tags=["big-projects"], status_code=201)
+def add_project_multimedia(project_id: str, payload: Dict[str, Any]) -> Any:
+    """Attach multimedia (``{"media_type": "video", "url": "..."}``)."""
+    return j(core.add_project_multimedia(project_id, payload.get("media_type", "video"), payload.get("url", "")))
+
+
+# ------------------------------------------------------------------
+# Images
+# ------------------------------------------------------------------
+
+
+@app.get("/images/{entity_type}/{entity_id}", tags=["images"])
+def image_list(entity_type: str, entity_id: str) -> Any:
+    """List images stored for an entity."""
+    return j(core.image_list(entity_type, entity_id))
+
+
+@app.post("/images", tags=["images"], status_code=201)
+def image_store(payload: Dict[str, Any]) -> Any:
+    """Store an image URL against an entity."""
+    return j(core.image_store(**payload))
+
+
+@app.post("/images/{entity_type}/{entity_id}/primary", tags=["images"])
+def image_set_primary(entity_type: str, entity_id: str, payload: Dict[str, Any]) -> Any:
+    """Mark one stored image as the primary/cover image (``{"image_index": 0}``)."""
+    return j(core.image_set_primary(entity_type, entity_id, int(payload.get("image_index", 0))))
+
+
+@app.delete("/images/{entity_type}/{entity_id}/{image_index}", tags=["images"])
+def image_delete(entity_type: str, entity_id: str, image_index: int) -> Any:
+    """Delete a stored image by index."""
+    return j(core.image_delete(entity_type, entity_id, image_index))
+
+
+# ------------------------------------------------------------------
+# Memory
+# ------------------------------------------------------------------
+
+
+@app.get("/memory/retrieve", tags=["memory"])
+def memory_retrieve(key: str) -> Any:
+    """Read a value from long-term memory or the near cache."""
+    return j(core.memory_retrieve(key))
+
+
+@app.delete("/memory", tags=["memory"])
+def memory_clear() -> Any:
+    """Clear the near cache and long-term memory."""
+    return j(core.memory_clear())
+
+
+# ------------------------------------------------------------------
+# GIS: boundaries, zones, destination, point-in-layer
+# ------------------------------------------------------------------
+
+
+@app.post("/gis/boundaries", tags=["gis"], status_code=201)
+def gis_add_boundary(payload: Dict[str, Any]) -> Any:
+    """Add a boundary polygon layer (scheme/society outline)."""
+    return j(core.gis_add_boundary(**payload))
+
+
+@app.post("/gis/zones", tags=["gis"], status_code=201)
+def gis_add_zone(payload: Dict[str, Any]) -> Any:
+    """Add a zone layer (residential / commercial / amenity)."""
+    return j(core.gis_add_zone(**payload))
+
+
+@app.get("/gis/destination", tags=["gis"])
+def gis_destination(latitude: float, longitude: float, bearing: float, distance_m: float) -> Any:
+    """Project a point a given bearing/distance (destination point)."""
+    return j(core.gis_destination(latitude, longitude, bearing, distance_m))
+
+
+@app.get("/gis/point-in-layer", tags=["gis"])
+def gis_point_in_layer(layer_id: str, latitude: float, longitude: float) -> Any:
+    """Test whether a point falls inside a layer's polygons."""
+    return j(core.gis_point_in_layer(layer_id, latitude, longitude))
+
+
+# ------------------------------------------------------------------
+# CRM parity (agents, customers, lead ops, interactions, appointments)
+# ------------------------------------------------------------------
+
+
+@app.post("/crm/agents", tags=["crm"], status_code=201)
+def crm_add_agent(payload: Dict[str, Any]) -> Any:
+    """Add a sales agent."""
+    return j(core.crm_add_agent(**payload))
+
+
+@app.get("/crm/agents/{agent_id}", tags=["crm"])
+def crm_get_agent(agent_id: str) -> Any:
+    """Fetch one agent with their pipeline."""
+    return j(core.crm_get_agent(agent_id))
+
+
+@app.put("/crm/agents/{agent_id}", tags=["crm"])
+def crm_update_agent(agent_id: str, payload: Dict[str, Any]) -> Any:
+    """Update an agent."""
+    return j(core.crm_update_agent(agent_id, **payload))
+
+
+@app.post("/crm/customers", tags=["crm"], status_code=201)
+def crm_add_customer(payload: Dict[str, Any]) -> Any:
+    """Add a customer."""
+    return j(core.crm_add_customer(**payload))
+
+
+@app.get("/crm/customers/{customer_id}", tags=["crm"])
+def crm_get_customer(customer_id: str) -> Any:
+    """Fetch one customer with their deals and interactions."""
+    return j(core.crm_get_customer(customer_id))
+
+
+@app.put("/crm/leads/{lead_id}", tags=["crm"])
+def crm_update_lead(lead_id: str, payload: Dict[str, Any]) -> Any:
+    """Update a lead (status, score, budget, assignment)."""
+    return j(core.crm_update_lead(lead_id, **payload))
+
+
+@app.post("/crm/leads/{lead_id}/assign", tags=["crm"])
+def crm_assign_lead(lead_id: str, payload: Dict[str, Any]) -> Any:
+    """Assign a lead to an agent (``{"agent_id": "..."}``)."""
+    return j(core.crm_assign_lead(lead_id, payload.get("agent_id", "")))
+
+
+@app.get("/crm/interactions", tags=["crm"])
+def crm_list_interactions(entity_id: Optional[str] = None) -> Any:
+    """List interactions, optionally filtered by related entity."""
+    return j(core.crm_list_interactions(entity_id=entity_id))
+
+
+@app.post("/crm/interactions", tags=["crm"], status_code=201)
+def crm_log_interaction(payload: Dict[str, Any]) -> Any:
+    """Log an interaction against a lead / customer / deal."""
+    return j(core.crm_log_interaction(**payload))
+
+
+@app.put("/crm/deals/{deal_id}/stage", tags=["crm"])
+def crm_update_deal_stage(deal_id: str, payload: Dict[str, Any]) -> Any:
+    """Move a deal to a new stage (and/or probability)."""
+    return j(core.crm_update_deal_stage(deal_id, **payload))
+
+
+@app.put("/crm/tasks/{task_id}/complete", tags=["crm"])
+def crm_complete_task(task_id: str, payload: Optional[Dict[str, Any]] = None) -> Any:
+    """Complete (or otherwise update the status of) a task."""
+    status = (payload or {}).get("status", "done")
+    return j(core.crm_complete_task(task_id, status=status))
+
+
+@app.post("/crm/appointments", tags=["crm"], status_code=201)
+def crm_schedule_appointment(payload: Dict[str, Any]) -> Any:
+    """Schedule an appointment."""
+    return j(core.crm_schedule_appointment(**payload))
+
+
+# ==================================================================
+# ACCOUNTING & FINANCE
+# ==================================================================
+
+
+class AccountCreateRequest(BaseModel):
+    code: str
+    name: str
+    account_type: str = "asset"
+    subtype: Optional[str] = None
+    parent_code: Optional[str] = None
+    normal_side: Optional[str] = None
+    description: Optional[str] = None
+    opening_balance: float = 0.0
+
+
+class AccountUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    subtype: Optional[str] = None
+    description: Optional[str] = None
+    active: Optional[bool] = None
+
+
+class JournalPostRequest(BaseModel):
+    lines: List[Dict[str, Any]]
+    date: Optional[str] = None
+    memo: Optional[str] = None
+    reference: Optional[str] = None
+    created_by: Optional[str] = None
+
+
+class InvoiceCreateRequest(BaseModel):
+    counterparty: str
+    lines: List[Dict[str, Any]]
+    invoice_type: str = "receivable"
+    issue_date: Optional[str] = None
+    due_date: Optional[str] = None
+    tax_rate: Optional[float] = None
+    property_id: Optional[str] = None
+    scheme_id: Optional[str] = None
+    city_id: Optional[str] = None
+    lease_id: Optional[str] = None
+    notes: Optional[str] = None
+    auto_post: bool = False
+
+
+class PaymentRequest(BaseModel):
+    amount: float
+    invoice_id: Optional[str] = None
+    direction: str = "in"
+    method: str = "bank_transfer"
+    account_code: str = "1010"
+    date: Optional[str] = None
+    counterparty: Optional[str] = None
+    reference: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class ExpenseRequest(BaseModel):
+    amount: float
+    account_code: str = "5900"
+    category: str = "misc"
+    date: Optional[str] = None
+    vendor: Optional[str] = None
+    description: Optional[str] = None
+    tax_amount: float = 0.0
+    paid: bool = True
+    property_id: Optional[str] = None
+    scheme_id: Optional[str] = None
+    city_id: Optional[str] = None
+
+
+class LeaseRequest(BaseModel):
+    tenant: str
+    rent_amount: float
+    property_id: Optional[str] = None
+    unit_label: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    billing_cycle: str = "monthly"
+    escalation_rate: Optional[float] = None
+    security_deposit: float = 0.0
+    tenant_id: Optional[str] = None
+    city_id: Optional[str] = None
+    scheme_id: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class BudgetRequest(BaseModel):
+    name: str
+    lines: Dict[str, float]
+    fiscal_year: str = ""
+    scope: str = "portfolio"
+    scope_id: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class RentInvoiceRequest(BaseModel):
+    period_month: Optional[int] = None
+    year: Optional[int] = None
+    auto_post: bool = True
+
+
+@app.get("/accounting/info", tags=["accounting"])
+def accounting_info() -> Any:
+    """Accounting configuration, allowed values and record counts."""
+    return j(core.accounting_info())
+
+
+@app.get("/accounting/accounts", tags=["accounting"])
+def accounting_accounts(account_type: Optional[str] = None, subtype: Optional[str] = None,
+                        active_only: bool = False) -> Any:
+    """Chart of accounts with live balances."""
+    return j(core.accounting_chart_of_accounts(account_type=account_type, subtype=subtype,
+                                               active_only=active_only))
+
+
+@app.post("/accounting/accounts", tags=["accounting"], status_code=201)
+def accounting_create_account(payload: AccountCreateRequest) -> Any:
+    """Add a ledger account."""
+    return j(core.accounting_create_account(**payload.model_dump(exclude_none=True)))
+
+
+@app.put("/accounting/accounts/{code}", tags=["accounting"])
+def accounting_update_account(code: str, payload: AccountUpdateRequest) -> Any:
+    """Rename / reclassify / deactivate an account."""
+    return j(core.accounting_update_account(code, **payload.model_dump(exclude_none=True)))
+
+
+@app.get("/accounting/accounts/{code}/balance", tags=["accounting"])
+def accounting_account_balance(code: str, as_of: Optional[str] = None) -> Any:
+    """Debit/credit movement and signed balance of one account."""
+    return j(core.accounting_account_balance(code, as_of))
+
+
+@app.get("/accounting/chart", tags=["accounting"])
+def accounting_chart() -> Any:
+    """Full chart of accounts with balances (all types)."""
+    return j(core.accounting_chart_of_accounts())
+
+
+@app.post("/accounting/journal", tags=["accounting"], status_code=201)
+def accounting_journal_post(payload: JournalPostRequest) -> Any:
+    """Post a balanced double-entry journal entry."""
+    return j(core.accounting_journal_post(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/accounting/journal", tags=["accounting"])
+def accounting_journal_list(from_date: Optional[str] = None, to_date: Optional[str] = None,
+                            source: Optional[str] = None, account: Optional[str] = None,
+                            property_id: Optional[str] = None, limit: int = 50) -> Any:
+    """List journal entries."""
+    return j(core.accounting_journal_list(from_date=from_date, to_date=to_date, source=source,
+                                          account=account, property_id=property_id, limit=limit))
+
+
+@app.get("/accounting/journal/{entry_id}", tags=["accounting"])
+def accounting_journal_get(entry_id: str) -> Any:
+    """Fetch one journal entry."""
+    return j(core.accounting_journal_get(entry_id))
+
+
+@app.post("/accounting/journal/{entry_id}/void", tags=["accounting"])
+def accounting_journal_void(entry_id: str, payload: Optional[Dict[str, Any]] = None) -> Any:
+    """Void a journal entry (``{"reason": "..."}`` optional)."""
+    return j(core.accounting_journal_void(entry_id, (payload or {}).get("reason")))
+
+
+@app.get("/accounting/trial-balance", tags=["accounting"])
+def accounting_trial_balance(as_of: Optional[str] = None) -> Any:
+    """Trial balance at a date."""
+    return j(core.accounting_trial_balance(as_of))
+
+
+@app.get("/accounting/ledger/{account_code}", tags=["accounting"])
+def accounting_general_ledger(account_code: str, from_date: Optional[str] = None,
+                              to_date: Optional[str] = None) -> Any:
+    """General ledger (running balance) for one account."""
+    return j(core.accounting_general_ledger(account_code, from_date, to_date))
+
+
+@app.get("/accounting/profit-and-loss", tags=["accounting"])
+def accounting_profit_and_loss(from_date: Optional[str] = None, to_date: Optional[str] = None,
+                               property_id: Optional[str] = None, scheme_id: Optional[str] = None,
+                               city_id: Optional[str] = None) -> Any:
+    """Profit & loss, optionally scoped to a property / scheme / city."""
+    return j(core.accounting_profit_and_loss(from_date, to_date, property_id=property_id,
+                                             scheme_id=scheme_id, city_id=city_id))
+
+
+@app.get("/accounting/balance-sheet", tags=["accounting"])
+def accounting_balance_sheet(as_of: Optional[str] = None) -> Any:
+    """Balance sheet at a date."""
+    return j(core.accounting_balance_sheet(as_of))
+
+
+@app.get("/accounting/cash-flow", tags=["accounting"])
+def accounting_cash_flow(from_date: Optional[str] = None, to_date: Optional[str] = None) -> Any:
+    """Cash-flow statement (operating / investing / financing)."""
+    return j(core.accounting_cash_flow(from_date, to_date))
+
+
+@app.get("/accounting/ratios", tags=["accounting"])
+def accounting_ratios(as_of: Optional[str] = None) -> Any:
+    """Liquidity, leverage and profitability ratios."""
+    return j(core.accounting_ratios(as_of))
+
+
+@app.get("/accounting/dashboard", tags=["accounting"])
+def accounting_dashboard(as_of: Optional[str] = None) -> Any:
+    """Finance dashboard snapshot."""
+    return j(core.accounting_dashboard(as_of))
+
+
+@app.post("/accounting/invoices", tags=["accounting"], status_code=201)
+def accounting_invoice_create(payload: InvoiceCreateRequest) -> Any:
+    """Create a receivable or payable invoice."""
+    return j(core.accounting_invoice_create(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/accounting/invoices", tags=["accounting"])
+def accounting_invoice_list(invoice_type: Optional[str] = None, status: Optional[str] = None,
+                            counterparty: Optional[str] = None, property_id: Optional[str] = None,
+                            overdue_only: bool = False, limit: int = 50) -> Any:
+    """List invoices with balances and overdue flags."""
+    return j(core.accounting_invoice_list(invoice_type=invoice_type, status=status,
+                                          counterparty=counterparty, property_id=property_id,
+                                          overdue_only=overdue_only, limit=limit))
+
+
+@app.get("/accounting/invoices/{invoice_id}", tags=["accounting"])
+def accounting_invoice_get(invoice_id: str) -> Any:
+    """Fetch one invoice with its payments."""
+    return j(core.accounting_invoice_get(invoice_id))
+
+
+@app.post("/accounting/invoices/{invoice_id}/post", tags=["accounting"])
+def accounting_invoice_post(invoice_id: str) -> Any:
+    """Post an invoice to the ledger."""
+    return j(core.accounting_invoice_post(invoice_id))
+
+
+@app.post("/accounting/payments", tags=["accounting"], status_code=201)
+def accounting_payment_record(payload: PaymentRequest) -> Any:
+    """Record a receipt or disbursement and allocate it to an invoice."""
+    return j(core.accounting_payment_record(**payload.model_dump(exclude_none=True)))
+
+
+@app.post("/accounting/expenses", tags=["accounting"], status_code=201)
+def accounting_expense_create(payload: ExpenseRequest) -> Any:
+    """Capture an expense."""
+    return j(core.accounting_expense_create(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/accounting/aging", tags=["accounting"])
+def accounting_invoice_aging(as_of: Optional[str] = None, invoice_type: Optional[str] = None) -> Any:
+    """Receivable/payable ageing buckets."""
+    return j(core.accounting_invoice_aging(as_of, invoice_type))
+
+
+@app.post("/accounting/leases", tags=["accounting"], status_code=201)
+def accounting_lease_create(payload: LeaseRequest) -> Any:
+    """Create a lease."""
+    return j(core.accounting_lease_create(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/accounting/leases", tags=["accounting"])
+def accounting_lease_list(status: Optional[str] = None, property_id: Optional[str] = None,
+                          scheme_id: Optional[str] = None, city_id: Optional[str] = None) -> Any:
+    """List leases."""
+    return j(core.accounting_lease_list(status=status, property_id=property_id,
+                                        scheme_id=scheme_id, city_id=city_id))
+
+
+@app.get("/accounting/rent-roll", tags=["accounting"])
+def accounting_rent_roll(as_of: Optional[str] = None) -> Any:
+    """Rent roll of active leases."""
+    return j(core.accounting_rent_roll(as_of))
+
+
+@app.post("/accounting/rent-invoices", tags=["accounting"], status_code=201)
+def accounting_generate_rent_invoices(payload: RentInvoiceRequest) -> Any:
+    """Raise this period's rent invoices for every due lease."""
+    return j(core.accounting_generate_rent_invoices(**payload.model_dump(exclude_none=True)))
+
+
+@app.post("/accounting/budgets", tags=["accounting"], status_code=201)
+def accounting_budget_create(payload: BudgetRequest) -> Any:
+    """Create a budget."""
+    return j(core.accounting_budget_create(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/accounting/budgets", tags=["accounting"])
+def accounting_budget_list() -> Any:
+    """List budgets."""
+    return j(core.accounting_budget_list())
+
+
+@app.get("/accounting/budgets/{budget_id}/variance", tags=["accounting"])
+def accounting_budget_variance(budget_id: str) -> Any:
+    """Budget vs actual variance."""
+    return j(core.accounting_budget_variance(budget_id))
+
+
+@app.get("/accounting/properties/{property_id}/performance", tags=["accounting"])
+def accounting_property_performance(property_id: str, from_date: Optional[str] = None,
+                                    to_date: Optional[str] = None) -> Any:
+    """Property-level P&L, rent roll and yields."""
+    return j(core.accounting_property_performance(property_id, from_date, to_date))
+
+
+# ------------------------------------------------------------------
+# Finance / ROI
+# ------------------------------------------------------------------
+
+
+class InvestmentMetricsRequest(BaseModel):
+    cashflows: List[float]
+    discount_rate: Optional[float] = None
+
+
+class RoiRequest(BaseModel):
+    initial_investment: float
+    annual_cash_flow: float = 0.0
+    hold_years: Optional[int] = None
+    terminal_value: float = 0.0
+    discount_rate: Optional[float] = None
+    annual_growth: float = 0.0
+    annual_cost_inflation: float = 0.0
+    loan_amount: float = 0.0
+    loan_rate: Optional[float] = None
+    loan_years: Optional[int] = None
+
+
+class PropertyRoiRequest(BaseModel):
+    purchase_price: float
+    annual_rent: float = 0.0
+    annual_expenses: float = 0.0
+    hold_years: Optional[int] = None
+    appreciation_rate: float = 0.075
+    discount_rate: Optional[float] = None
+    down_payment_share: float = 1.0
+    loan_rate: Optional[float] = None
+    loan_years: Optional[int] = None
+    selling_cost_rate: float = 0.02
+
+
+@app.get("/finance/mortgage", tags=["finance"])
+def finance_mortgage_calculator(principal: float, annual_rate: Optional[float] = None,
+                                years: Optional[int] = None, payments_per_year: int = 12) -> Any:
+    """Amortising mortgage: payment, total interest and schedule."""
+    return j(core.finance_mortgage_calculator(principal, annual_rate=annual_rate, years=years,
+                                              payments_per_year=payments_per_year))
+
+
+@app.post("/finance/investment-metrics", tags=["finance"])
+def finance_investment_metrics(payload: InvestmentMetricsRequest) -> Any:
+    """NPV / IRR / payback / PI / equity multiple for a cash-flow series."""
+    return j(core.finance_investment_metrics(payload.cashflows, payload.discount_rate))
+
+
+@app.get("/finance/cap-rate", tags=["finance"])
+def finance_cap_rate(noi: float, value: float) -> Any:
+    """Capitalisation rate from NOI and value."""
+    return j(core.finance_cap_rate(noi, value))
+
+
+@app.get("/finance/cash-on-cash", tags=["finance"])
+def finance_cash_on_cash(annual_cash_flow: float, cash_invested: float) -> Any:
+    """Cash-on-cash return."""
+    return j(core.finance_cash_on_cash(annual_cash_flow, cash_invested))
+
+
+@app.post("/finance/roi", tags=["finance"])
+def finance_roi_analysis(payload: RoiRequest) -> Any:
+    """Leveraged ROI analysis with scenarios."""
+    return j(core.finance_roi_analysis(**payload.model_dump(exclude_none=True)))
+
+
+@app.post("/finance/property-roi", tags=["finance"])
+def finance_property_roi(payload: PropertyRoiRequest) -> Any:
+    """Property ROI: yields, appreciation, leverage, IRR and exit proceeds."""
+    return j(core.finance_property_roi(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/finance/rental-yield/{property_id}", tags=["finance"])
+def finance_rental_yield(property_id: str, annual_rent: Optional[float] = None,
+                         annual_expenses: float = 0.0) -> Any:
+    """Gross/net rental yield and cap rate for a property."""
+    return j(core.finance_rental_yield(property_id, annual_rent=annual_rent, annual_expenses=annual_expenses))
+
+
+@app.get("/finance/portfolio-roi", tags=["finance"])
+def finance_portfolio_roi(discount_rate: Optional[float] = None, hold_years: int = 5,
+                          appreciation_rate: float = 0.075, city: Optional[str] = None,
+                          scheme: Optional[str] = None) -> Any:
+    """Portfolio-level leveraged ROI."""
+    return j(core.finance_portfolio_roi(discount_rate=discount_rate, hold_years=hold_years,
+                                        appreciation_rate=appreciation_rate, city=city, scheme=scheme))
+
+
+# ==================================================================
+# POINTS OF INTEREST (POI)
+# ==================================================================
+
+
+class PoiCreateRequest(BaseModel):
+    name: str
+    latitude: float
+    longitude: float
+    category: str = "other"
+    subcategory: Optional[str] = None
+    address: Optional[str] = None
+    city_id: Optional[str] = None
+    scheme_id: Optional[str] = None
+    block_zone_area_id: Optional[str] = None
+    rating: Optional[float] = None
+    importance: float = 1.0
+    tags: Optional[List[str]] = None
+    source: str = "manual"
+
+
+class PoiUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    address: Optional[str] = None
+    rating: Optional[float] = None
+    importance: Optional[float] = None
+    tags: Optional[List[str]] = None
+
+
+class PoiPolygonRequest(BaseModel):
+    coordinates: List[List[float]]
+    category: Optional[str] = None
+
+
+@app.post("/poi", tags=["poi"], status_code=201)
+def poi_add(payload: PoiCreateRequest) -> Any:
+    """Register a point of interest."""
+    return j(core.poi_add(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/poi", tags=["poi"])
+def poi_list(category: Optional[str] = None, city: Optional[str] = None, scheme: Optional[str] = None,
+             query: Optional[str] = None, limit: int = 100) -> Any:
+    """List points of interest."""
+    return j(core.poi_list(category=category, city=city, scheme=scheme, query=query, limit=limit))
+
+
+@app.get("/poi/categories", tags=["poi"])
+def poi_categories() -> Any:
+    """POI categories with counts and weights."""
+    return j(core.poi_categories())
+
+
+@app.get("/poi/nearby", tags=["poi"])
+def poi_nearby(latitude: float, longitude: float, radius_km: float = 2.0,
+               category: Optional[str] = None, limit: int = 50) -> Any:
+    """Points of interest within a radius of a point."""
+    return j(core.poi_nearby(latitude, longitude, radius_km=radius_km, category=category, limit=limit))
+
+
+@app.get("/poi/nearest", tags=["poi"])
+def poi_nearest(latitude: float, longitude: float, radius_km: float = 25.0) -> Any:
+    """Nearest POI in every category."""
+    return j(core.poi_nearest(latitude, longitude, radius_km=radius_km))
+
+
+@app.get("/poi/density/{entity_type}/{entity_id}", tags=["poi"])
+def poi_density(entity_type: str, entity_id: str) -> Any:
+    """POI mix and density inside an entity's footprint."""
+    return j(core.poi_density(entity_type, entity_id))
+
+
+@app.get("/poi/accessibility", tags=["poi"])
+def poi_accessibility(entity_type: Optional[str] = None, entity_id: Optional[str] = None,
+                      latitude: Optional[float] = None, longitude: Optional[float] = None,
+                      radius_km: float = 3.0) -> Any:
+    """Distance-decayed liveability score (0-100)."""
+    return j(core.poi_accessibility_score(entity_type=entity_type, entity_id=entity_id,
+                                          latitude=latitude, longitude=longitude, radius_km=radius_km))
+
+
+@app.get("/poi/map", tags=["poi"], response_class=HTMLResponse)
+def poi_map(entity_type: Optional[str] = None, entity_id: Optional[str] = None,
+            latitude: Optional[float] = None, longitude: Optional[float] = None,
+            radius_km: float = 2.0, limit: int = 60, base_map: Optional[str] = None,
+            lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """HTML map of points of interest."""
+    return HTMLResponse(content=core.poi_map(entity_type=entity_type, entity_id=entity_id,
+                                             latitude=latitude, longitude=longitude, radius_km=radius_km,
+                                             limit=limit, base_map=base_map, lang=lang, theme=theme))
+
+
+@app.post("/poi/within-polygon", tags=["poi"])
+def poi_within_polygon(payload: PoiPolygonRequest) -> Any:
+    """Points of interest inside a polygon."""
+    return j(core.poi_within_polygon(payload.coordinates, payload.category))
+
+
+@app.get("/poi/route", tags=["poi"])
+def poi_route(origin_poi: str, destination_poi: str, mode: str = "drive",
+              alternatives: int = 2, traffic_factor: Optional[float] = None,
+              network: Optional[str] = None) -> Any:
+    """Best route (plus alternatives) between two POIs, fitting the travel mode."""
+    return j(core.poi_route(origin_poi, destination_poi, mode=mode, alternatives=alternatives,
+                            traffic_factor=traffic_factor, network=network))
+
+
+@app.get("/poi/{poi_id}", tags=["poi"])
+def poi_get(poi_id: str) -> Any:
+    """Fetch one point of interest."""
+    return j(core.poi_get(poi_id))
+
+
+@app.put("/poi/{poi_id}", tags=["poi"])
+def poi_update(poi_id: str, payload: PoiUpdateRequest) -> Any:
+    """Update a point of interest."""
+    return j(core.poi_update(poi_id, **payload.model_dump(exclude_none=True)))
+
+
+@app.delete("/poi/{poi_id}", tags=["poi"])
+def poi_delete(poi_id: str) -> Any:
+    """Delete a point of interest."""
+    return j(core.poi_delete(poi_id))
+
+
+# ==================================================================
+# AREAS OF INTEREST (AOI)
+# ==================================================================
+
+
+class AoiCreateRequest(BaseModel):
+    name: str
+    kind: str = "circle"
+    description: Optional[str] = None
+    center_latitude: Optional[float] = None
+    center_longitude: Optional[float] = None
+    radius_m: Optional[float] = None
+    coordinates: Optional[List[List[float]]] = None
+    bounds: Optional[Dict[str, float]] = None
+    entity_type: Optional[str] = None
+    entity_id: Optional[str] = None
+    city: Optional[str] = None
+    scheme: Optional[str] = None
+    tags: Optional[List[str]] = None
+    watch_categories: Optional[List[str]] = None
+    watch_alert_threshold: float = 0.0
+    created_by: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class AoiUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    tags: Optional[List[str]] = None
+    watch_categories: Optional[List[str]] = None
+    watch_alert_threshold: Optional[float] = None
+    notes: Optional[str] = None
+
+
+class AoiCompareRequest(BaseModel):
+    aoi_ids: List[str]
+
+
+@app.post("/aoi", tags=["aoi"], status_code=201)
+def aoi_create(payload: AoiCreateRequest) -> Any:
+    """Save an area of interest."""
+    return j(core.aoi_create(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/aoi", tags=["aoi"])
+def aoi_list(kind: Optional[str] = None, city: Optional[str] = None, scheme: Optional[str] = None) -> Any:
+    """List saved areas of interest."""
+    return j(core.aoi_list(kind=kind, city=city, scheme=scheme))
+
+
+@app.post("/aoi/compare", tags=["aoi"])
+def aoi_compare(payload: AoiCompareRequest) -> Any:
+    """Compare areas of interest side by side."""
+    return j(core.aoi_compare(payload.aoi_ids))
+
+
+@app.get("/aoi/{aoi_id}", tags=["aoi"])
+def aoi_get(aoi_id: str) -> Any:
+    """Fetch one area of interest."""
+    return j(core.aoi_get(aoi_id))
+
+
+@app.put("/aoi/{aoi_id}", tags=["aoi"])
+def aoi_update(aoi_id: str, payload: AoiUpdateRequest) -> Any:
+    """Update an area of interest."""
+    return j(core.aoi_update(aoi_id, **payload.model_dump(exclude_none=True)))
+
+
+@app.delete("/aoi/{aoi_id}", tags=["aoi"])
+def aoi_delete(aoi_id: str) -> Any:
+    """Delete an area of interest."""
+    return j(core.aoi_delete(aoi_id))
+
+
+@app.get("/aoi/{aoi_id}/stats", tags=["aoi"])
+def aoi_stats(aoi_id: str) -> Any:
+    """Quick statistics for an area of interest."""
+    return j(core.aoi_stats(aoi_id))
+
+
+@app.get("/aoi/{aoi_id}/analyze", tags=["aoi"])
+def aoi_analyze(aoi_id: str, years: int = 5) -> Any:
+    """Full analytics for an area of interest."""
+    return j(core.aoi_analyze(aoi_id, years=years))
+
+
+@app.get("/aoi/{aoi_id}/watch", tags=["aoi"])
+def aoi_watch(aoi_id: str, days: int = 120) -> Any:
+    """News watch for an area of interest."""
+    return j(core.aoi_watch(aoi_id, days=days))
+
+
+@app.get("/aoi/{aoi_id}/report", tags=["aoi"], response_class=HTMLResponse)
+def aoi_report(aoi_id: str, years: int = 5, include_map: bool = True, include_news: bool = True,
+               lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """Printable HTML report for an area of interest."""
+    return HTMLResponse(content=core.aoi_report(aoi_id, years=years, include_map=include_map,
+                                                include_news=include_news, lang=lang, theme=theme))
+
+
+@app.get("/aoi/{aoi_id}/map", tags=["aoi"], response_class=HTMLResponse)
+def aoi_map(aoi_id: str, base_map: Optional[str] = None, include_properties: bool = True,
+            include_pois: bool = True, lang: str = Depends(ui_lang),
+            theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """HTML map of an area of interest."""
+    return HTMLResponse(content=core.aoi_map(aoi_id, base_map=base_map, include_properties=include_properties,
+                                             include_pois=include_pois, lang=lang, theme=theme))
+
+
+# ==================================================================
+# PORTAL: discovery, settings, federated search and statistics
+# ==================================================================
+
+
+class SettingsUpdateRequest(BaseModel):
+    updates: Dict[str, Any]
+
+
+@app.get("/portal/health", tags=["portal"])
+def portal_health() -> Any:
+    """Liveness snapshot."""
+    return j(core.portal_health())
+
+
+@app.get("/portal/catalog", tags=["portal"])
+def portal_catalog(include_parameters: bool = False, group: Optional[str] = None) -> Any:
+    """Inventory of every MCP tool, resource and prompt."""
+    return j(core.portal_catalog(include_parameters=include_parameters, group=group))
+
+
+@app.get("/portal/schema", tags=["portal"])
+def portal_schema(model: Optional[str] = None) -> Any:
+    """JSON schema for a portal model (or the model list)."""
+    return j(core.portal_schema(model))
+
+
+@app.get("/portal/settings", tags=["portal"])
+def portal_settings_get() -> Any:
+    """Read runtime settings."""
+    return j(core.portal_settings("get"))
+
+
+@app.put("/portal/settings", tags=["portal"])
+def portal_settings_update(payload: SettingsUpdateRequest) -> Any:
+    """Update runtime settings (assumptions / forecast / accounting / auth)."""
+    return j(core.portal_settings("update", payload.updates))
+
+
+@app.get("/portal/audit", tags=["portal"])
+def portal_audit_log(limit: int = 50) -> Any:
+    """Unified activity trail."""
+    return j(core.portal_audit_log(limit=limit))
+
+
+@app.get("/portal/search", tags=["portal"])
+def global_search(query: str, limit: int = 10) -> Any:
+    """Federated search across the whole portal."""
+    return j(core.global_search(query, limit=limit))
+
+
+@app.get("/portal/statistics", tags=["portal"])
+def portal_statistics() -> Any:
+    """Portfolio-wide statistics."""
+    return j(core.portal_statistics())
+
+
+@app.get("/portal/availability", tags=["portal"])
+def property_availability(city: Optional[str] = None, scheme: Optional[str] = None,
+                          use_type: Optional[str] = None, category: Optional[str] = None,
+                          status: Optional[str] = None, limit: int = 50) -> Any:
+    """Availability breakdown of the listing book."""
+    return j(core.property_availability(city=city, scheme=scheme, use_type=use_type, category=category,
+                                        status=status, limit=limit))
+
+
+@app.get("/portal/market-trends", tags=["portal"])
+def market_trends(city: Optional[str] = None, scheme: Optional[str] = None, years: int = 5,
+                  days: int = 180) -> Any:
+    """Market trends for a city or scheme."""
+    return j(core.market_trends(city=city, scheme=scheme, years=years, days=days))
+
+
+@app.get("/portal/home", tags=["portal"], response_class=HTMLResponse)
+def portal_home(lang: str = Depends(ui_lang), theme: str = Depends(ui_theme),
+                city: Optional[str] = None, scheme: Optional[str] = None,
+                include_ticker: bool = True, include_stats: bool = True) -> HTMLResponse:
+    """The public portal home page (HTML): content, stories, contacts and ad sections."""
+    return HTMLResponse(content=core.content_portal_home(
+        lang=lang, theme=theme, city=city, scheme=scheme,
+        include_ticker=include_ticker, include_stats=include_stats))
+
+
+@app.get("/portal/home.html", tags=["portal"], response_class=HTMLResponse)
+def portal_home_html(lang: str = Depends(ui_lang), theme: str = Depends(ui_theme),
+                     city: Optional[str] = None, scheme: Optional[str] = None) -> HTMLResponse:
+    """Alias of ``/portal/home`` that always serves HTML (for direct browsing)."""
+    return HTMLResponse(content=core.content_portal_home(lang=lang, theme=theme, city=city, scheme=scheme))
+
+
+# ==================================================================
+# ROUTING: on foot / bicycle / motor car — best & alternative routes
+# ==================================================================
+
+
+class RoadNetworkCreateRequest(BaseModel):
+    name: str
+    ways: Optional[List[Dict[str, Any]]] = None
+    description: Optional[str] = None
+
+
+class RouteMatrixRequest(BaseModel):
+    poi_ids: Optional[List[str]] = None
+    coordinates: Optional[List[List[float]]] = None
+    mode: str = "drive"
+    city: Optional[str] = None
+    scheme: Optional[str] = None
+    network: Optional[str] = None
+
+
+@app.get("/gis/travel-modes", tags=["routing"])
+def gis_travel_modes() -> Any:
+    """Available travel modes (on foot, bicycle, motor car) and their road speeds."""
+    return j(core.gis_travel_modes())
+
+
+@app.get("/gis/road-classes", tags=["routing"])
+def gis_road_classes() -> Any:
+    """Road classes with their per-mode speeds."""
+    return j(core.gis_road_classes())
+
+
+@app.get("/gis/road-networks", tags=["routing"])
+def gis_road_networks() -> Any:
+    """List the road networks available for routing."""
+    return j(core.gis_list_road_networks())
+
+
+@app.post("/gis/road-networks", tags=["routing"], status_code=201)
+def gis_road_network_create(payload: RoadNetworkCreateRequest) -> Any:
+    """Register a custom routable road network from polyline ``ways``."""
+    return j(core.gis_add_road_network(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/gis/route/compare", tags=["routing"])
+def gis_route_compare(origin_latitude: float, origin_longitude: float,
+                      destination_latitude: float, destination_longitude: float,
+                      modes: Optional[str] = None, city: Optional[str] = None,
+                      scheme: Optional[str] = None, network: Optional[str] = None) -> Any:
+    """Compare every travel mode between two points (comma-separated ``modes`` optional)."""
+    mode_list = [m.strip() for m in modes.split(",") if m.strip()] if modes else None
+    return j(core.gis_route_compare(origin_latitude, origin_longitude, destination_latitude,
+                                    destination_longitude, modes=mode_list, city=city,
+                                    scheme=scheme, network=network))
+
+
+@app.post("/gis/route/matrix", tags=["routing"])
+def gis_route_matrix(payload: RouteMatrixRequest) -> Any:
+    """Distance/time matrix between POIs or coordinates."""
+    return j(core.gis_route_matrix(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/gis/route/map", tags=["routing"], response_class=HTMLResponse)
+def gis_route_map(origin_latitude: float, origin_longitude: float,
+                  destination_latitude: float, destination_longitude: float,
+                  mode: str = "drive", alternatives: int = 2, include_compare: bool = True,
+                  ticker: bool = False, base_map: Optional[str] = None, city: Optional[str] = None,
+                  scheme: Optional[str] = None, network: Optional[str] = None,
+                  lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """HTML map of the best route and its alternatives."""
+    return HTMLResponse(content=core.gis_route_map(
+        origin_latitude, origin_longitude, destination_latitude, destination_longitude,
+        mode=mode, alternatives=alternatives, include_compare=include_compare, ticker=ticker,
+        base_map=base_map, city=city, scheme=scheme, network=network, lang=lang, theme=theme))
+
+
+@app.get("/gis/route", tags=["routing"])
+def gis_route(origin_latitude: float, origin_longitude: float,
+              destination_latitude: float, destination_longitude: float,
+              mode: str = "drive", alternatives: int = 2, traffic_factor: Optional[float] = None,
+              city: Optional[str] = None, scheme: Optional[str] = None,
+              network: Optional[str] = None, origin_label: Optional[str] = None,
+              destination_label: Optional[str] = None) -> Any:
+    """Best route (plus alternatives) between two points, on foot or by car."""
+    return j(core.gis_route(origin_latitude, origin_longitude, destination_latitude,
+                            destination_longitude, mode=mode, alternatives=alternatives,
+                            traffic_factor=traffic_factor, city=city, scheme=scheme,
+                            network=network, origin_label=origin_label,
+                            destination_label=destination_label))
+
+
+# ==================================================================
+# CONTENT: pages, history, contacts and success stories
+# ==================================================================
+
+
+class ContentPageCreateRequest(BaseModel):
+    key: str
+    title: str
+    category: str = "about"
+    subtitle: Optional[str] = None
+    summary: Optional[str] = None
+    body: Optional[List[str]] = None
+    highlights: Optional[List[Dict[str, str]]] = None
+    bullets: Optional[List[str]] = None
+    faqs: Optional[List[Dict[str, str]]] = None
+    tags: Optional[List[str]] = None
+    nav_label: Optional[str] = None
+    show_in_nav: bool = True
+    order: int = 100
+    status: str = "published"
+
+
+class ContentPageUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    category: Optional[str] = None
+    subtitle: Optional[str] = None
+    summary: Optional[str] = None
+    body: Optional[List[str]] = None
+    highlights: Optional[List[Dict[str, str]]] = None
+    bullets: Optional[List[str]] = None
+    faqs: Optional[List[Dict[str, str]]] = None
+    tags: Optional[List[str]] = None
+    nav_label: Optional[str] = None
+    show_in_nav: Optional[bool] = None
+    order: Optional[int] = None
+    status: Optional[str] = None
+
+
+class HistoryCreateRequest(BaseModel):
+    year: int
+    title: str
+    description: str
+    kind: str = "milestone"
+    month: Optional[int] = None
+    tags: Optional[List[str]] = None
+    featured: bool = False
+
+
+class ContactCreateRequest(BaseModel):
+    channel_type: str
+    label: str
+    value: str
+    url: Optional[str] = None
+    hours: Optional[str] = None
+    city: Optional[str] = None
+    scheme: Optional[str] = None
+    region: Optional[str] = None
+    priority: int = 100
+    is_primary: bool = False
+    notes: Optional[str] = None
+
+
+class StoryCreateRequest(BaseModel):
+    title: str
+    story_type: str = "case_study"
+    client_name: Optional[str] = None
+    client_role: Optional[str] = None
+    quote: Optional[str] = None
+    rating: Optional[float] = None
+    location: Optional[str] = None
+    city: Optional[str] = None
+    scheme: Optional[str] = None
+    property_id: Optional[str] = None
+    project_id: Optional[str] = None
+    narrative: Optional[List[str]] = None
+    metrics: Optional[List[Dict[str, str]]] = None
+    highlights: Optional[List[str]] = None
+    tags: Optional[List[str]] = None
+    featured: bool = False
+    date: Optional[str] = None
+
+
+@app.get("/content/overview", tags=["content"])
+def content_overview() -> Any:
+    """Counts and breakdowns for pages, history, contacts, stories and ads."""
+    return j(core.content_overview())
+
+
+@app.get("/content/pages", tags=["content"])
+def content_page_list(category: Optional[str] = None, tag: Optional[str] = None,
+                      status: str = "published", nav_only: bool = False) -> Any:
+    """List portal content pages."""
+    return j(core.content_page_list(category=category, tag=tag, status=status, nav_only=nav_only))
+
+
+@app.post("/content/pages", tags=["content"], status_code=201)
+def content_page_create(payload: ContentPageCreateRequest) -> Any:
+    """Create a portal content page."""
+    return j(core.content_page_create(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/content/pages/{key}", tags=["content"])
+def content_page_get(key: str) -> Any:
+    """Fetch one content page by key."""
+    return j(core.content_page_get(key))
+
+
+@app.put("/content/pages/{key}", tags=["content"])
+def content_page_update(key: str, payload: ContentPageUpdateRequest) -> Any:
+    """Update a portal content page."""
+    return j(core.content_page_update(key, **payload.model_dump(exclude_none=True)))
+
+
+@app.delete("/content/pages/{key}", tags=["content"])
+def content_page_delete(key: str) -> Any:
+    """Delete a portal content page."""
+    return j(core.content_page_delete(key))
+
+
+@app.get("/content/history", tags=["content"])
+def content_history(kind: Optional[str] = None, since: Optional[int] = None,
+                    until: Optional[int] = None, featured: Optional[bool] = None) -> Any:
+    """The company-history timeline."""
+    return j(core.content_history(kind=kind, since=since, until=until, featured=featured))
+
+
+@app.post("/content/history", tags=["content"], status_code=201)
+def content_history_add(payload: HistoryCreateRequest) -> Any:
+    """Add a company-history entry."""
+    return j(core.content_history_add(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/content/contacts", tags=["content"])
+def content_contact(channel_type: Optional[str] = None, city: Optional[str] = None,
+                    scheme: Optional[str] = None, primary_only: bool = False) -> Any:
+    """The contact directory."""
+    return j(core.content_contact(channel_type=channel_type, city=city, scheme=scheme,
+                                  primary_only=primary_only))
+
+
+@app.post("/content/contacts", tags=["content"], status_code=201)
+def content_contact_add(payload: ContactCreateRequest) -> Any:
+    """Add a contact channel."""
+    return j(core.content_contact_add(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/content/stories", tags=["content"])
+def content_stories(story_type: Optional[str] = None, city: Optional[str] = None,
+                    scheme: Optional[str] = None, featured: Optional[bool] = None,
+                    tag: Optional[str] = None) -> Any:
+    """Success stories, case studies and testimonials."""
+    return j(core.content_success_stories(story_type=story_type, city=city, scheme=scheme,
+                                          featured=featured, tag=tag))
+
+
+@app.post("/content/stories", tags=["content"], status_code=201)
+def content_story_add(payload: StoryCreateRequest) -> Any:
+    """Publish a success story."""
+    return j(core.content_success_story_add(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/content/navigation", tags=["content"])
+def content_navigation() -> Any:
+    """The portal navigation menu."""
+    return j(core.content_navigation())
+
+
+@app.get("/content/site", tags=["content"])
+def content_site(lang: str = "en", city: Optional[str] = None, scheme: Optional[str] = None) -> Any:
+    """The complete portal site payload (nav, blocks, content, resolved ads)."""
+    return j(core.content_site(lang=lang, city=city, scheme=scheme))
+
+
+# ==================================================================
+# ADVERTISING
+# ==================================================================
+
+
+class AdCreateRequest(BaseModel):
+    title: str
+    headline: str
+    advertiser: str = ""
+    category: str = "services"
+    slot: str = "infeed"
+    body: Optional[str] = None
+    keywords: Optional[List[str]] = None
+    cta_label: Optional[str] = None
+    cta_url: Optional[str] = None
+    media_url: Optional[str] = None
+    image_url: Optional[str] = None
+    tags: Optional[List[str]] = None
+    contact: Optional[str] = None
+    phone: Optional[str] = None
+    price_text: Optional[str] = None
+    offer: Optional[str] = None
+    city: Optional[str] = None
+    scheme: Optional[str] = None
+    lang: Optional[str] = None
+    priority: int = 100
+    weight: float = 1.0
+    status: str = "active"
+    valid_from: Optional[str] = None
+    valid_until: Optional[str] = None
+    budget: float = 0.0
+
+
+class AdUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    headline: Optional[str] = None
+    body: Optional[str] = None
+    advertiser: Optional[str] = None
+    category: Optional[str] = None
+    slot: Optional[str] = None
+    keywords: Optional[List[str]] = None
+    cta_label: Optional[str] = None
+    cta_url: Optional[str] = None
+    image_url: Optional[str] = None
+    tags: Optional[List[str]] = None
+    contact: Optional[str] = None
+    phone: Optional[str] = None
+    price_text: Optional[str] = None
+    offer: Optional[str] = None
+    city: Optional[str] = None
+    scheme: Optional[str] = None
+    lang: Optional[str] = None
+    priority: Optional[int] = None
+    weight: Optional[float] = None
+    status: Optional[str] = None
+    valid_from: Optional[str] = None
+    valid_until: Optional[str] = None
+    budget: Optional[float] = None
+
+
+@app.get("/ads/categories", tags=["ads"])
+def ad_categories() -> Any:
+    """Advertisement categories."""
+    return j(core.ad_categories())
+
+
+@app.get("/ads/slots", tags=["ads"])
+def ad_slots() -> Any:
+    """Advertisement slots."""
+    return j(core.ad_slots())
+
+
+@app.get("/ads/active", tags=["ads"])
+def ad_active(slot: Optional[str] = None, category: Optional[str] = None, city: Optional[str] = None,
+              scheme: Optional[str] = None, lang: Optional[str] = None, limit: Optional[int] = None) -> Any:
+    """Live, in-window, on-target creatives (weighted rotation)."""
+    return j(core.ad_active(slot=slot, category=category, city=city, scheme=scheme, lang=lang, limit=limit))
+
+
+@app.get("/ads/performance", tags=["ads"])
+def ad_performance(ad_id: Optional[str] = None) -> Any:
+    """Impression / click / CTR performance for one ad or the whole book."""
+    return j(core.ad_performance(ad_id))
+
+
+@app.get("/ads/section", tags=["ads"])
+def ad_section(slot: str = "infeed", category: Optional[str] = None, city: Optional[str] = None,
+               scheme: Optional[str] = None, lang: Optional[str] = None, limit: Optional[int] = None) -> Any:
+    """A ready-to-render advertisement section."""
+    return j(core.ad_section(slot=slot, category=category, city=city, scheme=scheme, lang=lang, limit=limit))
+
+
+@app.get("/ads/preview", tags=["ads"], response_class=HTMLResponse)
+def ad_preview(slot: str = "infeed", category: Optional[str] = None, city: Optional[str] = None,
+               scheme: Optional[str] = None, limit: Optional[int] = None,
+               lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """HTML preview of an advertisement slot."""
+    return HTMLResponse(content=core.ad_preview(slot=slot, category=category, city=city,
+                                                scheme=scheme, limit=limit, lang=lang, theme=theme))
+
+
+@app.get("/ads/report", tags=["ads"], response_class=HTMLResponse)
+def ad_report(lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """Printable advertising report (all slots + delivery performance)."""
+    return HTMLResponse(content=core.ad_report(lang=lang, theme=theme))
+
+
+@app.get("/ads", tags=["ads"])
+def ad_list(category: Optional[str] = None, slot: Optional[str] = None, status: Optional[str] = None,
+            advertiser: Optional[str] = None, tag: Optional[str] = None, limit: int = 100) -> Any:
+    """List advertisement creatives."""
+    return j(core.ad_list(category=category, slot=slot, status=status, advertiser=advertiser,
+                          tag=tag, limit=limit))
+
+
+@app.post("/ads", tags=["ads"], status_code=201)
+def ad_create(payload: AdCreateRequest) -> Any:
+    """Create an advertisement creative."""
+    return j(core.ad_create(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/ads/{ad_id}", tags=["ads"])
+def ad_get(ad_id: str) -> Any:
+    """Fetch one advertisement."""
+    return j(core.ad_get(ad_id))
+
+
+@app.put("/ads/{ad_id}", tags=["ads"])
+def ad_update(ad_id: str, payload: AdUpdateRequest) -> Any:
+    """Update an advertisement."""
+    return j(core.ad_update(ad_id, **payload.model_dump(exclude_none=True)))
+
+
+@app.delete("/ads/{ad_id}", tags=["ads"])
+def ad_delete(ad_id: str) -> Any:
+    """Delete an advertisement."""
+    return j(core.ad_delete(ad_id))
+
+
+@app.post("/ads/{ad_id}/track", tags=["ads"])
+def ad_track(ad_id: str, event: str = "impression", count: int = 1) -> Any:
+    """Record an impression / click / spend event."""
+    return j(core.ad_track(ad_id, event=event, count=count))
+
+
+# ==================================================================
+# USERS & ROLES (RBAC)
+# ==================================================================
+
+
+class RoleCreateRequest(BaseModel):
+    name: str
+    label: str
+    description: Optional[str] = None
+    portal_area: str = "staff"
+    level: int = 20
+    permissions: Optional[List[str]] = None
+
+
+class RoleUpdateRequest(BaseModel):
+    label: Optional[str] = None
+    description: Optional[str] = None
+    portal_area: Optional[str] = None
+    level: Optional[int] = None
+    permissions: Optional[List[str]] = None
+
+
+class SetRolesRequest(BaseModel):
+    roles: List[str]
+
+
+class AddRoleRequest(BaseModel):
+    role: str
+
+
+class PermissionRequest(BaseModel):
+    permission: str
+
+
+@app.get("/roles/permissions", tags=["roles"])
+def roles_permissions() -> Any:
+    """The full permission catalogue."""
+    return j(core.auth_permissions())
+
+
+@app.get("/roles/summary", tags=["roles"])
+def roles_summary() -> Any:
+    """Roles by portal area, permission count and per-role member counts."""
+    return j(core.auth_role_summary())
+
+
+@app.get("/roles", tags=["roles"])
+def roles_list(portal_area: Optional[str] = None) -> Any:
+    """List portal roles."""
+    return j(core.auth_list_roles(portal_area=portal_area))
+
+
+@app.post("/roles", tags=["roles"], status_code=201)
+def roles_create(payload: RoleCreateRequest) -> Any:
+    """Create a custom role."""
+    return j(core.auth_create_role(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/roles/{name}/users", tags=["roles"])
+def roles_users(name: str) -> Any:
+    """All users holding a given role."""
+    return j(core.auth_users_by_role(name))
+
+
+@app.get("/roles/{name}", tags=["roles"])
+def roles_get(name: str) -> Any:
+    """Fetch one role with its permissions and member count."""
+    return j(core.auth_get_role(name))
+
+
+@app.put("/roles/{name}", tags=["roles"])
+def roles_update(name: str, payload: RoleUpdateRequest) -> Any:
+    """Update a role."""
+    return j(core.auth_update_role(name, **payload.model_dump(exclude_none=True)))
+
+
+@app.delete("/roles/{name}", tags=["roles"])
+def roles_delete(name: str) -> Any:
+    """Delete a custom role."""
+    return j(core.auth_delete_role(name))
+
+
+@app.get("/users/{user_id}/permissions/check", tags=["roles"])
+def users_permission_check(user_id: str, permission: str) -> Any:
+    """Check whether a user holds a permission."""
+    return j(core.auth_check_permission(user_id, permission))
+
+
+@app.get("/users/{user_id}/permissions", tags=["roles"])
+def users_permissions(user_id: str) -> Any:
+    """A user's effective roles and permissions."""
+    return j(core.auth_user_permissions(user_id=user_id))
+
+
+@app.post("/users/{user_id}/permissions", tags=["roles"])
+def users_grant_permission(user_id: str, payload: PermissionRequest) -> Any:
+    """Grant an extra permission directly to a user."""
+    return j(core.auth_grant_permission(user_id, payload.permission))
+
+
+@app.delete("/users/{user_id}/permissions/{permission}", tags=["roles"])
+def users_revoke_permission(user_id: str, permission: str) -> Any:
+    """Revoke a directly-granted permission."""
+    return j(core.auth_revoke_permission(user_id, permission))
+
+
+@app.get("/users/{user_id}/roles", tags=["roles"])
+def users_roles(user_id: str) -> Any:
+    """A user's roles and primary role."""
+    return j(core.auth_user_roles(user_id=user_id))
+
+
+@app.put("/users/{user_id}/roles", tags=["roles"])
+def users_set_roles(user_id: str, payload: SetRolesRequest) -> Any:
+    """Replace a user's whole role set."""
+    return j(core.auth_set_user_roles(user_id, payload.roles))
+
+
+@app.post("/users/{user_id}/roles", tags=["roles"], status_code=201)
+def users_assign_role(user_id: str, payload: AddRoleRequest) -> Any:
+    """Grant one role to a user."""
+    return j(core.auth_assign_role(user_id, payload.role))
+
+
+@app.delete("/users/{user_id}/roles/{role}", tags=["roles"])
+def users_revoke_role(user_id: str, role: str) -> Any:
+    """Remove one role from a user."""
+    return j(core.auth_revoke_role(user_id, role))
+
+
+# ==================================================================
+# CONSTRUCTION WING
+# ==================================================================
+
+
+class ConstructionEstimateRequest(BaseModel):
+    covered_area: float
+    floors: int = 1
+    building_type: str = "house"
+    quality_tier: str = "standard"
+    system: str = "rcc_frame"
+    city: Optional[str] = None
+    plot_area: Optional[float] = None
+    escalation_years: float = 0.0
+
+
+class ConstructionSaveRequest(ConstructionEstimateRequest):
+    title: str
+    notes: Optional[str] = None
+
+
+class ConstructionReportRequest(BaseModel):
+    covered_area: float
+    floors: int = 1
+    building_type: str = "house"
+    quality_tier: str = "standard"
+    system: str = "rcc_frame"
+    city: Optional[str] = None
+
+
+@app.get("/construction/overview", tags=["construction"])
+def construction_overview() -> Any:
+    """Counts, categories and configuration for the construction wing."""
+    return j(core.construction_overview())
+
+
+@app.get("/construction/techniques", tags=["construction"])
+def construction_techniques(category: Optional[str] = None, building_type: Optional[str] = None,
+                            max_floors: Optional[int] = None, min_floors: Optional[int] = None) -> Any:
+    """Catalogue of construction techniques / systems."""
+    return j(core.construction_techniques(category=category, building_type=building_type,
+                                          max_floors=max_floors, min_floors=min_floors))
+
+
+@app.get("/construction/techniques/{key}", tags=["construction"])
+def construction_technique(key: str) -> Any:
+    """One construction technique by key."""
+    return j(core.construction_technique(key))
+
+
+@app.get("/construction/materials", tags=["construction"])
+def construction_materials(category: Optional[str] = None) -> Any:
+    """Building-material catalogue with unit rates."""
+    return j(core.construction_materials(category=category))
+
+
+@app.get("/construction/materials/{key}", tags=["construction"])
+def construction_material(key: str) -> Any:
+    """One building material by key."""
+    return j(core.construction_material(key))
+
+
+@app.get("/construction/element-rates", tags=["construction"])
+def construction_element_rates() -> Any:
+    """BOQ element unit rates for rate analysis."""
+    return j(core.construction_element_rates())
+
+
+@app.get("/construction/rate-analysis", tags=["construction"])
+def construction_rate_analysis(element: str, city: Optional[str] = None) -> Any:
+    """Rate analysis for one BOQ element."""
+    return j(core.construction_rate_analysis(element, city))
+
+
+@app.post("/construction/estimate", tags=["construction"])
+def construction_estimate(payload: ConstructionEstimateRequest) -> Any:
+    """Parameterised construction-cost estimate."""
+    return j(core.construction_estimate(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/construction/timeline", tags=["construction"])
+def construction_timeline(covered_area: float, floors: int = 1, building_type: str = "house",
+                          system: str = "rcc_frame") -> Any:
+    """Phase-weighted construction timeline."""
+    return j(core.construction_timeline(covered_area, floors=floors, building_type=building_type,
+                                        system=system))
+
+
+@app.get("/construction/takeoff", tags=["construction"])
+def construction_takeoff(covered_area: float, quality_tier: str = "standard",
+                         building_type: str = "house") -> Any:
+    """Indicative material take-off."""
+    return j(core.construction_takeoff(covered_area, quality_tier=quality_tier, building_type=building_type))
+
+
+@app.get("/construction/compare", tags=["construction"])
+def construction_compare(covered_area: float, floors: int = 1, building_type: str = "house",
+                         quality_tier: str = "standard", city: Optional[str] = None,
+                         category: str = "structure") -> Any:
+    """Compare competing construction techniques."""
+    return j(core.construction_compare(covered_area, floors=floors, building_type=building_type,
+                                       quality_tier=quality_tier, city=city, category=category))
+
+
+@app.get("/construction/impact", tags=["construction"])
+def construction_impact(covered_area: float, building_type: str = "house", city: Optional[str] = None,
+                        from_tier: str = "standard", to_tier: str = "premium",
+                        market_rate_sqft: float = 12000.0, gross_yield: float = 0.05,
+                        floors: int = 1) -> Any:
+    """Impact of construction quality on value, rent and payback."""
+    return j(core.construction_impact(covered_area, building_type=building_type, city=city,
+                                      from_tier=from_tier, to_tier=to_tier,
+                                      market_rate_sqft=market_rate_sqft, gross_yield=gross_yield,
+                                      floors=floors))
+
+
+@app.get("/construction/advisory", tags=["construction"])
+def construction_advisory(plot_area: float, floors: int = 2, building_type: str = "house",
+                          city: Optional[str] = None, soil: str = "sandy_loam",
+                          seismic_zone: str = "2A", budget_per_sqft: Optional[float] = None) -> Any:
+    """Recommend a technique, foundation and guidelines for a site."""
+    return j(core.construction_advisory(plot_area, floors=floors, building_type=building_type, city=city,
+                                        soil=soil, seismic_zone=seismic_zone,
+                                        budget_per_sqft=budget_per_sqft))
+
+
+@app.get("/construction/guidelines", tags=["construction"])
+def construction_guidelines(category: Optional[str] = None, authority: Optional[str] = None,
+                            building_type: Optional[str] = None) -> Any:
+    """Building codes, byelaws and guidelines."""
+    return j(core.construction_guidelines(category=category, authority=authority,
+                                          building_type=building_type))
+
+
+@app.get("/construction/approvals", tags=["construction"])
+def construction_approvals(project_type: str = "house", city: Optional[str] = None) -> Any:
+    """NOC / approval workflow for a project type."""
+    return j(core.construction_approvals(project_type=project_type, city=city))
+
+
+@app.get("/construction/qa", tags=["construction"])
+def construction_qa(stage: Optional[str] = None) -> Any:
+    """QA inspection checklists by stage."""
+    return j(core.construction_qa(stage))
+
+
+@app.get("/construction/hse", tags=["construction"])
+def construction_hse() -> Any:
+    """Health, safety & environment rules."""
+    return j(core.construction_hse())
+
+
+@app.get("/construction/trades", tags=["construction"])
+def construction_trades() -> Any:
+    """Construction trades with daily wage rates."""
+    return j(core.construction_trades())
+
+
+@app.post("/construction/estimates", tags=["construction"], status_code=201)
+def construction_estimate_save(payload: ConstructionSaveRequest) -> Any:
+    """Compute and persist a construction estimate."""
+    return j(core.construction_estimate_save(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/construction/estimates", tags=["construction"])
+def construction_estimates(building_type: Optional[str] = None, city: Optional[str] = None) -> Any:
+    """Saved construction estimates."""
+    return j(core.construction_estimates(building_type=building_type, city=city))
+
+
+@app.get("/construction/estimates/{estimate_id}", tags=["construction"])
+def construction_estimate_get(estimate_id: str) -> Any:
+    """One saved construction estimate."""
+    return j(core.construction_estimate_get(estimate_id))
+
+
+@app.get("/construction/portal", tags=["construction"], response_class=HTMLResponse)
+def construction_portal(lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """The Construction wing page (HTML)."""
+    return HTMLResponse(content=core.construction_portal(lang=lang, theme=theme))
+
+
+@app.get("/construction/portal.html", tags=["construction"], response_class=HTMLResponse)
+def construction_portal_html(lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """Alias of ``/construction/portal`` that always serves HTML."""
+    return HTMLResponse(content=core.construction_portal(lang=lang, theme=theme))
+
+
+@app.post("/construction/report", tags=["construction"], response_class=HTMLResponse)
+def construction_report(payload: ConstructionReportRequest, lang: str = Depends(ui_lang),
+                        theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """Construction cost report (HTML)."""
+    return HTMLResponse(content=core.construction_report(**payload.model_dump(exclude_none=True),
+                                                         lang=lang, theme=theme))
+
+
+# ==================================================================
+# MAINTENANCE WING
+# ==================================================================
+
+
+class MaintenanceEstimateRequest(BaseModel):
+    covered_area: float
+    property_type: str = "house"
+    tier: str = "standard"
+    quality: str = "standard"
+    age_years: float = 0.0
+    city: Optional[str] = None
+    floors: int = 1
+
+
+class MaintenancePlanRequest(BaseModel):
+    covered_area: float
+    property_type: str = "house"
+    tier: str = "standard"
+    quality: str = "standard"
+    age_years: float = 0.0
+    city: Optional[str] = None
+    title: str
+    notes: Optional[str] = None
+
+
+class MaintenanceReportRequest(BaseModel):
+    covered_area: float
+    property_type: str = "house"
+    tier: str = "standard"
+    quality: str = "standard"
+    age_years: float = 0.0
+    city: Optional[str] = None
+
+
+class WorkOrderCreateRequest(BaseModel):
+    title: str
+    property_type: str = "house"
+    component: Optional[str] = None
+    defect: Optional[str] = None
+    priority: str = "routine"
+    description: Optional[str] = None
+    estimated_cost: float = 0.0
+    assignee: Optional[str] = None
+
+
+class WorkOrderUpdateRequest(BaseModel):
+    status: Optional[str] = None
+    priority: Optional[str] = None
+    assignee: Optional[str] = None
+    estimated_cost: Optional[float] = None
+    description: Optional[str] = None
+
+
+@app.get("/maintenance/overview", tags=["maintenance"])
+def maintenance_overview() -> Any:
+    """Counts, categories and configuration for the maintenance wing."""
+    return j(core.maintenance_overview())
+
+
+@app.get("/maintenance/components", tags=["maintenance"])
+def maintenance_components(category: Optional[str] = None) -> Any:
+    """Maintainable components with service lives and criticality."""
+    return j(core.maintenance_components(category=category))
+
+
+@app.get("/maintenance/components/{key}", tags=["maintenance"])
+def maintenance_component(key: str) -> Any:
+    """One maintainable component by key."""
+    return j(core.maintenance_component(key))
+
+
+@app.get("/maintenance/services", tags=["maintenance"])
+def maintenance_services(category: Optional[str] = None, emergency: Optional[bool] = None) -> Any:
+    """Maintenance services and trades with cost bands."""
+    return j(core.maintenance_services(category=category, emergency=emergency))
+
+
+@app.get("/maintenance/services/{key}", tags=["maintenance"])
+def maintenance_service(key: str) -> Any:
+    """One maintenance service by key."""
+    return j(core.maintenance_service(key))
+
+
+@app.get("/maintenance/defects", tags=["maintenance"])
+def maintenance_defects(category: Optional[str] = None, severity: Optional[str] = None,
+                        component: Optional[str] = None) -> Any:
+    """The defect catalogue."""
+    return j(core.maintenance_defects(category=category, severity=severity, component=component))
+
+
+@app.get("/maintenance/defects/{key}", tags=["maintenance"])
+def maintenance_defect(key: str) -> Any:
+    """One defect by key."""
+    return j(core.maintenance_defect(key))
+
+
+@app.get("/maintenance/estimate", tags=["maintenance"])
+def maintenance_estimate(covered_area: float, property_type: str = "house", tier: str = "standard",
+                         quality: str = "standard", age_years: float = 0.0, city: Optional[str] = None,
+                         floors: int = 1) -> Any:
+    """Annual maintenance cost estimate with a category breakdown and reserve."""
+    return j(core.maintenance_estimate(covered_area, property_type=property_type, tier=tier,
+                                      quality=quality, age_years=age_years, city=city, floors=floors))
+
+
+@app.get("/maintenance/schedule", tags=["maintenance"])
+def maintenance_schedule(property_type: str = "house", age_years: float = 0.0,
+                         horizon_months: int = 12) -> Any:
+    """A periodic preventive-maintenance calendar."""
+    return j(core.maintenance_schedule(property_type=property_type, age_years=age_years,
+                                       horizon_months=horizon_months))
+
+
+@app.get("/maintenance/lifecycle", tags=["maintenance"])
+def maintenance_lifecycle(covered_area: float, property_type: str = "house",
+                          quality: str = "standard", age_years: float = 0.0,
+                          city: Optional[str] = None, years: int = 30) -> Any:
+    """Multi-year capital-replacement schedule (reserve study)."""
+    return j(core.maintenance_lifecycle(covered_area, property_type=property_type, quality=quality,
+                                        age_years=age_years, city=city, years=years))
+
+
+@app.get("/maintenance/reserve", tags=["maintenance"])
+def maintenance_reserve(covered_area: float, property_type: str = "house", quality: str = "standard",
+                        age_years: float = 0.0, city: Optional[str] = None) -> Any:
+    """Annual sinking-fund (reserve) contribution."""
+    return j(core.maintenance_reserve(covered_area, property_type=property_type, quality=quality,
+                                      age_years=age_years, city=city))
+
+
+@app.get("/maintenance/condition", tags=["maintenance"])
+def maintenance_condition(age_years: float, property_type: str = "house",
+                          ratings: Optional[str] = None) -> Any:
+    """Score a building's condition into a band with recommended actions."""
+    parsed: Optional[Dict[str, int]] = json.loads(ratings) if ratings else None
+    return j(core.maintenance_condition(age_years, property_type=property_type, ratings=parsed))
+
+
+@app.get("/maintenance/repair-estimate", tags=["maintenance"])
+def maintenance_repair_estimate(defect: str, quantity: float = 1.0, city: Optional[str] = None) -> Any:
+    """Estimate the cost to repair a known defect."""
+    return j(core.maintenance_repair_estimate(defect, quantity=quantity, city=city))
+
+
+@app.get("/maintenance/repair-or-replace", tags=["maintenance"])
+def maintenance_repair_or_replace(component: str, age_years: float, condition: Optional[str] = None,
+                                  covered_area: float = 1000.0, quality: str = "standard",
+                                  city: Optional[str] = None) -> Any:
+    """Repair-vs-replace decision with a 5-year cost comparison."""
+    return j(core.maintenance_repair_or_replace(component, age_years, condition=condition,
+                                                covered_area=covered_area, quality=quality, city=city))
+
+
+@app.get("/maintenance/impact", tags=["maintenance"])
+def maintenance_impact(market_value: float, monthly_rent: float, covered_area: float = 1000.0,
+                       current_condition: str = "fair", tier: str = "standard") -> Any:
+    """How maintenance moves value, rent, yield and occupancy."""
+    return j(core.maintenance_impact(market_value, monthly_rent, covered_area, current_condition, tier))
+
+
+@app.get("/maintenance/guidelines", tags=["maintenance"])
+def maintenance_guidelines(category: Optional[str] = None) -> Any:
+    """Maintenance best-practice, compliance and safety guidelines."""
+    return j(core.maintenance_guidelines(category=category))
+
+
+@app.get("/maintenance/warranty", tags=["maintenance"])
+def maintenance_warranty(component: Optional[str] = None) -> Any:
+    """Warranty terms by component."""
+    return j(core.maintenance_warranty(component))
+
+
+@app.get("/maintenance/inspection", tags=["maintenance"])
+def maintenance_inspection(area: Optional[str] = None) -> Any:
+    """Inspection checklists by area."""
+    return j(core.maintenance_inspection(area))
+
+
+@app.post("/maintenance/plans", tags=["maintenance"], status_code=201)
+def maintenance_plan_save(payload: MaintenancePlanRequest) -> Any:
+    """Compute and persist a maintenance plan."""
+    return j(core.maintenance_plan_save(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/maintenance/plans", tags=["maintenance"])
+def maintenance_plans(property_type: Optional[str] = None) -> Any:
+    """Saved maintenance plans."""
+    return j(core.maintenance_plans(property_type=property_type))
+
+
+@app.get("/maintenance/plans/{plan_id}", tags=["maintenance"])
+def maintenance_plan_get(plan_id: str) -> Any:
+    """One saved maintenance plan."""
+    return j(core.maintenance_plan_get(plan_id))
+
+
+@app.post("/maintenance/work-orders", tags=["maintenance"], status_code=201)
+def maintenance_work_order_create(payload: WorkOrderCreateRequest) -> Any:
+    """Raise a maintenance work order."""
+    return j(core.maintenance_work_order_create(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/maintenance/work-orders", tags=["maintenance"])
+def maintenance_work_orders(status: Optional[str] = None, priority: Optional[str] = None,
+                            component: Optional[str] = None) -> Any:
+    """List maintenance work orders."""
+    return j(core.maintenance_work_orders(status=status, priority=priority, component=component))
+
+
+@app.get("/maintenance/work-orders/{wo_id}", tags=["maintenance"])
+def maintenance_work_order_get(wo_id: str) -> Any:
+    """One maintenance work order."""
+    return j(core.maintenance_work_order_get(wo_id))
+
+
+@app.put("/maintenance/work-orders/{wo_id}", tags=["maintenance"])
+def maintenance_work_order_update(wo_id: str, payload: WorkOrderUpdateRequest) -> Any:
+    """Update a maintenance work order."""
+    return j(core.maintenance_work_order_update(wo_id, **payload.model_dump(exclude_none=True)))
+
+
+@app.get("/maintenance/portal", tags=["maintenance"], response_class=HTMLResponse)
+def maintenance_portal(lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """The Maintenance wing page (HTML)."""
+    return HTMLResponse(content=core.maintenance_portal(lang=lang, theme=theme))
+
+
+@app.get("/maintenance/portal.html", tags=["maintenance"], response_class=HTMLResponse)
+def maintenance_portal_html(lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """Alias of ``/maintenance/portal`` that always serves HTML."""
+    return HTMLResponse(content=core.maintenance_portal(lang=lang, theme=theme))
+
+
+@app.post("/maintenance/report", tags=["maintenance"], response_class=HTMLResponse)
+def maintenance_report(payload: MaintenanceReportRequest, lang: str = Depends(ui_lang),
+                       theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """Maintenance report (HTML)."""
+    return HTMLResponse(content=core.maintenance_report(**payload.model_dump(exclude_none=True),
+                                                        lang=lang, theme=theme))
+
+
+# ==================================================================
+# AGENTIC OS (product agents, runs, smart actions)
+# ==================================================================
+
+
+class AgentPlanRequest(BaseModel):
+    agent_key: str
+    objective: str = ""
+    subject_type: Optional[str] = None
+    subject_id: Optional[str] = None
+
+
+class AgentRunRequest(AgentPlanRequest):
+    text: Optional[str] = None
+    approve: bool = True
+    extra: Optional[Dict[str, Any]] = None
+
+
+class AgentOrchestrateRequest(BaseModel):
+    objective: str
+    agents_csv: str
+
+
+@app.get("/agents/overview", tags=["agents"])
+def agents_overview() -> Any:
+    """Counts, products, autonomy mix and run activity across the Agentic OS."""
+    return j(core.agents_overview())
+
+
+@app.get("/agents/catalog", tags=["agents"])
+def agents_catalog(category: Optional[str] = None, product: Optional[str] = None,
+                   priority: Optional[str] = None, autonomy: Optional[str] = None) -> Any:
+    """The agent catalogue (product agents plus specialist sub-agents)."""
+    return j(core.agents_catalog(category=category, product=product, priority=priority,
+                                 autonomy=autonomy))
+
+
+@app.get("/agents/products", tags=["agents"])
+def agent_products(priority: Optional[str] = None) -> Any:
+    """The eight roadmap products and their agent modules."""
+    return j(core.agent_products(priority=priority))
+
+
+@app.get("/agents/runs", tags=["agents"])
+def agent_runs(agent_key: Optional[str] = None, status: Optional[str] = None) -> Any:
+    """Recorded agent runs (the audit trail)."""
+    return j(core.agent_runs(agent_key=agent_key, status=status))
+
+
+@app.get("/agents/runs/{run_id}", tags=["agents"])
+def agent_run_get(run_id: str) -> Any:
+    """One agent run with its steps, outputs and approvals."""
+    return j(core.agent_run_get(run_id))
+
+
+@app.get("/agents/smart-actions", tags=["agents"])
+def agent_smart_actions(limit: int = 15) -> Any:
+    """The prioritised Smart Actions morning brief."""
+    return j(core.agent_smart_actions(limit=limit))
+
+
+@app.get("/agents/move-likelihood/{lead_id}", tags=["agents"])
+def agent_move_likelihood(lead_id: str) -> Any:
+    """Score a CRM lead's likelihood of moving (0–100)."""
+    return j(core.agent_move_likelihood(lead_id))
+
+
+@app.get("/agents/seller-intent", tags=["agents"])
+def agent_seller_intent(equity_pct: float = 0.0, holding_years: float = 0.0,
+                        market_heat: float = 0.5, life_event: Optional[str] = None,
+                        fsbo_signal: bool = False, engagement_score: int = 40) -> Any:
+    """Score how likely a contact is to sell (0–100)."""
+    return j(core.agent_seller_intent(equity_pct=equity_pct, holding_years=holding_years,
+                                      market_heat=market_heat, life_event=life_event,
+                                      fsbo_signal=fsbo_signal, engagement_score=engagement_score))
+
+
+@app.post("/agents/plan", tags=["agents"])
+def agent_plan(payload: AgentPlanRequest) -> Any:
+    """Plan (but do not execute) an agent run."""
+    return j(core.agent_plan(**payload.model_dump(exclude_none=True)))
+
+
+@app.post("/agents/run", tags=["agents"])
+def agent_run(payload: AgentRunRequest) -> Any:
+    """Execute an agent run against the live portal."""
+    return j(core.agent_run(**payload.model_dump(exclude_none=True)))
+
+
+@app.post("/agents/runs/{run_id}/approve", tags=["agents"])
+def agent_approve(run_id: str, approver: str = "user", execute: bool = True) -> Any:
+    """Approve a paused agent run (human-in-the-loop gate)."""
+    return j(core.agent_approve(run_id, approver=approver, execute=execute))
+
+
+@app.post("/agents/orchestrate", tags=["agents"])
+def agent_orchestrate(payload: AgentOrchestrateRequest) -> Any:
+    """Plan a multi-agent hand-off chain for a shared objective."""
+    return j(core.agent_orchestrate(payload.objective, payload.agents_csv))
+
+
+@app.get("/agents/portal", tags=["agents"], response_class=HTMLResponse)
+def agentic_portal(lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """The Agentic OS page (HTML)."""
+    return HTMLResponse(content=core.agentic_portal(lang=lang, theme=theme))
+
+
+@app.get("/agents/portal.html", tags=["agents"], response_class=HTMLResponse)
+def agentic_portal_html(lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """Alias of ``/agents/portal`` that always serves HTML."""
+    return HTMLResponse(content=core.agentic_portal(lang=lang, theme=theme))
+
+
+@app.get("/agents/{key}", tags=["agents"])
+def agent_get(key: str) -> Any:
+    """One agent's full definition by key."""
+    return j(core.agent_get(key))
+
+
+# ==================================================================
+# TRANSACTIONS
+# ==================================================================
+
+
+class TransactionCreateRequest(BaseModel):
+    transaction_type: str = "sale"
+    price: float = 0.0
+    property_id: Optional[str] = None
+    property_title: Optional[str] = None
+    buyer_name: Optional[str] = None
+    seller_name: Optional[str] = None
+    listing_agent_id: Optional[str] = None
+    selling_agent_id: Optional[str] = None
+    commission_rate: Optional[float] = None
+    start_date: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class TransactionUpdateRequest(BaseModel):
+    stage: Optional[str] = None
+    status: Optional[str] = None
+    price: Optional[float] = None
+    commission_rate: Optional[float] = None
+    buyer_name: Optional[str] = None
+    seller_name: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class MilestoneRequest(BaseModel):
+    key: str
+    name: str
+    due_date: Optional[str] = None
+    owner: str = "broker"
+    blocking: bool = False
+
+
+class MilestoneCompleteRequest(BaseModel):
+    as_of: Optional[str] = None
+
+
+class TermsExtractRequest(BaseModel):
+    text: str
+
+
+class OfferRequest(BaseModel):
+    price: float
+    buyer_name: Optional[str] = None
+    terms: Optional[str] = None
+
+
+class OfferRespondRequest(BaseModel):
+    action: str
+    counter_price: Optional[float] = None
+
+
+class SignatureRequest(BaseModel):
+    signer: str
+    role: str = "buyer"
+    method: str = "esign"
+    signed: bool = False
+
+
+class TransactionCloseRequest(BaseModel):
+    commission_rate: Optional[float] = None
+    platform_share: float = 0.20
+    listing_agent_share: float = 0.40
+    selling_agent_share: float = 0.40
+    post_to_ledger: bool = True
+    record_payouts: bool = True
+
+
+@app.get("/transactions/stages", tags=["transactions"])
+def transaction_stages() -> Any:
+    """The transaction lifecycle stages and configuration."""
+    return j(core.transaction_stages())
+
+
+@app.get("/transactions/deadlines", tags=["transactions"])
+def transaction_deadlines(horizon_days: int = 14) -> Any:
+    """Every transaction milestone due within the horizon."""
+    return j(core.transaction_deadlines(horizon_days=horizon_days))
+
+
+@app.post("/transactions/terms/extract", tags=["transactions"])
+def transaction_extract_terms(payload: TermsExtractRequest) -> Any:
+    """Extract key contract terms from agreement text."""
+    return j(core.transaction_extract_terms(payload.text))
+
+
+@app.post("/transactions", tags=["transactions"], status_code=201)
+def transaction_create(payload: TransactionCreateRequest) -> Any:
+    """Open a transaction with its milestone/deadline checklist."""
+    return j(core.transaction_create(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/transactions", tags=["transactions"])
+def transactions_list(status: Optional[str] = None, stage: Optional[str] = None,
+                      transaction_type: Optional[str] = None) -> Any:
+    """List transactions."""
+    return j(core.transactions_list(status=status, stage=stage, transaction_type=transaction_type))
+
+
+@app.get("/transactions/{tx_id}", tags=["transactions"])
+def transaction_get(tx_id: str) -> Any:
+    """One transaction with milestones, terms and offers."""
+    return j(core.transaction_get(tx_id))
+
+
+@app.put("/transactions/{tx_id}", tags=["transactions"])
+def transaction_update(tx_id: str, payload: TransactionUpdateRequest) -> Any:
+    """Update a transaction's stage, price, parties or commission rate."""
+    return j(core.transaction_update(tx_id, **payload.model_dump(exclude_none=True)))
+
+
+@app.get("/transactions/{tx_id}/progress", tags=["transactions"])
+def transaction_progress(tx_id: str) -> Any:
+    """Completion %, overdue milestones and next deadline."""
+    return j(core.transaction_progress(tx_id))
+
+
+@app.get("/transactions/{tx_id}/signatures", tags=["transactions"])
+def transaction_signatures(tx_id: str) -> Any:
+    """E-signature status for a transaction."""
+    return j(core.transaction_signatures(tx_id))
+
+
+@app.post("/transactions/{tx_id}/signatures", tags=["transactions"], status_code=201)
+def transaction_signature_add(tx_id: str, payload: SignatureRequest) -> Any:
+    """Record an e-signature request / signing."""
+    return j(core.transaction_signature_add(tx_id, **payload.model_dump(exclude_none=True)))
+
+
+@app.post("/transactions/{tx_id}/milestones", tags=["transactions"], status_code=201)
+def transaction_milestone_add(tx_id: str, payload: MilestoneRequest) -> Any:
+    """Add a custom milestone/deadline."""
+    return j(core.transaction_milestone_add(tx_id, **payload.model_dump(exclude_none=True)))
+
+
+@app.post("/transactions/{tx_id}/milestones/{key}/complete", tags=["transactions"])
+def transaction_milestone_complete(tx_id: str, key: str,
+                                   payload: Optional[MilestoneCompleteRequest] = None) -> Any:
+    """Mark a milestone complete."""
+    body = payload.model_dump(exclude_none=True) if payload else {}
+    return j(core.transaction_milestone_complete(tx_id, key, **body))
+
+
+@app.post("/transactions/{tx_id}/offers", tags=["transactions"], status_code=201)
+def transaction_offer_add(tx_id: str, payload: OfferRequest) -> Any:
+    """Record an offer on a transaction."""
+    return j(core.transaction_offer_add(tx_id, **payload.model_dump(exclude_none=True)))
+
+
+@app.post("/transactions/offers/{offer_id}/respond", tags=["transactions"])
+def transaction_offer_respond(offer_id: str, payload: OfferRespondRequest) -> Any:
+    """Respond to an offer (counter / accept / reject / withdraw)."""
+    return j(core.transaction_offer_respond(offer_id, **payload.model_dump(exclude_none=True)))
+
+
+@app.post("/transactions/{tx_id}/close", tags=["transactions"])
+def transaction_close(tx_id: str, payload: TransactionCloseRequest) -> Any:
+    """Close a transaction: commission, VAT, revenue share, ledger and payouts."""
+    return j(core.transaction_close(tx_id, **payload.model_dump(exclude_none=True)))
+
+
+@app.post("/transactions/{tx_id}/report", tags=["transactions"], response_class=HTMLResponse)
+def transaction_report(tx_id: str, lang: str = Depends(ui_lang),
+                       theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """Printable transaction/closing report (HTML)."""
+    return HTMLResponse(content=core.transaction_report(tx_id, lang=lang, theme=theme))
+
+
+# ==================================================================
+# INTELLIGENCE: buyer / seller / investment
+# ==================================================================
+
+
+class BuyerParseRequest(BaseModel):
+    text: str
+
+
+class BuyerRecommendRequest(BaseModel):
+    text: Optional[str] = None
+    limit: int = 8
+    city: Optional[str] = None
+    category: Optional[str] = None
+    use_type: Optional[str] = None
+    max_price: Optional[float] = None
+
+
+class BuyerReportRequest(BaseModel):
+    text: str
+
+
+class UnderwriteRequest(BaseModel):
+    purchase_price: float
+    monthly_rent: float = 0.0
+    annual_rent: Optional[float] = None
+    down_payment_share: float = 0.25
+    loan_rate: Optional[float] = None
+    loan_years: int = 20
+    vacancy_rate: float = 0.05
+    operating_expense_rate: float = 0.30
+    appreciation_rate: float = 0.06
+    exit_cap_rate: float = 0.07
+    hold_years: int = 10
+    tax_rate: float = 0.0
+
+
+class PortfolioAlertsRequest(BaseModel):
+    holdings: Optional[List[Dict[str, Any]]] = None
+    interest_rate: float = 0.18
+    rent_index_change: float = 0.0
+    supply_change: float = 0.0
+    market_heat: float = 0.5
+
+
+class InvestmentReportRequest(BaseModel):
+    city: Optional[str] = None
+    rental_yield: float = 0.045
+    min_cap_rate: float = 0.025
+
+
+@app.post("/intelligence/buyer/parse", tags=["intelligence"])
+def buyer_parse_requirement(payload: BuyerParseRequest) -> Any:
+    """Parse a natural-language buyer brief into a structured requirement."""
+    return j(core.buyer_parse_requirement(payload.text))
+
+
+@app.post("/intelligence/buyer/recommend", tags=["intelligence"])
+def buyer_recommend(payload: BuyerRecommendRequest) -> Any:
+    """Rank live listings against a parsed buyer brief."""
+    return j(core.buyer_recommend(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/intelligence/buyer/anomalies", tags=["intelligence"])
+def buyer_anomaly_scan(city: Optional[str] = None, category: Optional[str] = None,
+                       use_type: Optional[str] = None, threshold: float = 1.0) -> Any:
+    """Z-score the market for bargains and overpriced listings."""
+    return j(core.buyer_anomaly_scan(city=city, category=category, use_type=use_type,
+                                     threshold=threshold))
+
+
+@app.get("/intelligence/buyer/affordability", tags=["intelligence"])
+def buyer_affordability(price: float, down_payment_share: float = 0.25,
+                        annual_rate: Optional[float] = None, years: Optional[int] = None,
+                        monthly_income: Optional[float] = None, property_tax_rate: float = 0.01,
+                        holding_monthly: float = 0.0, other_debt_monthly: float = 0.0) -> Any:
+    """Monthly payment, tax, holding costs and an affordability verdict."""
+    return j(core.buyer_affordability(price, down_payment_share=down_payment_share,
+                                      annual_rate=annual_rate, years=years,
+                                      monthly_income=monthly_income, property_tax_rate=property_tax_rate,
+                                      holding_monthly=holding_monthly,
+                                      other_debt_monthly=other_debt_monthly))
+
+
+@app.post("/intelligence/buyer/report", tags=["intelligence"], response_class=HTMLResponse)
+def buyer_report(payload: BuyerReportRequest, lang: str = Depends(ui_lang),
+                 theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """The buyer brief & shortlist (HTML)."""
+    return HTMLResponse(content=core.buyer_report(payload.text, lang=lang, theme=theme))
+
+
+@app.get("/intelligence/seller/cma/{property_id}", tags=["intelligence"])
+def seller_cma(property_id: str, comp_ids: Optional[str] = None) -> Any:
+    """Adjusted-comparable market analysis for a property."""
+    comps = [c.strip() for c in comp_ids.split(",") if c.strip()] if comp_ids else None
+    return j(core.seller_cma(property_id, comps))
+
+
+@app.get("/intelligence/seller/net-proceeds", tags=["intelligence"])
+def seller_net_proceeds(price: float, commission_rate: float = 0.02, other_cost_rate: float = 0.01,
+                        mortgage_payoff: float = 0.0, cost_basis: Optional[float] = None,
+                        capital_gains_rate: Optional[float] = None) -> Any:
+    """A seller's net cash after commission, costs, payoff and capital gains."""
+    return j(core.seller_net_proceeds(price, commission_rate=commission_rate,
+                                      other_cost_rate=other_cost_rate,
+                                      mortgage_payoff=mortgage_payoff, cost_basis=cost_basis,
+                                      capital_gains_rate=capital_gains_rate))
+
+
+@app.get("/intelligence/seller/marketing/{property_id}", tags=["intelligence"])
+def seller_marketing_assets(property_id: str, tone: str = "professional",
+                            lang: str = "en") -> Any:
+    """Generate a full marketing kit for a listing."""
+    return j(core.seller_marketing_assets(property_id, tone=tone, lang=lang))
+
+
+@app.post("/intelligence/seller/report/{property_id}", tags=["intelligence"],
+          response_class=HTMLResponse)
+def seller_report(property_id: str, lang: str = Depends(ui_lang),
+                  theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """Seller pricing & marketing report (HTML)."""
+    return HTMLResponse(content=core.seller_report(property_id, lang=lang, theme=theme))
+
+
+@app.post("/intelligence/investment/underwrite", tags=["intelligence"])
+def investment_underwrite(payload: UnderwriteRequest) -> Any:
+    """Underwrite a deal: returns, debt, DSCR and a risk-adjusted grade."""
+    return j(core.investment_underwrite(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/intelligence/investment/screen", tags=["intelligence"])
+def investment_screen(city: Optional[str] = None, category: Optional[str] = None,
+                      rental_yield: float = 0.045, min_cap_rate: Optional[float] = None,
+                      min_dscr: Optional[float] = None, max_price: Optional[float] = None,
+                      down_payment_share: float = 0.25, loan_rate: float = 0.16,
+                      loan_years: int = 20, hold_years: int = 10, limit: int = 10) -> Any:
+    """Screen the live listing book into a risk-adjusted shortlist."""
+    return j(core.investment_screen(city=city, category=category, rental_yield=rental_yield,
+                                    min_cap_rate=min_cap_rate, min_dscr=min_dscr,
+                                    max_price=max_price, down_payment_share=down_payment_share,
+                                    loan_rate=loan_rate, loan_years=loan_years,
+                                    hold_years=hold_years, limit=limit))
+
+
+@app.post("/intelligence/investment/alerts", tags=["intelligence"])
+def investment_portfolio_alerts(payload: PortfolioAlertsRequest) -> Any:
+    """Proactive investor alerts for a portfolio."""
+    return j(core.investment_portfolio_alerts(**payload.model_dump(exclude_none=True)))
+
+
+@app.post("/intelligence/investment/report", tags=["intelligence"], response_class=HTMLResponse)
+def investment_report(payload: InvestmentReportRequest, lang: str = Depends(ui_lang),
+                      theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """Investment screener report (HTML)."""
+    return HTMLResponse(content=core.investment_report(**payload.model_dump(exclude_none=True),
+                                                       lang=lang, theme=theme))
+
+
+# ==================================================================
+# AUTONOMOUS LEASING
+# ==================================================================
+
+
+class RentalUnitCreateRequest(BaseModel):
+    title: str
+    rent: float = 0.0
+    city: Optional[str] = None
+    scheme: Optional[str] = None
+    bedrooms: Optional[int] = None
+    area: Optional[float] = None
+    deposit: float = 0.0
+    monthly_holding_cost: float = 0.0
+    amenities: Optional[List[str]] = None
+
+
+class LeasingInquiryRequest(BaseModel):
+    message: str
+    unit_id: Optional[str] = None
+    channel: str = "web_chat"
+    lang: str = "en"
+
+
+class LeasingApplicationRequest(BaseModel):
+    applicant: str
+    monthly_income: float
+    unit_id: Optional[str] = None
+    employment: str = "salaried"
+    references_count: int = 0
+    credit_proxy: int = 70
+    occupants: int = 1
+    pets: bool = False
+    move_in_days: int = 15
+
+
+@app.get("/leasing/units", tags=["leasing"])
+def leasing_units(status: Optional[str] = None, city: Optional[str] = None,
+                  limit: int = 50) -> Any:
+    """Rental units available to the leasing agent."""
+    return j(core.leasing_units(status=status, city=city, limit=limit))
+
+
+@app.get("/leasing/rent-floor", tags=["leasing"])
+def leasing_rent_floor(monthly_holding_cost: float, margin: Optional[float] = None) -> Any:
+    """Minimum rent that keeps a unit cash-flow positive."""
+    return j(core.leasing_rent_floor(monthly_holding_cost, margin=margin))
+
+
+@app.get("/leasing/units/{unit_id}", tags=["leasing"])
+def leasing_unit(unit_id: str) -> Any:
+    """One rental unit by id."""
+    return j(core.leasing_unit(unit_id))
+
+
+@app.post("/leasing/units", tags=["leasing"], status_code=201)
+def leasing_unit_create(payload: RentalUnitCreateRequest) -> Any:
+    """Register a rental unit."""
+    return j(core.leasing_unit_create(**payload.model_dump(exclude_none=True)))
+
+
+@app.post("/leasing/inquiries", tags=["leasing"], status_code=201)
+def leasing_inquiry(payload: LeasingInquiryRequest) -> Any:
+    """Handle a tenant inquiry autonomously."""
+    return j(core.leasing_inquiry(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/leasing/inquiries", tags=["leasing"])
+def leasing_inquiries(unit_id: Optional[str] = None, intent: Optional[str] = None) -> Any:
+    """Log of handled leasing inquiries."""
+    return j(core.leasing_inquiries(unit_id=unit_id, intent=intent))
+
+
+@app.post("/leasing/apply", tags=["leasing"], status_code=201)
+def leasing_screen_application(payload: LeasingApplicationRequest) -> Any:
+    """Screen a rental application."""
+    return j(core.leasing_screen_application(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/leasing/renewals", tags=["leasing"])
+def leasing_renewals(uplift: float = 0.08, hold_rent_if_risky: bool = True) -> Any:
+    """Renewal recommendations for every active lease."""
+    return j(core.leasing_renewals(uplift=uplift, hold_rent_if_risky=hold_rent_if_risky))
+
+
+@app.get("/leasing/collection", tags=["leasing"])
+def leasing_collection() -> Any:
+    """Rent-collection board from the ledger."""
+    return j(core.leasing_collection())
+
+
+@app.get("/leasing/funnel", tags=["leasing"])
+def leasing_funnel() -> Any:
+    """Leasing funnel metrics."""
+    return j(core.leasing_funnel())
+
+
+@app.get("/leasing/portal", tags=["leasing"], response_class=HTMLResponse)
+def leasing_portal(lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """The Autonomous Leasing wing page (HTML)."""
+    return HTMLResponse(content=core.leasing_portal(lang=lang, theme=theme))
+
+
+@app.get("/leasing/portal.html", tags=["leasing"], response_class=HTMLResponse)
+def leasing_portal_html(lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """Alias of ``/leasing/portal`` that always serves HTML."""
+    return HTMLResponse(content=core.leasing_portal(lang=lang, theme=theme))
+
+
+# ==================================================================
+# AI MARKETING CONDUCTOR
+# ==================================================================
+
+
+class RouteAddRequest(BaseModel):
+    name: str
+    match: Dict[str, Any]
+    assign_to_agent_id: Optional[str] = None
+    queue: str = "general"
+    priority: int = 100
+    sla_hours: int = 4
+
+
+class ContentGenerateRequest(BaseModel):
+    kind: str = "market_report"
+    property_id: Optional[str] = None
+    tone: str = "professional"
+    lang: str = "en"
+    topic: Optional[str] = None
+
+
+class CampaignRequest(BaseModel):
+    objective: str
+    budget: float
+    channels: List[str]
+    days: int = 14
+    audience: Optional[int] = None
+
+
+class ApproveRequest(BaseModel):
+    approver: str = "user"
+
+
+@app.get("/marketing/channels", tags=["marketing"])
+def marketing_channels() -> Any:
+    """Cross-channel lead sources and content kinds."""
+    return j(core.marketing_channels())
+
+
+@app.get("/marketing/routes", tags=["marketing"])
+def marketing_routes() -> Any:
+    """Lead-routing rules."""
+    return j(core.marketing_routes())
+
+
+@app.post("/marketing/routes", tags=["marketing"], status_code=201)
+def marketing_route_add(payload: RouteAddRequest) -> Any:
+    """Add a lead-routing rule."""
+    return j(core.marketing_route_add(**payload.model_dump(exclude_none=True)))
+
+
+@app.post("/marketing/qualify/{lead_id}", tags=["marketing"])
+def marketing_qualify(lead_id: str) -> Any:
+    """Qualify a CRM lead and sync the score back."""
+    return j(core.marketing_qualify(lead_id))
+
+
+@app.post("/marketing/route/{lead_id}", tags=["marketing"])
+def marketing_route_lead(lead_id: str) -> Any:
+    """Route a CRM lead to the best-matching rule."""
+    return j(core.marketing_route_lead(lead_id))
+
+
+@app.get("/marketing/reengagement", tags=["marketing"])
+def marketing_reengagement(inactive_days: Optional[int] = None,
+                           min_score: Optional[int] = None) -> Any:
+    """Dormant / false-negative lead re-engagement candidates."""
+    return j(core.marketing_reengagement(inactive_days=inactive_days, min_score=min_score))
+
+
+@app.post("/marketing/content", tags=["marketing"], status_code=201)
+def marketing_generate_content(payload: ContentGenerateRequest) -> Any:
+    """Generate a marketing content asset."""
+    return j(core.marketing_generate_content(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/marketing/content", tags=["marketing"])
+def marketing_content_assets(status: Optional[str] = None) -> Any:
+    """Content assets by status."""
+    return j(core.marketing_content_assets(status=status))
+
+
+@app.post("/marketing/content/{asset_id}/approve", tags=["marketing"])
+def marketing_content_approve(asset_id: str, payload: Optional[ApproveRequest] = None) -> Any:
+    """Human approval gate for a content asset."""
+    body = payload.model_dump(exclude_none=True) if payload else {}
+    return j(core.marketing_content_approve(asset_id, **body))
+
+
+@app.post("/marketing/campaigns", tags=["marketing"], status_code=201)
+def marketing_campaign_plan(payload: CampaignRequest) -> Any:
+    """Plan a multichannel campaign."""
+    return j(core.marketing_campaign_plan(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/marketing/funnel", tags=["marketing"])
+def marketing_funnel() -> Any:
+    """Lead funnel metrics."""
+    return j(core.marketing_funnel())
+
+
+@app.get("/marketing/portal", tags=["marketing"], response_class=HTMLResponse)
+def marketing_portal(lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """The AI Marketing Conductor wing page (HTML)."""
+    return HTMLResponse(content=core.marketing_portal(lang=lang, theme=theme))
+
+
+@app.get("/marketing/portal.html", tags=["marketing"], response_class=HTMLResponse)
+def marketing_portal_html(lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """Alias of ``/marketing/portal`` that always serves HTML."""
+    return HTMLResponse(content=core.marketing_portal(lang=lang, theme=theme))
+
+
+# ==================================================================
+# COMMERCIALIZATION
+# ==================================================================
+
+
+class RecommendPackageRequest(BaseModel):
+    segment: str
+    seats: int = 1
+    expected_calls: int = 0
+    product: Optional[str] = None
+
+
+class SubscribeRequest(BaseModel):
+    account: str
+    plan_key: str
+    seats: int = 1
+
+
+class MeterUsageRequest(BaseModel):
+    account: str
+    tool: str
+    units: int = 1
+    product: Optional[str] = None
+    unit_price: Optional[float] = None
+
+
+class RevenueShareRequest(BaseModel):
+    commission_gross: float
+    platform_share: float = 0.20
+
+
+class PayoutRequest(BaseModel):
+    transaction_id: str
+    gross_commission: float
+    payee: str
+    share_pct: float
+    role: str = "agent"
+
+
+@app.get("/commercial/products", tags=["commercial"])
+def commercial_products(category: Optional[str] = None, priority: Optional[str] = None) -> Any:
+    """The commercial product catalogue."""
+    return j(core.commercial_products(category=category, priority=priority))
+
+
+@app.get("/commercial/plans", tags=["commercial"])
+def commercial_plans(product: Optional[str] = None) -> Any:
+    """Subscription / usage plans."""
+    return j(core.commercial_plans(product=product))
+
+
+@app.get("/commercial/pricing", tags=["commercial"])
+def commercial_pricing_matrix() -> Any:
+    """The hybrid-pricing matrix and GTM playbook."""
+    return j(core.commercial_pricing_matrix())
+
+
+@app.get("/commercial/subscriptions", tags=["commercial"])
+def commercial_subscriptions(account: Optional[str] = None) -> Any:
+    """Active subscriptions."""
+    return j(core.commercial_subscriptions(account=account))
+
+
+@app.get("/commercial/gtm", tags=["commercial"])
+def commercial_gtm() -> Any:
+    """The go-to-market playbook."""
+    return j(core.commercial_gtm())
+
+
+@app.get("/commercial/products/{key}", tags=["commercial"])
+def commercial_product(key: str) -> Any:
+    """One commercial product by key."""
+    return j(core.commercial_product(key))
+
+
+@app.get("/commercial/plans/{key}", tags=["commercial"])
+def commercial_plan(key: str) -> Any:
+    """One pricing plan by key."""
+    return j(core.commercial_plan(key))
+
+
+@app.post("/commercial/recommend", tags=["commercial"])
+def commercial_recommend_package(payload: RecommendPackageRequest) -> Any:
+    """Recommend the best-fit plan for a segment and estimate the monthly bill."""
+    return j(core.commercial_recommend_package(**payload.model_dump(exclude_none=True)))
+
+
+@app.post("/commercial/subscribe", tags=["commercial"], status_code=201)
+def commercial_subscribe(payload: SubscribeRequest) -> Any:
+    """Create a subscription for an account on a plan."""
+    return j(core.commercial_subscribe(**payload.model_dump(exclude_none=True)))
+
+
+@app.post("/commercial/meter", tags=["commercial"], status_code=201)
+def commercial_meter_usage(payload: MeterUsageRequest) -> Any:
+    """Record a metered usage event for an account."""
+    return j(core.commercial_meter_usage(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/commercial/usage/{account}", tags=["commercial"])
+def commercial_usage(account: str, days: int = 30) -> Any:
+    """Usage summary for an account."""
+    return j(core.commercial_usage(account, days=days))
+
+
+@app.get("/commercial/bill/{account}", tags=["commercial"])
+def commercial_bill(account: str, plan_key: Optional[str] = None, days: int = 30) -> Any:
+    """A usage-based billing statement for an account."""
+    return j(core.commercial_bill(account, plan_key=plan_key, days=days))
+
+
+@app.post("/commercial/revenue-share", tags=["commercial"])
+def commercial_revenue_share(payload: RevenueShareRequest) -> Any:
+    """Split a commission into platform and partner shares."""
+    return j(core.commercial_revenue_share(**payload.model_dump(exclude_none=True)))
+
+
+@app.post("/commercial/payouts", tags=["commercial"], status_code=201)
+def commercial_record_payout(payload: PayoutRequest) -> Any:
+    """Record a payee payout against a transaction commission."""
+    return j(core.commercial_record_payout(**payload.model_dump(exclude_none=True)))
+
+
+@app.get("/commercial/payouts", tags=["commercial"])
+def commercial_payouts(account: Optional[str] = None, status: Optional[str] = None) -> Any:
+    """Recorded payouts."""
+    return j(core.commercial_payouts(account=account, status=status))
+
+
+@app.get("/commercial/portal", tags=["commercial"], response_class=HTMLResponse)
+def commercial_portal(lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """The Commercialization wing page (HTML)."""
+    return HTMLResponse(content=core.commercial_portal(lang=lang, theme=theme))
+
+
+@app.get("/commercial/portal.html", tags=["commercial"], response_class=HTMLResponse)
+def commercial_portal_html(lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """Alias of ``/commercial/portal`` that always serves HTML."""
+    return HTMLResponse(content=core.commercial_portal(lang=lang, theme=theme))
+
+
+# ==================================================================
+# PRODUCT SURFACES: MCP-for-brokers & Property Intelligence
+# ==================================================================
+
+
+@app.get("/broker/contacts", tags=["broker"])
+def search_contacts(query: Optional[str] = None, status: Optional[str] = None,
+                    min_intent_score: Optional[float] = None,
+                    lifecycle: Optional[str] = None, limit: int = 25) -> Any:
+    """CRM contacts with live move-likelihood intent scoring (product: MCP for Brokers)."""
+    return j(core.search_contacts(query=query, status=status, min_intent_score=min_intent_score,
+                                  lifecycle=lifecycle, limit=limit))
+
+
+@app.get("/broker/commission-projection", tags=["broker"])
+def get_commission_projection(agent_id: Optional[str] = None, horizon_days: int = 90,
+                              commission_rate: float = 0.02) -> Any:
+    """Realised + weighted-pipeline commission projection from the live deal pipeline."""
+    return j(core.get_commission_projection(agent_id=agent_id, horizon_days=horizon_days,
+                                            commission_rate=commission_rate))
+
+
+@app.get("/broker/property-gis", tags=["broker"])
+def analyze_property_gis(property_id: Optional[str] = None, address: Optional[str] = None,
+                         commute_destination: Optional[str] = None) -> Any:
+    """GIS-enhanced property analysis (amenities, schools, safety, commute)."""
+    return j(core.analyze_property_gis(property_id=property_id, address=address,
+                                       commute_destination=commute_destination))
+
+
+@app.get("/broker/listing-draft/{property_id}", tags=["broker"])
+def create_listing_draft(property_id: str, tone: str = "professional", lang: str = "en") -> Any:
+    """Draft a complete listing kit (headline, description, social posts, e-mail, video)."""
+    return j(core.create_listing_draft(property_id, tone=tone, lang=lang))
+
+
+@app.get("/property-intelligence/gis-score", tags=["property-intelligence"])
+def get_gis_score(property_id: Optional[str] = None, address: Optional[str] = None,
+                  destination: Optional[str] = None) -> Any:
+    """The Property-Intelligence GIS score for an address or property (0–100 + grade)."""
+    return j(core.get_gis_score(property_id=property_id, address=address, destination=destination))
+
+
+@app.get("/property-intelligence/accounting-snapshot/{property_id}", tags=["property-intelligence"])
+def get_accounting_snapshot(property_id: str, rental_yield: float = 0.045,
+                            operating_expense_rate: float = 0.30) -> Any:
+    """Per-property accounting snapshot: value, NOI, cap rate, ROI and active leases."""
+    return j(core.get_accounting_snapshot(property_id, rental_yield=rental_yield,
+                                          operating_expense_rate=operating_expense_rate))
+
+
+@app.get("/property-intelligence/market-intelligence", tags=["property-intelligence"])
+def get_market_intelligence(region: Optional[str] = None, years: int = 5) -> Any:
+    """Regional market intelligence: pricing, factors, news momentum and forecast."""
+    return j(core.get_market_intelligence(region=region, years=years))
+
+
+@app.get("/property-intelligence/seller-intent/{contact_id}", tags=["property-intelligence"])
+def score_seller_intent(contact_id: str, equity_pct: Optional[float] = None,
+                        holding_years: Optional[float] = None, market_heat: float = 0.6,
+                        life_event: Optional[str] = None, fsbo_signal: bool = False) -> Any:
+    """Score a CRM contact's likelihood of selling (0–100) with reasons and next action."""
+    return j(core.score_seller_intent(contact_id, equity_pct=equity_pct,
+                                      holding_years=holding_years, market_heat=market_heat,
+                                      life_event=life_event, fsbo_signal=fsbo_signal))
+
+
+__all__ = ["app"]

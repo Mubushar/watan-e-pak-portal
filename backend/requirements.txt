@@ -1,0 +1,6 @@
+# Runtime dependencies (uv is the source of truth — see pyproject.toml / uv.lock)
+mcp[cli]>=2.3.0
+pydantic
+fastapi
+uvicorn[standard]
+httpx
