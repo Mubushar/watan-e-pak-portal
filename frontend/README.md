@@ -20,8 +20,8 @@ npm run dev                      # http://localhost:5173
 Sign in with a seeded demo account — the login page has one-click buttons
 (`admin@portal.pk` / `Admin@12345`, agent, finance, developer, investor, buyer, …).
 
-Vite proxies `/api/*` (including WebSockets) and `/media/*` to the backend, so the
-backend needs no CORS changes. Point it elsewhere with `VITE_API_TARGET` (see
+Vite proxies `/api/*` (including WebSockets), `/media/*` (uploaded listing photos) and
+`/ads.txt` to the backend, so the portal is same-origin in development. Point it elsewhere with `VITE_API_TARGET` (see
 `.env.example`).
 
 | Script | What it does |
@@ -48,17 +48,18 @@ backend needs no CORS changes. Point it elsewhere with `VITE_API_TARGET` (see
 
 | Area | Routes | Backend wings |
 | --- | --- | --- |
-| Portal | `/`, `/properties`, `/properties/:id`, `/compare`, `/favorites` | properties, search, intelligence, broker, finance |
-| GIS & market | `/map`, `/schemes`, `/cities/:city`, `/projects`, `/insights`, `/news` | gis, gis-analysis, poi, aoi, routing, hierarchy, big-projects, news, portal |
-| AI | `/ai`, `/ai/agents/:key`, `/ai/mcp` | agents (Agentic OS), `/v1` OpenAI facade, `/rag`, **MCP** (`/mcp`) |
+| Portal | `/`, `/properties`, `/properties/:id`, `/compare`, `/favorites` | properties, search (incl. `near`, `near_place`, `feature`), places (`/properties/{id}/nearby`), masterplans, intelligence, broker, finance |
+| GIS & market | `/map`, `/schemes`, `/cities/:city`, `/projects`, `/insights`, `/news` | gis, gis-analysis, poi, aoi, routing, hierarchy, areas (`/areas/profile`), masterplans (DHA plan tiles + search), big-projects, news, portal |
+| AI | `/ai`, `/ai/agents/:key`, `/ai/mcp` | agents (Agentic OS), `/v1` OpenAI facade, `/ai/capabilities` + `/ai/tools` (tool-calling chat), `/rag`, **MCP** (`/mcp`) |
 | Tools | `/tools`, `/tools/:key` | tools (calculators, converters, calendar, GIS, CAD) |
 | Content | `/pages/:key`, `/stories`, `/pricing` | content, commercial |
 | Auth | `/login`, `/signup`, `/forgot` | auth (password + OTP) |
-| Dashboard | `/app/*` — overview, Agentic OS, CRM, transactions, leasing, marketing, accounting, advertising, PMO, construction, maintenance, messages, admin, profile, new listing | crm, transactions, leasing, marketing, accounting, ads, pmo, construction, maintenance, messaging (+ WebSocket), roles |
+| Dashboard | `/app/*` — overview, Agentic OS, CRM, transactions, leasing, marketing, accounting, advertising, PMO, construction, maintenance, messages, admin, profile, my listings, new listing | `/me/listings` (+ photo upload), crm, transactions, leasing, marketing, accounting, ads, pmo, construction, maintenance, messaging (+ WebSocket), roles |
 
-Cross-cutting features: live market + news ticker, rotating advertisement slots with
-impression/click tracking, floating AI assistant (RAG chat with listing cards and agent
-hand-off), ⌘K federated search, natural-language property search, favourites and
+Cross-cutting features: live market + news ticker, rotating advertisement slots
+(`/ads/{id}/event` view/click billing for flat / CPM / CPC campaigns, AdSense for unsold
+slots when configured), floating AI assistant (with OpenAI connected it searches and acts
+through the backend's tools; otherwise a RAG chat with listing cards and agent hand-off), ⌘K federated search, natural-language property search, favourites and
 side-by-side comparison, dark mode, English/Urdu (RTL), responsive down to 360 px.
 
 ## Project layout
