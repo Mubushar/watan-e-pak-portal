@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Circle, Marker, Popup } from "react-leaflet";
+import { Circle, Marker, Popup, TileLayer } from "react-leaflet";
 import {
   Bath,
   BedDouble,
@@ -13,6 +13,8 @@ import {
   Compass,
   Expand,
   FileText,
+  Footprints,
+  Map as MapIcon,
   Layers,
   LineChart,
   Mail,
@@ -30,11 +32,11 @@ import {
   Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Property, PropertyList } from "@/types";
+import type { MapOverlay, NearbyList, Property, PropertyList } from "@/types";
 import { useApi, useMutate } from "@/hooks/useApi";
-import { apiUrl, post } from "@/lib/api";
+import { API_BASE, apiUrl, post } from "@/lib/api";
 import { area, num, pct, pkr, pkrShort, titleCase } from "@/lib/format";
-import { gallery } from "@/lib/images";
+import { gallery, resolveImage } from "@/lib/images";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/store/auth";
 import { usePrefs } from "@/store/prefs";
@@ -120,6 +122,87 @@ function Gallery({ images, title }: { images: string[]; title: string }) {
   );
 }
 
+// ---------------------------------------------------------------- location
+const POI_ICON: Record<string, string> = { education: "🎓", health: "✚", worship: "🕌", shopping: "🛍", park: "🌳", transport: "🚌", bank: "🏦", restaurant: "🍽", fuel: "⛽", government: "🏛" };
+const distance = (km: number) => (km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`);
+
+interface PlanView {
+  plan: string;
+  plan_key: string;
+  snapshot_url: string;
+  map?: { overlays?: MapOverlay[] };
+  on_the_plan?: { features?: Record<string, string[]>; plot_sizes?: { size: string; count: number }[]; note?: string };
+  attribution?: string;
+}
+
+/** The closest school, mosque, hospital, market … (GET /properties/{id}/nearby — portal POIs + OpenStreetMap data). */
+function ClosestPlaces({ p }: { p: Property }) {
+  const q = useApi<NearbyList>(`/properties/${p.id}/nearby`, { radius_km: 3 }, { retry: false });
+  const rows = q.data?.nearby ?? [];
+  if (q.isLoading) return <Skeleton className="h-28 w-full" />;
+  if (!rows.length) return null;
+  return (
+    <div>
+      <p className="mb-2 font-display font-semibold">Closest places</p>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {rows.slice(0, 9).map((r) => (
+          <div key={r.category} className="flex items-center gap-3 rounded-xl bg-brand-50/60 px-3 py-2.5 dark:bg-white/5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-sm dark:bg-white/10">{POI_ICON[r.category] ?? "📍"}</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-mute">{r.kind}</p>
+              <p className="truncate text-sm font-semibold">{r.name}</p>
+            </div>
+            <span className="shrink-0 text-end text-xs font-semibold text-brand-700 dark:text-brand-300">
+              {distance(r.distance_km)}
+              <span className="flex items-center justify-end gap-0.5 font-normal text-ink-mute">
+                <Footprints className="h-3 w-3" /> {r.walk_minutes} min
+              </span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** A close-up of the DHA master plan around the listing, when it sits on a loaded plan (GET /masterplans/view). */
+function MasterPlanCard({ view }: { view: PlanView }) {
+  const features = Object.entries(view.on_the_plan?.features ?? {}).slice(0, 6);
+  const sizes = view.on_the_plan?.plot_sizes ?? [];
+  return (
+    <div className="overflow-hidden rounded-2xl border border-black/5 dark:border-white/10">
+      <div className="grid gap-0 md:grid-cols-[1.2fr_1fr]">
+        <a href={`${API_BASE}${view.snapshot_url}`} target="_blank" rel="noreferrer" className="block bg-black/5">
+          <img src={`${API_BASE}${view.snapshot_url}`} alt={`${view.plan} master plan around this listing`} className="h-full max-h-80 w-full object-cover" loading="lazy" />
+        </a>
+        <div className="space-y-3 p-4">
+          <p className="flex items-center gap-2 font-display font-semibold">
+            <MapIcon className="h-4 w-4 text-gold-600" /> On the {view.plan} master plan
+          </p>
+          {!!sizes.length && (
+            <div>
+              <p className="label">Plot sizes nearby</p>
+              <div className="flex flex-wrap gap-1.5">
+                {sizes.map((s) => (
+                  <Badge key={s.size} tone="gray">
+                    {s.size} × {s.count}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          {features.map(([kind, names]) => (
+            <p key={kind} className="text-sm">
+              <span className="font-semibold capitalize">{kind}:</span> <span className="text-ink-mute">{names.join(", ")}</span>
+            </p>
+          ))}
+          <p className="text-xs text-ink-mute">{view.on_the_plan?.note ?? view.attribution}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- tabs
 function LocationTab({ p }: { p: Property }) {
   const has = p.latitude && p.longitude;
@@ -130,12 +213,30 @@ function LocationTab({ p }: { p: Property }) {
     radius_km: radius,
   });
   const score = useApi<{ composite_score: number; grade: string; dimensions: Record<string, number>; commute_km: number; commute_minutes: number; narrative: string }>("/property-intelligence/gis-score", { property_id: p.id });
+  // 404 when the listing isn't on a loaded master plan — then the section is simply left out.
+  const plan = useApi<PlanView>(has ? "/masterplans/view" : null, { listing_id: p.id, radius_m: 250 }, { retry: false, staleTime: 10 * 60_000 });
+  const overlays = plan.data?.map?.overlays ?? [];
   if (!has) return <EmptyState title="No coordinates on file" hint="This listing hasn’t been geo-tagged yet." />;
   const grouped = (pois.data?.pois ?? []).reduce<Record<string, number>>((a, x) => ((a[x.category] = (a[x.category] ?? 0) + 1), a), {});
   return (
     <div className="space-y-5">
       <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
         <PortalMap center={[p.latitude!, p.longitude!]} zoom={15} height={380} scrollWheelZoom>
+          {overlays.map((o) => (
+            <TileLayer
+              key={o.key}
+              url={`${API_BASE}${o.tile_url}`}
+              bounds={[
+                [o.bounds[0], o.bounds[1]],
+                [o.bounds[2], o.bounds[3]],
+              ]}
+              minZoom={o.min_zoom}
+              maxNativeZoom={o.max_native_zoom}
+              maxZoom={20}
+              opacity={0.75}
+              attribution={o.attribution}
+            />
+          ))}
           <Marker position={[p.latitude!, p.longitude!]} icon={pin("featured", { pulse: true, size: 40 })}>
             <Popup>
               <div className="p-3 font-semibold">{p.title}</div>
@@ -199,15 +300,17 @@ function LocationTab({ p }: { p: Property }) {
       <div className="grid gap-2 sm:grid-cols-2">
         {(pois.data?.pois ?? []).slice(0, 10).map((x) => (
           <div key={x.id} className="flex items-center gap-3 rounded-xl border border-black/5 px-3 py-2.5 dark:border-white/10">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-sm dark:bg-white/5">{({ education: "🎓", health: "✚", worship: "🕌", shopping: "🛍", park: "🌳", transport: "🚌", bank: "🏦", restaurant: "🍽", fuel: "⛽", government: "🏛" } as Record<string, string>)[x.category] ?? "📍"}</span>
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-sm dark:bg-white/5">{POI_ICON[x.category] ?? "📍"}</span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold">{x.name}</p>
               <p className="text-xs capitalize text-ink-mute">{x.category}</p>
             </div>
-            <span className="text-xs font-semibold text-brand-700 dark:text-brand-300">{x.distance_km < 1 ? `${Math.round(x.distance_km * 1000)} m` : `${x.distance_km.toFixed(1)} km`}</span>
+            <span className="text-xs font-semibold text-brand-700 dark:text-brand-300">{distance(x.distance_km)}</span>
           </div>
         ))}
       </div>
+      <ClosestPlaces p={p} />
+      {plan.data && <MasterPlanCard view={plan.data} />}
     </div>
   );
 }
@@ -643,7 +746,7 @@ export default function PropertyDetail() {
       </div>
     );
   const p = q.data;
-  const uploads = [...(stored.data?.images ?? [])].sort((a, b) => Number(!!b.is_primary) - Number(!!a.is_primary)).map((x) => x.url);
+  const uploads = [...(stored.data?.images ?? [])].sort((a, b) => Number(!!b.is_primary) - Number(!!a.is_primary)).map((x) => resolveImage(x.url));
   const imgs = uploads.length ? [...uploads, ...gallery(p).filter((g) => !uploads.includes(g))].slice(0, 10) : gallery(p);
   const similar = (all.data?.results ?? []).filter((x) => x.id !== p.id && (x.category === p.category || x.city_name === p.city_name)).slice(0, 8);
   const loc = [p.block_name, p.scheme_name, p.city_name].filter(Boolean).join(", ");

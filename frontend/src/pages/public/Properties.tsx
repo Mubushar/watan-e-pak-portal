@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Marker, Popup } from "react-leaflet";
-import { BedDouble, Grid3X3, KeyRound, List, Map as MapIcon, MapPin, RotateCcw, Search, SlidersHorizontal, Sparkles, Wand2, X } from "lucide-react";
+import { BedDouble, Grid3X3, KeyRound, List, Map as MapIcon, MapPin, Navigation, RotateCcw, Search, SlidersHorizontal, Sparkles, Wand2, X } from "lucide-react";
 import type { City, Property, PropertyList } from "@/types";
 import { useApi } from "@/hooks/useApi";
 import { post } from "@/lib/api";
@@ -10,13 +10,23 @@ import { area, pkrShort, titleCase } from "@/lib/format";
 import { coverImage, HERO } from "@/lib/images";
 import { cn } from "@/lib/utils";
 import { Badge, Button, Drawer, EmptyState, ErrorState, RangeSlider, Segmented, Skeleton, Toggle } from "@/components/ui";
-import { CompareButton, FavoriteButton, PropertyCard } from "@/components/property/PropertyCard";
+import { CompareButton, FavoriteButton, NearbyNote, PropertyCard } from "@/components/property/PropertyCard";
 import { PortalMap, pin } from "@/components/map/PortalMap";
 import { AdSlot } from "@/components/ads/AdSlot";
 
 const CATEGORIES = ["house", "apartment", "plot", "shop", "office", "floor", "building", "space"];
 const USE_TYPES = ["residential", "commercial", "mix"];
 const MAX_PRICE = 200_000_000;
+/** `near=` kinds the backend understands (school, mosque, hospital, market, park, transport …). */
+const NEAR_KINDS = [
+  { value: "school", label: "School" },
+  { value: "mosque", label: "Mosque" },
+  { value: "hospital", label: "Hospital" },
+  { value: "market", label: "Market" },
+  { value: "park", label: "Park" },
+  { value: "transport", label: "Transport" },
+];
+const NEAR_KM = [1, 2, 5];
 const SORTS = [
   { value: "relevance", label: "Featured first" },
   { value: "price_asc", label: "Price: low to high" },
@@ -61,16 +71,22 @@ function useFilters() {
     minPrice: Number(sp.get("min") ?? 0),
     maxPrice: Number(sp.get("max") ?? MAX_PRICE),
     beds: Number(sp.get("beds") ?? 0),
+    baths: Number(sp.get("baths") ?? 0),
+    feature: sp.get("feature") ?? "",
+    near: sp.get("near") ?? "",
+    nearPlace: sp.get("near_place") ?? "",
+    nearKm: Number(sp.get("near_km") ?? 2),
     featured: sp.get("featured") === "1",
     sort: sp.get("sort") ?? "relevance",
     view: (sp.get("view") ?? "grid") as "grid" | "list" | "map",
   };
   const set = (patch: Partial<Record<keyof typeof f, string | number | boolean>>) => {
     const next = new URLSearchParams(sp);
-    const keyMap: Record<string, string> = { minPrice: "min", maxPrice: "max" };
+    const keyMap: Record<string, string> = { minPrice: "min", maxPrice: "max", nearPlace: "near_place", nearKm: "near_km" };
     for (const [k, v] of Object.entries(patch)) {
       const key = keyMap[k] ?? k;
-      const isDefault = v === "" || v === false || v === 0 || (k === "maxPrice" && v === MAX_PRICE) || (k === "sort" && v === "relevance") || (k === "view" && v === "grid") || (k === "purpose" && v === "buy");
+      const isDefault =
+        v === "" || v === false || v === 0 || (k === "maxPrice" && v === MAX_PRICE) || (k === "sort" && v === "relevance") || (k === "view" && v === "grid") || (k === "purpose" && v === "buy") || (k === "nearKm" && v === 2);
       if (isDefault) next.delete(key);
       else next.set(key, v === true ? "1" : String(v));
     }
@@ -86,6 +102,7 @@ function matches(p: Property, f: ReturnType<typeof useFilters>["f"]) {
   if (f.use_type && p.use_type !== f.use_type) return false;
   if (p.price < f.minPrice || p.price > f.maxPrice) return false;
   if (f.beds && (p.bedrooms ?? 0) < f.beds) return false;
+  if (f.baths && (p.bathrooms ?? 0) < f.baths) return false;
   if (f.featured && !p.featured) return false;
   if (f.q) {
     const hay = [p.title, p.description, p.scheme_name, p.block_name, p.city_name, p.category, p.use_type, p.street_address].join(" ").toLowerCase();
@@ -98,6 +115,10 @@ function matches(p: Property, f: ReturnType<typeof useFilters>["f"]) {
 function FilterPanel({ f, set, reset, cities, counts }: { f: ReturnType<typeof useFilters>["f"]; set: ReturnType<typeof useFilters>["set"]; reset: () => void; cities: City[]; counts: Record<string, number> }) {
   const [price, setPrice] = useState<[number, number]>([f.minPrice, f.maxPrice]);
   useEffect(() => setPrice([f.minPrice, f.maxPrice]), [f.minPrice, f.maxPrice]);
+  const [place, setPlace] = useState(f.nearPlace);
+  useEffect(() => setPlace(f.nearPlace), [f.nearPlace]);
+  const [feature, setFeature] = useState(f.feature);
+  useEffect(() => setFeature(f.feature), [f.feature]);
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -159,6 +180,58 @@ function FilterPanel({ f, set, reset, cities, counts }: { f: ReturnType<typeof u
           ))}
         </div>
       </div>
+      <div>
+        <p className="label">Bathrooms (min)</p>
+        <div className="flex gap-1.5">
+          {[0, 1, 2, 3, 4].map((b) => (
+            <button key={b} onClick={() => set({ baths: b })} className={cn("h-9 flex-1 rounded-lg text-sm font-semibold ring-1 transition", f.baths === b ? "bg-brand-700 text-white ring-brand-700" : "ring-black/10 hover:ring-brand-300 dark:ring-white/10")}>
+              {b === 0 ? "Any" : `${b}+`}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <p className="label">Close to</p>
+        <div className="flex flex-wrap gap-1.5">
+          {NEAR_KINDS.map((k) => (
+            <button key={k.value} onClick={() => set({ near: f.near === k.value ? "" : k.value })} className={cn("chip ring-1 transition", f.near === k.value ? "bg-brand-700 text-white ring-brand-700" : "bg-white text-ink-soft ring-black/10 hover:ring-brand-300 dark:bg-white/5 dark:text-slate-300 dark:ring-white/10")}>
+              {k.label}
+            </button>
+          ))}
+        </div>
+        <form
+          className="mt-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            set({ nearPlace: place.trim() });
+          }}
+        >
+          <div className="flex items-center gap-2 rounded-xl px-3 ring-1 ring-black/10 focus-within:ring-brand-400 dark:ring-white/10">
+            <Navigation className="h-4 w-4 shrink-0 text-brand-600" />
+            <input value={place} onChange={(e) => setPlace(e.target.value)} onBlur={() => place.trim() !== f.nearPlace && set({ nearPlace: place.trim() })} placeholder="A place, e.g. G-13 or a university" className="h-10 w-full bg-transparent text-sm outline-none placeholder:text-ink-mute" />
+          </div>
+        </form>
+        {(f.near || f.nearPlace) && (
+          <div className="mt-2 flex gap-1.5">
+            {NEAR_KM.map((km) => (
+              <button key={km} onClick={() => set({ nearKm: km })} className={cn("h-8 flex-1 rounded-lg text-xs font-semibold ring-1 transition", f.nearKm === km ? "bg-brand-700 text-white ring-brand-700" : "ring-black/10 hover:ring-brand-300 dark:ring-white/10")}>
+                within {km} km
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <div>
+        <p className="label">Feature</p>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            set({ feature: feature.trim() });
+          }}
+        >
+          <input value={feature} onChange={(e) => setFeature(e.target.value)} onBlur={() => feature.trim() !== f.feature && set({ feature: feature.trim() })} placeholder="e.g. solar, basement, corner" className="input text-sm" />
+        </form>
+      </div>
       <Toggle checked={f.featured} onChange={(v) => set({ featured: v })} label={<span className="text-sm font-medium">Featured only</span>} />
       <AdSlot slot="sidebar" />
     </div>
@@ -183,6 +256,7 @@ function ListRow({ p }: { p: Property }) {
             </div>
             <p className="shrink-0 font-display text-xl font-bold text-brand-700 dark:text-gold-300">{pkrShort(p.price)}</p>
           </div>
+          <NearbyNote p={p} />
           <p className="mt-3 line-clamp-2 text-sm text-ink-soft dark:text-slate-300">{p.description}</p>
           <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
             <Badge tone="gray">{titleCase(p.category)}</Badge>
@@ -242,7 +316,12 @@ function Rentals({ city }: { city: string }) {
 
 export default function Properties() {
   const { f, set, reset } = useFilters();
-  const q = useApi<PropertyList>("/properties", { limit: 500 });
+  // Place- and feature-aware filters run on the server (/search); everything else filters the full list here.
+  const serverSearch = !!(f.near || f.nearPlace || f.feature);
+  const q = useApi<PropertyList>(
+    serverSearch ? "/search" : "/properties",
+    serverSearch ? { near: f.near, near_place: f.nearPlace, near_km: f.near || f.nearPlace ? f.nearKm : undefined, feature: f.feature, limit: 500 } : { limit: 500 },
+  );
   const cities = useApi<{ cities: City[] }>("/cities");
   const [text, setText] = useState(f.q);
   const [mobileFilters, setMobileFilters] = useState(false);
@@ -259,9 +338,11 @@ export default function Properties() {
     else if (f.sort === "price_desc") s.sort((a, b) => b.price - a.price);
     else if (f.sort === "size_desc") s.sort((a, b) => (b.total_area ?? 0) - (a.total_area ?? 0));
     else if (f.sort === "newest") s.sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
-    else s.sort((a, b) => Number(!!b.featured) - Number(!!a.featured));
+    else if (!f.near && !f.nearPlace) s.sort((a, b) => Number(!!b.featured) - Number(!!a.featured)); // near searches come back closest first
     return s;
   }, [all, f]);
+  const nearPlace = q.data?.near_place;
+  const outside = q.data?.nearest_outside_radius ?? [];
 
   const aiSearch = async () => {
     if (!text.trim()) return;
@@ -290,6 +371,10 @@ export default function Properties() {
     f.category && { k: "category", label: titleCase(f.category) },
     f.use_type && { k: "use_type", label: titleCase(f.use_type) },
     f.beds > 0 && { k: "beds", label: `${f.beds}+ beds` },
+    f.baths > 0 && { k: "baths", label: `${f.baths}+ baths` },
+    f.near && { k: "near", label: `Near a ${NEAR_KINDS.find((k) => k.value === f.near)?.label.toLowerCase() ?? f.near} (${f.nearKm} km)` },
+    f.nearPlace && { k: "nearPlace", label: `Within ${f.nearKm} km of ${nearPlace?.found && nearPlace.name ? nearPlace.name : f.nearPlace}` },
+    f.feature && { k: "feature", label: `With “${f.feature}”` },
     (f.minPrice > 0 || f.maxPrice < MAX_PRICE) && { k: "price", label: `${pkrShort(f.minPrice, false)} – ${pkrShort(f.maxPrice, false)}` },
     f.featured && { k: "featured", label: "Featured" },
   ].filter(Boolean) as { k: string; label: string }[];
@@ -391,7 +476,7 @@ export default function Properties() {
               {activeChips.map((c) => (
                 <button
                   key={c.k}
-                  onClick={() => (c.k === "price" ? set({ minPrice: 0, maxPrice: MAX_PRICE }) : set({ [c.k]: c.k === "beds" ? 0 : c.k === "featured" ? false : "" } as never))}
+                  onClick={() => (c.k === "price" ? set({ minPrice: 0, maxPrice: MAX_PRICE }) : set({ [c.k]: c.k === "beds" || c.k === "baths" ? 0 : c.k === "featured" ? false : "" } as never))}
                   className="chip bg-brand-700 text-white"
                 >
                   {c.label} <X className="h-3 w-3" />
@@ -412,6 +497,19 @@ export default function Properties() {
               {Array.from({ length: 6 }).map((_, i) => (
                 <Skeleton key={i} className="h-80" />
               ))}
+            </div>
+          ) : !results.length && nearPlace && !nearPlace.found ? (
+            <EmptyState title={`Couldn’t find “${f.nearPlace}” on the map`} hint="Try a sector, society, landmark or road name — e.g. “G-13”, “DHA Phase 2” or “Rawalpindi Medical University”." action={<Button variant="outline" onClick={() => set({ nearPlace: "" })}>Clear the place</Button>} />
+          ) : !results.length && outside.length ? (
+            <div>
+              <p className="mb-4 text-sm text-ink-mute">
+                Nothing within {f.nearKm} km of <b className="text-ink dark:text-white">{nearPlace?.name ?? f.nearPlace}</b> — these are the closest listings:
+              </p>
+              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                {outside.map((p) => (
+                  <PropertyCard key={p.id} p={p} />
+                ))}
+              </div>
             </div>
           ) : !results.length ? (
             <EmptyState

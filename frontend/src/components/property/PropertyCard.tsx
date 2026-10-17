@@ -54,6 +54,19 @@ export function CompareButton({ id, className, label }: { id: string; className?
   );
 }
 
+/** What a place-aware search matched on: the closest school / mosque … or the distance from a named place. */
+export function NearbyNote({ p, className }: { p: Property; className?: string }) {
+  const km = (v: number) => (v < 1 ? `${Math.round(v * 1000)} m` : `${v.toFixed(1)} km`);
+  if (p.nearby)
+    return (
+      <p className={cn("mt-1 line-clamp-1 text-xs font-semibold text-brand-700 dark:text-brand-300", className)}>
+        {p.nearby.kind} {km(p.nearby.distance_km)} away · {p.nearby.name}
+      </p>
+    );
+  if (p.distance_km !== undefined) return <p className={cn("mt-1 text-xs font-semibold text-brand-700 dark:text-brand-300", className)}>{km(p.distance_km)} away</p>;
+  return null;
+}
+
 export function PropertyCard({ p, className, compact }: { p: Property; className?: string; compact?: boolean }) {
   const loc = [p.block_name, p.scheme_name, p.city_name].filter(Boolean).join(", ") || p.street_address || p.city_name || "Pakistan";
   return (
@@ -85,6 +98,7 @@ export function PropertyCard({ p, className, compact }: { p: Property; className
             <MapPin className="h-3.5 w-3.5 shrink-0 text-gold-600" />
             <span className="line-clamp-1">{loc}</span>
           </p>
+          <NearbyNote p={p} />
           <div className="mt-3 flex items-center gap-4 border-t border-black/5 pt-3 text-xs font-medium text-ink-soft dark:border-white/10 dark:text-slate-300">
             <span className="inline-flex items-center gap-1">
               <Ruler className="h-3.5 w-3.5 text-brand-600" />
