@@ -1,19 +1,26 @@
 /**
  * Conversational property assistant.
  *
- * Each user turn fans out to:
- *   - POST /v1/chat/completions  (OpenAI-compatible facade; local RAG or a proxied LLM)
+ * With OpenAI connected on the backend (GET /ai/capabilities → "upstream"), each turn
+ * runs the tool-calling agent (lib/agent): the model searches listings, opens details,
+ * looks up places, master plans and the web itself, and its results appear as cards.
+ * Otherwise (or if that fails) a turn fans out to:
+ *   - POST /v1/chat/completions  (the facade's local RAG answer)
  *   - GET  /rag/search            (structured matches rendered as listing cards)
- * and offers a one-click hand-off to the Conversational Homebuying agent.
+ * Either way it offers a one-click hand-off to the Conversational Homebuying agent.
  */
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
+import { CircleMarker, Marker, Tooltip } from "react-leaflet";
 import { Bot, Calculator, Map as MapIcon, Send, Sparkles, User as UserIcon, Wand2 } from "lucide-react";
+import type { Property } from "@/types";
+import { agentReply, capabilities, type AgentEffect } from "@/lib/agent";
 import { get, post } from "@/lib/api";
 import { pkrShort, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { PropertyRow } from "@/components/property/PropertyCard";
+import { PortalMap, pin } from "@/components/map/PortalMap";
 import { Markdown } from "./Markdown";
 
 interface RagHit {
@@ -29,7 +36,7 @@ interface RagHit {
   marla?: number;
 }
 
-interface Msg {
+interface Msg extends AgentEffect {
   role: "user" | "assistant";
   content: string;
   hits?: RagHit[];
@@ -76,6 +83,18 @@ export function ChatPanel({ compact, className, initial }: { compact?: boolean; 
     setBusy(true);
     const history = [...msgs.filter((m) => !m.pending), { role: "user" as const, content: q }];
     setMsgs([...history, { role: "assistant", content: "", pending: true }]);
+    const { chat_mode, chat_model } = await capabilities();
+    if (chat_mode === "upstream") {
+      try {
+        const turns = history.filter((m) => m !== WELCOME && m.content).map((m) => ({ role: m.role, content: m.content }));
+        const reply = await agentReply(turns, chat_model);
+        setMsgs([...history, { role: "assistant", ...reply }]);
+        setBusy(false);
+        return;
+      } catch {
+        /* fall back to the local answer below */
+      }
+    }
     const [chat, rag] = await Promise.allSettled([
       post<{ choices: { message: { content: string } }[] }>("/v1/chat/completions", {
         model: "portal-realestate-rag",
@@ -84,7 +103,7 @@ export function ChatPanel({ compact, className, initial }: { compact?: boolean; 
           ...history.slice(-8).map((m) => ({ role: m.role, content: m.content })),
         ],
       }),
-      get<{ results: RagHit[] }>("/rag/search", { query: q, limit: 6 }),
+      get<{ results: RagHit[] }>("/rag/search", { query: q, top_k: 6 }),
     ]);
     let content = chat.status === "fulfilled" ? chat.value.choices?.[0]?.message?.content ?? "" : "";
     // The local RAG fallback appends an operator note; keep replies user-facing.
@@ -115,6 +134,43 @@ export function ChatPanel({ compact, className, initial }: { compact?: boolean; 
                   </span>
                 ) : (
                   <Markdown text={m.content} />
+                )}
+                {!!m.listings?.length && (
+                  <div className="mt-2 space-y-1 rounded-xl bg-white p-1.5 dark:bg-black/20">
+                    {m.listings.slice(0, compact ? 3 : 5).map((l: Property) => (
+                      <PropertyRow key={l.id} p={l} />
+                    ))}
+                  </div>
+                )}
+                {m.image && (
+                  <a href={m.image.url} target="_blank" rel="noreferrer" className="mt-2 block overflow-hidden rounded-xl bg-white dark:bg-black/20">
+                    <img src={m.image.url} alt={m.image.caption} className="max-h-64 w-full object-cover" loading="lazy" />
+                    <span className="block px-2 py-1 text-[11px] text-ink-mute">{m.image.caption}</span>
+                  </a>
+                )}
+                {m.map && (
+                  <div className="mt-2 overflow-hidden rounded-xl">
+                    <PortalMap center={[m.map.focus.latitude, m.map.focus.longitude]} zoom={14} height={compact ? 180 : 240} switcher={false}>
+                      <Marker position={[m.map.focus.latitude, m.map.focus.longitude]} icon={pin("featured", { size: 32 })} />
+                      {m.map.markers.map((mk, k) => (
+                        <CircleMarker key={k} center={[mk.latitude, mk.longitude]} radius={6} pathOptions={{ color: "#146f45", weight: 2, fillColor: "#f2dd8f", fillOpacity: 0.9 }}>
+                          <Tooltip>
+                            {mk.name} · {mk.kind}
+                            {mk.distance_km !== undefined ? ` · ${mk.distance_km} km` : ""}
+                          </Tooltip>
+                        </CircleMarker>
+                      ))}
+                    </PortalMap>
+                  </div>
+                )}
+                {!!m.links?.length && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {m.links.map((l) => (
+                      <Link key={l.label} to={l.to} className={cn("chip", l.primary ? "bg-brand-700 text-white" : "bg-white text-brand-800 ring-1 ring-brand-200 dark:bg-white/10 dark:text-brand-100 dark:ring-white/10")}>
+                        {l.label}
+                      </Link>
+                    ))}
+                  </div>
                 )}
                 {!!m.hits?.length && (
                   <div className="mt-2 space-y-1 rounded-xl bg-white p-1.5 dark:bg-black/20">
