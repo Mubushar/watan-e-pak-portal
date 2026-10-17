@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Building2, CheckCircle2, MoreVertical, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Building2, CheckCircle2, ImagePlus, MoreVertical, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import type { Property, PropertyList } from "@/types";
 import { useApi, useMutate } from "@/hooks/useApi";
-import { del, put } from "@/lib/api";
+import { del, post, put } from "@/lib/api";
+import { compressImage } from "@/lib/images";
 import { pkrShort, titleCase } from "@/lib/format";
 import { useAuth, roleLabel } from "@/store/auth";
 import { Button, EmptyState, Field, Input, Segmented, Sheet, Skeleton, Textarea, TopBar } from "@/components/ui";
@@ -26,6 +27,19 @@ export default function MyListings() {
     success: (r) => `Marked as ${(r as Property).status}`,
   });
   const remove = useMutate((id: string) => del(`/me/listings/${id}`), { invalidate: ["/me/listings", "/search", "/properties"], success: "Listing removed" });
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [photoFor, setPhotoFor] = useState<Property | null>(null);
+  const addPhotos = useMutate(
+    async ({ id, files }: { id: string; files: File[] }) => {
+      let done = 0;
+      for (const file of files) {
+        await post(`/me/listings/${id}/photos`, { data_url: await compressImage(file), is_primary: false }, { timeoutMs: 60_000 });
+        done++;
+      }
+      return done;
+    },
+    { invalidate: ["/me/listings", "/search", "/properties"], success: (n) => `${n} photo${n === 1 ? "" : "s"} added` },
+  );
 
   return (
     <div>
@@ -101,6 +115,20 @@ export default function MyListings() {
         </div>
       </div>
 
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        multiple
+        hidden
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = "";
+          if (photoFor && files.length) addPhotos.mutate({ id: photoFor.id, files });
+          setPhotoFor(null);
+        }}
+      />
+
       <Sheet open={!!menu} onClose={() => setMenu(null)} title={menu?.title}>
         {menu && (
           <div className="grid gap-2">
@@ -114,6 +142,19 @@ export default function MyListings() {
               }}
             >
               Edit price & details
+            </Button>
+            <Button
+              variant="soft"
+              className="justify-start"
+              icon={<ImagePlus className="h-4 w-4" />}
+              loading={addPhotos.isPending}
+              onClick={() => {
+                setPhotoFor(menu);
+                setMenu(null);
+                fileRef.current?.click();
+              }}
+            >
+              Add photos
             </Button>
             {menu.status === "active" ? (
               <>
@@ -150,8 +191,9 @@ export default function MyListings() {
 }
 
 function EditSheet({ p, onClose }: { p: Property; onClose: () => void }) {
-  const [f, setF] = useState({ title: p.title, price: String(p.price), description: p.description ?? "" });
-  const save = useMutate(() => put(`/me/listings/${p.id}`, { title: f.title.trim(), price: Number(f.price), description: f.description }), {
+  const [f, setF] = useState({ title: p.title, price: String(p.price), description: p.description ?? "", amenities: (p.amenities ?? []).join(", ") });
+  const amenities = f.amenities.split(/[,،\n]/).map((a) => a.trim()).filter(Boolean);
+  const save = useMutate(() => put(`/me/listings/${p.id}`, { title: f.title.trim(), price: Number(f.price), description: f.description, amenities }), {
     invalidate: ["/me/listings", "/search", "/properties"],
     success: "Listing updated",
     onSuccess: onClose,
@@ -167,6 +209,9 @@ function EditSheet({ p, onClose }: { p: Property; onClose: () => void }) {
         </Field>
         <Field label="Description">
           <Textarea value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
+        </Field>
+        <Field label="Features" hint="Comma-separated, e.g. Solar system, Basement, Corner">
+          <Input value={f.amenities} onChange={(e) => setF({ ...f, amenities: e.target.value })} />
         </Field>
         <Button className="w-full" size="lg" loading={save.isPending} disabled={f.title.trim().length < 5 || !(Number(f.price) > 0)} onClick={() => save.mutate()}>
           Save changes
