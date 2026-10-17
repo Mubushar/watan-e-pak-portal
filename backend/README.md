@@ -92,19 +92,44 @@ If a client expects an OpenAI-style API (it probes `/v1/models`), point it at
 * **Local fallback (default)** — `/v1/chat/completions` answers from the portal's
   own catalogue via RAG, so it works with no external service. `/v1/embeddings`
   returns a deterministic hash embedding.
-* **Proxy mode** — set these env vars to forward requests to a real
-  OpenAI-compatible LLM (OpenAI, Ollama, LM Studio, vLLM, ...). Streaming is
-  passed through:
-
-  ```powershell
-  $env:PORTAL_LLM_BASE_URL = "https://api.openai.com/v1"   # include /v1
-  $env:PORTAL_LLM_API_KEY  = "sk-..."
-  $env:PORTAL_LLM_MODEL    = "gpt-4o-mini"
-  uv run python main.py
-  ```
+* **OpenAI mode** — with `OPENAI_API_KEY` in `backend/.env`, requests are forwarded
+  to OpenAI (`OPENAI_MODEL`, optional `OPENAI_BASE_URL`). Streaming is passed through.
+  The same key powers voice (`openai_voice.py`).
 
 The portal's **tool** interface is still MCP at `/mcp`; the `/v1` facade is only
 an LLM-compatible shim.
+
+### Testing without OpenAI credit (LM Studio chat, Gemini Live voice)
+
+Two optional switches in `backend/.env` let you keep testing the assistant for free.
+They don't touch your `OPENAI_*` settings:
+
+```ini
+# Chat -> any OpenAI-compatible server, e.g. LM Studio (Developer tab -> start server,
+# or `lms server start`); the model id is what http://localhost:1234/v1/models lists.
+LLM_BASE_URL=http://localhost:1234/v1
+LLM_MODEL=qwen3-4b-instruct-2507
+LLM_API_KEY=                      # optional; LM Studio needs none
+
+# Live voice conversation -> Google Gemini Live (free key: https://aistudio.google.com/apikey)
+VOICE_PROVIDER=gemini
+GEMINI_API_KEY=...
+GEMINI_LIVE_MODEL=gemini-3.8-live
+GEMINI_VOICE=Kore
+```
+
+* Chat (typed messages in the portal and the app, with all the assistant's tools) goes
+  to `LLM_BASE_URL`. Pick a model with tool calling — Qwen3 / Qwen2.5 Instruct work
+  well. Small local models are slower and their Urdu is weaker than OpenAI's.
+* The app's live voice conversation uses Gemini Live (`gemini_live.py` mints a
+  single-use token; the app streams audio over a WebSocket). Gemini's Google Search
+  stands in for the `web_lookup` tool. Google may use free-tier content to improve its
+  products — test with demo data.
+* Still OpenAI-only: voice notes (`/ai/transcribe`, `/ai/speak`) and `/ai/web-lookup`.
+* `GET /ai/capabilities` shows what is active (`chat_provider`, `voice.live_provider`).
+
+**Back to OpenAI:** delete (or comment out) the `LLM_*` and `VOICE_PROVIDER` lines and
+restart the backend. No code changes.
 
 ## MCP HTTP mode
 

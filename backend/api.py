@@ -39,6 +39,7 @@ import masterplan
 import web_lookup
 import ai_guard
 import openai_voice
+import gemini_live
 import openai_facade
 from openai_facade import router as openai_router
 
@@ -572,8 +573,15 @@ class RealtimeSessionRequest(BaseModel):
 
 @app.get("/ai/capabilities", tags=["ai"])
 def ai_capabilities() -> Any:
-    """What the assistant can use: the OpenAI chat model and OpenAI voice (no secrets)."""
-    voice = openai_voice.status()
+    """What the assistant can use: the chat model and voice (no secrets).
+
+    ``voice.live_provider`` says which service runs the live conversation: ``openai``
+    (Realtime, the default) or ``gemini`` (``VOICE_PROVIDER=gemini``, for testing)."""
+    voice = dict(openai_voice.status())
+    if gemini_live.active():
+        voice.update(realtime=True, realtime_model=gemini_live.MODEL, live_provider="gemini", live_voice=gemini_live.VOICE)
+    else:
+        voice["live_provider"] = "openai" if voice["realtime"] else None
     upstream = bool(openai_facade.UPSTREAM_BASE_URL)
     return {
         "chat_mode": "upstream" if upstream else "local",
@@ -657,19 +665,28 @@ async def ai_web_lookup(payload: WebLookupRequest, request: Request) -> Any:
 @app.post("/ai/realtime/session", tags=["ai"])
 async def ai_realtime_session(payload: RealtimeSessionRequest, request: Request,
                               authorization: Optional[str] = Header(default=None)) -> Any:
-    """Start a live voice conversation (OpenAI Realtime API).
+    """Start a live voice conversation.
 
-    Returns a short-lived ``client_secret`` (10 minutes to connect) plus the ``calls_url``
-    the app posts its WebRTC offer to. The session carries the assistant's instructions
-    (with the signed-in user's name and role when a bearer token is sent), the reply
-    language (``auto`` / ``ur`` / ``en``) and the tools the app executes.
+    OpenAI Realtime (default): returns a short-lived ``client_secret`` (10 minutes to
+    connect) plus the ``calls_url`` the app posts its WebRTC offer to.
+    Gemini Live (``VOICE_PROVIDER=gemini``): returns ``provider: "gemini"``, a single-use
+    ephemeral ``token``, the ``ws_url`` and the ``setup`` to send.
+    Either way the session carries the assistant's instructions (with the signed-in user's
+    name and role when a bearer token is sent), the reply language (``auto`` / ``ur`` /
+    ``en``) and the tools the app executes.
     """
-    if not openai_voice.configured():
-        raise HTTPException(status_code=501, detail="The live voice agent needs OPENAI_API_KEY in backend/.env")
+    use_gemini = gemini_live.active()
+    if not use_gemini and not openai_voice.configured():
+        raise HTTPException(status_code=501, detail="The live voice agent needs OPENAI_API_KEY (or VOICE_PROVIDER=gemini with GEMINI_API_KEY) in backend/.env")
     ai_guard.check(request, "live")
     account = core.auth.current_user(_bearer_token(authorization))
     user = core.auth.public_user(account) if account else None
     lang = payload.reply_lang if payload.reply_lang in ("auto", "ur", "en") else "auto"
+    if use_gemini:
+        try:
+            return await asyncio.to_thread(gemini_live.live_session, user, lang)
+        except gemini_live.GeminiError as exc:
+            raise HTTPException(status_code=exc.status, detail=str(exc))
     try:
         return await asyncio.to_thread(openai_voice.realtime_session, user, lang)
     except openai_voice.VoiceError as exc:
