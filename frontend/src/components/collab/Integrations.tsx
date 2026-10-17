@@ -74,7 +74,7 @@ export function IntegrationsCard() {
                 "—"
               )}
             </Row>
-            <Row icon={<Megaphone className="h-4 w-4" />} title="Ad networks" ok={ads.data ? !!(ads.data.adsense || ads.data.admob) : undefined}>
+            <Row icon={<Megaphone className="h-4 w-4" />} title="Ad networks" ok={ads.data ? !!(ads.data.adsense || (ads.data.admob && !ads.data.admob.testing)) : undefined}>
               {ads.data ? (
                 <>
                   AdSense (web): <b>{ads.data.adsense ? `${Object.keys(ads.data.adsense.slots).length} unit(s)` : "off"}</b> · AdMob (apps): <b>{ads.data.admob ? (ads.data.admob.testing ? "test ads" : "live") : "off"}</b>
