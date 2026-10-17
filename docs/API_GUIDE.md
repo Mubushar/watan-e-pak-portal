@@ -18,7 +18,7 @@ OpenAI-compatible facade and error handling. For the MCP surface, see the
 | OpenAPI schema | `/openapi.json` |
 | MCP (mounted) | `/mcp` |
 | OpenAI facade | `/v1` |
-| Routes | **626** across **37 tags** |
+| Routes | **628** across **37 tags** |
 
 Every route calls a plain-Python function that the matching MCP tool also calls, so the
 two surfaces are guaranteed equivalent.
@@ -280,12 +280,18 @@ OpenAI-style API.
   `PORTAL_LLM_MODEL` to forward to a real OpenAI-compatible LLM (OpenAI, Ollama,
   LM Studio, vLLM, …). Streaming is passed through.
 
-### Assistant helpers
+### Assistant helpers (OpenAI)
 
 | Endpoint | Purpose |
 | --- | --- |
-| `GET /ai/capabilities` | Which chat model answers (`local` RAG fallback or `upstream`) and whether server-side speech-to-text is available. |
-| `POST /ai/transcribe` | `{"audio_base64", "mime_type", "language"}` → `{"text"}`. Forwards to the upstream `/audio/transcriptions` (model `PORTAL_STT_MODEL`, default `whisper-1`); `501` without `PORTAL_LLM_BASE_URL`. |
+| `GET /ai/capabilities` | The chat model (`local` fallback or `upstream` OpenAI) and OpenAI voice status: `voice.{provider, stt, tts, realtime, realtime_model, voice}`. No secrets. |
+| `POST /ai/realtime/session` | `{"reply_lang": "auto" \| "ur" \| "en"}` returns `{"client_secret", "expires_at", "model", "calls_url", "voice"}`. The app posts its WebRTC SDP offer to `calls_url` with `Authorization: Bearer <client_secret>` (`Content-Type: application/sdp`). Send the user's bearer token to personalise the agent. Returns `501` without `OPENAI_API_KEY`. |
+| `POST /ai/transcribe` | `{"audio_base64", "mime_type"}` returns `{"text"}`, transcribed by OpenAI `gpt-transcribe` with Urdu and English expected. |
+| `POST /ai/speak` | `{"text", "language"}` returns `{"audio_base64", "mime_type": "audio/mpeg"}` from OpenAI text-to-speech. |
+
+**Chat:** with `OPENAI_API_KEY` set, `/v1/chat/completions` forwards to OpenAI (model
+`gpt-5.6-luna`, or `OPENAI_MODEL`). A request that names the local model id is sent to
+that model instead.
 
 ### CORS
 

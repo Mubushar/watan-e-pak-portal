@@ -170,6 +170,13 @@ scoped to their (revoked) identity.
 * **Password reset** → `POST /auth/password/reset-request` → `POST /auth/password/reset`
   (revokes all sessions); signed-in change via `POST /auth/password/set`.
 
+### 4.3 Audit & monitoring
+
+* **Auth audit trail** — `GET /auth/events`.
+* **Portal audit trail** — role/assignment/audit views; messaging keeps its own audit log
+  (`messaging://audit`). Grant `audit.view` to auditors.
+* **OTP outbox** — `GET /auth/notifications` (simulated SMS/e-mail outbox for demos).
+
 ### 4.4 Delivering OTPs (SMS / WhatsApp / e-mail)
 
 Out of the box **no code is sent anywhere**. Each message goes only to the in-memory
@@ -196,12 +203,43 @@ What changes once a channel is configured:
   person can simply try again.
 * `GET /auth/config` → `delivery` shows which provider each channel uses (no secrets).
 
-### 4.3 Audit & monitoring
+### 4.5 AI model and voice for the assistant (OpenAI)
 
-* **Auth audit trail** — `GET /auth/events`.
-* **Portal audit trail** — role/assignment/audit views; messaging keeps its own audit log
-  (`messaging://audit`). Grant `audit.view` to auditors.
-* **OTP outbox** — `GET /auth/notifications` (simulated SMS/e-mail outbox for demos).
+OpenAI is the assistant's only AI provider (`backend/openai_facade.py`,
+`backend/openai_voice.py`). Set `OPENAI_API_KEY` in `backend/.env` (template:
+`backend/.env.example`). Without it the assistant runs in **basic mode**: answers come
+from listing search and voice is off; the app shows a notice.
+
+| Feature | OpenAI API | Setting (default) |
+| --- | --- | --- |
+| Typed chat and voice-note replies | Chat completions | `OPENAI_MODEL` (`gpt-5.6-luna`) |
+| **Live voice agent** | Realtime API (speech-to-speech, WebRTC) | `OPENAI_REALTIME_MODEL` (`gpt-realtime-2.1`) |
+| Voice notes and live captions | Speech-to-text, with `languages: ["ur","en"]` so Urdu comes back in Urdu script and not Hindi | `OPENAI_TRANSCRIBE_MODEL` (`gpt-transcribe`) |
+| Voice-note replies | Text-to-speech | `OPENAI_TTS_MODEL` (`gpt-4o-mini-tts`) |
+| Voice | Built-in voice, or your own custom voice | `OPENAI_VOICE` (`marin`), `OPENAI_VOICE_ID` (`voice_…`) |
+
+**How the live agent connects.** The app calls `POST /ai/realtime/session`. The backend
+mints a 10-minute client secret (`/v1/realtime/client_secrets`) carrying:
+
+- the agent's instructions, including the signed-in user's name and role;
+- the reply language (`auto`, `ur` or `en`);
+- the voice, the semantic turn detection that lets users interrupt, and Urdu/English captions;
+- four tools: `search_listings`, `get_listing`, `my_listings`, `draft_listing`.
+
+The app then opens a WebRTC call directly to OpenAI with that secret. The real API key
+never leaves the server. The app runs the tool calls against this backend, using the
+user's own session, and returns the results to the model. One call can last at most 60
+minutes.
+
+**Custom voice.** OpenAI creates voices from your own recordings only for eligible
+customers; you request access through OpenAI sales. You record a fixed consent phrase
+(there is no Urdu phrase, so use the English one) and upload a 10–30 second sample. Put
+the resulting `voice_…` id in `OPENAI_VOICE_ID`. OpenAI requires telling listeners that
+the voice is AI-generated.
+
+**Cost.** Realtime is billed per audio token, speech-to-text per minute and text-to-speech
+per character. Set usage limits on the OpenAI project. The session endpoint is open to
+guests; put it behind sign-in or rate limiting before a public launch.
 
 ---
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BadgeCheck, Building2, ChevronRight, Heart, LogIn, LogOut, Mail, Monitor, Moon, Phone, Server, Sun, UserPlus } from "lucide-react";
 import { toast } from "sonner";
@@ -6,14 +6,19 @@ import { apiBase, post } from "@/lib/api";
 import { DEFAULT_API_BASE, normalizeServerUrl } from "@/lib/config";
 import { runtime, runtimeLabel } from "@/lib/platform";
 import { useChat } from "@/lib/assistant";
+import { resetServerVoice, serverVoice, type ServerVoice } from "@/lib/voice";
 import { roleLabel, useAuth } from "@/store/auth";
-import { usePrefs, type Theme } from "@/store/prefs";
-import { Avatar, Badge, Button, Field, Input, Segmented, Toggle, TopBar } from "@/components/ui";
+import { usePrefs, type ReplyLang, type Theme } from "@/store/prefs";
+import { Avatar, Badge, Button, Field, Input, Segmented, TopBar } from "@/components/ui";
 
 export default function Profile() {
   const nav = useNavigate();
   const { user, token, logout } = useAuth();
-  const { theme, setTheme, voiceLang, setVoiceLang, autoSpeak, setAutoSpeak, handsFree, setHandsFree, serverUrl, setServerUrl } = usePrefs();
+  const { theme, setTheme, voiceLang, setVoiceLang, replyLang, setReplyLang, serverUrl, setServerUrl } = usePrefs();
+  const [voice, setVoice] = useState<ServerVoice | null>(null);
+  useEffect(() => {
+    void serverVoice().then(setVoice);
+  }, [serverUrl]);
   const [server, setServer] = useState(serverUrl ?? "");
   const [testing, setTesting] = useState(false);
 
@@ -33,6 +38,7 @@ export default function Profile() {
       const j = (await r.json()) as { status?: string; version?: string };
       if (j.status !== "ok") throw new Error("Unexpected response");
       setServerUrl(normalizeServerUrl(server) || null);
+      resetServerVoice();
       toast.success(`Connected to Arz-e-Pak server v${j.version ?? "?"}`);
     } catch {
       toast.error(`Can't reach ${url}. Check the address and that the backend is running.`);
@@ -109,18 +115,37 @@ export default function Profile() {
 
         <section className="card px-5 pt-5">
           <p className="label">AI assistant</p>
+          <p className="label">Reply language</p>
+          <Segmented<ReplyLang>
+            value={replyLang}
+            onChange={setReplyLang}
+            options={[
+              { value: "auto", label: "Auto" },
+              { value: "en", label: "English" },
+              { value: "ur", label: "اردو" },
+            ]}
+          />
+          <p className="mt-1.5 text-xs text-ink-mute dark:text-slate-400">
+            {replyLang === "auto" ? "Replies in the language of each message — English, Urdu or Roman Urdu." : replyLang === "en" ? "Always replies in English." : "ہمیشہ اردو میں جواب دے گا۔"}
+          </p>
+          <p className="label mt-4">Typing language</p>
           <Segmented
             value={voiceLang}
             onChange={setVoiceLang}
             options={[
-              { value: "en-US", label: "English voice" },
-              { value: "ur-PK", label: "اردو آواز" },
+              { value: "en-US", label: "English" },
+              { value: "ur-PK", label: "اردو" },
             ]}
           />
-          <div className="mt-2 divide-y divide-black/5 dark:divide-white/5">
-            <Toggle checked={autoSpeak} onChange={setAutoSpeak} label="Read replies aloud" hint="When you ask by voice, the assistant answers out loud." />
-            <Toggle checked={handsFree} onChange={setHandsFree} label="Conversation mode" hint="Keep listening after each spoken reply — hands-free." />
-          </div>
+          <p className="label mt-4">Voice</p>
+          <p className="text-xs text-ink-mute dark:text-slate-400">
+            {voice?.provider === "openai"
+              ? "OpenAI voice is active: live conversation (Realtime), voice notes and spoken replies."
+              : "Voice is off — the server needs OPENAI_API_KEY in backend/.env."}
+          </p>
+          <p className="mt-3 text-xs text-ink-mute dark:text-slate-400">
+            The assistant mirrors you: typed messages get text replies, voice notes get voice-note replies, and a voice conversation is spoken.
+          </p>
         </section>
 
         <section className="card p-5">
@@ -140,6 +165,7 @@ export default function Profile() {
                 onClick={() => {
                   setServer("");
                   setServerUrl(null);
+                  resetServerVoice();
                   toast.success("Using the default server");
                 }}
               >

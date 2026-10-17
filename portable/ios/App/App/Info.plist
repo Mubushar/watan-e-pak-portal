@@ -65,9 +65,7 @@
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Arz-e-Pak uses the microphone so you can talk to the AI property assistant.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Arz-e-Pak turns your voice into text so the AI assistant can search and list properties for you.</string>
+	<string>Arz-e-Pak uses the microphone for voice notes and live conversations with the AI property assistant.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Take photos of your property to add them to a listing.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

@@ -47,12 +47,7 @@ from urllib.parse import quote
 
 import httpx
 
-try:  # python-dotenv ships with the MCP SDK; settings in backend/.env are optional.
-    from dotenv import load_dotenv
-
-    load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"), override=False)
-except Exception:  # pragma: no cover - dotenv missing or unreadable file
-    pass
+import envfile  # noqa: F401  (loads backend/.env)
 
 TIMEOUT_SECONDS = 15
 

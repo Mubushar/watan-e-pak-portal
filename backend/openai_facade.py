@@ -7,20 +7,20 @@ This module makes the portal answer on those routes.
 
 Two modes
 ---------
-1. **Proxy mode** (recommended for real LLM answers): if `PORTAL_LLM_BASE_URL` is
-   set, every request is forwarded verbatim to that OpenAI-compatible upstream
-   (OpenAI, Azure, Ollama, LM Studio, vLLM, ...). Streaming is passed through.
+1. **OpenAI mode** (real LLM answers): with `OPENAI_API_KEY` set, every request is
+   forwarded to OpenAI (model `gpt-5.6-luna` unless `OPENAI_MODEL` says otherwise).
+   Streaming is passed through.
 
 2. **Local fallback mode** (default, no config): `/v1/chat/completions` answers
    directly from the portal's own data using `rag_search`, so the endpoint still
    returns a useful completion without any external service. `/v1/embeddings`
    returns a deterministic hash embedding.
 
-Environment variables
----------------------
-    PORTAL_LLM_BASE_URL   e.g. https://api.openai.com/v1   (include /v1)
-    PORTAL_LLM_API_KEY    bearer token for the upstream
-    PORTAL_LLM_MODEL      model name to advertise / send upstream
+Environment variables (or backend/.env)
+---------------------------------------
+    OPENAI_API_KEY        enables OpenAI for chat (and voice — see openai_voice.py)
+    OPENAI_MODEL          chat model, default gpt-5.6-luna
+    OPENAI_BASE_URL       optional, e.g. an Azure OpenAI / proxy URL (default https://api.openai.com/v1)
 
 The portal's *tool* interface remains MCP at `/mcp`; this facade is only an
 LLM-compatible shim.
@@ -39,13 +39,20 @@ import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
+import envfile  # noqa: F401  (loads backend/.env)
 import server as core
 
 router = APIRouter(prefix="/v1", tags=["openai-compatible"])
 
-UPSTREAM_BASE_URL = os.getenv("PORTAL_LLM_BASE_URL", "").rstrip("/")
-UPSTREAM_API_KEY = os.getenv("PORTAL_LLM_API_KEY") or os.getenv("OPENAI_API_KEY", "")
-UPSTREAM_MODEL = os.getenv("PORTAL_LLM_MODEL", "gpt-4o-mini")
+# OpenAI is the only AI provider (chat here, voice in openai_voice.py).
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
+
+UPSTREAM_BASE_URL = OPENAI_BASE_URL if OPENAI_API_KEY else ""
+UPSTREAM_API_KEY = OPENAI_API_KEY
+UPSTREAM_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna")
+UPSTREAM_PROVIDER = "openai" if OPENAI_API_KEY else None
+
 
 _LOCAL_MODEL = "portal-realestate-rag"
 _CREATED = int(time.time())
@@ -215,6 +222,10 @@ async def chat_completions(request: Request) -> Any:
 
     # ----- proxy mode -----
     if _proxying():
+        # Clients written for the local fallback (e.g. the web portal) ask for the local
+        # model id; send those to the configured upstream model instead.
+        if body.get("model") in (None, "", _LOCAL_MODEL):
+            body["model"] = UPSTREAM_MODEL
         url = f"{UPSTREAM_BASE_URL}/chat/completions"
         headers = _upstream_headers(request)
         if stream:

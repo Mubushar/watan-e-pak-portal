@@ -19,7 +19,6 @@ import { compressImage, coverImage } from "@/lib/images";
 import { draftFromIntent, parseIntent, type ListingDraft } from "@/lib/intent";
 import { listen, type ListenSession } from "@/lib/voice";
 import { cn } from "@/lib/utils";
-import { usePrefs } from "@/store/prefs";
 import { Button, Field, Input, Segmented, Select, Stepper, Textarea, TopBar } from "@/components/ui";
 
 const CATEGORIES = ["house", "apartment", "plot", "shop", "office", "floor", "building"];
@@ -52,7 +51,6 @@ export default function ListingForm() {
   const nav = useNavigate();
   const loc = useLocation();
   const [incoming] = useState<ListingDraft | undefined>(() => (loc.state as { draft?: ListingDraft } | null)?.draft ?? useChat.getState().pendingDraft ?? undefined);
-  const voiceLang = usePrefs((s) => s.voiceLang);
   const cities = useApi<{ cities: City[] }>("/cities");
   const tree = useApi<Hierarchy>("/hierarchy");
   const [step, setStep] = useState(0);
@@ -110,9 +108,9 @@ export default function ListingForm() {
   const describeByVoice = async () => {
     if (rec) return rec.stop();
     try {
-      const s = await listen({ lang: voiceLang, onPartial: setPartial });
+      const s = await listen({ onPartial: setPartial });
       setRec(s);
-      const said = await s.result;
+      const said = (await s.result).text;
       setRec(null);
       setPartial("");
       if (!said) return toast.info("I didn't catch that — try again or type it.");

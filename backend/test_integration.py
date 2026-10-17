@@ -1245,9 +1245,15 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         r = client.get("/ai/capabilities")
         check("GET /ai/capabilities", r.status_code == 200 and r.json().get("chat_mode") in ("local", "upstream"),
               str(r.status_code))
-        if r.json().get("chat_mode") == "local":
+        voice = r.json().get("voice") or {}
+        check("GET /ai/capabilities voice status", {"provider", "stt", "tts", "realtime"} <= set(voice), str(voice))
+        if not voice.get("provider"):  # no OPENAI_API_KEY in the test environment
             r = client.post("/ai/transcribe", json={"audio_base64": "AAAA"})
-            check("POST /ai/transcribe (no upstream -> 501)", r.status_code == 501, str(r.status_code))
+            check("POST /ai/transcribe (no OpenAI key -> 501)", r.status_code == 501, str(r.status_code))
+            r = client.post("/ai/speak", json={"text": "Assalam-o-Alaikum"})
+            check("POST /ai/speak (no OpenAI key -> 501)", r.status_code == 501, str(r.status_code))
+            r = client.post("/ai/realtime/session", json={"reply_lang": "ur"})
+            check("POST /ai/realtime/session (no OpenAI key -> 501)", r.status_code == 501, str(r.status_code))
 
         # --- MCP share the same auth store as REST ---
         r = client.post("/auth/login", json={"identifier": "mcp@portal.test", "password": "Secret@123"})

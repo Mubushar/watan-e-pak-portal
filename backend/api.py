@@ -23,7 +23,7 @@ import json
 import os
 import re
 from contextlib import asynccontextmanager
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 from fastapi import (Depends, FastAPI, Header, HTTPException, Query, WebSocket,
@@ -33,6 +33,7 @@ from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel
 
 import server as core
+import openai_voice
 import openai_facade
 from openai_facade import router as openai_router
 
@@ -399,57 +400,85 @@ def rag_search_post(payload: Dict[str, Any]) -> Any:
     return j(core.rag_search(payload.get("query", ""), top_k=int(payload.get("top_k", 5))))
 
 
-STT_MODEL = os.getenv("PORTAL_STT_MODEL", "whisper-1")
-
-
 class TranscribeRequest(BaseModel):
     audio_base64: str
     mime_type: str = "audio/webm"
-    language: Optional[str] = None  # ISO-639-1, e.g. "en" or "ur"
+    language: Optional[str] = None  # ignored: the language is detected from the audio
+
+
+class SpeakRequest(BaseModel):
+    text: str
+    language: Optional[str] = None  # e.g. "ur-PK" or "en-US"; Urdu script is detected anyway
+
+
+class RealtimeSessionRequest(BaseModel):
+    reply_lang: str = "auto"  # "auto" (follow the speaker), "ur" or "en"
 
 
 @app.get("/ai/capabilities", tags=["ai"])
 def ai_capabilities() -> Any:
-    """What the conversational assistant can use: the chat model and server-side speech-to-text."""
+    """What the assistant can use: the OpenAI chat model and OpenAI voice (no secrets)."""
+    voice = openai_voice.status()
     upstream = bool(openai_facade.UPSTREAM_BASE_URL)
     return {
         "chat_mode": "upstream" if upstream else "local",
+        "chat_provider": openai_facade.UPSTREAM_PROVIDER,
         "chat_model": openai_facade.UPSTREAM_MODEL if upstream else openai_facade._LOCAL_MODEL,
-        "transcription": upstream,
-        "transcription_model": STT_MODEL if upstream else None,
+        "transcription": voice["stt"],
+        "transcription_model": voice["stt_model"],
+        "voice": voice,
     }
 
 
 @app.post("/ai/transcribe", tags=["ai"])
 async def ai_transcribe(payload: TranscribeRequest) -> Any:
-    """Speech-to-text for clients without on-device recognition (e.g. the desktop app).
-
-    Forwards the audio to the upstream OpenAI-compatible ``/audio/transcriptions``
-    endpoint; needs ``PORTAL_LLM_BASE_URL`` (returns 501 otherwise).
-    """
-    if not openai_facade.UPSTREAM_BASE_URL:
-        raise HTTPException(status_code=501, detail="Server-side transcription needs PORTAL_LLM_BASE_URL")
+    """Speech-to-text for voice notes (OpenAI ``OPENAI_TRANSCRIBE_MODEL``; Urdu, English or mixed)."""
+    if not openai_voice.configured():
+        raise HTTPException(status_code=501, detail="Voice needs OPENAI_API_KEY in backend/.env")
     try:
         audio = base64.b64decode(payload.audio_base64.split(",")[-1], validate=False)
     except Exception:
         raise HTTPException(status_code=400, detail="audio_base64 is not valid base64")
     if not audio:
         raise HTTPException(status_code=400, detail="Empty audio")
-    ext = payload.mime_type.split("/")[-1].split(";")[0] or "webm"
-    data = {"model": STT_MODEL}
-    if payload.language:
-        data["language"] = payload.language
-    headers = {}
-    if openai_facade.UPSTREAM_API_KEY:
-        headers["Authorization"] = f"Bearer {openai_facade.UPSTREAM_API_KEY}"
-    async with httpx.AsyncClient(timeout=120) as client:
-        upstream = await client.post(
-            f"{openai_facade.UPSTREAM_BASE_URL}/audio/transcriptions",
-            data=data, files={"file": (f"speech.{ext}", audio, payload.mime_type)}, headers=headers,
-        )
-    if upstream.status_code >= 400:
-        raise HTTPException(status_code=502, detail=f"Transcription failed upstream ({upstream.status_code})")
-    return {"text": upstream.json().get("text", "")}
+    try:
+        text = await asyncio.to_thread(openai_voice.transcribe, audio, payload.mime_type)
+    except openai_voice.VoiceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return {"text": text, "provider": "openai"}
+
+
+@app.post("/ai/speak", tags=["ai"])
+async def ai_speak(payload: SpeakRequest) -> Any:
+    """Text-to-speech for voice-note replies (OpenAI ``OPENAI_TTS_MODEL`` with ``OPENAI_VOICE`` /
+    ``OPENAI_VOICE_ID``). Returns ``{"audio_base64", "mime_type"}``."""
+    if not openai_voice.configured():
+        raise HTTPException(status_code=501, detail="Voice needs OPENAI_API_KEY in backend/.env")
+    try:
+        audio, mime = await asyncio.to_thread(openai_voice.speak, payload.text, payload.language)
+    except openai_voice.VoiceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return {"audio_base64": base64.b64encode(audio).decode(), "mime_type": mime, "provider": "openai"}
+
+
+@app.post("/ai/realtime/session", tags=["ai"])
+async def ai_realtime_session(payload: RealtimeSessionRequest, authorization: Optional[str] = Header(default=None)) -> Any:
+    """Start a live voice conversation (OpenAI Realtime API).
+
+    Returns a short-lived ``client_secret`` (10 minutes to connect) plus the ``calls_url``
+    the app posts its WebRTC offer to. The session carries the assistant's instructions
+    (with the signed-in user's name and role when a bearer token is sent), the reply
+    language (``auto`` / ``ur`` / ``en``) and the tools the app executes.
+    """
+    if not openai_voice.configured():
+        raise HTTPException(status_code=501, detail="The live voice agent needs OPENAI_API_KEY in backend/.env")
+    account = core.auth.current_user(_bearer_token(authorization))
+    user = core.auth.public_user(account) if account else None
+    lang = payload.reply_lang if payload.reply_lang in ("auto", "ur", "en") else "auto"
+    try:
+        return await asyncio.to_thread(openai_voice.realtime_session, user, lang)
+    except openai_voice.VoiceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
 
 
 @app.get("/memory", tags=["memory"])

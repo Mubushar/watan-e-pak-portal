@@ -1,6 +1,6 @@
 # REST endpoint reference
 
-Auto-generated from the FastAPI app — **626 routes** across **37 tags**. Every route calls the same function the MCP tool of the same name calls, so behaviour can never drift.
+Auto-generated from the FastAPI app — **628 routes** across **37 tags**. Every route calls the same function the MCP tool of the same name calls, so behaviour can never drift.
 
 | Tag | Routes |
 | --- | --- |
@@ -31,9 +31,9 @@ Auto-generated from the FastAPI app — **626 routes** across **37 tags**. Every
 | [big-projects](#big-projects) | 9 |
 | [finance](#finance) | 8 |
 | [routing](#routing) | 8 |
+| [ai](#ai) | 6 |
 | [news](#news) | 6 |
 | [other](#other) | 5 |
-| [ai](#ai) | 4 |
 | [broker](#broker) | 4 |
 | [images](#images) | 4 |
 | [memory](#memory) | 4 |
@@ -125,12 +125,14 @@ Auto-generated from the FastAPI app — **626 routes** across **37 tags**. Every
 
 ## ai
 
-4 routes.
+6 routes.
 
 | Method(s) | Path | Purpose |
 | --- | --- | --- |
-| GET | `/ai/capabilities` | What the conversational assistant can use: the chat model and server-side speech-to-text. |
-| POST | `/ai/transcribe` | Speech-to-text for clients without on-device recognition (e.g. the desktop app). |
+| GET | `/ai/capabilities` | What the assistant can use: the OpenAI chat model and OpenAI voice (no secrets). |
+| POST | `/ai/realtime/session` | Start a live voice conversation (OpenAI Realtime API). |
+| POST | `/ai/speak` | Text-to-speech for voice-note replies (OpenAI ``OPENAI_TTS_MODEL`` with ``OPENAI_VOICE`` / |
+| POST | `/ai/transcribe` | Speech-to-text for voice notes (OpenAI ``OPENAI_TRANSCRIBE_MODEL``; Urdu, English or mixed). |
 | GET | `/rag/search` |  |
 | POST | `/rag/search` |  |
 

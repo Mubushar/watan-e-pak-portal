@@ -1,14 +1,18 @@
 /**
  * The assistant's "brain": understands the request on-device (lib/intent), fetches
  * real data from the portal (search, RAG, the user's own listings), and phrases the
- * reply — with the backend LLM when one is configured (PORTAL_LLM_BASE_URL), or from
- * templates when the backend runs its built-in RAG fallback.
+ * reply — with the backend LLM when one is configured (e.g. Google Gemini), or from
+ * built-in templates otherwise.
+ *
+ * It mirrors the person: replies come in the language of their message (English,
+ * Urdu script or Roman Urdu — lib/lang), and spoken replies (voice notes, voice
+ * conversation) are phrased to be heard rather than read.
  */
 import { create } from "zustand";
 import type { Property, PropertyList } from "@/types";
 import { get, post } from "./api";
-import { pkrShort } from "./format";
-import { describeIntent, draftFromIntent, parseIntent, searchQuery, type Intent, type ListingDraft } from "./intent";
+import { draftFromIntent, parseIntent, searchQuery, type Intent, type ListingDraft } from "./intent";
+import { city as cityName, describe, detectLang, money, t, type Lang } from "./lang";
 import type { User } from "@/store/auth";
 
 export interface ChatAction {
@@ -22,14 +26,22 @@ export interface ChatAction {
   primary?: boolean;
 }
 
+/** How a message was sent: typed, as a voice note, or in a live voice conversation. */
+export type MsgKind = "text" | "voice-note" | "live";
+
 export interface ChatMsg {
   id: string;
   role: "user" | "assistant";
   content: string;
+  kind?: MsgKind;
+  /** Language of the message (drives the reply language and the voice used). */
+  lang?: Lang;
+  /** Recorded or synthesized audio for voice notes (object or data URL). */
+  audioUrl?: string;
+  durationMs?: number;
   listings?: Property[];
   actions?: ChatAction[];
   pending?: boolean;
-  voice?: boolean;
 }
 
 interface ChatState {
@@ -53,36 +65,13 @@ export const useChat = create<ChatState>((set) => ({
 
 export const newId = () => Math.random().toString(36).slice(2, 10);
 
-export function welcomeFor(user: User | null): ChatMsg {
-  const name = user?.name?.split(" ")[0];
-  const role = user?.role;
-  const line =
-    role === "seller" || role === "landlord"
-      ? "Tell me about the property you want to sell or rent out and I’ll draft the listing for you."
-      : role === "agent"
-        ? "I can draft listings for your clients, find matching properties and price-check deals."
-        : role === "investor"
-          ? "Ask me for investment picks, price trends or yields in any city."
-          : "Tell me what you’re looking for — city, budget, size or purpose — and I’ll search live listings for you.";
-  return {
-    id: "welcome",
-    role: "assistant",
-    content: `Assalam-o-Alaikum${name ? ` ${name}` : ""}! I’m **Arz-e-Pak AI**. ${line}\n\nTap the mic to talk, or type below — English or Urdu.`,
-  };
+/** The greeting shown before the person says anything (in the app's chosen language). */
+export function welcomeFor(user: User | null, lang: Lang): ChatMsg {
+  return { id: "welcome", role: "assistant", lang, content: t(lang).welcome(user?.name?.split(" ")[0], user?.role) };
 }
 
-export function suggestionsFor(role?: string): string[] {
-  switch (role) {
-    case "seller":
-    case "landlord":
-      return ["I want to sell my 10 marla house in Lahore for 4.5 crore", "What’s my 5 marla plot in Islamabad worth?", "Show my listings", "How do I sell faster?"];
-    case "agent":
-      return ["List a 1 kanal house in DHA Lahore for 9.5 crore", "3 bed apartments in Karachi under 2 crore", "Show my listings", "Commercial shops in Lahore"];
-    case "investor":
-      return ["Best investment plots in Islamabad", "Commercial property in Lahore under 10 crore", "Featured listings", "Which city has the best returns?"];
-    default:
-      return ["10 marla house in Lahore under 5 crore", "Apartments in Karachi", "Plots in Islamabad", "I want to sell my house"];
-  }
+export function suggestionsFor(role: string | undefined, lang: Lang): string[] {
+  return t(lang).suggestions(role);
 }
 
 // ------------------------------------------------------------------ capabilities
@@ -132,38 +121,65 @@ const ragToProperty = (h: RagHit): Property => ({
   city_name: h.city,
 });
 
-const HELP_RE = /^(hi|hello|hey|salam|assalam|aoa|help|what can you do|who are you|kya kar sakte)/i;
+const HELP_RE = /^(hi|hello|hey|salam|assalam|aoa|help|madad|what can you do|who are you|kya kar sakte|السلام|سلام|مدد|آپ کیا)/i;
 
 export interface Reply {
   content: string;
+  /** Language the reply is written in. */
+  lang: Lang;
   listings?: Property[];
   actions?: ChatAction[];
 }
 
-/** Produce the assistant's reply to `text`, given the conversation so far. */
-export async function respond(text: string, history: ChatMsg[], user: User | null, voiceLang: string): Promise<Reply> {
-  const intent = parseIntent(text, await knownCities());
+export interface RespondOptions {
+  /** "voice" when the reply will be heard (voice note or voice conversation). */
+  mode: "text" | "voice";
+  /** Language to use when the message itself gives no clue ("ok", "5 crore"). */
+  fallback?: Lang;
+  /** The person's chosen reply language (Profile / assistant header); overrides detection. */
+  force?: Lang;
+}
+
+/** Whether the server has a real AI model for chat (vs. the built-in templates). */
+export async function chatMode(): Promise<"local" | "upstream"> {
+  return (await capabilities()).chat_mode;
+}
+
+/** Produce the assistant's reply to `text` in the person's language, given the conversation so far. */
+export async function respond(text: string, history: ChatMsg[], user: User | null, opts: RespondOptions): Promise<Reply> {
+  let lang = opts.force ?? detectLang(text, opts.fallback ?? "en");
+  // Spoken Urdu sounds right only from Urdu script, so voice replies use it.
+  if (lang === "roman" && opts.mode === "voice") lang = "ur";
+  const cities = await knownCities();
+  const intent = withContext(parseIntent(text, cities), history);
   const { chat_mode, chat_model } = await capabilities();
-  const facts = await gather(intent, text, user);
+  const facts = await gather(intent, text, user, lang);
 
   // Template replies are clearer than the RAG fallback for actions and greetings.
   if (chat_mode === "local" || intent.action === "my_listings" || intent.action === "signin") {
-    if (intent.action === "chat" && HELP_RE.test(text.trim()) && !facts.listings?.length) return { ...facts, content: helpText(user) };
+    if (intent.action === "chat" && HELP_RE.test(text.trim()) && !facts.listings?.length) return { ...facts, content: t(lang).help(user?.name?.split(" ")[0]) };
+    // Heard replies can't show cards, so name the best match out loud.
+    const top = facts.listings?.[0];
+    if (opts.mode === "voice" && top) return { ...facts, content: facts.content + t(lang).bestMatch(top.title, money(top.price, lang)) };
     return facts;
   }
 
-  // Upstream LLM: let it phrase the answer, grounded on what we found.
+  // Upstream LLM (e.g. Gemini): let it phrase the answer, grounded on what we found.
   const context = facts.listings?.length
-    ? `Listings found in the Arz-e-Pak database (shown to the user as cards below your reply):\n${facts.listings
+    ? `Listings found in the Arz-e-Pak database (the app shows them as cards with your reply):\n${facts.listings
         .slice(0, 6)
-        .map((p) => `- ${p.title} — ${pkrShort(p.price)}, ${p.category}, ${p.city_name ?? ""}${p.bedrooms ? `, ${p.bedrooms} bed` : ""}`)
+        .map((p) => `- ${p.title} — ${money(p.price, "en")}, ${p.category}, ${p.city_name ?? ""}${p.bedrooms ? `, ${p.bedrooms} bed` : ""}`)
         .join("\n")}`
     : "No matching listings were found in the database for this message.";
   const system = [
     "You are Arz-e-Pak AI, the friendly assistant inside the Arz-e-Pak real-estate app for Pakistan.",
     `The user is ${user ? `${user.name ?? "a member"} (${user.role} account)` : "a guest (not signed in)"}.`,
-    "Keep replies under 120 words, warm and practical. Quote prices in PKR crore/lakh. Use short bullet points only when listing options.",
-    voiceLang.startsWith("ur") ? "Reply in Urdu script." : "Reply in the language the user writes in (English, Urdu or Roman Urdu).",
+    t(lang).replyInstruction,
+    "Always answer in the same language as the user's latest message, even if earlier messages used another language.",
+    opts.mode === "voice"
+      ? "Your reply will be spoken aloud as audio: use natural, conversational sentences, no markdown, bullets, emojis or links, and keep it under 60 words."
+      : "Keep replies under 120 words, warm and practical. Use short bullet points only when listing options.",
+    "Quote prices in crore/lakh.",
     "The app can search listings, open details, draft a listing from a description, and manage the user's own listings — buttons for these appear under your reply, so refer to them instead of inventing links.",
     intent.action === "sell" ? "The user wants to list a property; a draft has been prepared — encourage them to tap 'Create listing' and mention any missing details (size, price, location, photos)." : "",
     context,
@@ -178,7 +194,7 @@ export async function respond(text: string, history: ChatMsg[], user: User | nul
         messages: [
           { role: "system", content: system },
           ...history
-            .filter((m) => !m.pending && m.id !== "welcome")
+            .filter((m) => !m.pending && m.id !== "welcome" && m.content)
             .slice(-8)
             .map((m) => ({ role: m.role, content: m.content })),
           { role: "user", content: text },
@@ -193,79 +209,114 @@ export async function respond(text: string, history: ChatMsg[], user: User | nul
   }
 }
 
-async function gather(intent: Intent, text: string, user: User | null): Promise<Reply> {
+/**
+ * Follow-ups refine the previous search: after "plots in Islamabad", "10 marla" means
+ * 10-marla plots in Islamabad, and "under 2 crore" keeps the city and type.
+ */
+let lastSearch: Intent | null = null;
+
+function withContext(intent: Intent, history: ChatMsg[]): Intent {
+  if (!history.some((m) => m.role === "user")) lastSearch = null; // new conversation
+  if (intent.action !== "search") return intent;
+  const prev = lastSearch;
+  lastSearch = prev ? merge(intent, prev) : intent;
+  return lastSearch;
+}
+
+function merge(intent: Intent, prev: Intent): Intent {
+  const merged: Intent = { ...intent };
+  merged.city ??= prev.city;
+  merged.area_hint ??= intent.city ? undefined : prev.area_hint;
+  merged.category ??= prev.category;
+  merged.use_type ??= prev.use_type;
+  merged.purpose ??= prev.purpose;
+  // Size, rooms and budget only carry over while the property type stays the same.
+  if (merged.category === prev.category) {
+    merged.marla ??= prev.marla;
+    merged.bedrooms ??= prev.bedrooms;
+    if (!intent.min_price && !intent.max_price) {
+      merged.min_price = prev.min_price;
+      merged.max_price = prev.max_price;
+    }
+  }
+  return merged;
+}
+
+async function gather(intent: Intent, text: string, user: User | null, lang: Lang): Promise<Reply> {
+  const tr = t(lang);
   switch (intent.action) {
     case "search":
-      return searchReply(intent);
+      return searchReply(intent, lang);
     case "sell": {
       const draft = draftFromIntent(intent, text);
-      const missing = [!intent.city && "city", !intent.marla && "size", !(intent.price ?? intent.max_price) && "asking price"].filter(Boolean) as string[];
-      const summary = [draft.title, draft.price ? `at ${pkrShort(draft.price)}` : ""].filter(Boolean).join(" ");
+      const missing = [!intent.city && tr.missingCity, !intent.marla && tr.missingSize, !(intent.price ?? intent.max_price) && tr.missingPrice].filter(Boolean) as string[];
+      const what = describe({ ...intent, action: "sell", min_price: undefined, max_price: undefined }, lang);
+      const summary = [what, draft.price ? `— ${money(draft.price, lang)}` : ""].filter(Boolean).join(" ");
       return {
-        content: `Great — I’ve drafted a listing${summary ? ` for **${summary}**` : ""}. ${missing.length ? `I still need the ${missing.join(", ")} — you can add ${missing.length > 1 ? "them" : "it"} on the form. ` : ""}Tap **Create listing** to add photos and publish.${user ? "" : " You’ll need to sign in first — it only takes a one-time code."}`,
-        actions: [{ label: "Create listing", draft, primary: true }, ...(user ? [{ label: "My listings", to: "/listings" }] : [{ label: "Sign in", to: "/signin?next=/listings/new" }])],
+        lang,
+        content: tr.drafted(summary, missing, !!user),
+        actions: [{ label: tr.createListing, draft, primary: true }, user ? { label: tr.myListings, to: "/listings" } : { label: tr.signIn, to: "/signin?next=/listings/new" }],
       };
     }
     case "my_listings": {
       if (!user)
         return {
-          content: "Sign in to see and manage your listings — I’ll send you a one-time code, no password needed.",
+          lang,
+          content: tr.listingsNeedSignIn,
           actions: [
-            { label: "Sign in", to: "/signin?next=/listings", primary: true },
-            { label: "Create account", to: "/signup" },
+            { label: tr.signIn, to: "/signin?next=/listings", primary: true },
+            { label: tr.createAccount, to: "/signup" },
           ],
         };
       try {
         const r = await get<PropertyList>("/me/listings", undefined, { noFallback: true });
         const active = r.results.filter((p) => p.status === "active");
         return {
-          content: r.count
-            ? `You have **${r.count}** listing${r.count === 1 ? "" : "s"} (${active.length} active, worth ${pkrShort(active.reduce((s, p) => s + p.price, 0))}).`
-            : "You haven’t listed anything yet. Tell me about your property — e.g. “10 marla house in Lahore for 4 crore” — and I’ll draft it.",
+          lang,
+          content: r.count ? tr.listingsCount(r.count, active.length, money(active.reduce((s, p) => s + p.price, 0), lang)) : tr.listingsNone,
           listings: r.results.slice(0, 5),
           actions: [
-            { label: "Manage listings", to: "/listings", primary: true },
-            { label: "Add a listing", to: "/listings/new" },
+            { label: tr.manageListings, to: "/listings", primary: true },
+            { label: tr.addListing, to: "/listings/new" },
           ],
         };
       } catch (e) {
-        return { content: (e as Error).message };
+        return { lang, content: (e as Error).message };
       }
     }
     case "signin":
       return user
-        ? { content: `You’re signed in as **${user.name ?? user.email ?? user.mobile}**.`, actions: [{ label: "Profile", to: "/profile", primary: true }] }
+        ? { lang, content: tr.signedInAs(user.name ?? user.email ?? user.mobile ?? ""), actions: [{ label: tr.profile, to: "/profile", primary: true }] }
         : {
-            content: "You can sign up or sign in with just your mobile number or e-mail — I’ll send a 6-digit code.",
+            lang,
+            content: tr.signInHelp,
             actions: [
-              { label: "Create account", to: "/signup", primary: true },
-              { label: "Sign in", to: "/signin" },
+              { label: tr.createAccount, to: "/signup", primary: true },
+              { label: tr.signIn, to: "/signin" },
             ],
           };
     default: {
       try {
         const r = await get<{ results: RagHit[] }>("/rag/search", { query: text, top_k: 6 }, { noFallback: true });
         const listings = r.results.filter((h) => h.type === "property").map(ragToProperty);
-        const places = r.results.filter((h) => h.type !== "property").map((h) => h.name ?? h.title);
+        const places = r.results.filter((h) => h.type !== "property").map((h) => h.name ?? h.title ?? "");
         return {
-          content: listings.length
-            ? `Here are the closest matches I found${places.length ? ` (related: ${places.slice(0, 3).join(", ")})` : ""}:`
-            : places.length
-              ? `I found these related places: **${places.slice(0, 4).join(", ")}**. Tell me a budget or property type and I’ll find listings there.`
-              : "I couldn’t find a match for that. Try a city (Lahore, Karachi, Islamabad), a type (house, plot, apartment, shop) and a budget.",
+          lang,
+          content: listings.length ? tr.ragMatches(places) : places.length ? tr.ragPlaces(places) : tr.ragNone,
           listings,
-          actions: listings.length ? [{ label: "Open Explore", to: "/explore" }] : undefined,
+          actions: listings.length ? [{ label: tr.openExplore, to: "/explore" }] : undefined,
         };
       } catch (e) {
-        return { content: (e as Error).message };
+        return { lang, content: (e as Error).message };
       }
     }
   }
 }
 
-async function searchReply(intent: Intent): Promise<Reply> {
+async function searchReply(intent: Intent, lang: Lang): Promise<Reply> {
+  const tr = t(lang);
   const q = searchQuery(intent);
-  const label = describeIntent(intent, (n) => pkrShort(n));
+  const label = describe(intent, lang);
   const explore = `/explore?${new URLSearchParams(Object.entries({ city: intent.city, category: intent.category, use_type: intent.use_type, bedrooms: intent.bedrooms, min_price: intent.min_price, max_price: intent.max_price }).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString()}`;
   try {
     let r = await get<PropertyList>("/search", { ...q, limit: 6 });
@@ -274,29 +325,13 @@ async function searchReply(intent: Intent): Promise<Reply> {
       r = await get<PropertyList>("/search", { city: intent.city, category: intent.category, use_type: intent.use_type, limit: 6 });
       relaxed = true;
     }
-    const invest = intent.purpose === "invest" ? " For investment, look at featured and newly launched schemes — ask me about returns in any city." : "";
     return {
-      content: !r.count
-        ? `I couldn’t find any listings for **${label || "that"}** yet. Try another city, type or budget.`
-        : relaxed
-          ? `Nothing matched **${label}** exactly, so here are the closest ${r.count === 1 ? "option" : "options"}${intent.city ? ` in ${intent.city}` : ""}:`
-          : `I found **${r.count}** ${r.count === 1 ? "listing" : "listings"} for **${label}**.${invest}`,
+      lang,
+      content: !r.count ? tr.none(label) : relaxed ? tr.relaxed(label, cityName(intent.city, lang)) : tr.found(r.count, label) + (intent.purpose === "invest" ? tr.investHint : ""),
       listings: r.results,
-      actions: r.count ? [{ label: `See all ${r.count}`, to: explore, primary: true }] : [{ label: "Browse all listings", to: "/explore" }],
+      actions: r.count ? [{ label: tr.seeAll(r.count), to: explore, primary: true }] : [{ label: tr.browseAll, to: "/explore" }],
     };
   } catch (e) {
-    return { content: (e as Error).message };
+    return { lang, content: (e as Error).message };
   }
-}
-
-function helpText(user: User | null): string {
-  return [
-    `Here’s what I can do${user?.name ? `, ${user.name.split(" ")[0]}` : ""}:`,
-    "- **Find property** — “3 bed house in Lahore under 5 crore”",
-    "- **List your property** — “I want to sell my 1 kanal plot in DHA Islamabad for 3.5 crore”",
-    "- **Your listings** — “Show my listings”",
-    "- **Ask anything** — areas, schemes, prices and buying tips",
-    "",
-    "You can talk to me in English or Urdu — tap the mic.",
-  ].join("\n");
 }

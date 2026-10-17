@@ -16,7 +16,9 @@ export default defineConfig(({ mode }) => {
     // Relative asset URLs so the same dist/ loads from Capacitor, Electron and a web server.
     base: "./",
     resolve: { alias: { "@": path.resolve(__dirname, "src") } },
-    server: { port: 5174, proxy },
+    // Only scan the app itself — not the copies of the built app inside android/ and ios/.
+    optimizeDeps: { entries: ["index.html"] },
+    server: { port: 5174, proxy, watch: { ignored: ["**/android/**", "**/ios/**", "**/release/**"] } },
     preview: { port: 4174, proxy },
     build: {
       target: "es2020",

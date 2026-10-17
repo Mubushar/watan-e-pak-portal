@@ -69,14 +69,20 @@ function amount(numStr: string, unit?: string): number {
   return n;
 }
 
-const MONEY = String.raw`(\d+(?:[.,]\d+)?)\s*(crore|cr|lakh|lakhs|lac|lacs|million|mn|m|k|thousand|کروڑ|لاکھ|ہزار)\b`;
+// `(?![a-z])` instead of `\b`: JavaScript's \b doesn't see Urdu letters as word characters.
+const MONEY = String.raw`(\d+(?:[.,]\d+)?)\s*(crore|cr|lakh|lakhs|lac|lacs|million|mn|m|k|thousand|کروڑ|لاکھ|ہزار)(?![a-z])`;
+
+/** Eastern Arabic / Urdu digits (۰-۹, ٠-٩) → ASCII so numbers parse the same way. */
+function asciiDigits(s: string): string {
+  return s.replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0)).replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660));
+}
 
 export function parseIntent(raw: string, knownCities: string[] = []): Intent {
-  const text = raw.toLowerCase().replace(/\s+/g, " ").trim();
+  const text = asciiDigits(raw).toLowerCase().replace(/\s+/g, " ").trim();
   const intent: Intent = { action: "chat" };
 
   // ---- action
-  if (/\b(my (listings?|properties|ads?)|meri (listing|property))\b/.test(text)) intent.action = "my_listings";
+  if (/\b(my (listings?|properties|ads?)|meri (listings?|propert(y|ies)|ads?))\b|میری (لسٹنگ|پراپرٹ|اشتہار)|میرے (اشتہار|پلاٹ)/.test(text)) intent.action = "my_listings";
   else if (/\b(sell|selling|list my|post (an? )?(ad|listing)|add (a |my )?(listing|property)|bechna|baichna|farokht)\b|بیچ|فروخت/.test(text)) intent.action = "sell";
   else if (/\b(sign ?in|log ?in|sign ?up|register|create (an )?account)\b/.test(text)) intent.action = "signin";
 
@@ -103,7 +109,7 @@ export function parseIntent(raw: string, knownCities: string[] = []): Intent {
   if (kanal) intent.marla = parseFloat(kanal[1]!) * 20;
   else if (marla) intent.marla = parseFloat(marla[1]!);
 
-  const beds = text.match(/(\d+)\s*(?:-|\s)?(bed(room)?s?|bhk|br|kamr[ae]y?)\b/);
+  const beds = text.match(/(\d+)\s*(?:-|\s)?(bed(room)?s?|bhk|br|kamr[ae]y?)\b/) ?? text.match(/(\d+)\s*(کمرے|کمروں|کمرہ|بیڈ)/);
   if (beds) intent.bedrooms = parseInt(beds[1]!, 10);
 
   // ---- price
@@ -114,10 +120,13 @@ export function parseIntent(raw: string, knownCities: string[] = []): Intent {
   } else {
     const under = text.match(new RegExp(String.raw`(?:under|below|less than|upto|up to|within|max(?:imum)?|budget(?: of| is)?|تک)\s*(?:pkr|rs\.?)?\s*` + MONEY));
     const over = text.match(new RegExp(String.raw`(?:over|above|more than|min(?:imum)?|starting)\s*(?:pkr|rs\.?)?\s*` + MONEY));
-    if (under) intent.max_price = amount(under[1]!, under[2]);
-    if (over) intent.min_price = amount(over[1]!, over[2]);
+    // Urdu puts the limit after the amount: "5 کروڑ تک", "2 کروڑ سے زیادہ".
+    const underUr = text.match(new RegExp(MONEY + String.raw`\s*(?:تک|سے کم|کے اندر|tak|se kam)`));
+    const overUr = text.match(new RegExp(MONEY + String.raw`\s*(?:سے زیادہ|سے اوپر|se zyada|se upar)`));
+    if (under ?? underUr) intent.max_price = amount((under ?? underUr)![1]!, (under ?? underUr)![2]);
+    if (over ?? overUr) intent.min_price = amount((over ?? overUr)![1]!, (over ?? overUr)![2]);
     const any = text.match(new RegExp(MONEY));
-    if (!under && !over && any) {
+    if (!under && !over && !underUr && !overUr && any) {
       const v = amount(any[1]!, any[2]);
       if (intent.action === "sell") intent.price = v;
       else intent.max_price = v;

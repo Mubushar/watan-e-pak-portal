@@ -23,13 +23,13 @@ One React codebase that ships as a native app on **Android**, **iOS**, **Windows
 * **Create and manage listings** (any signed-in role): a 5-step wizard (describe →
   location → size & price → photos → review) with camera/gallery photo upload. My
   Listings lets you edit, mark sold/rented, re-list or delete.
-* **Voice + text AI assistant**: talk or type in English, Urdu or Roman Urdu. It
-  understands requests on the device, for example "3 bed 10 marla house in Lahore under 5
-  crore" or "I want to sell my 1 kanal plot in DHA Islamabad for 3.5 crore". It answers
-  with real listings and buttons that do the next step, such as opening the results or a
-  **pre-filled listing form**. Replies can be read aloud. *Conversation mode* keeps
-  listening after each reply, so you can use it hands-free. You can also fill the
-  listing wizard's first step by voice.
+* **Voice + text AI assistant** that mirrors the user: a typed message gets a text reply,
+  a voice note gets a voice-note reply, and a voice conversation is spoken. Every reply
+  is in the language of the user's message: English, Urdu (اردو) or Roman Urdu. It
+  understands requests in all three, for example "3 bed 10 marla house in Lahore under 5
+  crore", "لاہور میں 10 مرلہ گھر 5 کروڑ تک" or "meri listings dikhao". It answers with real
+  listings and buttons that do the next step, such as opening the results or a
+  **pre-filled listing form**. You can also fill the listing wizard's first step by voice.
 * Light/dark theme, offline fallback (sample listings), configurable server URL.
 
 ## Backend endpoints used
@@ -42,7 +42,7 @@ The app talks to the same FastAPI backend as the portal (`backend/`):
 | Browse | `GET /search`, `/properties`, `/properties/{id}`, `/cities`, `/hierarchy` |
 | My listings | `GET/POST /me/listings`, `PUT/DELETE /me/listings/{id}`, `POST /me/listings/{id}/photos`, `GET /media/uploads/{file}` |
 | Enquiries | `POST /crm/leads` |
-| AI | `POST /v1/chat/completions`, `GET /rag/search`, `GET /ai/capabilities`, `POST /ai/transcribe` |
+| AI (OpenAI) | `POST /v1/chat/completions`, `GET /rag/search`, `GET /ai/capabilities`, `POST /ai/realtime/session`, `POST /ai/transcribe`, `POST /ai/speak` |
 
 The backend has CORS enabled (override it with `PORTAL_CORS_ORIGINS`), so the desktop app
 and any separately hosted build can call it. On Android/iOS, requests go through
@@ -101,18 +101,52 @@ npm run ios:open         # opens Xcode → pick a team → Run
 Development builds allow plain `http://` (Android `usesCleartextTraffic`, iOS
 `NSAllowsLocalNetworking`). Use HTTPS for production and remove those exceptions.
 
-## Voice engines
+## How the assistant replies
 
-| Platform | Speech-to-text | Text-to-speech |
-| --- | --- | --- |
-| Android / iOS | On-device recognizer (`@capacitor-community/speech-recognition`) | Native voices (`@capacitor-community/text-to-speech`) |
-| Browser (Chrome, Edge, Safari) | Web Speech API | `speechSynthesis` |
-| Windows / macOS app | Records the mic and sends the audio to `POST /ai/transcribe`, which forwards it to the configured LLM's `/audio/transcriptions` (needs `PORTAL_LLM_BASE_URL`; model `PORTAL_STT_MODEL`, default `whisper-1`) | `speechSynthesis` (OS voices) |
+The assistant answers the way the user asked:
 
-Without an upstream LLM, the assistant still works. It understands requests on the
-device and answers from the portal's own data through the RAG fallback. With
-`PORTAL_LLM_BASE_URL` set, replies come from the LLM, grounded on the listings the app
-found.
+| User sends | Assistant replies with |
+| --- | --- |
+| A typed message | A text message (nothing is played). The 🔊 Listen link reads it on request. |
+| A voice note (🎤 when the box is empty; tap ➤ to send, 🗑 to discard) | A voice note (play button and audio, plus the text), played once automatically. |
+| A voice conversation (🎧) | Spoken answers. One tap starts it; it listens, answers, then listens again until the user taps ■. **Let me talk** cuts an answer short. Three silent turns in a row pause it. |
+
+**Language:** the reply-language button in the assistant header (also in Profile) is
+your choice. **Auto**, the default, replies in the language of each message: Urdu script,
+Roman Urdu or English, detected per message (`src/lib/lang.ts`). **EN** or **اردو** always
+replies in that language. A message with no language clue,
+like "ok" or "5 crore", keeps the conversation's language. Spoken Roman-Urdu replies use
+Urdu script so the Urdu voice pronounces them correctly.
+
+**Follow-ups** refine the previous search. "Houses in Lahore" → "10 marla" → "under 5
+crore" → "and in Karachi?" keeps the type, size and budget and changes only the city.
+
+**Typing in Urdu:** the **EN | اردو** switch next to the message box sets the typing
+language. It also sets the greeting and the on-device speech-recognition language.
+- In اردو mode a PC or Mac keyboard types Urdu phonetically (`src/components/UrduKeyboard.tsx`).
+  Letters map by sound, for example a=ا b=ب p=پ t=ت j=ج c=چ d=د r=ر s=س x=ش k=ک g=گ l=ل m=م
+  n=ن w/o=و h=ہ i=ی y=ے. Shift gives the extra letters: T=ٹ D=ڈ R=ڑ N=ں M=ھ A=آ H=ح K=خ S=ص.
+- ⌨ (in the message box, in both languages) opens the on-screen keyboard. It has English
+  (QWERTY, with Shift) and Urdu layouts, number keys, punctuation, backspace, and ⏎ to
+  send. 🌐 switches the layout and the typing language together. While it's open the
+  device's own keyboard stays hidden. Choosing اردو on a touch screen opens it
+  automatically, because phone keyboards don't report letter keys. You can also switch
+  the phone's own keyboard to Urdu.
+
+### OpenAI voice
+
+All AI runs on OpenAI through the backend (`OPENAI_API_KEY` in `backend/.env`). The key
+never ships in the app.
+
+| Mode | How it works |
+| --- | --- |
+| **Live conversation** (🎧) | OpenAI **Realtime API** (`gpt-realtime-2.1`), speech-to-speech over WebRTC (`src/lib/realtime.ts`). Natural, low-latency talk that you can interrupt. Captions of both sides appear in the chat. The agent calls tools: it searches listings, opens details, reads your listings and drafts a new listing, and the results appear as cards and buttons. Mute and hang-up controls are on screen. |
+| **Voice note** (🎤) | Your recording goes to OpenAI speech-to-text (`gpt-transcribe`; Urdu in Urdu script). The reply comes from the chat model and is returned as a voice note (`gpt-4o-mini-tts`). |
+| **Typed message** | The OpenAI chat model (`gpt-5.6-luna`) replies in text. 🔊 Listen reads it aloud with the OpenAI voice. |
+
+The voice is the same everywhere: `OPENAI_VOICE` (default `marin`), or your own
+`OPENAI_VOICE_ID`. Microphone access works in Chrome, Edge and Safari, in the desktop
+app, and in the Android and iOS apps (WebRTC plus the microphone permission).
 
 ## Layout
 
