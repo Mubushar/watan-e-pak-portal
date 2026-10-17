@@ -168,8 +168,11 @@ REALTIME_TOOLS: List[Dict[str, Any]] = [
     {
         "type": "function",
         "name": "search_listings",
-        "description": "Search Arz-e-Pak property listings. Use whenever the user wants to find, buy, rent or compare properties. "
-                       "Prices are in Pakistani rupees (1 crore = 10,000,000; 1 lakh = 100,000). Size in marla (1 kanal = 20 marla).",
+        "description": "Search Arz-e-Pak property listings. Use whenever the user wants to find, buy, rent or compare properties, "
+                       "including follow-ups that refine the previous search: keep the earlier city, type and budget unless the user "
+                       "changes them (e.g. after 'houses in Rawalpindi under 5 crore', 'bigger than 7.5' means min_marla 7.5 with the same "
+                       "city and budget). Prices are in Pakistani rupees (1 crore = 10,000,000; 1 lakh = 100,000). Size in marla "
+                       "(1 kanal = 20 marla). If nothing matches, relax one filter and search again before answering.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -256,6 +259,7 @@ def realtime_instructions(user: Optional[Dict[str, Any]], reply_lang: str) -> st
         "- When the user wants to sell or rent out a property, ask briefly for anything missing (type, city, size, price), "
         "then call draft_listing and tell them to tap 'Create listing' on screen to add photos and publish.",
         "- Results also appear on screen as cards, so don't list everything aloud.",
+        "- You search yourself. Never ask the user to press a search button or any button you haven't been told is on screen.",
         "",
         "# Safety",
         "You give general guidance, not legal or financial advice; for documents and title checks suggest a lawyer.",

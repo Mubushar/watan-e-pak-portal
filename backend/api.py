@@ -430,6 +430,17 @@ def ai_capabilities() -> Any:
     }
 
 
+@app.get("/ai/tools", tags=["ai"])
+def ai_tools() -> Any:
+    """The assistant's tools in Chat Completions format (the same ones the live agent gets).
+
+    The app runs the calls itself against this API, so typed chat and voice notes can
+    search listings, open details, read the user's listings and draft a listing.
+    """
+    return {"tools": [{"type": "function", "function": {k: t[k] for k in ("name", "description", "parameters")}}
+                      for t in openai_voice.REALTIME_TOOLS]}
+
+
 @app.post("/ai/transcribe", tags=["ai"])
 async def ai_transcribe(payload: TranscribeRequest) -> Any:
     """Speech-to-text for voice notes (OpenAI ``OPENAI_TRANSCRIBE_MODEL``; Urdu, English or mixed)."""

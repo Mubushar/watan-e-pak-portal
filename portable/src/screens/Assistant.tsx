@@ -15,12 +15,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Bot, Headphones, Info, Keyboard, Languages, Mic, MicOff, Pause, Play, RotateCcw, Send, Sparkles, Square, Trash2, User as UserIcon, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
-import type { Property, PropertyList } from "@/types";
-import { get } from "@/lib/api";
 import { chatMode, newId, respond, suggestionsFor, useChat, welcomeFor, type ChatAction, type ChatMsg, type MsgKind, type Reply } from "@/lib/assistant";
-import type { ListingDraft } from "@/lib/intent";
-import { detectLang, money, speechTag, t, type Lang } from "@/lib/lang";
+import { detectLang, speechTag, type Lang } from "@/lib/lang";
 import { RealtimeAgent, type AgentState } from "@/lib/realtime";
+import { runAgentTool } from "@/lib/tools";
 import { NOT_CONFIGURED, playAudio, recordVoiceNote, serverVoice, speak, stopSpeaking, synthesize, type ServerVoice, type VoiceNoteSession } from "@/lib/voice";
 import { isNative } from "@/lib/platform";
 import { cn, isUrdu } from "@/lib/utils";
@@ -44,18 +42,6 @@ const clock = (ms: number) => {
   const s = Math.max(0, Math.round(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 };
-
-/** A compact listing for the live agent to talk about (ids for follow-ups, no long fields). */
-const brief = (p: Property) => ({
-  id: p.id,
-  title: p.title,
-  price: money(p.price, "en"),
-  city: p.city_name,
-  category: p.category,
-  size_marla: p.marla_area ?? undefined,
-  bedrooms: p.bedrooms ?? undefined,
-  status: p.status,
-});
 
 export default function Assistant() {
   const nav = useNavigate();
@@ -216,44 +202,9 @@ export default function Assistant() {
   /** Run a tool the live agent called, against our backend with the user's session. */
   const runTool = useCallback(
     async (name: string, args: Record<string, unknown>, responseId: string): Promise<unknown> => {
-      const tr = t(uiLang);
-      if (name === "search_listings") {
-        const r = await get<PropertyList>("/search", { ...(args as Record<string, string | number | boolean>), limit: 5 });
-        const q = new URLSearchParams(Object.entries(args).filter(([, v]) => v !== undefined && v !== null && v !== "").map(([k, v]) => [k, String(v)]));
-        attach(responseId, { listings: r.results, actions: r.count ? [{ label: tr.seeAll(r.count), to: `/explore?${q}`, primary: true }] : undefined });
-        return { count: r.count, results: r.results.map(brief) };
-      }
-      if (name === "get_listing") {
-        const p = await get<Property>(`/properties/${String(args.id ?? "")}`);
-        attach(responseId, { listings: [p] });
-        return { ...brief(p), description: p.description, bathrooms: p.bathrooms, location: [p.block_name, p.scheme_name, p.city_name].filter(Boolean).join(", ") };
-      }
-      if (name === "my_listings") {
-        if (!useAuth.getState().token) {
-          attach(responseId, { actions: [{ label: tr.signIn, to: "/signin?next=/listings", primary: true }] });
-          return { error: "not_signed_in" };
-        }
-        const r = await get<PropertyList>("/me/listings", undefined, { noFallback: true });
-        attach(responseId, { listings: r.results.slice(0, 5), actions: [{ label: tr.manageListings, to: "/listings" }] });
-        return { count: r.count, results: r.results.slice(0, 10).map(brief) };
-      }
-      if (name === "draft_listing") {
-        const d = args as Record<string, string | number | undefined>;
-        const draft: ListingDraft = {
-          title: d.title as string | undefined,
-          description: d.description as string | undefined,
-          category: d.category as string | undefined,
-          use_type: d.use_type as string | undefined,
-          city: d.city as string | undefined,
-          marla: d.marla as number | undefined,
-          bedrooms: d.bedrooms as number | undefined,
-          bathrooms: d.bathrooms as number | undefined,
-          price: d.price as number | undefined,
-        };
-        attach(responseId, { actions: [{ label: tr.createListing, draft, primary: true }] });
-        return { ok: true, shown_on_screen: "A 'Create listing' button with these details is now on screen.", signed_in: !!useAuth.getState().token };
-      }
-      return { error: `unknown tool ${name}` };
+      const { output, effect } = await runAgentTool(name, args, uiLang);
+      attach(responseId, effect);
+      return output;
     },
     [attach, uiLang],
   );

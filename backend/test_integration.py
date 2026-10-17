@@ -1247,6 +1247,9 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
               str(r.status_code))
         voice = r.json().get("voice") or {}
         check("GET /ai/capabilities voice status", {"provider", "stt", "tts", "realtime"} <= set(voice), str(voice))
+        r = client.get("/ai/tools")
+        names = [t["function"]["name"] for t in r.json().get("tools", [])] if r.status_code == 200 else []
+        check("GET /ai/tools (chat tool definitions)", names == ["search_listings", "get_listing", "my_listings", "draft_listing"], str(names))
         if not voice.get("provider"):  # no OPENAI_API_KEY in the test environment
             r = client.post("/ai/transcribe", json={"audio_base64": "AAAA"})
             check("POST /ai/transcribe (no OpenAI key -> 501)", r.status_code == 501, str(r.status_code))

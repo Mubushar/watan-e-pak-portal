@@ -18,7 +18,7 @@ OpenAI-compatible facade and error handling. For the MCP surface, see the
 | OpenAPI schema | `/openapi.json` |
 | MCP (mounted) | `/mcp` |
 | OpenAI facade | `/v1` |
-| Routes | **628** across **37 tags** |
+| Routes | **629** across **37 tags** |
 
 Every route calls a plain-Python function that the matching MCP tool also calls, so the
 two surfaces are guaranteed equivalent.
@@ -286,6 +286,7 @@ OpenAI-style API.
 | --- | --- |
 | `GET /ai/capabilities` | The chat model (`local` fallback or `upstream` OpenAI) and OpenAI voice status: `voice.{provider, stt, tts, realtime, realtime_model, voice}`. No secrets. |
 | `POST /ai/realtime/session` | `{"reply_lang": "auto" \| "ur" \| "en"}` returns `{"client_secret", "expires_at", "model", "calls_url", "voice"}`. The app posts its WebRTC SDP offer to `calls_url` with `Authorization: Bearer <client_secret>` (`Content-Type: application/sdp`). Send the user's bearer token to personalise the agent. Returns `501` without `OPENAI_API_KEY`. |
+| `GET /ai/tools` | The assistant's tools in Chat Completions format: `search_listings`, `get_listing`, `my_listings`, `draft_listing`. These are the same tools the live agent gets. The app runs the calls itself, so typed chat and voice notes can search and act. |
 | `POST /ai/transcribe` | `{"audio_base64", "mime_type"}` returns `{"text"}`, transcribed by OpenAI `gpt-transcribe` with Urdu and English expected. |
 | `POST /ai/speak` | `{"text", "language"}` returns `{"audio_base64", "mime_type": "audio/mpeg"}` from OpenAI text-to-speech. |
 

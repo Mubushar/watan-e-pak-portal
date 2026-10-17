@@ -1,8 +1,9 @@
 /**
- * The assistant's "brain": understands the request on-device (lib/intent), fetches
- * real data from the portal (search, RAG, the user's own listings), and phrases the
- * reply — with the backend LLM when one is configured (e.g. Google Gemini), or from
- * built-in templates otherwise.
+ * The assistant's "brain" for typed messages and voice notes. With OpenAI connected it
+ * is a tool-using agent: the model reads the conversation, calls the same tools as the
+ * live voice agent (lib/tools: listing search, details, your listings, drafting a
+ * listing) and answers. Without it, the request is understood on-device (lib/intent)
+ * and answered from built-in templates.
  *
  * It mirrors the person: replies come in the language of their message (English,
  * Urdu script or Roman Urdu — lib/lang), and spoken replies (voice notes, voice
@@ -13,6 +14,7 @@ import type { Property, PropertyList } from "@/types";
 import { get, post } from "./api";
 import { draftFromIntent, parseIntent, searchQuery, type Intent, type ListingDraft } from "./intent";
 import { city as cityName, describe, detectLang, money, t, type Lang } from "./lang";
+import { mergeEffects, runAgentTool, type ToolEffect } from "./tools";
 import type { User } from "@/store/auth";
 
 export interface ChatAction {
@@ -42,6 +44,8 @@ export interface ChatMsg {
   listings?: Property[];
   actions?: ChatAction[];
   pending?: boolean;
+  /** What the agent looked up for this reply (shown to the model on later turns, not to the user). */
+  context?: string;
 }
 
 interface ChatState {
@@ -129,6 +133,7 @@ export interface Reply {
   lang: Lang;
   listings?: Property[];
   actions?: ChatAction[];
+  context?: string;
 }
 
 export interface RespondOptions {
@@ -150,63 +155,139 @@ export async function respond(text: string, history: ChatMsg[], user: User | nul
   let lang = opts.force ?? detectLang(text, opts.fallback ?? "en");
   // Spoken Urdu sounds right only from Urdu script, so voice replies use it.
   if (lang === "roman" && opts.mode === "voice") lang = "ur";
+  const { chat_mode, chat_model } = await capabilities();
+
+  // With OpenAI connected, the model understands the request in context and runs the tools itself.
+  if (chat_mode === "upstream") {
+    try {
+      return await agentReply(text, history, user, lang, opts, chat_model);
+    } catch {
+      /* fall back to the built-in replies below */
+    }
+  }
+
   const cities = await knownCities();
   const intent = withContext(parseIntent(text, cities), history);
-  const { chat_mode, chat_model } = await capabilities();
   const facts = await gather(intent, text, user, lang);
+  if (intent.action === "chat" && HELP_RE.test(text.trim()) && !facts.listings?.length) return { ...facts, content: t(lang).help(user?.name?.split(" ")[0]) };
+  // Heard replies can't show cards, so name the best match out loud.
+  const top = facts.listings?.[0];
+  if (opts.mode === "voice" && top) return { ...facts, content: facts.content + t(lang).bestMatch(top.title, money(top.price, lang)) };
+  return facts;
+}
 
-  // Template replies are clearer than the RAG fallback for actions and greetings.
-  if (chat_mode === "local" || intent.action === "my_listings" || intent.action === "signin") {
-    if (intent.action === "chat" && HELP_RE.test(text.trim()) && !facts.listings?.length) return { ...facts, content: t(lang).help(user?.name?.split(" ")[0]) };
-    // Heard replies can't show cards, so name the best match out loud.
-    const top = facts.listings?.[0];
-    if (opts.mode === "voice" && top) return { ...facts, content: facts.content + t(lang).bestMatch(top.title, money(top.price, lang)) };
-    return facts;
-  }
+// ------------------------------------------------------------------ OpenAI agent (tool calling)
 
-  // Upstream LLM (e.g. Gemini): let it phrase the answer, grounded on what we found.
-  const context = facts.listings?.length
-    ? `Listings found in the Arz-e-Pak database (the app shows them as cards with your reply):\n${facts.listings
-        .slice(0, 6)
-        .map((p) => `- ${p.title} — ${money(p.price, "en")}, ${p.category}, ${p.city_name ?? ""}${p.bedrooms ? `, ${p.bedrooms} bed` : ""}`)
-        .join("\n")}`
-    : "No matching listings were found in the database for this message.";
-  const system = [
-    "You are Arz-e-Pak AI, the friendly assistant inside the Arz-e-Pak real-estate app for Pakistan.",
-    `The user is ${user ? `${user.name ?? "a member"} (${user.role} account)` : "a guest (not signed in)"}.`,
-    t(lang).replyInstruction,
-    "Always answer in the same language as the user's latest message, even if earlier messages used another language.",
+type ToolDef = { type: "function"; function: { name: string; description: string; parameters: unknown } };
+let toolDefs: Promise<ToolDef[]> | null = null;
+function chatTools(): Promise<ToolDef[]> {
+  toolDefs ??= get<{ tools: ToolDef[] }>("/ai/tools", undefined, { noFallback: true })
+    .then((r) => r.tools)
+    .catch((e) => {
+      toolDefs = null;
+      throw e;
+    });
+  return toolDefs;
+}
+
+interface ToolCall {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
+}
+interface ChatMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | null;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
+}
+
+const LANGUAGE_RULE: Record<Lang, string> = {
+  ur: "Reply in Urdu written in Urdu script.",
+  roman: "Reply in Roman Urdu (Urdu written in English letters), the way the user writes.",
+  en: "Reply in English.",
+};
+
+function agentSystem(user: User | null, lang: Lang, opts: RespondOptions): string {
+  return [
+    "# Role",
+    "You are Arz-e-Pak AI, the friendly real-estate assistant inside the Arz-e-Pak app in Pakistan. You help people find, buy, rent, sell and list property.",
+    user ? `You are talking to ${user.name ?? "a member"} (${user.role} account).` : "The user is a guest (not signed in).",
+    "",
+    "# Language",
+    opts.force ? `${LANGUAGE_RULE[lang]} Always, whatever language the user writes in.` : `${LANGUAGE_RULE[lang]} Match the language of the user's latest message.`,
+    "",
+    "# Style",
     opts.mode === "voice"
-      ? "Your reply will be spoken aloud as audio: use natural, conversational sentences, no markdown, bullets, emojis or links, and keep it under 60 words."
-      : "Keep replies under 120 words, warm and practical. Use short bullet points only when listing options.",
-    "Quote prices in crore/lakh.",
-    "The app can search listings, open details, draft a listing from a description, and manage the user's own listings — buttons for these appear under your reply, so refer to them instead of inventing links.",
-    intent.action === "sell" ? "The user wants to list a property; a draft has been prepared — encourage them to tap 'Create listing' and mention any missing details (size, price, location, photos)." : "",
-    context,
-  ]
-    .filter(Boolean)
-    .join("\n");
-  try {
-    const r = await post<{ choices: { message: { content: string } }[] }>(
+      ? "Your reply is played as audio (a voice note): 1-3 short natural sentences, no markdown, lists, emojis or links."
+      : "Keep replies short (under 100 words), warm and practical. Short bullet points only when comparing options.",
+    "Say prices in crore/lakh and sizes in marla/kanal (1 kanal = 20 marla). Never read out ids.",
+    "",
+    "# Tools",
+    "- You search yourself with search_listings — never ask the user to press a search button, and never mention buttons except ones a tool result says are on screen ('See all', 'Create listing', 'Sign in').",
+    "- Follow-ups refine the previous search: keep the earlier city, type and budget unless the user changes them. The app appends notes like [context: ...] to your earlier replies so you know what was searched; never write such notes yourself.",
+    "- If a search finds nothing, relax one filter and search again, then say what you changed.",
+    "- Mention the best 1-3 results (name, size, price); they also appear as cards under your reply. Never invent listings.",
+    "- When the user wants to sell or rent out a property, ask briefly for missing essentials (type, city, size, price), then call draft_listing.",
+    "- For their own listings call my_listings; if it says not_signed_in, ask them to sign in with a one-time code.",
+  ].join("\n");
+}
+
+async function agentReply(text: string, history: ChatMsg[], user: User | null, lang: Lang, opts: RespondOptions, model: string): Promise<Reply> {
+  const tools = await chatTools();
+  const messages: ChatMessage[] = [
+    { role: "system", content: agentSystem(user, lang, opts) },
+    ...history
+      .filter((m) => !m.pending && m.id !== "welcome" && m.content)
+      .slice(-12)
+      .map((m): ChatMessage => ({ role: m.role, content: m.context ? `${m.content}\n\n[context: ${m.context}]` : m.content })),
+    { role: "user", content: text },
+  ];
+  let effect: ToolEffect = {};
+  const notes: string[] = [];
+  for (let round = 0; round < 4; round++) {
+    const r = await post<{ choices: { message: ChatMessage }[] }>(
       "/v1/chat/completions",
-      {
-        model: chat_model,
-        messages: [
-          { role: "system", content: system },
-          ...history
-            .filter((m) => !m.pending && m.id !== "welcome" && m.content)
-            .slice(-8)
-            .map((m) => ({ role: m.role, content: m.content })),
-          { role: "user", content: text },
-        ],
-      },
-      { timeoutMs: 60_000 },
+      // gpt-5.x models only accept function tools in Chat Completions with reasoning off.
+      { model, messages, tools, tool_choice: round === 3 ? "none" : "auto", reasoning_effort: "none" },
+      { timeoutMs: 90_000 },
     );
-    const content = r.choices?.[0]?.message?.content?.trim();
-    return { ...facts, content: content || facts.content };
-  } catch {
-    return facts;
+    const msg = r.choices?.[0]?.message;
+    if (!msg) throw new Error("empty reply");
+    if (!msg.tool_calls?.length) {
+      // Drop any [context: …] note the model copied from earlier turns.
+      const content = (msg.content ?? "").replace(/\s*\[context:[^\]]*\]/gi, "").trim();
+      if (!content) throw new Error("empty reply");
+      return { lang, content, listings: effect.listings, actions: effect.actions, context: notes.join(" | ") || undefined };
+    }
+    messages.push({ role: "assistant", content: msg.content ?? null, tool_calls: msg.tool_calls });
+    for (const call of msg.tool_calls) {
+      let args: Record<string, unknown> = {};
+      try {
+        args = JSON.parse(call.function.arguments || "{}");
+      } catch {
+        /* keep {} */
+      }
+      let output: unknown;
+      try {
+        const run = await runAgentTool(call.function.name, args, lang);
+        effect = mergeEffects(effect, run.effect);
+        output = run.output;
+      } catch (e) {
+        output = { error: (e as Error).message };
+      }
+      notes.push(summarizeCall(call.function.name, args, output));
+      messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(output ?? {}) });
+    }
   }
+  throw new Error("too many tool rounds");
+}
+
+/** One-line memory of a tool call, e.g. `search_listings {"city":"Rawalpindi",...} → 1 result: Rawalpindi 7 Marla House (PKR 2.8 Crore)`. */
+function summarizeCall(name: string, args: Record<string, unknown>, output: unknown): string {
+  const out = output as { count?: number; results?: { title: string; price: string }[]; error?: string };
+  const found = out?.error ? `error ${out.error}` : out?.results ? `${out.count ?? out.results.length} result(s)${out.results.length ? ": " + out.results.slice(0, 3).map((x) => `${x.title} (${x.price})`).join("; ") : ""}` : "done";
+  return `${name} ${JSON.stringify(args)} → ${found}`;
 }
 
 /**
