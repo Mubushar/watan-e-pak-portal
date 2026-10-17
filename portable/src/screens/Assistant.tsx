@@ -18,7 +18,7 @@ import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { chatMode, newId, respond, suggestionsFor, useChat, welcomeFor, type ChatAction, type ChatMsg, type MsgKind, type Reply } from "@/lib/assistant";
 import { detectLang, speechTag, type Lang } from "@/lib/lang";
 import { RealtimeAgent, type AgentState } from "@/lib/realtime";
-import { mergeEffects, runAgentTool } from "@/lib/tools";
+import { mergeEffects, runAgentTool, type ToolEffect } from "@/lib/tools";
 import { NOT_CONFIGURED, playAudio, recordVoiceNote, serverVoice, speak, stopSpeaking, synthesize, type ServerVoice, type VoiceNoteSession } from "@/lib/voice";
 import { isNative } from "@/lib/platform";
 import { cn, isUrdu } from "@/lib/utils";
@@ -66,6 +66,10 @@ export default function Assistant() {
   const agent = useRef<RealtimeAgent | null>(null);
   /** Cards / buttons produced by tool calls, waiting for the agent's spoken answer. */
   const liveExtras = useRef(new Map<string, Partial<ChatMsg>>());
+  // Cards from the live agent's tool calls wait here until it gives its answer, so they
+  // appear under the answer, not under "let me check…" said before the search.
+  const turnCards = useRef<ToolEffect>({});
+  const toolResponses = useRef(new Set<string>());
   const busy = useRef(false); // a text / voice-note reply is being prepared
   const scroller = useRef<HTMLDivElement>(null);
   const all: ChatMsg[] = [welcomeFor(user, uiLang), ...messages];
@@ -203,14 +207,32 @@ export default function Assistant() {
   /** Run a tool the live agent called, against our backend with the user's session. */
   const runTool = useCallback(
     async (name: string, args: Record<string, unknown>, responseId: string): Promise<unknown> => {
+      toolResponses.current.add(responseId);
       // Buttons follow the language the person is speaking (unless they picked one).
       const spoken = [...useChat.getState().messages].reverse().find((m) => m.role === "user" && m.lang)?.lang;
       const lang = usePrefs.getState().replyLang === "auto" ? (spoken ?? uiLang) : uiLang;
       const { output, effect } = await runAgentTool(name, args, lang);
-      attach(responseId, effect);
+      turnCards.current = mergeEffects(turnCards.current, effect);
       return output;
     },
-    [attach, uiLang],
+    [uiLang],
+  );
+
+  /** The agent's answer (a response that called no tool) gets the cards its searches found. */
+  const responseDone = useCallback(
+    (responseId: string) => {
+      if (toolResponses.current.has(responseId)) return;
+      const cards = turnCards.current;
+      if (!cards.listings && !cards.actions) return;
+      turnCards.current = {};
+      const msgs = useChat.getState().messages;
+      // An answer cut off before it said anything: use the agent's latest line instead.
+      const target = msgs.some((m) => m.id === `rt-a-${responseId}`)
+        ? responseId
+        : [...msgs].reverse().find((m) => m.id.startsWith("rt-a-"))?.id.slice(5);
+      if (target) attach(target, cards);
+    },
+    [attach],
   );
 
   const endConversation = useCallback(() => {
@@ -225,12 +247,15 @@ export default function Assistant() {
     haptic();
     setMuted(false);
     liveExtras.current.clear();
+    turnCards.current = {};
+    toolResponses.current.clear();
     const a = new RealtimeAgent({
       onState: setLive,
       onUserText: (itemId, text, final) =>
         upsert(`rt-u-${itemId}`, { role: "user", content: text || (final ? "…" : ""), lang: text ? detectLang(text) : undefined, pending: !final && !text }),
       onAgentText: (responseId, text) => upsert(`rt-a-${responseId}`, { role: "assistant", content: text, lang: detectLang(text), pending: false, ...liveExtras.current.get(responseId) }),
       runTool,
+      onResponseDone: responseDone,
       onError: (msg) => toast.error(msg),
       onEnd: () => {
         agent.current = null;
@@ -245,7 +270,7 @@ export default function Assistant() {
       toast.error((e as Error).message);
       a.stop();
     }
-  }, [note, runTool, upsert]);
+  }, [note, runTool, responseDone, upsert]);
 
   // Voice + AI availability; hang up when leaving the screen.
   useEffect(() => {

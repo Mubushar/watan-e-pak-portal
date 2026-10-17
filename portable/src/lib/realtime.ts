@@ -20,6 +20,8 @@ export interface AgentHandlers {
   onAgentText: (responseId: string, text: string, final: boolean) => void;
   /** Run a tool the agent called; the returned value is sent back to the model. */
   runTool: (name: string, args: Record<string, unknown>, responseId: string) => Promise<unknown>;
+  /** A response (one stretch of the agent's speech, maybe ending in a tool call) finished. */
+  onResponseDone?: (responseId: string) => void;
   onError: (message: string) => void;
   /** The call ended (by stop() or by the server). */
   onEnd: () => void;
@@ -188,6 +190,7 @@ export class RealtimeAgent {
       }
       case "response.done":
         if (ev.response?.status === "failed") this.h.onError(ev.response?.status_details?.error?.message ?? "The voice agent couldn't answer.");
+        if (ev.response?.id) this.h.onResponseDone?.(ev.response.id);
         break;
       case "error":
         // Cancelling when nothing is playing is harmless; don't alarm the user.
