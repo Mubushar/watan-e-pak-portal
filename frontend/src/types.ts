@@ -137,7 +137,27 @@ export interface Ad {
   priority?: number;
   budget?: number;
   spend?: number;
+  remaining_budget?: number;
+  /** How the advertiser pays: flat fee, per 1,000 impressions or per click. */
+  pricing?: "flat" | "cpm" | "cpc";
+  /** PKR per 1,000 impressions (cpm) or per click (cpc). */
+  rate?: number;
+  pricing_label?: string;
+  /** "Sponsored" (configurable on the backend). */
+  sponsored_label?: string;
+  /** Demo creative, not a real advertiser. */
+  sample?: boolean;
 }
+
+/** GET /ads/config — direct ads plus Google AdSense ids for slots nobody has bought. */
+export interface AdConfig {
+  direct: boolean;
+  sponsored_label: string;
+  advertise: { title: string; body: string; email: string | null };
+  adsense: { client: string; slots: Partial<Record<AdPlacement, string>> } | null;
+}
+/** The AdSense placements the backend knows (ADS_ADSENSE_SLOT_HOME / _EXPLORE / _DETAIL). */
+export type AdPlacement = "home" | "explore" | "detail";
 
 export interface Story {
   id: string;

@@ -2,8 +2,9 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
 
-// The FastAPI backend has no CORS middleware, so in development every
-// backend call goes through Vite's proxy: `/api/*` -> `${API_TARGET}/*`.
+// Every backend call goes through Vite's proxy (`/api/*` -> `${API_TARGET}/*`), so the
+// portal is same-origin in development and needs no CORS set-up. `/media` serves
+// uploaded listing photos and `/ads.txt` is the AdSense file Google expects at the root.
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const target = env.VITE_API_TARGET || "http://127.0.0.1:8000";
@@ -20,6 +21,7 @@ export default defineConfig(({ mode }) => {
           rewrite: (p) => p.replace(/^\/api/, ""),
         },
         "/media": { target, changeOrigin: true },
+        "/ads.txt": { target, changeOrigin: true },
       },
     },
     preview: {
@@ -27,6 +29,7 @@ export default defineConfig(({ mode }) => {
       proxy: {
         "/api": { target, changeOrigin: true, ws: true, rewrite: (p) => p.replace(/^\/api/, "") },
         "/media": { target, changeOrigin: true },
+        "/ads.txt": { target, changeOrigin: true },
       },
     },
     build: {

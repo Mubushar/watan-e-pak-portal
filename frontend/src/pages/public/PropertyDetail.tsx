@@ -905,7 +905,7 @@ export default function PropertyDetail() {
         <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
           <ContactCard p={p} />
           <MortgageMini price={p.price} />
-          <AdSlot slot="sidebar" />
+          <AdSlot slot="sidebar" placement="detail" />
         </aside>
       </div>
 

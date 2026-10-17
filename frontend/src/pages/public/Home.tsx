@@ -820,7 +820,7 @@ export default function Home() {
       <Featured props={props} loading={q.isLoading} />
       <MapAndAssistant props={props} />
       <div className="container mt-12">
-        <AdSlot slot="banner" />
+        <AdSlot slot="banner" placement="home" />
       </div>
       <Cities />
       <Categories />

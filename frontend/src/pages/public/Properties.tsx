@@ -554,7 +554,7 @@ export default function Properties() {
               {results.map((p, i) => (
                 <div key={p.id}>
                   <ListRow p={p} />
-                  {i === 3 && <AdSlot slot="banner" className="mt-4" />}
+                  {i === 3 && <AdSlot slot="banner" className="mt-4" placement="explore" />}
                 </div>
               ))}
             </div>
@@ -562,7 +562,7 @@ export default function Properties() {
             <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
               {results.flatMap((p, i) => {
                 const items = [<PropertyCard key={p.id} p={p} />];
-                if (i === 5) items.push(<AdSlot key="ad" slot="infeed" />);
+                if (i === 5) items.push(<AdSlot key="ad" slot="infeed" placement="explore" />);
                 return items;
               })}
             </div>

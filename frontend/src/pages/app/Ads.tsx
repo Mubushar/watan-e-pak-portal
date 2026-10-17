@@ -90,6 +90,7 @@ export default function Ads() {
           <p className="line-clamp-1 text-xs text-ink-mute">
             {a.advertiser} · “{a.headline}”
           </p>
+          {a.sample && <Badge tone="gray" className="mt-1">Sample</Badge>}
         </div>
       ),
     },
@@ -114,6 +115,12 @@ export default function Ads() {
             {pkrShort(a.spend ?? 0, false)} <span className="text-ink-mute">/ {a.budget ? pkrShort(a.budget, false) : "∞"}</span>
           </p>
           {!!a.budget && <Progress value={a.spend ?? 0} max={a.budget} tone={(a.spend ?? 0) / a.budget > 0.9 ? "red" : "gold"} className="mt-1 h-1.5" />}
+          {a.pricing && a.pricing !== "flat" && (
+            <p className="mt-0.5 text-[10px] text-ink-mute">
+              {a.pricing.toUpperCase()} · Rs {(a.rate ?? 0).toLocaleString("en-PK")}
+              {a.pricing === "cpc" ? "/click" : "/1k"}
+            </p>
+          )}
         </div>
       ),
     },
@@ -312,6 +319,8 @@ function AdEditor({ ad, slots, cats, onClose }: { ad: AdRow | null; slots: Recor
     priority: String(ad?.priority ?? 100),
     status: ad?.status ?? "active",
     budget: String(ad?.budget ?? 0),
+    pricing: ad?.pricing ?? "flat",
+    rate: String(ad?.rate ?? 0),
     valid_from: ad?.valid_from?.slice(0, 10) ?? "",
     valid_until: ad?.valid_until?.slice(0, 10) ?? "",
   });
@@ -335,6 +344,8 @@ function AdEditor({ ad, slots, cats, onClose }: { ad: AdRow | null; slots: Recor
     priority: Number(f.priority) || 100,
     status: f.status,
     budget: Number(f.budget) || 0,
+    pricing: f.pricing,
+    rate: f.pricing === "flat" ? 0 : Number(f.rate) || 0,
     valid_from: f.valid_from || null,
     valid_until: f.valid_until || null,
   });
@@ -424,6 +435,20 @@ function AdEditor({ ad, slots, cats, onClose }: { ad: AdRow | null; slots: Recor
           </Field>
           <Field label="Budget (PKR)" hint={Number(f.budget) ? pkrShort(Number(f.budget)) : "0 = unlimited"}>
             <Input type="number" min={0} value={f.budget} onChange={set("budget")} />
+          </Field>
+          <Field label="Pricing" hint={f.pricing === "flat" ? "Fixed fee — spend is entered by hand" : "Spend grows automatically as the ad is shown / clicked"}>
+            <Select
+              value={f.pricing}
+              onChange={set("pricing")}
+              options={[
+                { value: "flat", label: "Fixed fee" },
+                { value: "cpm", label: "Per 1,000 impressions (CPM)" },
+                { value: "cpc", label: "Per click (CPC)" },
+              ]}
+            />
+          </Field>
+          <Field label={f.pricing === "cpc" ? "Rate per click (PKR)" : "Rate per 1,000 impressions (PKR)"} hint={f.pricing === "flat" ? "Not used for fixed-fee ads" : "Delivery pauses when the budget is spent"}>
+            <Input type="number" min={0} step="0.5" value={f.rate} onChange={set("rate")} disabled={f.pricing === "flat"} />
           </Field>
           <Field label="Keywords" hint="comma separated">
             <Input value={f.keywords} onChange={set("keywords")} />

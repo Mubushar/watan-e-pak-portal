@@ -1,10 +1,12 @@
 /**
- * Live advertisement slot backed by `/ads/active`. Impressions are tracked once
- * per creative per mount; clicks are tracked before opening the CTA.
+ * Live advertisement slot backed by `/ads/active`. Views and clicks are reported to
+ * `/ads/{id}/event`, which counts each viewer once per window (so refreshes don't
+ * bill the advertiser twice) and charges CPM / CPC campaigns.
  *
  *   <AdSlot slot="banner" />            full-width banner
  *   <AdSlot slot="sidebar" />           stacked tiles
  *   <AdSlot slot="infeed" layout="card" />
+ *   <AdSlot slot="banner" placement="home" />   falls back to Google AdSense when no ad is booked
  */
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -28,7 +30,7 @@ import {
   Cpu,
   type LucideIcon,
 } from "lucide-react";
-import type { Ad } from "@/types";
+import type { Ad, AdConfig, AdPlacement } from "@/types";
 import { post } from "@/lib/api";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
@@ -52,14 +54,51 @@ const CATEGORY_STYLE: Record<string, { icon: LucideIcon; from: string; to: strin
 const styleFor = (c: string) => CATEGORY_STYLE[c] ?? { icon: Home, from: "#093a26", to: "#146f45" };
 
 const seen = new Set<string>();
+const trackEvent = (id: string, event: "impression" | "click") => post(`/ads/${id}/event`, { event }).catch(() => {});
 function trackImpression(id: string) {
   if (seen.has(id)) return;
   seen.add(id);
-  post(`/ads/${id}/track`, undefined, { event: "impression" }).catch(() => {});
+  void trackEvent(id, "impression");
 }
 function trackClick(ad: Ad) {
-  post(`/ads/${ad.id}/track`, undefined, { event: "click" }).catch(() => {});
+  void trackEvent(ad.id, "click");
   if (ad.cta_url) window.open(ad.cta_url, "_blank", "noopener,noreferrer");
+}
+
+// ------------------------------------------------------------------ AdSense (fills unsold slots)
+declare global {
+  interface Window {
+    adsbygoogle?: unknown[];
+  }
+}
+let adsenseLoaded = false;
+function loadAdSense(client: string) {
+  if (adsenseLoaded) return;
+  adsenseLoaded = true;
+  const el = document.createElement("script");
+  el.async = true;
+  el.crossOrigin = "anonymous";
+  el.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(client)}`;
+  document.head.appendChild(el);
+}
+
+function AdSenseUnit({ client, unit, className }: { client: string; unit: string; className?: string }) {
+  const pushed = useRef(false);
+  useEffect(() => {
+    loadAdSense(client);
+    if (pushed.current) return;
+    pushed.current = true;
+    try {
+      (window.adsbygoogle = window.adsbygoogle || []).push({});
+    } catch {
+      /* blocked by an ad blocker */
+    }
+  }, [client]);
+  return (
+    <div className={cn("overflow-hidden rounded-2xl", className)}>
+      <ins className="adsbygoogle block" style={{ display: "block" }} data-ad-client={client} data-ad-slot={unit} data-ad-format="auto" data-full-width-responsive="true" />
+    </div>
+  );
 }
 
 /** `noTrack` disables impression/click tracking (previews in the ad manager). */
@@ -78,7 +117,8 @@ export function AdCreative({ ad, layout = "banner", className, noTrack }: { ad: 
   const bg = { background: `linear-gradient(135deg, ${st.from}, ${st.to})` };
   const sponsor = (
     <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/90 backdrop-blur">
-      <Megaphone className="h-3 w-3" /> Sponsored · {ad.advertiser}
+      <Megaphone className="h-3 w-3" /> {ad.sponsored_label ?? "Sponsored"}
+      {ad.sample ? " · Sample" : ""} · {ad.advertiser}
     </span>
   );
 
@@ -150,6 +190,7 @@ export function AdSlot({
   rotate = 9000,
   className,
   city,
+  placement,
 }: {
   slot: "hero" | "banner" | "sidebar" | "infeed" | "footer" | "newsletter";
   layout?: "banner" | "card" | "tile" | "strip";
@@ -157,8 +198,11 @@ export function AdSlot({
   rotate?: number;
   className?: string;
   city?: string;
+  /** AdSense unit to show when no sponsored ad is booked for this slot (if configured on the backend). */
+  placement?: AdPlacement;
 }) {
   const q = useApi<{ advertisements: Ad[] }>("/ads/active", { slot, limit, city }, { staleTime: 5 * 60_000 });
+  const cfg = useApi<AdConfig>(placement ? "/ads/config" : null, undefined, { staleTime: 30 * 60_000, retry: false });
   const ads = q.data?.advertisements ?? [];
   const [i, setI] = useState(0);
   useEffect(() => {
@@ -166,7 +210,10 @@ export function AdSlot({
     const t = setInterval(() => setI((x) => (x + 1) % ads.length), rotate);
     return () => clearInterval(t);
   }, [ads.length, rotate]);
-  if (!ads.length) return null;
+  if (!ads.length) {
+    const unit = placement && cfg.data?.adsense?.slots[placement];
+    return q.isSuccess && unit ? <AdSenseUnit client={cfg.data!.adsense!.client} unit={unit} className={className} /> : null;
+  }
   const lay = layout ?? (slot === "sidebar" ? "tile" : slot === "footer" ? "strip" : slot === "infeed" ? "card" : "banner");
   const ad = ads[i % ads.length]!;
   return (
