@@ -238,12 +238,22 @@ REALTIME_TOOLS: List[Dict[str, Any]] = [
 
 _LANGUAGE_POLICY = {
     "auto": (
-        "Start in Urdu. Answer in the language the user is speaking right now: if they speak Urdu (or Urdu mixed "
-        "with English words), answer in natural Pakistani Urdu; if they speak English, answer in English. "
-        "Only change language when the user changes."
+        "Mirror the user's language turn by turn. Every reply is in the language of the user's LATEST turn: "
+        "Urdu (or Urdu mixed with English words) -> natural Pakistani Urdu; English -> English. "
+        "The moment the user switches language, switch with them, even if your earlier replies were in the other "
+        "language. Listing titles and tool results are in English; still answer in the user's language. "
+        "If a turn has no clear language (only a number or a place name), keep the language of their previous turn."
     ),
     "ur": "Speak only natural Pakistani Urdu, even when the user uses English words. Never switch to another language.",
     "en": "Speak only English, even when the user speaks Urdu. Never switch to another language.",
+}
+
+
+# Repeated last: realtime models drift into English (tool results are English) unless reminded.
+_LANGUAGE_REMINDER = {
+    "auto": "Always answer in the language the user used in their most recent turn: Urdu if they just spoke Urdu, English if they just spoke English.",
+    "ur": "Always answer in Urdu.",
+    "en": "Always answer in English.",
 }
 
 
@@ -275,6 +285,9 @@ def realtime_instructions(user: Optional[Dict[str, Any]], reply_lang: str) -> st
         "",
         "# Safety",
         "You give general guidance, not legal or financial advice; for documents and title checks suggest a lawyer.",
+        "",
+        "# Reminder",
+        _LANGUAGE_REMINDER.get(reply_lang, _LANGUAGE_REMINDER["auto"]),
     ])
 
 
