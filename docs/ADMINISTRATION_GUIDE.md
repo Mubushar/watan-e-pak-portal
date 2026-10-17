@@ -228,7 +228,7 @@ mints a 10-minute client secret (`/v1/realtime/client_secrets`) carrying:
 - the agent's instructions, including the signed-in user's name and role;
 - the reply language (`auto`, `ur` or `en`);
 - the voice, the semantic turn detection that lets users interrupt, and Urdu/English captions;
-- four tools: `search_listings`, `get_listing`, `my_listings`, `draft_listing`.
+- five tools: `search_listings`, `get_listing` (shows the listing's card with *Open listing* and *Request a call*), `request_call` (sends the owner / agent a call-back request as a CRM lead, from the signed-in user's account), `my_listings`, `draft_listing`.
 
 The app then opens a WebRTC call directly to OpenAI with that secret. The real API key
 never leaves the server. The app runs the tool calls against this backend, using the

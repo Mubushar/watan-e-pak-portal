@@ -228,6 +228,9 @@ function agentSystem(user: User | null, lang: Lang, opts: RespondOptions): strin
     "- Follow-ups refine the previous search: keep the earlier city, type and budget unless the user changes them. The app appends notes like [context: ...] to your earlier replies so you know what was searched; never write such notes yourself.",
     "- If a search finds nothing, relax one filter and search again, then say what you changed.",
     "- Mention the best 1-3 results (name, size, price); they also appear as cards under your reply. Never invent listings.",
+    "- Results include bedrooms and bathrooms: compare them yourself, and use the min_bathrooms / bedrooms filters rather than opening listings one by one.",
+    "- To show one listing (the one you recommend, or one the user asks to see, open or share) call get_listing: its card appears under your reply with 'Open listing' and 'Request a call' buttons. Never say you cannot show or share a card.",
+    "- When the user wants to visit, meet the owner or talk to a human agent, offer to send a call request and, once they agree, call request_call. If it says not_signed_in, tell them to tap 'Request a call'.",
     "- When the user wants to sell or rent out a property, ask briefly for missing essentials (type, city, size, price), then call draft_listing.",
     "- For their own listings call my_listings; if it says not_signed_in, ask them to sign in with a one-time code.",
   ].join("\n");

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Bath, BedDouble, Bot, Building2, CalendarDays, Layers, MapPin, Navigation, PhoneCall, Ruler, Share2, Sparkles, Tag } from "lucide-react";
 import { Share } from "@capacitor/share";
 import { toast } from "sonner";
@@ -17,7 +17,9 @@ export default function PropertyDetail() {
   const { id } = useParams();
   const q = useApi<Property>(id ? `/properties/${id}` : null);
   const [slide, setSlide] = useState(0);
-  const [enquire, setEnquire] = useState(false);
+  // ?enquire=1 (the assistant's "Request a call" button) opens the call request straight away.
+  const [params] = useSearchParams();
+  const [enquire, setEnquire] = useState(params.get("enquire") === "1");
   const p = q.data;
 
   const share = async () => {

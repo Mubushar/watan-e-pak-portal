@@ -6,7 +6,7 @@
  * (openai_voice.REALTIME_TOOLS, served at GET /ai/tools).
  */
 import type { Property, PropertyList } from "@/types";
-import { get } from "./api";
+import { get, post } from "./api";
 import type { ListingDraft } from "./intent";
 import { money, t, type Lang } from "./lang";
 import { useAuth } from "@/store/auth";
@@ -34,10 +34,18 @@ const brief = (p: Property) => ({
   category: p.category,
   size_marla: p.marla_area ?? undefined,
   bedrooms: p.bedrooms ?? undefined,
+  bathrooms: p.bathrooms ?? undefined,
   status: p.status,
 });
 
-const SEARCH_KEYS = ["city", "category", "use_type", "min_price", "max_price", "bedrooms", "min_marla", "max_marla", "featured"];
+const SEARCH_KEYS = ["city", "category", "use_type", "min_price", "max_price", "bedrooms", "min_bathrooms", "min_marla", "max_marla", "featured"];
+
+/** "Open listing" (+ "Request a call" while it's for sale/rent) under a listing's card. */
+function listingButtons(p: Property, lang: Lang): ChatAction[] {
+  const tr = t(lang);
+  const open: ChatAction = { label: tr.openListing, to: `/property/${p.id}`, primary: true };
+  return p.status === "active" ? [open, { label: tr.requestCall, to: `/property/${p.id}?enquire=1` }] : [open];
+}
 
 export async function runAgentTool(name: string, args: Record<string, unknown>, lang: Lang): Promise<ToolRun> {
   const tr = t(lang);
@@ -53,8 +61,43 @@ export async function runAgentTool(name: string, args: Record<string, unknown>, 
   if (name === "get_listing") {
     const p = await get<Property>(`/properties/${String(args.id ?? "")}`);
     return {
-      output: { ...brief(p), description: p.description, bathrooms: p.bathrooms, location: [p.block_name, p.scheme_name, p.city_name].filter(Boolean).join(", ") },
-      effect: { listings: [p] },
+      output: {
+        ...brief(p),
+        description: p.description,
+        location: [p.block_name, p.scheme_name, p.city_name].filter(Boolean).join(", "),
+        shown_on_screen: `This listing's card with '${tr.openListing}' and '${tr.requestCall}' buttons (say the button names exactly like this).`,
+      },
+      effect: { listings: [p], actions: listingButtons(p, lang) },
+    };
+  }
+  if (name === "request_call") {
+    const p = await get<Property>(`/properties/${String(args.listing_id ?? args.id ?? "")}`);
+    if (p.status !== "active") return { output: { ok: false, error: `listing is ${p.status}` }, effect: { listings: [p], actions: listingButtons(p, lang) } };
+    const user = useAuth.getState().user;
+    if (!user || (!user.mobile && !user.email)) {
+      return {
+        output: { ok: false, error: "not_signed_in", shown_on_screen: `A '${tr.requestCall}' button for this listing (say the button name exactly like this).` },
+        effect: { listings: [p], actions: [{ label: tr.requestCall, to: `/property/${p.id}?enquire=1`, primary: true }, { label: tr.signIn, to: `/signin?next=/property/${p.id}` }] },
+      };
+    }
+    const when = typeof args.preferred_time === "string" && args.preferred_time.trim() ? `\nPreferred time: ${args.preferred_time.trim()}` : "";
+    const note = typeof args.message === "string" && args.message.trim() ? `\n${args.message.trim()}` : "";
+    await post("/crm/leads", {
+      name: user.name || user.mobile || user.email,
+      phone: user.mobile ?? undefined,
+      email: user.email ?? undefined,
+      source: "mobile_app_ai",
+      interest_use_type: p.use_type,
+      interest_category: p.category,
+      budget_max: p.price,
+      city_id: p.city_id ?? undefined,
+      scheme_id: p.scheme_id ?? undefined,
+      assigned_agent_id: p.agent_id || undefined,
+      notes: `Call request from the Arz-e-Pak AI assistant.${when}${note}\n\nListing: ${p.title} (${p.id})`,
+    });
+    return {
+      output: { ok: true, sent_to: "the owner / agent of this listing", they_will_contact: user.mobile ? "by phone" : "by e-mail" },
+      effect: { listings: [p], actions: [{ label: tr.openListing, to: `/property/${p.id}`, primary: true }] },
     };
   }
   if (name === "my_listings") {
@@ -90,9 +133,9 @@ export async function runAgentTool(name: string, args: Record<string, unknown>, 
 
 /** Merge effects from several tool calls in one reply (latest listings win, buttons add up). */
 export function mergeEffects(a: ToolEffect, b: ToolEffect): ToolEffect {
-  // A newer search replaces the older search's "See all" / "Browse" buttons.
-  const isSearch = (x: ChatAction) => !!x.to?.startsWith("/explore");
-  const keep = b.listings ? (a.actions ?? []).filter((x) => !isSearch(x)) : a.actions ?? [];
+  // New cards replace the older cards' buttons ("See all", "Open listing", ...).
+  const belongsToCards = (x: ChatAction) => !!x.to && /^\/(explore|property\/|signin\?next=\/property)/.test(x.to);
+  const keep = b.listings ? (a.actions ?? []).filter((x) => !belongsToCards(x)) : a.actions ?? [];
   const actions = [...keep, ...(b.actions ?? [])].filter((x, i, all) => all.findIndex((y) => y.label === x.label) === i);
   return { listings: b.listings ?? a.listings, actions: actions.length ? actions : undefined };
 }

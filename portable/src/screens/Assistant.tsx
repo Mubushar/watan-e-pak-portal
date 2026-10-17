@@ -18,7 +18,7 @@ import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { chatMode, newId, respond, suggestionsFor, useChat, welcomeFor, type ChatAction, type ChatMsg, type MsgKind, type Reply } from "@/lib/assistant";
 import { detectLang, speechTag, type Lang } from "@/lib/lang";
 import { RealtimeAgent, type AgentState } from "@/lib/realtime";
-import { runAgentTool } from "@/lib/tools";
+import { mergeEffects, runAgentTool } from "@/lib/tools";
 import { NOT_CONFIGURED, playAudio, recordVoiceNote, serverVoice, speak, stopSpeaking, synthesize, type ServerVoice, type VoiceNoteSession } from "@/lib/voice";
 import { isNative } from "@/lib/platform";
 import { cn, isUrdu } from "@/lib/utils";
@@ -192,7 +192,8 @@ export default function Assistant() {
   const attach = useCallback(
     (responseId: string, extra: Partial<ChatMsg>) => {
       const id = `rt-a-${responseId}`;
-      const merged = { ...liveExtras.current.get(responseId), ...extra };
+      const prev = liveExtras.current.get(responseId) ?? {};
+      const merged = { ...prev, ...mergeEffects(prev, extra) };
       liveExtras.current.set(responseId, merged);
       if (useChat.getState().messages.some((m) => m.id === id)) update(id, merged);
     },
@@ -202,7 +203,10 @@ export default function Assistant() {
   /** Run a tool the live agent called, against our backend with the user's session. */
   const runTool = useCallback(
     async (name: string, args: Record<string, unknown>, responseId: string): Promise<unknown> => {
-      const { output, effect } = await runAgentTool(name, args, uiLang);
+      // Buttons follow the language the person is speaking (unless they picked one).
+      const spoken = [...useChat.getState().messages].reverse().find((m) => m.role === "user" && m.lang)?.lang;
+      const lang = usePrefs.getState().replyLang === "auto" ? (spoken ?? uiLang) : uiLang;
+      const { output, effect } = await runAgentTool(name, args, lang);
       attach(responseId, effect);
       return output;
     },

@@ -194,6 +194,7 @@ REALTIME_TOOLS: List[Dict[str, Any]] = [
                 "min_price": {"type": "number", "description": "Minimum price in rupees"},
                 "max_price": {"type": "number", "description": "Maximum price in rupees"},
                 "bedrooms": {"type": "integer", "description": "Minimum bedrooms"},
+                "min_bathrooms": {"type": "integer", "description": "Minimum bathrooms"},
                 "min_marla": {"type": "number"},
                 "max_marla": {"type": "number"},
                 "featured": {"type": "boolean"},
@@ -204,8 +205,29 @@ REALTIME_TOOLS: List[Dict[str, Any]] = [
     {
         "type": "function",
         "name": "get_listing",
-        "description": "Get full details of one listing by its id (from search results).",
+        "description": "Show one listing to the user and get its full details. Puts the listing's card on the user's "
+                       "screen with 'Open listing' and 'Request a call' buttons. Call it whenever the user wants to see, open "
+                       "or share a listing, and for the listing you recommend, so its card is the one on screen.",
         "parameters": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"], "additionalProperties": False},
+    },
+    {
+        "type": "function",
+        "name": "request_call",
+        "description": "Ask the listing's owner / agent to call the user back, to arrange a visit, meet the owner or talk to "
+                       "a human agent. Only call it after the user has agreed. Sends the request with the user's name and "
+                       "phone/e-mail from their account; if they are not signed in, a 'Request a call' button is shown instead.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "listing_id": {"type": "string"},
+                "preferred_time": {"type": "string", "description": "When the user would like the call or visit, if they said, in English. "
+                                   "Urdu days: پیر Monday, منگل Tuesday, بدھ Wednesday, جمعرات Thursday, جمعہ Friday, "
+                                   "ہفتہ / ہفتے Saturday, اتوار Sunday."},
+                "message": {"type": "string", "description": "Anything the user wants the owner/agent to know, in English"},
+            },
+            "required": ["listing_id"],
+            "additionalProperties": False,
+        },
     },
     {
         "type": "function",
@@ -276,11 +298,17 @@ def realtime_instructions(user: Optional[Dict[str, Any]], reply_lang: str) -> st
         "# Tools",
         "- Use search_listings whenever the user wants properties; then mention the best one to three matches "
         "(name, size, price). Never invent listings, prices or availability.",
-        "- Use get_listing for details about a specific result.",
+        "- Search results include bedrooms and bathrooms, so compare them yourself; use min_bathrooms / bedrooms "
+        "filters instead of opening listings one by one.",
+        "- Every listing a tool returns appears on the user's screen as a card they can tap to open. To show a listing "
+        "(the one you recommend, or one the user asks to see, open or share), call get_listing: its card then appears "
+        "with 'Open listing' and 'Request a call' buttons. Never say you cannot show or share a card.",
+        "- When the user wants to visit, see the property, meet the owner or talk to a human agent, offer to send a call "
+        "request; once they agree, call request_call. If it says not_signed_in, tell them to tap 'Request a call' on screen.",
         "- Use my_listings when the user asks about their own listings. If it reports they are not signed in, tell them to sign in with a one-time code.",
         "- When the user wants to sell or rent out a property, ask briefly for anything missing (type, city, size, price), "
         "then call draft_listing and tell them to tap 'Create listing' on screen to add photos and publish.",
-        "- Results also appear on screen as cards, so don't list everything aloud.",
+        "- Don't read every result aloud; the cards are on screen.",
         "- You search yourself. Never ask the user to press a search button or any button you haven't been told is on screen.",
         "",
         "# Safety",

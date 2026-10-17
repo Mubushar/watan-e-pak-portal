@@ -971,6 +971,7 @@ def search_properties(
     featured: Optional[bool] = None,
     status: Optional[str] = None,
     limit: int = 20,
+    min_bathrooms: Optional[int] = None,
 ) -> str:
     """Search properties with hierarchical and numeric filters."""
     c = resolve_city(city) if city else None
@@ -990,6 +991,8 @@ def search_properties(
         if max_price is not None and p.price > max_price:
             continue
         if bedrooms is not None and (p.bedrooms or 0) < bedrooms:
+            continue
+        if min_bathrooms is not None and (p.bathrooms or 0) < min_bathrooms:
             continue
         if min_marla is not None and (p.marla_area or 0) < min_marla:
             continue

@@ -153,6 +153,8 @@ type Phrasebook = {
   createAccount: string;
   profile: string;
   manageListings: string;
+  openListing: string;
+  requestCall: string;
   addListing: string;
   openExplore: string;
   listingsNeedSignIn: string;
@@ -208,6 +210,8 @@ const BOOKS: Record<Lang, Phrasebook> = {
     createAccount: "Create account",
     profile: "Profile",
     manageListings: "Manage listings",
+    openListing: "Open listing",
+    requestCall: "Request a call",
     addListing: "Add a listing",
     openExplore: "Open Explore",
     listingsNeedSignIn: "Sign in to see and manage your listings — I’ll send you a one-time code, no password needed.",
@@ -259,6 +263,8 @@ const BOOKS: Record<Lang, Phrasebook> = {
     createAccount: "اکاؤنٹ بنائیں",
     profile: "پروفائل",
     manageListings: "لسٹنگز سنبھالیں",
+    openListing: "لسٹنگ کھولیں",
+    requestCall: "کال کی درخواست",
     addListing: "نئی لسٹنگ",
     openExplore: "تلاش کھولیں",
     listingsNeedSignIn: "اپنی لسٹنگز دیکھنے کے لیے سائن اِن کریں — میں آپ کو ایک کوڈ بھیجوں گا، پاس ورڈ کی ضرورت نہیں۔",
@@ -308,6 +314,8 @@ const BOOKS: Record<Lang, Phrasebook> = {
     createAccount: "Account banayein",
     profile: "Profile",
     manageListings: "Listings manage karein",
+    openListing: "Listing kholein",
+    requestCall: "Call ki darkhwast",
     addListing: "Nayi listing",
     openExplore: "Explore kholein",
     listingsNeedSignIn: "Apni listings dekhne ke liye sign in karein — main aap ko ek code bhejunga, password ki zaroorat nahi.",
