@@ -26,6 +26,8 @@ export interface Property {
   amenities?: string[];
   /** Set by /search?near=…: the matching place and how far it is. */
   nearby?: NearbyPlace;
+  /** Set by /search?near_place=…: km from that place. */
+  distance_km?: number;
   agent_id?: string | null;
   owner_user_id?: string | null;
   created_at?: string;
@@ -39,6 +41,11 @@ export interface PropertyList {
   count: number;
   returned: number;
   results: Property[];
+  /** Present when searching with `near_place`. */
+  near_place?: { query: string; found: boolean; name?: string; radius_km?: number };
+  /** With `near_place` and nothing inside the radius: the closest listings outside it. */
+  nearest_outside_radius?: Property[];
+  note?: string;
 }
 
 export interface City {

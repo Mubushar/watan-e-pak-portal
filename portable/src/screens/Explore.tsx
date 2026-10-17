@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import type { City, PropertyList } from "@/types";
 import { useApi } from "@/hooks/useApi";
 import { pkrShort, titleCase } from "@/lib/format";
-import { Button, EmptyState, Field, Segmented, Select, Sheet, Skeleton, TopBar } from "@/components/ui";
+import { Button, EmptyState, Field, Input, Segmented, Select, Sheet, Skeleton, TopBar } from "@/components/ui";
 import { PropertyCard, PropertyRow } from "@/components/PropertyCard";
 import { AdSlot, BannerSpacer, useNativeBanner } from "@/components/Ads";
 
@@ -14,8 +14,39 @@ const AD_EVERY = 6;
 
 const CATEGORIES = ["house", "apartment", "plot", "shop", "office", "floor", "building"];
 const PRICE_STEPS = [0, 2_500_000, 5_000_000, 10_000_000, 20_000_000, 35_000_000, 50_000_000, 100_000_000, 250_000_000];
-const FILTER_KEYS = ["city", "category", "use_type", "bedrooms", "min_price", "max_price", "featured"] as const;
+/** Every /search filter, so links from the assistant ("See all …") show exactly what it found. */
+const FILTER_KEYS = ["city", "category", "use_type", "bedrooms", "min_bathrooms", "min_price", "max_price", "min_marla", "max_marla", "featured", "feature", "near", "near_km", "near_place"] as const;
 type Filters = Partial<Record<(typeof FILTER_KEYS)[number], string>>;
+/** `near=` kinds the backend understands. */
+const NEAR_KINDS = ["school", "mosque", "hospital", "market", "park", "transport"];
+
+function chipLabel(k: string, v: string, f: Filters): string {
+  const km = f.near_km ?? "2";
+  switch (k) {
+    case "min_price":
+      return `≥ ${pkrShort(Number(v))}`;
+    case "max_price":
+      return `≤ ${pkrShort(Number(v))}`;
+    case "bedrooms":
+      return `${v}+ beds`;
+    case "min_bathrooms":
+      return `${v}+ baths`;
+    case "min_marla":
+      return `≥ ${v} marla`;
+    case "max_marla":
+      return `≤ ${v} marla`;
+    case "featured":
+      return "Featured";
+    case "feature":
+      return `With “${v}”`;
+    case "near":
+      return `Near a ${v} (${km} km)`;
+    case "near_place":
+      return `Within ${km} km of ${v}`;
+    default:
+      return titleCase(v);
+  }
+}
 
 export default function Explore() {
   const [sp, setSp] = useSearchParams();
@@ -36,11 +67,12 @@ export default function Explore() {
     for (const [k, v] of Object.entries(f)) if (v) next.set(k, v);
     setSp(next, { replace: true });
   };
-  const chips = Object.entries(filters).map(([k, v]) => ({
-    key: k,
-    label:
-      k === "min_price" ? `≥ ${pkrShort(Number(v))}` : k === "max_price" ? `≤ ${pkrShort(Number(v))}` : k === "bedrooms" ? `${v}+ beds` : k === "featured" ? "Featured" : titleCase(v),
-  }));
+  // near_km only qualifies near / near_place; it's shown inside their chips.
+  const chips = Object.entries(filters)
+    .filter(([k]) => k !== "near_km")
+    .map(([k, v]) => ({ key: k, label: chipLabel(k, v!, filters) }));
+  const nearest = q.data?.nearest_outside_radius ?? [];
+  const placeMissing = q.data?.near_place && !q.data.near_place.found;
 
   return (
     <div>
@@ -88,7 +120,7 @@ export default function Explore() {
             {chips
               .filter((c) => c.key !== "category")
               .map((c) => (
-                <button key={c.key} onClick={() => apply({ ...filters, [c.key]: undefined })} className="chip bg-gold-50 text-gold-800 ring-1 ring-gold-200 dark:bg-gold-500/10 dark:text-gold-200 dark:ring-gold-500/20">
+                <button key={c.key} onClick={() => apply({ ...filters, [c.key]: undefined, ...(c.key === "near" || c.key === "near_place" ? { near_km: filters.near && filters.near_place ? filters.near_km : undefined } : {}) })} className="chip bg-gold-50 text-gold-800 ring-1 ring-gold-200 dark:bg-gold-500/10 dark:text-gold-200 dark:ring-gold-500/20">
                   {c.label} <X className="h-3 w-3" />
                 </button>
               ))}
@@ -110,6 +142,21 @@ export default function Explore() {
           <EmptyState icon={<SearchX className="h-7 w-7" />} title="Couldn't load listings">
             {q.error.message}
           </EmptyState>
+        ) : !q.data?.results.length && placeMissing ? (
+          <EmptyState icon={<SearchX className="h-7 w-7" />} title={`Couldn't find “${filters.near_place}” on the map`}>
+            Try a sector, society or landmark — e.g. “G-13”, “DHA Phase 2” or a university.
+          </EmptyState>
+        ) : !q.data?.results.length && nearest.length ? (
+          <div className="mt-3">
+            <p className="mb-3 text-sm text-ink-mute dark:text-slate-400">
+              Nothing within {filters.near_km ?? 2} km of {q.data?.near_place?.name ?? filters.near_place} — the closest listings:
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {nearest.map((p) => (
+                <PropertyCard key={p.id} p={p} />
+              ))}
+            </div>
+          </div>
         ) : !q.data?.results.length ? (
           <EmptyState
             icon={<SearchX className="h-7 w-7" />}
@@ -172,6 +219,7 @@ export default function Explore() {
                 <option value="">Any</option>
                 <option value="residential">Residential</option>
                 <option value="commercial">Commercial</option>
+                <option value="mix">Mixed use</option>
               </Select>
             </Field>
           </div>
@@ -210,6 +258,51 @@ export default function Explore() {
               ))}
             </div>
           </Field>
+          <Field label="Bathrooms">
+            <div className="grid grid-cols-5 gap-2">
+              {["", "1", "2", "3", "4"].map((b) => (
+                <button
+                  key={b}
+                  type="button"
+                  onClick={() => setDraft({ ...draft, min_bathrooms: b || undefined })}
+                  className={`rounded-xl border py-2 text-sm font-semibold ${(draft.min_bathrooms ?? "") === b ? "border-brand-600 bg-brand-50 text-brand-800 dark:bg-brand-500/15 dark:text-white" : "border-black/10 dark:border-white/10"}`}
+                >
+                  {b ? `${b}+` : "Any"}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Close to">
+            <div className="flex flex-wrap gap-2">
+              {NEAR_KINDS.map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setDraft({ ...draft, near: draft.near === k ? undefined : k })}
+                  className={`chip px-3 py-1.5 text-sm ${draft.near === k ? "bg-brand-700 text-white" : "bg-white text-brand-800 ring-1 ring-black/10 dark:bg-white/5 dark:text-brand-100 dark:ring-white/10"}`}
+                >
+                  {titleCase(k)}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <div className="grid grid-cols-[1fr_auto] gap-3">
+            <Field label="Near a place">
+              <Input value={draft.near_place ?? ""} onChange={(e) => setDraft({ ...draft, near_place: e.target.value || undefined })} placeholder="e.g. G-13, a university" />
+            </Field>
+            <Field label="Within">
+              <Select value={draft.near_km ?? "2"} onChange={(e) => setDraft({ ...draft, near_km: e.target.value === "2" ? undefined : e.target.value })}>
+                {["1", "2", "5"].map((km) => (
+                  <option key={km} value={km}>
+                    {km} km
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+          <Field label="Feature">
+            <Input value={draft.feature ?? ""} onChange={(e) => setDraft({ ...draft, feature: e.target.value || undefined })} placeholder="e.g. solar, basement, corner" />
+          </Field>
           <label className="flex items-center gap-3 text-sm font-semibold">
             <input type="checkbox" className="h-5 w-5 accent-brand-600" checked={!!draft.featured} onChange={(e) => setDraft({ ...draft, featured: e.target.checked ? "1" : undefined })} />
             Featured listings only
@@ -221,7 +314,7 @@ export default function Explore() {
             <Button
               className="flex-1"
               onClick={() => {
-                apply(draft);
+                apply({ ...draft, near_place: draft.near_place?.trim() || undefined, feature: draft.feature?.trim() || undefined });
                 setOpen(false);
               }}
             >

@@ -57,10 +57,18 @@ export function PropertyCard({ p, className, compact }: { p: Property; className
         <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-ink-mute dark:text-slate-400">
           <MapPin className="h-3.5 w-3.5 shrink-0" /> {locationOf(p)}
         </p>
+        <NearbyNote p={p} />
         <Specs p={p} className="mt-2.5" />
       </div>
     </Link>
   );
+}
+
+/** What a place-aware search matched on: the closest school / mosque … or the distance from a named place. */
+export function NearbyNote({ p, className }: { p: Property; className?: string }) {
+  const km = (v: number) => (v < 1 ? `${Math.round(v * 1000)} m` : `${v.toFixed(1)} km`);
+  const text = p.nearby ? `${p.nearby.kind} ${km(p.nearby.distance_km)} away · ${p.nearby.name}` : p.distance_km !== undefined ? `${km(p.distance_km)} away` : null;
+  return text ? <p className={cn("mt-1 line-clamp-1 text-xs font-semibold text-brand-700 dark:text-brand-300", className)}>{text}</p> : null;
 }
 
 export function Specs({ p, className }: { p: Property; className?: string }) {
@@ -93,6 +101,7 @@ export function PropertyRow({ p, extra, to, className }: { p: Property; extra?: 
         <p className="truncate text-xs text-ink-mute dark:text-slate-400">
           {titleCase(p.category)} · {area(p)} · {p.city_name ?? "Pakistan"}
         </p>
+        <NearbyNote p={p} className="mt-0" />
         <div className="mt-1 flex items-center gap-2">
           <span className="font-display text-sm font-bold text-brand-700 dark:text-brand-300">{pkrShort(p.price)}</span>
           {p.status && p.status !== "active" && <Badge tone={statusTone(p.status)}>{titleCase(p.status)}</Badge>}
