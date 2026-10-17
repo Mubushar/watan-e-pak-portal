@@ -51,6 +51,7 @@ import {
   type Column,
 } from "@/components/ui";
 import { ok } from "@/components/collab/kit";
+import { IntegrationsCard } from "@/components/collab/Integrations";
 
 // ---------------------------------------------------------------- types
 interface AdminUser {
@@ -592,6 +593,8 @@ function SystemTab() {
           <StatCard label="Data stores" value={Object.keys(ph.data.stores).length} tone="purple" icon={<Database className="h-5 w-5" />} hint={`${compact(Object.values(ph.data.stores).reduce((a, b) => a + b, 0))} records`} />
         </div>
       )}
+
+      <IntegrationsCard />
 
       <div className="grid gap-6 xl:grid-cols-3">
         <Card className="xl:col-span-2">
