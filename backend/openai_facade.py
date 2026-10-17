@@ -22,6 +22,15 @@ Environment variables (or backend/.env)
     OPENAI_MODEL          chat model, default gpt-5.6-luna
     OPENAI_BASE_URL       optional, e.g. an Azure OpenAI / proxy URL (default https://api.openai.com/v1)
 
+Testing with a free / local model (chat only — voice is unaffected)::
+
+    LLM_BASE_URL=http://localhost:1234/v1     # any OpenAI-compatible server, e.g. LM Studio
+    LLM_MODEL=qwen3-4b-instruct-2507          # the model id that server lists at /models
+    LLM_API_KEY=                              # optional (LM Studio needs none)
+
+When ``LLM_BASE_URL`` is set, chat goes there instead of OpenAI. Remove those lines and
+restart to go back to OpenAI.
+
 The portal's *tool* interface remains MCP at `/mcp`; this facade is only an
 LLM-compatible shim.
 """
@@ -45,14 +54,25 @@ import server as core
 
 router = APIRouter(prefix="/v1", tags=["openai-compatible"])
 
-# OpenAI is the only AI provider (chat here, voice in openai_voice.py).
+# OpenAI by default (chat here, voice in openai_voice.py); LLM_* points chat alone at
+# another OpenAI-compatible server (LM Studio, Ollama, …) for testing.
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "").strip().rstrip("/")
 
-UPSTREAM_BASE_URL = OPENAI_BASE_URL if OPENAI_API_KEY else ""
-UPSTREAM_API_KEY = OPENAI_API_KEY
-UPSTREAM_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna")
-UPSTREAM_PROVIDER = "openai" if OPENAI_API_KEY else None
+if LLM_BASE_URL:
+    UPSTREAM_BASE_URL = LLM_BASE_URL
+    UPSTREAM_API_KEY = os.getenv("LLM_API_KEY", "").strip()
+    UPSTREAM_MODEL = os.getenv("LLM_MODEL", "").strip() or "local-model"
+    UPSTREAM_PROVIDER: Optional[str] = "lmstudio" if ":1234" in LLM_BASE_URL else "openai-compatible"
+else:
+    UPSTREAM_BASE_URL = OPENAI_BASE_URL if OPENAI_API_KEY else ""
+    UPSTREAM_API_KEY = OPENAI_API_KEY
+    UPSTREAM_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna")
+    UPSTREAM_PROVIDER = "openai" if OPENAI_API_KEY else None
+
+# OpenAI-only request fields that other servers may reject.
+_OPENAI_ONLY_FIELDS = ("reasoning_effort", "verbosity", "store", "safety_identifier", "prompt_cache_key")
 
 
 _LOCAL_MODEL = "portal-realestate-rag"
@@ -74,7 +94,7 @@ def _upstream_headers(request: Request) -> Dict[str, str]:
     auth = request.headers.get("authorization")
     if UPSTREAM_API_KEY:
         headers["Authorization"] = f"Bearer {UPSTREAM_API_KEY}"
-    elif auth:
+    elif auth and not LLM_BASE_URL:  # never hand a portal session token to a test LLM server
         headers["Authorization"] = auth
     return headers
 
@@ -247,8 +267,11 @@ async def chat_completions(request: Request) -> Any:
             return _error("Conversation too long — start a new conversation.", status=413)
         # Clients written for the local fallback (e.g. the web portal) ask for the local
         # model id; send those to the configured upstream model instead.
-        if body.get("model") in (None, "", _LOCAL_MODEL):
+        if body.get("model") in (None, "", _LOCAL_MODEL) or (LLM_BASE_URL and body.get("model") != UPSTREAM_MODEL):
             body["model"] = UPSTREAM_MODEL
+        if LLM_BASE_URL:
+            for field in _OPENAI_ONLY_FIELDS:
+                body.pop(field, None)
         url = f"{UPSTREAM_BASE_URL}/chat/completions"
         if stream:
             return StreamingResponse(
