@@ -1257,6 +1257,7 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
             check("POST /ai/speak (no OpenAI key -> 501)", r.status_code == 501, str(r.status_code))
             r = client.post("/ai/realtime/session", json={"reply_lang": "ur"})
             check("POST /ai/realtime/session (no OpenAI key -> 501)", r.status_code == 501, str(r.status_code))
+        run_ai_guard_checks()
 
         # --- MCP share the same auth store as REST ---
         r = client.post("/auth/login", json={"identifier": "mcp@portal.test", "password": "Secret@123"})
@@ -2359,6 +2360,55 @@ async def run_products_checks() -> None:
 # ============================================================
 # 2b) Agentic products (REST)
 # ============================================================
+
+
+def run_ai_guard_checks() -> None:
+    """Rate limits / sign-in gate for the OpenAI endpoints, and OpenAI error mapping."""
+    import httpx
+    from fastapi import HTTPException
+    from starlette.requests import Request
+
+    import ai_guard
+    import openai_voice
+
+    def fake_request(ip: str, forwarded: str = "") -> Request:
+        headers = [(b"x-forwarded-for", forwarded.encode())] if forwarded else []
+        return Request({"type": "http", "method": "POST", "path": "/", "headers": headers, "client": (ip, 5000)})
+
+    def status_of(req: Request, bucket: str) -> int:
+        try:
+            ai_guard.check(req, bucket)
+            return 200
+        except HTTPException as exc:
+            return exc.status_code
+
+    saved = (dict(ai_guard.LIMITS), ai_guard.REQUIRE_SIGNIN, ai_guard.TRUST_PROXY)
+    try:
+        ai_guard.reset()
+        ai_guard.LIMITS["live"] = (2, 3600)
+        codes = [status_of(fake_request("10.0.0.1"), "live") for _ in range(3)]
+        check("ai_guard: rate limit kicks in after the limit", codes == [200, 200, 429], str(codes))
+        check("ai_guard: limits are per caller", status_of(fake_request("10.0.0.2"), "live") == 200)
+        # X-Forwarded-For is ignored unless AI_TRUST_PROXY is on (it is trivially spoofed).
+        check("ai_guard: spoofed X-Forwarded-For ignored",
+              status_of(fake_request("10.0.0.1", "1.2.3.4"), "live") == 429)
+        ai_guard.TRUST_PROXY = True
+        check("ai_guard: X-Forwarded-For honoured behind a proxy",
+              status_of(fake_request("10.0.0.1", "1.2.3.4"), "live") == 200)
+        ai_guard.REQUIRE_SIGNIN = True
+        check("ai_guard: AI_REQUIRE_SIGNIN turns guests away", status_of(fake_request("10.0.0.3"), "chat") == 401)
+    finally:
+        ai_guard.LIMITS.clear()
+        ai_guard.LIMITS.update(saved[0])
+        ai_guard.REQUIRE_SIGNIN, ai_guard.TRUST_PROXY = saved[1], saved[2]
+        ai_guard.reset()
+
+    quota = openai_voice._error(httpx.Response(429, json={"error": {"message": "quota"}}))
+    check("openai_voice: OpenAI 429 -> 429", quota.status == 429, str(quota.status))
+    bad_key = openai_voice._error(httpx.Response(401, json={"error": {"message": "bad key"}}))
+    check("openai_voice: OpenAI 401 -> clear key message", bad_key.status == 502 and "OPENAI_API_KEY" in str(bad_key), str(bad_key))
+    gateway = openai_voice._error(httpx.Response(503, text="<html>Service Unavailable</html>"))
+    check("openai_voice: non-JSON error handled", gateway.status == 502 and "503" in str(gateway), str(gateway))
 
 
 def run_products_rest_checks(client: TestClient) -> None:

@@ -32,6 +32,10 @@ uv sync                 # or: uv add fastapi "uvicorn[standard]" httpx mcp[cli]
 | **MCP only (stdio)** | `uv run mcp dev server.py` | Opens MCP Inspector on `:6274`. For desktop MCP clients. |
 | **Production** | `uvicorn api:app --host 0.0.0.0 --port 8000` | Put a reverse proxy/TLS terminator in front. |
 
+`main.py` listens on `127.0.0.1:8000` by default, so only this computer can reach it. To
+test the Android or iOS app on a real phone, set `PORTAL_HOST=0.0.0.0` (and optionally
+`PORTAL_PORT`) in `backend/.env`. Then point the app at `http://<this-pc's-LAN-IP>:8000`.
+
 ### 1.4 Ports
 
 | Port | Service |
@@ -238,8 +242,35 @@ the resulting `voice_…` id in `OPENAI_VOICE_ID`. OpenAI requires telling liste
 the voice is AI-generated.
 
 **Cost.** Realtime is billed per audio token, speech-to-text per minute and text-to-speech
-per character. Set usage limits on the OpenAI project. The session endpoint is open to
-guests; put it behind sign-in or rate limiting before a public launch.
+per character. Set usage limits on the OpenAI project as well.
+
+**Cost protection.** Every endpoint that spends OpenAI credit is rate-limited per caller.
+These are `/v1/chat/completions` and `/v1/completions` (when proxying), `/ai/transcribe`,
+`/ai/speak` and `/ai/realtime/session`. A caller is the signed-in user, or the IP address
+for a guest. Over the limit, the API answers `429` with a `Retry-After` header. Counters
+are kept in memory and reset on restart.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `AI_CHAT_PER_MINUTE` | 30 | Chat requests (typed messages, voice-note replies). `0` = no limit. |
+| `AI_VOICE_PER_MINUTE` | 30 | Speech-to-text and text-to-speech calls. |
+| `AI_LIVE_PER_HOUR` | 20 | Live voice-agent calls started. |
+| `AI_REQUIRE_SIGNIN` | 0 | `1` = guests get `401` and must sign in to use the AI. |
+| `AI_TRUST_PROXY` | 0 | `1` only behind your own reverse proxy: guests are told apart by `X-Forwarded-For`. Otherwise anyone could fake that header to dodge the limits. |
+
+There are also fixed size caps:
+
+- voice notes: 25 MB (OpenAI's limit);
+- text to speak: 4,000 characters;
+- chat: 60 messages or 200,000 characters per request.
+
+Requests over a cap get `413`.
+
+If OpenAI itself refuses a request, the app gets a readable error:
+
+- OpenAI rate limit or exhausted quota: `429`;
+- rejected API key: `502` "check OPENAI_API_KEY";
+- OpenAI unreachable: `502`.
 
 ---
 

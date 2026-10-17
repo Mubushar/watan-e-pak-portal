@@ -26,13 +26,14 @@ from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
-from fastapi import (Depends, FastAPI, Header, HTTPException, Query, WebSocket,
+from fastapi import (Depends, FastAPI, Header, HTTPException, Query, Request, WebSocket,
                      WebSocketDisconnect)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel
 
 import server as core
+import ai_guard
 import openai_voice
 import openai_facade
 from openai_facade import router as openai_router
@@ -441,11 +442,19 @@ def ai_tools() -> Any:
                       for t in openai_voice.REALTIME_TOOLS]}
 
 
+# OpenAI accepts audio files up to 25 MB; base64 adds a third.
+MAX_AUDIO_B64 = 25 * 1024 * 1024 * 4 // 3
+MAX_SPEAK_CHARS = 4000
+
+
 @app.post("/ai/transcribe", tags=["ai"])
-async def ai_transcribe(payload: TranscribeRequest) -> Any:
+async def ai_transcribe(payload: TranscribeRequest, request: Request) -> Any:
     """Speech-to-text for voice notes (OpenAI ``OPENAI_TRANSCRIBE_MODEL``; Urdu, English or mixed)."""
     if not openai_voice.configured():
         raise HTTPException(status_code=501, detail="Voice needs OPENAI_API_KEY in backend/.env")
+    if len(payload.audio_base64) > MAX_AUDIO_B64:
+        raise HTTPException(status_code=413, detail="Recording too long (25 MB max)")
+    ai_guard.check(request, "voice")
     try:
         audio = base64.b64decode(payload.audio_base64.split(",")[-1], validate=False)
     except Exception:
@@ -455,25 +464,29 @@ async def ai_transcribe(payload: TranscribeRequest) -> Any:
     try:
         text = await asyncio.to_thread(openai_voice.transcribe, audio, payload.mime_type)
     except openai_voice.VoiceError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        raise HTTPException(status_code=exc.status, detail=str(exc))
     return {"text": text, "provider": "openai"}
 
 
 @app.post("/ai/speak", tags=["ai"])
-async def ai_speak(payload: SpeakRequest) -> Any:
+async def ai_speak(payload: SpeakRequest, request: Request) -> Any:
     """Text-to-speech for voice-note replies (OpenAI ``OPENAI_TTS_MODEL`` with ``OPENAI_VOICE`` /
     ``OPENAI_VOICE_ID``). Returns ``{"audio_base64", "mime_type"}``."""
     if not openai_voice.configured():
         raise HTTPException(status_code=501, detail="Voice needs OPENAI_API_KEY in backend/.env")
+    if len(payload.text) > MAX_SPEAK_CHARS:
+        raise HTTPException(status_code=413, detail=f"Text too long to speak ({MAX_SPEAK_CHARS} characters max)")
+    ai_guard.check(request, "voice")
     try:
         audio, mime = await asyncio.to_thread(openai_voice.speak, payload.text, payload.language)
     except openai_voice.VoiceError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        raise HTTPException(status_code=exc.status, detail=str(exc))
     return {"audio_base64": base64.b64encode(audio).decode(), "mime_type": mime, "provider": "openai"}
 
 
 @app.post("/ai/realtime/session", tags=["ai"])
-async def ai_realtime_session(payload: RealtimeSessionRequest, authorization: Optional[str] = Header(default=None)) -> Any:
+async def ai_realtime_session(payload: RealtimeSessionRequest, request: Request,
+                              authorization: Optional[str] = Header(default=None)) -> Any:
     """Start a live voice conversation (OpenAI Realtime API).
 
     Returns a short-lived ``client_secret`` (10 minutes to connect) plus the ``calls_url``
@@ -483,13 +496,14 @@ async def ai_realtime_session(payload: RealtimeSessionRequest, authorization: Op
     """
     if not openai_voice.configured():
         raise HTTPException(status_code=501, detail="The live voice agent needs OPENAI_API_KEY in backend/.env")
+    ai_guard.check(request, "live")
     account = core.auth.current_user(_bearer_token(authorization))
     user = core.auth.public_user(account) if account else None
     lang = payload.reply_lang if payload.reply_lang in ("auto", "ur", "en") else "auto"
     try:
         return await asyncio.to_thread(openai_voice.realtime_session, user, lang)
     except openai_voice.VoiceError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        raise HTTPException(status_code=exc.status, detail=str(exc))
 
 
 @app.get("/memory", tags=["memory"])

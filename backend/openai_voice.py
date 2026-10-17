@@ -55,7 +55,14 @@ def _language_fields(model: str) -> Dict[str, Any]:
 
 
 class VoiceError(Exception):
-    """An OpenAI voice call failed (bad key, quota, unsupported input, ...)."""
+    """An OpenAI voice call failed (bad key, quota, unsupported input, ...).
+
+    ``status`` is the HTTP status to return to the app (429 for rate limits/quota,
+    502 for other upstream problems)."""
+
+    def __init__(self, message: str, status: int = 502):
+        super().__init__(message)
+        self.status = status
 
 
 def configured() -> bool:
@@ -93,13 +100,18 @@ def _headers() -> Dict[str, str]:
     return {"Authorization": f"Bearer {API_KEY}"}
 
 
-def _error(resp: httpx.Response) -> str:
+def _error(resp: httpx.Response) -> VoiceError:
+    """Turn an OpenAI error response into a VoiceError with a readable message."""
     try:
         err = resp.json().get("error") or {}
         msg = err.get("message") if isinstance(err, dict) else err
     except Exception:
         msg = resp.text[:200]
-    return f"OpenAI {resp.status_code}: {msg}"
+    if resp.status_code == 429:
+        return VoiceError(f"OpenAI rate limit or quota reached — try again shortly. ({msg})", 429)
+    if resp.status_code == 401:
+        return VoiceError("OpenAI rejected the API key — check OPENAI_API_KEY in backend/.env.", 502)
+    return VoiceError(f"OpenAI {resp.status_code}: {msg}", 502)
 
 
 # ------------------------------------------------------------------ voice notes
@@ -124,7 +136,7 @@ def transcribe(audio: bytes, mime_type: str) -> str:
     except httpx.HTTPError as exc:
         raise VoiceError(f"Could not reach OpenAI ({type(exc).__name__})") from exc
     if resp.status_code >= 400:
-        raise VoiceError(_error(resp))
+        raise _error(resp)
     return (resp.json().get("text") or "").strip()
 
 
@@ -156,7 +168,7 @@ def speak(text: str, language: Optional[str] = None) -> Tuple[bytes, str]:
     except httpx.HTTPError as exc:
         raise VoiceError(f"Could not reach OpenAI ({type(exc).__name__})") from exc
     if resp.status_code >= 400:
-        raise VoiceError(_error(resp))
+        raise _error(resp)
     return resp.content, "audio/mpeg"
 
 
@@ -296,7 +308,7 @@ def realtime_session(user: Optional[Dict[str, Any]] = None, reply_lang: str = "a
     except httpx.HTTPError as exc:
         raise VoiceError(f"Could not reach OpenAI ({type(exc).__name__})") from exc
     if resp.status_code >= 400:
-        raise VoiceError(_error(resp))
+        raise _error(resp)
     data = resp.json()
     return {
         "client_secret": data.get("value"),

@@ -39,6 +39,7 @@ import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
+import ai_guard
 import envfile  # noqa: F401  (loads backend/.env)
 import server as core
 
@@ -76,6 +77,24 @@ def _upstream_headers(request: Request) -> Dict[str, str]:
     elif auth:
         headers["Authorization"] = auth
     return headers
+
+
+MAX_MESSAGES = 60
+MAX_REQUEST_CHARS = 200_000
+
+
+async def _forward(url: str, request: Request, body: Dict[str, Any]) -> JSONResponse:
+    """POST to the upstream and return its JSON as-is. Network failures and non-JSON
+    error pages (gateways, proxies) become OpenAI-style 502 errors."""
+    try:
+        async with httpx.AsyncClient(timeout=120) as client:
+            upstream = await client.post(url, json=body, headers=_upstream_headers(request))
+    except httpx.HTTPError as exc:
+        return _error(f"Could not reach the AI service ({type(exc).__name__})", status=502, err_type="upstream_error")
+    try:
+        return JSONResponse(status_code=upstream.status_code, content=upstream.json())
+    except ValueError:
+        return _error(f"AI service error {upstream.status_code}", status=502, err_type="upstream_error")
 
 
 def _error(message: str, status: int = 400, err_type: str = "invalid_request_error") -> JSONResponse:
@@ -222,19 +241,20 @@ async def chat_completions(request: Request) -> Any:
 
     # ----- proxy mode -----
     if _proxying():
+        # The upstream spends the server's OpenAI credit: rate-limit and cap request size.
+        ai_guard.check(request, "chat")
+        if len(messages) > MAX_MESSAGES or len(json.dumps(messages)) > MAX_REQUEST_CHARS:
+            return _error("Conversation too long — start a new conversation.", status=413)
         # Clients written for the local fallback (e.g. the web portal) ask for the local
         # model id; send those to the configured upstream model instead.
         if body.get("model") in (None, "", _LOCAL_MODEL):
             body["model"] = UPSTREAM_MODEL
         url = f"{UPSTREAM_BASE_URL}/chat/completions"
-        headers = _upstream_headers(request)
         if stream:
             return StreamingResponse(
-                _stream_upstream(url, headers, body), media_type="text/event-stream"
+                _stream_upstream(url, _upstream_headers(request), body), media_type="text/event-stream"
             )
-        async with httpx.AsyncClient(timeout=120) as client:
-            upstream = await client.post(url, json=body, headers=headers)
-        return JSONResponse(status_code=upstream.status_code, content=upstream.json())
+        return await _forward(url, request, body)
 
     # ----- local fallback mode -----
     user_text = _last_user_message(messages)
@@ -271,11 +291,10 @@ async def completions(request: Request) -> Any:
     model = body.get("model") or (UPSTREAM_MODEL if _proxying() else _LOCAL_MODEL)
 
     if _proxying():
-        url = f"{UPSTREAM_BASE_URL}/completions"
-        headers = _upstream_headers(request)
-        async with httpx.AsyncClient(timeout=120) as client:
-            upstream = await client.post(url, json=body, headers=headers)
-        return JSONResponse(status_code=upstream.status_code, content=upstream.json())
+        ai_guard.check(request, "chat")
+        if len(json.dumps(body)) > MAX_REQUEST_CHARS:
+            return _error("Prompt too long", status=413)
+        return await _forward(f"{UPSTREAM_BASE_URL}/completions", request, body)
 
     content = _local_answer(str(prompt))
     return {
@@ -320,11 +339,7 @@ async def embeddings(request: Request) -> Any:
     model = body.get("model") or (UPSTREAM_MODEL if _proxying() else _LOCAL_MODEL)
 
     if _proxying():
-        url = f"{UPSTREAM_BASE_URL}/embeddings"
-        headers = _upstream_headers(request)
-        async with httpx.AsyncClient(timeout=120) as client:
-            upstream = await client.post(url, json=body, headers=headers)
-        return JSONResponse(status_code=upstream.status_code, content=upstream.json())
+        return await _forward(f"{UPSTREAM_BASE_URL}/embeddings", request, body)
 
     raw_input = body.get("input")
     if raw_input is None:
