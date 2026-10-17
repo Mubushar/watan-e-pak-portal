@@ -224,7 +224,7 @@ export default function Assistant() {
     (responseId: string) => {
       if (toolResponses.current.has(responseId)) return;
       const cards = turnCards.current;
-      if (!cards.listings && !cards.actions) return;
+      if (!cards.listings && !cards.actions && !cards.map) return;
       turnCards.current = {};
       const msgs = useChat.getState().messages;
       // An answer cut off before it said anything: use the agent's latest line instead.
