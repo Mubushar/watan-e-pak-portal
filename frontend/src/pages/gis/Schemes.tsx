@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 import { Badge, Button, Card, CardBody, CardHeader, EmptyState, ErrorState, Input, JsonView, PageHeader, ScoreRing, Skeleton, StatCard } from "@/components/ui";
 import { PropertyCard } from "@/components/property/PropertyCard";
 import { PortalMap, pin } from "@/components/map/PortalMap";
+import { AreaProfileCard } from "@/components/gis/AreaProfile";
 import { FactorBars, ForecastChart, MiniStat, ReportButton, ReportModal, bandTone, type ReportRef } from "@/components/gis/kit";
 import type { GisAreaAnalysis, HierarchyCity, HierarchyScheme, Scenarios } from "@/components/gis/types";
 
@@ -411,6 +412,8 @@ function SchemeDetail({
             <span className="chip bg-white/15 text-white backdrop-blur">
               <Home className="h-3 w-3" /> {num(scheme.total_units)} units
             </span>
+            {scheme.development_status && <span className="chip bg-white/15 capitalize text-white backdrop-blur">{scheme.development_status}</span>}
+            {scheme.approval_authority && <span className="chip bg-white/15 text-white backdrop-blur">{scheme.approval_authority} approved</span>}
             {ana?.area && (
               <span className="chip bg-white/15 text-white backdrop-blur">
                 <LandPlot className="h-3 w-3" /> {num(ana.area.area_acres, 0)} acres
@@ -440,6 +443,8 @@ function SchemeDetail({
         <StatCard label="Blocks" value={scheme.blocks ?? h?.blocks.length ?? "—"} icon={<Layers className="h-5 w-5" />} tone="blue" />
         <StatCard label="Live listings" value={h?.properties ?? properties.length} icon={<Home className="h-5 w-5" />} tone="purple" hint={ana?.properties ? pkrShort(ana.properties.total_market_value) : undefined} />
       </div>
+
+      <AreaProfileCard schemeId={scheme.id} area={scheme.name} />
 
       {/* blocks */}
       {h && h.blocks.length > 0 && (

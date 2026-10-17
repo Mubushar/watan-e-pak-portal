@@ -95,6 +95,8 @@ export interface Scheme {
   total_units?: number;
   established_year?: number;
   blocks?: number;
+  development_status?: string | null;
+  approval_authority?: string | null;
 }
 
 export interface NewsItem {
