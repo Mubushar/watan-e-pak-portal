@@ -4,10 +4,13 @@
  *   GET /masterplans/{key}/tiles/{z}/{x}/{y}.png
  *   GET /masterplans/search?q=…              text on the plans (sectors, roads, mosques, plot numbers)
  * With no plans built, the section says so and nothing is drawn.
+ *
+ * Plan tiles exist only for zooms 12–17, so each plan's boundary is also drawn as an
+ * outline (visible at any zoom, click to zoom in) and the tiles are scaled down to zoom 9.
  */
 import { useState } from "react";
 import type L from "leaflet";
-import { CircleMarker, TileLayer, Tooltip } from "react-leaflet";
+import { CircleMarker, Polygon, Rectangle, TileLayer, Tooltip } from "react-leaflet";
 import { Map as MapIcon, Search, Target } from "lucide-react";
 import { useApi } from "@/hooks/useApi";
 import { API_BASE } from "@/lib/api";
@@ -22,6 +25,8 @@ export interface MasterPlan {
   /** [south, west, north, east] */
   bounds: [number, number, number, number];
   tile_url: string | null;
+  /** The plan's boundary as [lat, lon] points. */
+  outline?: [number, number][] | null;
   zoom?: [number, number];
   accuracy?: { rmse_m?: number };
   attribution?: string;
@@ -45,18 +50,53 @@ const corners = (b: MasterPlan["bounds"]): [number, number][] => [
   [b[2], b[3]],
 ];
 
-/** Tile layers + the highlighted search hit; render inside the map. */
-export function MasterPlanLayers({ plans, shown, opacity, hit }: { plans: MasterPlan[]; shown: Set<string>; opacity: number; hit?: PlanLabel | null }) {
+/** Tile layers, boundaries + the highlighted search hit; render inside the map. */
+export function MasterPlanLayers({
+  plans,
+  shown,
+  opacity,
+  hit,
+  onSelect,
+}: {
+  plans: MasterPlan[];
+  shown: Set<string>;
+  opacity: number;
+  hit?: PlanLabel | null;
+  /** Clicking a plan's boundary (e.g. to zoom to it). */
+  onSelect?: (p: MasterPlan) => void;
+}) {
+  const visible = plans.filter((p) => shown.has(p.key));
+  const style = { color: "#c99a22", weight: 2, dashArray: "6 5", fillColor: "#f2dd8f", fillOpacity: 0.06 };
   return (
     <>
-      {plans
-        .filter((p) => p.tile_url && shown.has(p.key))
+      {visible.map((p) => {
+        const tip = (
+          <Tooltip sticky>
+            <span className="font-semibold">{p.name}</span> master plan{onSelect ? " · click to zoom in" : ""}
+          </Tooltip>
+        );
+        const eventHandlers = onSelect ? { click: () => onSelect(p) } : undefined;
+        return p.outline?.length ? (
+          <Polygon key={`outline-${p.key}`} positions={p.outline} pathOptions={style} eventHandlers={eventHandlers}>
+            {tip}
+          </Polygon>
+        ) : (
+          <Rectangle key={`outline-${p.key}`} bounds={corners(p.bounds)} pathOptions={style} eventHandlers={eventHandlers}>
+            {tip}
+          </Rectangle>
+        );
+      })}
+      {visible
+        .filter((p) => p.tile_url)
         .map((p) => (
           <TileLayer
             key={p.key}
             url={`${API_BASE}${p.tile_url}`}
             bounds={corners(p.bounds)}
-            minZoom={p.zoom?.[0]}
+            // Native tiles start at zoom 12; Leaflet scales them down a few levels so the plan
+            // is still visible when the whole phase is on screen.
+            minNativeZoom={p.zoom?.[0]}
+            minZoom={p.zoom ? Math.max(9, p.zoom[0] - 3) : undefined}
             maxNativeZoom={p.zoom?.[1]}
             maxZoom={20}
             opacity={opacity}

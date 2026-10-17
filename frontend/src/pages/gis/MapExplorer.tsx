@@ -152,6 +152,15 @@ export default function MapExplorer() {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const plansQ = useMasterPlans();
   const [planShown, setPlanShown] = useState<Set<string>>(new Set());
+  // Every loaded master plan starts switched on (they can be hidden from the Layers tab).
+  const plansInit = useRef(false);
+  useEffect(() => {
+    const plans = plansQ.data?.plans;
+    if (plans?.length && !plansInit.current) {
+      plansInit.current = true;
+      setPlanShown(new Set(plans.map((p) => p.key)));
+    }
+  }, [plansQ.data]);
   const [planHit, setPlanHit] = useState<PlanLabel | null>(null);
   const [layerOpacity, setLayerOpacity] = useState(70);
   useEffect(() => {
@@ -261,7 +270,25 @@ export default function MapExplorer() {
     <div className={cn("relative h-[calc(100dvh-110px)] min-h-[540px] w-full overflow-hidden bg-brand-950", analysing && "[&_.leaflet-container]:cursor-crosshair")}>
       <PortalMap height="100%" className="rounded-none" scrollWheelZoom onReady={onReady} zoom={5}>
         {/* ----------------------------------------------------- DHA master plans */}
-        {vis.layers && <MasterPlanLayers plans={plansQ.data?.plans ?? []} shown={planShown} opacity={layerOpacity / 100} hit={planHit} />}
+        {vis.layers && (
+          <MasterPlanLayers
+            plans={plansQ.data?.plans ?? []}
+            shown={planShown}
+            opacity={layerOpacity / 100}
+            hit={planHit}
+            onSelect={(p) =>
+              fitTo(
+                map,
+                [
+                  [p.bounds[0], p.bounds[1]],
+                  [p.bounds[2], p.bounds[3]],
+                ],
+                15,
+                sidePad(),
+              )
+            }
+          />
+        )}
 
         {/* ----------------------------------------------------- GIS layers */}
         {vis.layers &&
