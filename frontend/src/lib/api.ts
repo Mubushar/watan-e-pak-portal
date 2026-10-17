@@ -137,7 +137,8 @@ export async function api<T = any>(path: string, opts: ApiOptions = {}): Promise
   }
 
   // Vite's proxy answers 502/504 (or 500 with an ECONNREFUSED body) when the backend is down.
-  if ([502, 503, 504].includes(res.status) || (res.status === 500 && !res.headers.get("content-type")?.includes("json"))) {
+  // A JSON error is the backend itself reporting an upstream problem (e.g. AI quota): show it.
+  if ([500, 502, 503, 504].includes(res.status) && !res.headers.get("content-type")?.includes("json")) {
     setOffline(true);
     if (canFallback) {
       const s = await fromSnapshot<T>(rel);

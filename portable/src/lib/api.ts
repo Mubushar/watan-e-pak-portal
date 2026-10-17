@@ -142,7 +142,10 @@ export async function api<T = unknown>(path: string, opts: ApiOptions = {}): Pro
     clearTimeout(timer);
   }
 
-  if ([502, 503, 504].includes(res.status)) {
+  // A gateway/proxy error page means the backend is down; a JSON error is the backend itself
+  // reporting an upstream problem (e.g. OpenAI over quota) and its message should be shown.
+  const isJson = (res.headers.get("content-type") ?? "").includes("json");
+  if ([502, 503, 504].includes(res.status) && !isJson) {
     setOffline(true);
     if (canFallback) {
       const s = await fromSnapshot<T>(path, opts.query);
