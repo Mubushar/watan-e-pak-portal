@@ -10,7 +10,7 @@
  * conversation) are phrased to be heard rather than read.
  */
 import { create } from "zustand";
-import type { MapView, Property, PropertyList } from "@/types";
+import type { ChatImage, MapView, Property, PropertyList } from "@/types";
 import { get, post } from "./api";
 import { draftFromIntent, parseIntent, searchQuery, type Intent, type ListingDraft } from "./intent";
 import { city as cityName, describe, detectLang, money, t, type Lang } from "./lang";
@@ -45,6 +45,8 @@ export interface ChatMsg {
   actions?: ChatAction[];
   /** A map card under the reply (show_map). */
   map?: MapView;
+  /** An image under the reply (show_plan). */
+  image?: ChatImage;
   pending?: boolean;
   /** What the agent looked up for this reply (shown to the model on later turns, not to the user). */
   context?: string;
@@ -136,6 +138,7 @@ export interface Reply {
   listings?: Property[];
   actions?: ChatAction[];
   map?: MapView;
+  image?: ChatImage;
   context?: string;
 }
 
@@ -238,6 +241,8 @@ function agentSystem(user: User | null, lang: Lang, opts: RespondOptions): strin
     "- Answer every part of the user's question. Don't stop at 'none found': if find_places finds none, use 'broader' (e.g. how many schools there are when none is named 'High School') and 'closest_outside_area' (nearest ones just outside, with distance); for well-known facts the map may lack, also use web_lookup.",
     "- Questions about an area (which malls / schools / hospitals are in it, how many, population, how developed, what's around it): use find_places and area_info. Give real names and numbers; say counts come from the map and may miss small places, and that population is an estimate.",
     "- When the user wants a map, a map screenshot, or to see a listing and the schools / mosques / parks / malls around it, call show_map (with the listing's id, or a place name): a map card appears under your reply. Never say you can't show a map.",
+    "- For DHA Islamabad-Rawalpindi phases (I, II, III, V, VI, ME-1/ME-2, River View North / South) use master_plan: summary for an overview, search to find blocks / roads / facilities / plot numbers, at for what the plan shows around a listing or place. Explain plot sizes (50x90 = 1 kanal, 35x65 ≈ 10 marla, 25x45 = 5 marla), road widths and nearby facilities; say it's from the master plan and what is built may differ. Use web_lookup for possession, progress, prices or news.",
+    "- When the user wants to see the master plan, a block or the plots around a listing, call show_plan: a plan close-up and a map with the plan overlaid appear under your reply. Never say you can't show the plan.",
     "- For approval status, possession, developer, news or anything the tools don't cover, use web_lookup and name the source website. Never guess facts.",
     "- When the user wants to visit, meet the owner or talk to a human agent, offer to send a call request and, once they agree, call request_call. If it says not_signed_in, tell them to tap 'Request a call'.",
     "- When the user wants to sell or rent out a property, ask briefly for missing essentials (type, city, size, price), then call draft_listing.",
@@ -270,7 +275,7 @@ async function agentReply(text: string, history: ChatMsg[], user: User | null, l
       // Drop any [context: …] note the model copied from earlier turns.
       const content = (msg.content ?? "").replace(/\s*\[context:[^\]]*\]/gi, "").trim();
       if (!content) throw new Error("empty reply");
-      return { lang, content, listings: effect.listings, actions: effect.actions, map: effect.map, context: notes.join(" | ") || undefined };
+      return { lang, content, listings: effect.listings, actions: effect.actions, map: effect.map, image: effect.image, context: notes.join(" | ") || undefined };
     }
     messages.push({ role: "assistant", content: msg.content ?? null, tool_calls: msg.tool_calls });
     for (const call of msg.tool_calls) {

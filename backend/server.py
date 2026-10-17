@@ -37,6 +37,7 @@ Run the combined FastAPI + MCP HTTP app:
 
 import json
 import math
+import os
 import re
 import statistics
 import uuid
@@ -54,6 +55,7 @@ import commercial
 import construction
 import content
 import geo
+import masterplan
 import gis
 import intelligence
 import leasing
@@ -1287,7 +1289,95 @@ def map_view(listing_id: Optional[str] = None, place: Optional[str] = None, kind
                                  "price": p.price, "distance_km": round(haversine_km(lat, lon, p.latitude, p.longitude), 2)})
     return dump({"focus": focus, "radius_km": radius_km, "kinds": kinds, "markers": markers, "listings": listings,
                  "tiles": {"url": geo.TILE_URL, "attribution": geo.TILE_ATTRIBUTION},
-                 "attribution": geo.ATTRIBUTION})
+                 "overlays": masterplan.overlays_at(lat, lon), "attribution": geo.ATTRIBUTION})
+
+
+# ---------- DHA master plans ----------
+
+
+def _plan_point(place: Optional[str] = None, listing_id: Optional[str] = None, plan: Optional[str] = None,
+                latitude: Optional[float] = None, longitude: Optional[float] = None
+                ) -> Optional[Tuple[float, float, str]]:
+    """Resolve where to look: a listing, a label on the plan ("C10 commercial"), a place, or a point."""
+    if latitude is not None and longitude is not None:
+        return latitude, longitude, f"{latitude:.5f}, {longitude:.5f}"
+    if listing_id:
+        p = find_property(listing_id)
+        if p and p.latitude is not None:
+            return p.latitude, p.longitude, p.title
+        return None
+    if place:
+        hit = masterplan.search(place, plan=plan, limit=1)
+        if hit["results"] and (plan or hit["count"] <= 25):
+            r = hit["results"][0]
+            return r["latitude"], r["longitude"], f"{r['text']} ({r['plan']})"
+        loc = geo.locate(place)
+        if loc:
+            return loc["lat"], loc["lon"], loc["name"]
+    if plan:
+        meta = masterplan.find_plan(plan)
+        if meta:
+            return meta["center"][0], meta["center"][1], meta["name"]
+    return None
+
+
+@mcp.tool()
+def masterplan_list() -> str:
+    """The DHA master plans loaded into the portal (outline, accuracy, map overlay, label counts)."""
+    return dump({"count": len(masterplan.plans()), "plans": masterplan.plans(), "attribution": masterplan.ATTRIBUTION})
+
+
+@mcp.tool()
+def masterplan_summary(plan: str) -> str:
+    """A DHA phase from its master plan: plot sizes, sectors / blocks, named roads, mosques, parks,
+    schools, commercial areas, clubs, gates, the sheet's area statement, and web facts."""
+    return dump(masterplan.summary(plan))
+
+
+@mcp.tool()
+def masterplan_search(query: str, plan: Optional[str] = None, category: Optional[str] = None, limit: int = 20) -> str:
+    """Find text on the master plans ("C10 commercial", "Jinnah Blvd", "masjid", "plot 23 street 13")."""
+    return dump(masterplan.search(query, plan=plan, category=category, limit=limit))
+
+
+@mcp.tool()
+def masterplan_at(place: Optional[str] = None, listing_id: Optional[str] = None, plan: Optional[str] = None,
+                  latitude: Optional[float] = None, longitude: Optional[float] = None, radius_m: float = 200.0) -> str:
+    """What the master plan shows around a listing, a place or a point (roads, plot sizes, parks, mosques …)."""
+    pt = _plan_point(place, listing_id, plan, latitude, longitude)
+    if not pt:
+        return dump({"error": "Couldn't find that location."})
+    return dump({"location": pt[2], "latitude": pt[0], "longitude": pt[1], **masterplan.at(pt[0], pt[1], radius_m)})
+
+
+@mcp.tool()
+def masterplan_view(plan: Optional[str] = None, place: Optional[str] = None, listing_id: Optional[str] = None,
+                    radius_m: float = 250.0) -> str:
+    """A section of a master plan to show: a readable close-up image (snapshot_url) and a map with
+    the plan overlaid, centred on a listing, a label on the plan or a place."""
+    pt = _plan_point(place, listing_id, plan)
+    if not pt:
+        return dump({"error": "Couldn't find that location."})
+    lat, lon, label = pt
+    meta = masterplan.find_plan(plan) if plan else None
+    covering = masterplan.plans_at(lat, lon)
+    if meta is None or (covering and meta not in covering):
+        meta = covering[0] if covering else meta
+    if not meta:
+        return dump({"error": f"{label} is not on any loaded master plan.", "plans": [p["name"] for p in masterplan.plans()]})
+    radius_m = max(80.0, min(radius_m, 3000.0))
+    q = f"lat={lat:.6f}&lon={lon:.6f}&radius_m={radius_m:.0f}"
+    view = json.loads(map_view(place=None, listing_id=listing_id, radius_km=1.0)) if listing_id else None
+    if not view or "error" in view:
+        view = {"focus": {"type": "place", "name": label, "latitude": lat, "longitude": lon}, "radius_km": 1.0, "kinds": [],
+                "markers": [], "listings": [], "tiles": {"url": geo.TILE_URL, "attribution": geo.TILE_ATTRIBUTION},
+                "overlays": masterplan.overlays_at(lat, lon), "attribution": geo.ATTRIBUTION}
+    return dump({
+        "plan": meta["name"], "plan_key": meta["key"], "location": label, "latitude": lat, "longitude": lon,
+        "radius_m": radius_m, "snapshot_url": f"/masterplans/{meta['key']}/snapshot.png?{q}",
+        "map": view, "on_the_plan": masterplan.at(lat, lon, min(radius_m, 400.0)),
+        "accuracy": meta["accuracy"], "attribution": masterplan.ATTRIBUTION,
+    })
 
 
 @mcp.tool()
@@ -14405,6 +14495,40 @@ def _seed_accounting() -> None:
     )
 
 
+def _seed_master_plans() -> None:
+    """Register each built DHA master plan as a housing scheme with GIS layers: its outline,
+    the georeferenced plan (map tiles) and the PDF's text as annotation layers."""
+    if os.getenv("MASTERPLANS_GIS", "1").strip().lower() in ("0", "false", "no", "off") or not masterplan.available():
+        return
+    for meta in masterplan.store().meta.values():
+        city = resolve_city(meta["city"])
+        if not city:
+            continue
+        acc = meta["accuracy"]
+        about = (f"Georeferenced from the DHA master plan PDF ({meta.get('pdf')}): {acc.get('method')} fit on "
+                 f"{acc.get('gcps')} ground control points" + (f", RMSE {acc['rmse_m']} m" if acc.get("rmse_m") else "") + ".")
+        scheme = next((s for s in housing_schemes_db if s.name.lower() == meta["name"].lower()), None)
+        if scheme is None:
+            scheme = HousingScheme(name=meta["name"], city_id=city.id, latitude=meta["center"][0], longitude=meta["center"][1],
+                                   developer="Defence Housing Authority (DHA) Islamabad-Rawalpindi", description=about)
+            housing_schemes_db.append(scheme)
+        outline = masterplan.outline_geojson(meta)
+        gis.add_layer(gis.GeoLayer(name=f"{meta['name']} — boundary", layer_type="boundary", entity_type="scheme",
+                                   entity_id=scheme.id, geojson=outline, description=about, source_url=meta.get("pdf"),
+                                   style={"color": "#c99a22", "fillColor": "#c99a22", "fillOpacity": 0.05, "weight": 2, "opacity": 0.9}))
+        gis.add_layer(gis.GeoLayer(name=f"{meta['name']} — master plan", layer_type="master_plan", entity_type="scheme",
+                                   entity_id=scheme.id, geojson=outline, description=about, source_url=meta.get("pdf"),
+                                   image_url=masterplan.tile_path(meta["key"]) if meta.get("tiles") else None,
+                                   opacity=0.75, z_index=1))
+        for title, cats, visible in masterplan.LABEL_GROUPS:
+            gis.add_layer(gis.GeoLayer(name=f"{meta['name']} — plan labels: {title}", layer_type="annotation",
+                                       entity_type="scheme", entity_id=scheme.id, visible=visible, z_index=2,
+                                       geojson=masterplan.geojson_labels(meta["key"], cats),
+                                       description=f"Text from the master plan PDF, placed on the ground. {about}",
+                                       source_url=meta.get("pdf"),
+                                       style={"color": "#1d4ed8", "fillColor": "#1d4ed8", "fillOpacity": 0.8, "weight": 1, "opacity": 0.9}))
+
+
 def _seed_pois() -> None:
     """Register a realistic set of points of interest around the seeded societies."""
     lsc = resolve_scheme("Lahore Smart City")
@@ -16393,6 +16517,9 @@ def init_sample_data() -> None:
 
     # ---- Team messaging & notifications wing ----
     _seed_messaging()
+
+    # ---- DHA master plans (if built): schemes + GIS layers ----
+    _seed_master_plans()
 
 
 init_sample_data()

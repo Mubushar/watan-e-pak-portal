@@ -345,7 +345,75 @@ To add a city, add its bounding box to `REGIONS` (and well-known societies to
 already does. Map data © OpenStreetMap contributors (ODbL 1.0). Population © Kontur
 (CC BY 4.0).
 
-### 4.7 Advertising (earning from ads)
+### 4.7 DHA master plans (GIS layers and the assistant)
+
+The portal can load the DHA Islamabad-Rawalpindi master plans: Phases I, II, III, V and VI,
+ME-1 & ME-2, and River View North and South. It uses the PDFs together with their
+georeferenced images (ground control points; about 10–20 m absolute accuracy).
+
+**What gets built** (into `media/masterplans`, or `MASTERPLANS_DIR`):
+- **Labels on the ground.** Every text label in each PDF (about 100,000) is placed at its
+  real location and classified:
+  - sector / block, plot number, plot size, road and width;
+  - park, mosque, school, health, commercial, apartments, club, gate, lake / nullah;
+  - parking, amenity plots, infrastructure marks and dimensions.
+
+  The PDF is matched to the georeferenced image, then each label goes from PDF points to
+  image pixels and through the control-point fit to latitude and longitude.
+- **Map tiles** of each plan (zoom 12–17), shown as a switchable overlay on every map card.
+- **Close-up pieces.** The full-resolution plan is cut into pieces, so the assistant can
+  share a readable section around any point.
+- **Outline and area statement.** The plan outline, plus the sheet's legend and
+  area-statement text.
+
+**GIS registration.** At start-up each plan becomes a housing scheme (`DHA Phase II`, …)
+with these GIS layers:
+- `boundary`: the plan outline;
+- `master_plan`: the outline plus the tile URL in `image_url`;
+- three `annotation` layers with the PDF text:
+  - *names & facilities*, visible;
+  - *plot numbers & sizes*, hidden by default;
+  - *engineering marks & dimensions*, hidden by default.
+
+They work with all existing `/gis` endpoints and MCP tools. Turn this off with
+`MASTERPLANS_GIS=0`.
+
+**The assistant's tools:**
+- **`master_plan`** (`GET /masterplans/{key}`, `/masterplans/search`, `/masterplans/at`):
+  - a phase summary: plot sizes with kanal/marla equivalents, sectors and blocks, named
+    roads, mosques, parks, schools, commercial areas, clubs, gates and the area statement;
+  - label search;
+  - what the plan shows around a listing or place.
+- **`show_plan`** (`GET /masterplans/view`, `/masterplans/{key}/snapshot.png`): puts a
+  close-up of the plan in the chat, with a marker and scale bar, plus a map with the plan
+  overlaid.
+- **Web facts per phase** (`POST /masterplans/knowledge/refresh`) collect possession,
+  development, approvals, facilities and news from the web, with sources. They're saved to
+  `knowledge.json` and included in phase summaries. For live questions the agent also uses
+  `web_lookup`.
+
+**Building / refreshing** (after DHA issues a new plan, or to add GCPs):
+
+```powershell
+cd backend
+uv run --with pymupdf --with numpy python masterplans/build_masterplans.py --maps "C:\path\to\Maps"
+# optional: only some plans, e.g. --plans ph2,ph5
+```
+
+The `Maps` folder holds the PDFs and `Georeferenced\` (per plan: `_source.png`,
+`_EPSG3857.png` + `.pgw`, `_gcps.csv`, plus `accuracy_report.json`). To add another plan,
+georeference it the same way and add an entry to `PLANS` in the script. The output is
+large (map tiles and image pieces) and is not committed to git. Build it on each server,
+or copy the folder there.
+
+**Accuracy and wording.** The agent says that answers come from the master plan, that
+positions are approximate (about 10–20 m), and that what is built may differ. Plot sizes in
+marla use DHA's 225 sq ft per marla (1 kanal = 4,500 sq ft).
+
+**Permission.** The plans are © DHA Islamabad-Rawalpindi. Showing them to customers in a
+commercial app may need DHA's permission. Check before launch.
+
+### 4.8 Advertising (earning from ads)
 
 The apps carry ad slots on Home (rotating banners), Explore (one card after every 6
 listings), each listing page and Profile ("Advertise with Arz-e-Pak"). Each slot first
@@ -579,7 +647,8 @@ plausible-but-wrong data.
       `POST/PUT/DELETE /properties` and `POST/PUT/DELETE /ads` (and `/ads/{id}/track`).
       The apps don't need them: they use `/me/listings` (sign-in required) and
       `/ads/{id}/event` (counts each viewer once).
-- [ ] Replace AdMob's sample app ids and set `ADS_ADMOB_TESTING=0` only in release builds (§4.7).
+- [ ] Replace AdMob's sample app ids and set `ADS_ADMOB_TESTING=0` only in release builds (§4.8).
+- [ ] Confirm DHA's permission to show its master plans to customers (§4.7).
 
 ---
 

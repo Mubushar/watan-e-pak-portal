@@ -1,6 +1,6 @@
 # MCP tool reference
 
-Auto-generated from `server.py` — **600 tools** across **30 groups**. Regenerate with `uv run python docs/_gen/gen_docs.py` from the repository root's `backend/`.
+Auto-generated from `server.py` — **605 tools** across **30 groups**. Regenerate with `uv run python docs/_gen/gen_docs.py` from the repository root's `backend/`.
 
 Legend: `?` = optional parameter. Types are the JSON-Schema types the server advertises to MCP clients.
 
@@ -16,10 +16,10 @@ Legend: `?` = optional parameter. Types are the JSON-Schema types the server adv
 | [maintenance](#maintenance) | 27 |
 | [hierarchy](#hierarchy) | 26 |
 | [construction](#construction) | 23 |
+| [general](#general) | 20 |
 | [commercial](#commercial) | 16 |
 | [transactions](#transactions) | 16 |
 | [content](#content) | 15 |
-| [general](#general) | 15 |
 | [agents](#agents) | 14 |
 | [advertising](#advertising) | 13 |
 | [poi](#poi) | 13 |
@@ -305,7 +305,7 @@ Legend: `?` = optional parameter. Types are the JSON-Schema types the server adv
 
 ## general
 
-15 tools.
+20 tools.
 
 | Tool | Purpose | Parameters |
 | --- | --- | --- |
@@ -319,6 +319,11 @@ Legend: `?` = optional parameter. Types are the JSON-Schema types the server adv
 | `map_view` | A map of a listing (or a named place / area) with the nearest schools, mosques, parks, | `listing_id`?:optional, `place`?:optional, `kinds`?:optional, `radius_km`?:number=2.0, `per_kind`?:integer=3 |
 | `market_insights` | Aggregate market statistics for a city. | `city`:string |
 | `market_trends` | Market trends for a market: pricing, factor index, news momentum, forecast and yields. | `city`?:optional, `scheme`?:optional, `years`?:integer=5, `days`?:integer=180 |
+| `masterplan_at` | What the master plan shows around a listing, a place or a point (roads, plot sizes, parks, mosques …). | `place`?:optional, `listing_id`?:optional, `plan`?:optional, `latitude`?:optional, `longitude`?:optional, `radius_m`?:number=200.0 |
+| `masterplan_list` | The DHA master plans loaded into the portal (outline, accuracy, map overlay, label counts). | — |
+| `masterplan_search` | Find text on the master plans ("C10 commercial", "Jinnah Blvd", "masjid", "plot 23 street 13"). | `query`:string, `plan`?:optional, `category`?:optional, `limit`?:integer=20 |
+| `masterplan_summary` | A DHA phase from its master plan: plot sizes, sectors / blocks, named roads, mosques, parks, | `plan`:string |
+| `masterplan_view` | A section of a master plan to show: a readable close-up image (snapshot_url) and a map with | `plan`?:optional, `place`?:optional, `listing_id`?:optional, `radius_m`?:number=250.0 |
 | `places_find` | Find and count real places (schools, malls, hospitals, mosques, universities, parks …) | `kind`?:optional, `area`?:optional, `near`?:optional, `radius_km`?:number=2.0, `name`?:optional, `limit`?:integer=15 |
 | `property_availability` | Availability breakdown of the listing book (by status / use / category) with the listings. | `city`?:optional, `scheme`?:optional, `use_type`?:optional, `category`?:optional, `status`?:optional, `limit`?:integer=50 |
 | `property_nearby` | Nearby places for a listing: the closest school, mosque, hospital, mall, park, | `property_id`:string, `radius_km`?:number=3.0 |

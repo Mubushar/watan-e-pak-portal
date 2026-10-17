@@ -5,8 +5,8 @@
  * to ask the person to press a button. Definitions live on the backend
  * (openai_voice.REALTIME_TOOLS, served at GET /ai/tools).
  */
-import type { MapView, NearbyList, NearbyPlace, Property, PropertyList } from "@/types";
-import { get, post } from "./api";
+import type { ChatImage, MapView, NearbyList, NearbyPlace, Property, PropertyList } from "@/types";
+import { apiBase, get, post } from "./api";
 import type { ListingDraft } from "./intent";
 import { money, t, type Lang } from "./lang";
 import { useAuth } from "@/store/auth";
@@ -18,6 +18,8 @@ export interface ToolEffect {
   actions?: ChatAction[];
   /** A map card (show_map). */
   map?: MapView;
+  /** An image card (show_plan). */
+  image?: ChatImage;
 }
 
 export interface ToolRun {
@@ -102,6 +104,29 @@ export async function runAgentTool(name: string, args: Record<string, unknown>, 
     return {
       output: { ok: true, shown_on_screen: `A map of ${view.focus.name} with ${view.markers.length} nearby places marked.`, radius_km: view.radius_km, marked: shown },
       effect: { map: view },
+    };
+  }
+  if (name === "master_plan") {
+    const action = String(args.action ?? "summary");
+    const s = (k: string) => (args[k] ? String(args[k]) : undefined);
+    const r =
+      action === "search"
+        ? await get<Record<string, unknown>>("/masterplans/search", { q: s("query") ?? s("place") ?? "", plan: s("plan"), category: s("category"), limit: 15 })
+        : action === "at"
+          ? await get<Record<string, unknown>>("/masterplans/at", { place: s("place"), listing_id: s("listing_id"), plan: s("plan"), radius_m: typeof args.radius_m === "number" ? args.radius_m : undefined })
+          : await get<Record<string, unknown>>(`/masterplans/${encodeURIComponent(s("plan") ?? "")}`);
+    return { output: r, effect: {} };
+  }
+  if (name === "show_plan") {
+    const v = await get<{ plan: string; location: string; snapshot_url: string; map: MapView; on_the_plan: unknown; accuracy: unknown }>("/masterplans/view", {
+      plan: args.plan ? String(args.plan) : undefined,
+      place: args.place ? String(args.place) : undefined,
+      listing_id: args.listing_id ? String(args.listing_id) : undefined,
+      radius_m: typeof args.radius_m === "number" ? args.radius_m : undefined,
+    });
+    return {
+      output: { ok: true, shown_on_screen: `A close-up of the ${v.plan} master plan around ${v.location}, and a map with the plan overlaid.`, on_the_plan: v.on_the_plan, accuracy: v.accuracy },
+      effect: { image: { url: `${apiBase()}${v.snapshot_url}`, caption: `${v.plan} master plan — ${v.location}` }, map: v.map },
     };
   }
   if (name === "web_lookup") {
@@ -192,5 +217,5 @@ export function mergeEffects(a: ToolEffect, b: ToolEffect): ToolEffect {
   const belongsToCards = (x: ChatAction) => !!x.to && /^\/(explore|property\/|signin\?next=\/property)/.test(x.to);
   const keep = b.listings ? (a.actions ?? []).filter((x) => !belongsToCards(x)) : a.actions ?? [];
   const actions = [...keep, ...(b.actions ?? [])].filter((x, i, all) => all.findIndex((y) => y.label === x.label) === i);
-  return { listings: b.listings ?? a.listings, actions: actions.length ? actions : undefined, map: b.map ?? a.map };
+  return { listings: b.listings ?? a.listings, actions: actions.length ? actions : undefined, map: b.map ?? a.map, image: b.image ?? a.image };
 }

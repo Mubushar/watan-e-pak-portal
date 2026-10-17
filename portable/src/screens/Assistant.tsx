@@ -224,7 +224,7 @@ export default function Assistant() {
     (responseId: string) => {
       if (toolResponses.current.has(responseId)) return;
       const cards = turnCards.current;
-      if (!cards.listings && !cards.actions && !cards.map) return;
+      if (!cards.listings && !cards.actions && !cards.map && !cards.image) return;
       turnCards.current = {};
       const msgs = useChat.getState().messages;
       // An answer cut off before it said anything: use the agent's latest line instead.
@@ -399,6 +399,12 @@ export default function Assistant() {
                         <PropertyRow key={p.id} p={p} className="p-1.5" />
                       ))}
                     </div>
+                  )}
+                  {m.image && (
+                    <a href={m.image.url} target="_blank" rel="noreferrer" className="mt-2 block overflow-hidden rounded-xl border border-black/5 bg-white dark:border-white/10">
+                      <img src={m.image.url} alt={m.image.caption} className="max-h-[420px] w-full object-contain" />
+                      <span className="block px-2.5 py-1.5 text-[11px] font-semibold text-ink-soft">{m.image.caption} · tap to enlarge</span>
+                    </a>
                   )}
                   {m.map && <MapCard view={m.map} className="mt-2" />}
                   {!!m.actions?.length && (

@@ -8,6 +8,7 @@ import { ExternalLink, MapPinned } from "lucide-react";
 import type { Map as LeafletMap } from "leaflet";
 import type { MapView } from "@/types";
 import { pkrShort } from "@/lib/format";
+import { apiBase } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const GROUPS: Record<string, { label: string; color: string; glyph: string }> = {
@@ -61,6 +62,16 @@ export function MapCard({ view, className, height = 260 }: { view: MapView; clas
         const m = L.map(el.current, { zoomControl: true, attributionControl: true, scrollWheelZoom: false });
         map.current = m;
         L.tileLayer(view.tiles.url, { attribution: view.tiles.attribution, maxZoom: 19 }).addTo(m);
+        // DHA master plans laid over the base map, with a switch.
+        const plans: Record<string, L.TileLayer> = {};
+        for (const o of view.overlays ?? []) {
+          const b = o.bounds;
+          plans[o.name] = L.tileLayer(`${apiBase()}${o.tile_url}`, {
+            opacity: 0.75, maxZoom: 19, maxNativeZoom: o.max_native_zoom, minZoom: 0, attribution: o.attribution,
+            bounds: L.latLngBounds([b[0], b[1]], [b[2], b[3]]), errorTileUrl: "data:image/gif;base64,R0lGODlhAQABAAAAACw=",
+          }).addTo(m);
+        }
+        if (Object.keys(plans).length) L.control.layers(undefined, plans, { collapsed: true }).addTo(m);
         const f = view.focus;
         const bounds = L.latLngBounds([[f.latitude, f.longitude]]);
         L.marker([f.latitude, f.longitude], {
@@ -111,6 +122,11 @@ export function MapCard({ view, className, height = 260 }: { view: MapView; clas
         <span className="chip bg-gold-100 px-2 py-0.5 text-[11px] text-gold-800 dark:bg-gold-500/15 dark:text-gold-200">
           {view.focus.type === "listing" ? "🏠" : "📍"} {view.focus.name}
         </span>
+        {(view.overlays ?? []).map((o) => (
+          <span key={o.key} className="chip bg-amber-100 px-2 py-0.5 text-[11px] text-amber-900 dark:bg-amber-500/15 dark:text-amber-200">
+            🗺️ {o.name}
+          </span>
+        ))}
         {legend.map((g) => (
           <span key={g.label} className="chip px-2 py-0.5 text-[11px]" style={{ background: `${g.color}1a`, color: g.color }}>
             {g.glyph} {g.label}

@@ -35,6 +35,7 @@ from pydantic import BaseModel, Field
 import server as core
 import ads_network
 import geo
+import masterplan
 import web_lookup
 import ai_guard
 import openai_voice
@@ -339,6 +340,91 @@ def places_map(listing_id: Optional[str] = None, place: Optional[str] = None, ki
         raise HTTPException(status_code=404 if "not found" in result["error"].lower() or "find" in result["error"] else 422,
                             detail=result["error"])
     return result
+
+
+@app.get("/masterplans", tags=["masterplans"])
+def masterplans_list() -> Any:
+    """The DHA master plans loaded into the portal."""
+    return j(core.masterplan_list())
+
+
+@app.get("/masterplans/search", tags=["masterplans"])
+def masterplans_search(q: str, plan: Optional[str] = None, category: Optional[str] = None, limit: int = 20) -> Any:
+    """Find text on the master plans (sector / block names, roads, mosques, plot numbers …)."""
+    return j(core.masterplan_search(q, plan=plan, category=category, limit=min(limit, 100)))
+
+
+@app.get("/masterplans/at", tags=["masterplans"])
+def masterplans_at(place: Optional[str] = None, listing_id: Optional[str] = None, plan: Optional[str] = None,
+                   lat: Optional[float] = None, lon: Optional[float] = None, radius_m: float = 200.0) -> Any:
+    """What the master plan shows around a listing, a place or a point."""
+    result = j(core.masterplan_at(place=place, listing_id=listing_id, plan=plan, latitude=lat, longitude=lon,
+                                  radius_m=min(radius_m, 1500.0)))
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
+@app.get("/masterplans/view", tags=["masterplans"])
+def masterplans_view(plan: Optional[str] = None, place: Optional[str] = None, listing_id: Optional[str] = None,
+                     radius_m: float = 250.0) -> Any:
+    """A plan section to show: close-up image URL + map with the plan overlaid."""
+    result = j(core.masterplan_view(plan=plan, place=place, listing_id=listing_id, radius_m=radius_m))
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
+@app.post("/masterplans/knowledge/refresh", tags=["masterplans"])
+async def masterplans_refresh_knowledge(request: Request, plan: Optional[str] = None) -> Any:
+    """Collect facts about each phase from the web (OpenAI web search), with sources."""
+    if not openai_voice.configured():
+        raise HTTPException(status_code=501, detail="Needs OPENAI_API_KEY in backend/.env")
+    ai_guard.check(request, "live")
+    meta = masterplan.find_plan(plan) if plan else None
+    if plan and not meta:
+        raise HTTPException(status_code=404, detail=f"No master plan for '{plan}'")
+    out = await asyncio.to_thread(masterplan.collect_knowledge, [meta["key"]] if meta else None)
+    return {"updated": list(out), "knowledge": out}
+
+
+@app.get("/masterplans/{key}", tags=["masterplans"])
+def masterplans_summary(key: str) -> Any:
+    """A phase at a glance: plot sizes, sectors / blocks, roads, facilities, area statement, web facts."""
+    result = j(core.masterplan_summary(key))
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+
+@app.get("/masterplans/{key}/labels.geojson", tags=["masterplans"])
+def masterplans_labels(key: str, category: Optional[str] = None) -> Any:
+    """The plan's text labels as GeoJSON points (comma-separated ``category`` filter)."""
+    meta = masterplan.find_plan(key)
+    if not meta:
+        raise HTTPException(status_code=404, detail=f"No master plan '{key}'")
+    return masterplan.geojson_labels(meta["key"], [c for c in (category or "").split(",") if c] or None)
+
+
+@app.get("/masterplans/{key}/tiles/{z}/{x}/{y}.png", tags=["masterplans"])
+def masterplans_tile(key: str, z: int, x: int, y: int) -> Any:
+    """Map tile of the georeferenced plan (transparent where the plan has nothing)."""
+    if not re.fullmatch(r"[a-z0-9]+", key):
+        raise HTTPException(status_code=404)
+    path = masterplan.DIR / key / "tiles" / str(z) / str(x) / f"{y}.png"
+    if not path.is_file():
+        return Response(status_code=204)
+    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/masterplans/{key}/snapshot.png", tags=["masterplans"])
+async def masterplans_snapshot(key: str, lat: float, lon: float, radius_m: float = 250.0,
+                               label: Optional[str] = None) -> Response:
+    """A readable close-up of the master plan around a point (PNG), with a marker and scale bar."""
+    png = await asyncio.to_thread(masterplan.snapshot, key, lat, lon, max(60.0, min(radius_m, 3000.0)), label)
+    if png is None:
+        raise HTTPException(status_code=404, detail="That point is not on this master plan.")
+    return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=3600"})
 
 
 @app.get("/geo/locate", tags=["places"])

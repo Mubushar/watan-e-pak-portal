@@ -18,7 +18,7 @@ OpenAI-compatible facade and error handling. For the MCP surface, see the
 | OpenAPI schema | `/openapi.json` |
 | MCP (mounted) | `/mcp` |
 | OpenAI facade | `/v1` |
-| Routes | **640** across **38 tags** |
+| Routes | **649** across **39 tags** |
 
 Every route calls a plain-Python function that the matching MCP tool also calls, so the
 two surfaces are guaranteed equivalent.
@@ -145,6 +145,13 @@ curl "http://127.0.0.1:8000/places/find?kind=mall&area=Bahria%20Phase%208%20Rawa
 curl "http://127.0.0.1:8000/places/find?kind=high%20school&area=DHA%202%20Islamabad"
 # population, development level, facilities and nearby housing areas
 curl "http://127.0.0.1:8000/areas/profile?area=G-13%20Islamabad"
+# DHA master plans: list, phase summary, find text, what's around a point, a close-up image
+curl "http://127.0.0.1:8000/masterplans"
+curl "http://127.0.0.1:8000/masterplans/ph2"
+curl "http://127.0.0.1:8000/masterplans/search?q=jinnah%20blvd&plan=dha%202"
+curl "http://127.0.0.1:8000/masterplans/at?place=Paradise%20Park&plan=DHA%20Phase%20II"
+curl "http://127.0.0.1:8000/masterplans/view?plan=DHA%20Phase%20II&place=Paradise%20Park"
+curl -o plan.png "http://127.0.0.1:8000/masterplans/ph2/snapshot.png?lat=33.53&lon=73.16&radius_m=250"
 # a listing (or ?place=…) with the nearest schools, mosques, parks, malls … for a map card
 curl "http://127.0.0.1:8000/places/map?listing_id=PROP-0001&kinds=school,mosque,park,mall"
 ```

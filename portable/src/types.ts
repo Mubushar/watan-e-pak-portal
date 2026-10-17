@@ -87,4 +87,20 @@ export interface MapView {
   markers: MapMarker[];
   listings?: { id: string; name: string; latitude: number; longitude: number; price: number; distance_km: number }[];
   tiles: { url: string; attribution: string };
+  /** Georeferenced master plans laid over the map. */
+  overlays?: MapOverlay[];
+}
+export interface MapOverlay {
+  key: string;
+  name: string;
+  tile_url: string;
+  bounds: [number, number, number, number];
+  min_zoom: number;
+  max_native_zoom: number;
+  attribution: string;
+}
+/** An image shown in the chat (e.g. a master-plan close-up). */
+export interface ChatImage {
+  url: string;
+  caption: string;
 }

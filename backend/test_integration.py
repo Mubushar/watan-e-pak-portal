@@ -1250,8 +1250,8 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         r = client.get("/ai/tools")
         names = [t["function"]["name"] for t in r.json().get("tools", [])] if r.status_code == 200 else []
         check("GET /ai/tools (chat tool definitions)",
-              names == ["search_listings", "get_listing", "request_call", "find_places", "area_info", "show_map",
-                        "web_lookup", "my_listings", "draft_listing"], str(names))
+              names == ["search_listings", "get_listing", "request_call", "find_places", "area_info", "master_plan",
+                        "show_plan", "show_map", "web_lookup", "my_listings", "draft_listing"], str(names))
         r = client.get("/search", params={"min_bathrooms": 6, "limit": 50})
         baths = [x.get("bathrooms") for x in r.json().get("results", [])] if r.status_code == 200 else []
         check("GET /search?min_bathrooms=6", bool(baths) and all((b or 0) >= 6 for b in baths), str(baths))
@@ -2496,7 +2496,48 @@ def run_geo_checks(client: TestClient) -> None:
     check("GET /places/map (nothing to show -> 422)", r.status_code == 422, str(r.status_code))
     r = client.get("/geo/locate", params={"q": "Centaurus Mall Islamabad"})
     check("GET /geo/locate", r.json().get("found") is True, r.text[:200])
+    run_masterplan_checks(client)
     geo.ONLINE_LOOKUP = True
+
+
+def run_masterplan_checks(client: TestClient) -> None:
+    """DHA master plans (only when built locally: media/masterplans is not in git)."""
+    import gis
+    import masterplan
+    if not masterplan.find_plan("DHA Phase II"):
+        print("  [SKIP] master plans not built (masterplans/build_masterplans.py)")
+        return
+    r = client.get("/masterplans").json()
+    check("GET /masterplans", r.get("count", 0) >= 1 and all(p.get("outline") for p in r["plans"]), str(r)[:200])
+    r = client.get("/masterplans/search", params={"q": "jinnah blvd", "plan": "dha 2"}).json()
+    check("GET /masterplans/search (road on DHA II)", r.get("count", 0) > 0
+          and all(x["category"] == "road" and x["plan_key"] == "ph2" for x in r["results"]), str(r)[:300])
+    r = client.get("/masterplans/ph2").json()
+    check("GET /masterplans/{key} (summary)", r.get("plan") == "DHA Phase II" and r.get("plot_sizes")
+          and "Mosque" in r.get("facilities", {}), str(r)[:300])
+    r = client.get("/masterplans/DHA%20Phase%202")
+    check("GET /masterplans/{name} (alias)", r.status_code == 200 and r.json().get("key") == "ph2", str(r.status_code))
+    r = client.get("/masterplans/at", params={"place": "Paradise Park", "plan": "DHA Phase II"}).json()
+    check("GET /masterplans/at (around a label)", "DHA Phase II" in r.get("inside_plans", []) and r.get("features"), str(r)[:300])
+    r = client.get("/masterplans/view", params={"plan": "DHA Phase II", "place": "Paradise Park", "radius_m": 200})
+    j = r.json()
+    check("GET /masterplans/view", r.status_code == 200 and j.get("snapshot_url", "").startswith("/masterplans/ph2/snapshot.png")
+          and j.get("map", {}).get("focus"), str(j)[:300])
+    if (masterplan.DIR / "ph2" / "source").is_dir():
+        r = client.get(j["snapshot_url"])
+        check("GET /masterplans/{key}/snapshot.png", r.status_code == 200 and r.headers["content-type"] == "image/png"
+              and r.content[:4] == b"\x89PNG" and len(r.content) > 10_000, f"{r.status_code} {len(r.content)}")
+        check("map overlays for a point on a plan", any(o["key"] == "ph2" for o in j["map"].get("overlays", [])),
+              str(j["map"].get("overlays"))[:200])
+    r = client.get("/masterplans/ph2/tiles/3/0/0.png")
+    check("GET /masterplans tile (empty -> 204)", r.status_code == 204, str(r.status_code))
+    r = client.get("/masterplans/nope")
+    check("GET /masterplans/{key} (unknown -> 404)", r.status_code == 404, str(r.status_code))
+    layers = [l for l in gis.list_layers(layer_type="annotation") if l.name.startswith("DHA Phase II —")]
+    check("GIS: plan labels attached as annotation layers", len(layers) == 3
+          and sum(len(l.geojson["features"]) for l in layers) > 5000, str([l.name for l in layers]))
+    check("GIS: plan registered as master_plan layer",
+          any(l.name == "DHA Phase II — master plan" for l in gis.list_layers(layer_type="master_plan")))
 
 
 def run_ai_guard_checks() -> None:

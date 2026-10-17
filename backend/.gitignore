@@ -11,3 +11,6 @@ wheels/
 
 # Listing photos uploaded through the portable app
 media/uploads/
+
+# DHA master-plan layers built from the source PDFs (masterplans/build_masterplans.py)
+media/masterplans/

@@ -1,6 +1,6 @@
 # REST endpoint reference
 
-Auto-generated from the FastAPI app — **640 routes** across **38 tags**. Every route calls the same function the MCP tool of the same name calls, so behaviour can never drift.
+Auto-generated from the FastAPI app — **649 routes** across **39 tags**. Every route calls the same function the MCP tool of the same name calls, so behaviour can never drift.
 
 | Tag | Routes |
 | --- | --- |
@@ -29,6 +29,7 @@ Auto-generated from the FastAPI app — **640 routes** across **38 tags**. Every
 | [aoi](#aoi) | 11 |
 | [hierarchy](#hierarchy) | 11 |
 | [big-projects](#big-projects) | 9 |
+| [masterplans](#masterplans) | 9 |
 | [ai](#ai) | 8 |
 | [finance](#finance) | 8 |
 | [routing](#routing) | 8 |
@@ -512,6 +513,22 @@ Auto-generated from the FastAPI app — **640 routes** across **38 tags**. Every
 | POST | `/marketing/route/{lead_id}` | Route a CRM lead to the best-matching rule. |
 | GET | `/marketing/routes` | Lead-routing rules. |
 | POST | `/marketing/routes` | Add a lead-routing rule. |
+
+## masterplans
+
+9 routes.
+
+| Method(s) | Path | Purpose |
+| --- | --- | --- |
+| GET | `/masterplans` | The DHA master plans loaded into the portal. |
+| GET | `/masterplans/at` | What the master plan shows around a listing, a place or a point. |
+| POST | `/masterplans/knowledge/refresh` | Collect facts about each phase from the web (OpenAI web search), with sources. |
+| GET | `/masterplans/search` | Find text on the master plans (sector / block names, roads, mosques, plot numbers …). |
+| GET | `/masterplans/view` | A plan section to show: close-up image URL + map with the plan overlaid. |
+| GET | `/masterplans/{key}` | A phase at a glance: plot sizes, sectors / blocks, roads, facilities, area statement, web facts. |
+| GET | `/masterplans/{key}/labels.geojson` | The plan's text labels as GeoJSON points (comma-separated ``category`` filter). |
+| GET | `/masterplans/{key}/snapshot.png` | A readable close-up of the master plan around a point (PNG), with a marker and scale bar. |
+| GET | `/masterplans/{key}/tiles/{z}/{x}/{y}.png` | Map tile of the georeferenced plan (transparent where the plan has nothing). |
 
 ## memory
 

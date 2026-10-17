@@ -178,6 +178,9 @@ def speak(text: str, language: Optional[str] = None) -> Tuple[bytes, str]:
 #: API, with the user's own session) and sends the results back to the model.
 KIND_ENUM = ['school', 'high school', 'primary school', 'college', 'university', 'medical college', 'kindergarten', 'hospital', 'clinic', 'pharmacy', 'mosque', 'mall', 'supermarket', 'market', 'park', 'sports', 'bank', 'restaurant', 'cafe', 'transport', 'fuel', 'police', 'government']
 
+PLAN_CATEGORIES = ["sector", "road", "plot_number", "plot_size", "park", "mosque", "education", "health", "commercial",
+                   "mixed_use", "apartments", "community", "water", "gate", "fuel", "amenity", "parking", "graveyard"]
+
 REALTIME_TOOLS: List[Dict[str, Any]] = [
     {
         "type": "function",
@@ -274,6 +277,48 @@ REALTIME_TOOLS: List[Dict[str, Any]] = [
             "type": "object",
             "properties": {"area": {"type": "string", "description": "Area name with the city, e.g. 'DHA Phase 2 Islamabad'"}},
             "required": ["area"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "master_plan",
+        "description": "Read the official DHA master plans (Phase I, II, III, V, VI, ME-1 & ME-2, River View North / South; "
+                       "georeferenced, about 10-20 m accuracy). action 'summary': a phase's plot sizes, sectors / blocks, "
+                       "named roads, mosques, parks, schools, commercial areas, clubs, gates, area statement and web facts. "
+                       "action 'search': find text on the plans (a block like 'C10', a road like 'Jinnah Blvd', 'masjid', "
+                       "a plot number with its street). action 'at': what the plan shows around a listing or place "
+                       "(roads and widths, plot sizes, parks, mosques, plot numbers).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "enum": ["summary", "search", "at"]},
+                "plan": {"type": "string", "description": "e.g. 'DHA Phase II', 'DHA 5', 'River View North', 'ME-1'"},
+                "query": {"type": "string", "description": "For search: the words to find"},
+                "category": {"type": "string", "enum": PLAN_CATEGORIES, "description": "For search: only this kind of label"},
+                "place": {"type": "string", "description": "For at: a place, a label on the plan or an area"},
+                "listing_id": {"type": "string", "description": "For at: a listing id"},
+                "radius_m": {"type": "number", "description": "For at: metres around the point, default 200"},
+            },
+            "required": ["action"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "show_plan",
+        "description": "Show part of a DHA master plan in the chat: a readable close-up image of the plan around a listing, "
+                       "a label on the plan (e.g. 'C10 commercial', 'Paradise Park') or a place, plus a map with the plan "
+                       "laid over it. Use whenever the user wants to see the master plan, a block, the plots around a "
+                       "listing, or 'share the map / plan'. Never say you can't show the plan.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "plan": {"type": "string", "description": "Which phase, e.g. 'DHA Phase II'"},
+                "place": {"type": "string", "description": "What to centre on: a label on the plan or a place"},
+                "listing_id": {"type": "string"},
+                "radius_m": {"type": "number", "description": "Half-width of the close-up in metres (default 250; 600+ for a whole sector)"},
+            },
             "additionalProperties": False,
         },
     },
@@ -403,6 +448,13 @@ def realtime_instructions(user: Optional[Dict[str, Any]], reply_lang: str) -> st
         "schools there are when none is named 'High School') and 'closest_outside_area' (the nearest ones just outside, "
         "with distance). For well-known facts the map may lack (a society's commercial areas, a new mall), also use "
         "web_lookup.",
+        "- For DHA Islamabad-Rawalpindi phases (I, II, III, V, VI, ME-1/ME-2, River View North / South) use master_plan: "
+        "summary for a phase overview, search to find blocks / roads / facilities / plot numbers (for 'where is …' questions: "
+        "each hit says the street it is near), at for what the plan shows around a listing or place. Explain plot sizes (e.g. 50x90 = 1 kanal, 35x65 ≈ 10 marla, 25x45 = 5 marla), "
+        "road widths, nearby parks, mosques, schools and commercial areas. Say it's from the master plan and that what is "
+        "built may differ. Use web_lookup for possession, development progress, prices or news.",
+        "- When the user wants to see the master plan, a block or the plots around a listing, call show_plan: a plan "
+        "close-up and a map with the plan overlaid appear in the chat.",
         "- When the user wants a map, a map screenshot, or to see a listing and the schools / mosques / parks / malls "
         "around it, call show_map (with the listing's id, or a place name): a map card appears in the chat.",
         "- For approval status, possession, developer, news or anything the tools don't cover, use web_lookup and "
