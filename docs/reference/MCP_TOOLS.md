@@ -1,6 +1,6 @@
 # MCP tool reference
 
-Auto-generated from `server.py` — **594 tools** across **30 groups**. Regenerate with `uv run python docs/_gen/gen_docs.py` from the repository root's `backend/`.
+Auto-generated from `server.py` — **595 tools** across **30 groups**. Regenerate with `uv run python docs/_gen/gen_docs.py` from the repository root's `backend/`.
 
 Legend: `?` = optional parameter. Types are the JSON-Schema types the server advertises to MCP clients.
 
@@ -24,8 +24,8 @@ Legend: `?` = optional parameter. Types are the JSON-Schema types the server adv
 | [poi](#poi) | 13 |
 | [marketing](#marketing) | 12 |
 | [aoi](#aoi) | 11 |
+| [general](#general) | 11 |
 | [leasing](#leasing) | 11 |
-| [general](#general) | 10 |
 | [intelligence](#intelligence) | 10 |
 | [portal](#portal) | 9 |
 | [finance](#finance) | 8 |
@@ -305,7 +305,7 @@ Legend: `?` = optional parameter. Types are the JSON-Schema types the server adv
 
 ## general
 
-10 tools.
+11 tools.
 
 | Tool | Purpose | Parameters |
 | --- | --- | --- |
@@ -317,6 +317,7 @@ Legend: `?` = optional parameter. Types are the JSON-Schema types the server adv
 | `market_insights` | Aggregate market statistics for a city. | `city`:string |
 | `market_trends` | Market trends for a market: pricing, factor index, news momentum, forecast and yields. | `city`?:optional, `scheme`?:optional, `years`?:integer=5, `days`?:integer=180 |
 | `property_availability` | Availability breakdown of the listing book (by status / use / category) with the listings. | `city`?:optional, `scheme`?:optional, `use_type`?:optional, `category`?:optional, `status`?:optional, `limit`?:integer=50 |
+| `property_nearby` | Nearby places for a listing: the closest school, mosque, hospital, mall, park, | `property_id`:string, `radius_km`?:number=3.0 |
 | `server_info` | Server metadata: version, capability counts and the data model. | — |
 | `set_property_coordinates` | Set/update the GPS coordinates of a property. | `property_id`:string, `latitude`:number, `longitude`:number |
 
@@ -392,7 +393,7 @@ Legend: `?` = optional parameter. Types are the JSON-Schema types the server adv
 | `add_project_floor_plan` | Attach a floor plan to a big project. | `project_id`:string, `floor_plan_url`:string |
 | `add_project_map` | Attach a map/location image to a big project. | `project_id`:string, `map_url`:string |
 | `add_project_multimedia` | Attach multimedia (e.g. video/VR/drone) to a big project. | `project_id`:string, `media_type`:string, `url`:string |
-| `add_property` | Create a property. Areas auto-derive between total_area / marla / kanal. | `title`:string, `price`:number, `city_id`:string, `description`?:optional, `use_type`?:string="residential", `category`?:string="house", `scheme_id`?:optional, `block_zone_area_id`?:optional, `total_area`?:optional, `marla_area`?:optional, `kanal_area`?:optional, `bedrooms`?:optional, `bathrooms`?:optional, `balconies`?:optional, `floors`?:optional, `street_address`?:optional, `plot_number`?:optional, `sector`?:optional, `landmark`?:optional, `latitude`?:optional, `longitude`?:optional, `featured`?:boolean=false, `agent_id`?:optional, `owner_user_id`?:optional |
+| `add_property` | Create a property. Areas auto-derive between total_area / marla / kanal. | `title`:string, `price`:number, `city_id`:string, `description`?:optional, `use_type`?:string="residential", `category`?:string="house", `scheme_id`?:optional, `block_zone_area_id`?:optional, `total_area`?:optional, `marla_area`?:optional, `kanal_area`?:optional, `bedrooms`?:optional, `bathrooms`?:optional, `balconies`?:optional, `floors`?:optional, `street_address`?:optional, `plot_number`?:optional, `sector`?:optional, `landmark`?:optional, `latitude`?:optional, `longitude`?:optional, `featured`?:boolean=false, `agent_id`?:optional, `owner_user_id`?:optional, `amenities`?:optional |
 | `delete_big_project` | Delete a big project by id. | `project_id`:string |
 | `delete_property` | Delete a property by id. | `property_id`:string |
 | `get_big_project_by_id` | Fetch a big project by id. | `project_id`:string |
@@ -408,7 +409,7 @@ Legend: `?` = optional parameter. Types are the JSON-Schema types the server adv
 | `list_owned_properties` | List the properties a portal account has published (newest first). | `owner_user_id`:string, `status`?:optional, `limit`?:integer=100 |
 | `list_schemes` | List housing schemes/societies, optionally filtered by city (id or name). | `city`?:optional |
 | `update_big_project` | Update editable fields of a big project. | `project_id`:string, `name`?:optional, `description`?:optional, `status`?:optional, `floor_count`?:optional, `total_area`?:optional, `total_units`?:optional, `occupancy_rate`?:optional, `developer`?:optional, `completion_date`?:optional, `total_parking_spaces`?:optional, `total_retail_space`?:optional, `total_office_space`?:optional, `total_residential_units`?:optional |
-| `update_property` | Update editable fields of a property (only the provided fields change). | `property_id`:string, `title`?:optional, `description`?:optional, `price`?:optional, `use_type`?:optional, `category`?:optional, `status`?:optional, `bedrooms`?:optional, `bathrooms`?:optional, `total_area`?:optional, `marla_area`?:optional, `kanal_area`?:optional, `latitude`?:optional, `longitude`?:optional, `featured`?:optional |
+| `update_property` | Update editable fields of a property (only the provided fields change). | `property_id`:string, `title`?:optional, `description`?:optional, `price`?:optional, `use_type`?:optional, `category`?:optional, `status`?:optional, `bedrooms`?:optional, `bathrooms`?:optional, `total_area`?:optional, `marla_area`?:optional, `kanal_area`?:optional, `latitude`?:optional, `longitude`?:optional, `featured`?:optional, `amenities`?:optional |
 
 ## images
 
@@ -740,7 +741,7 @@ Legend: `?` = optional parameter. Types are the JSON-Schema types the server adv
 | Tool | Purpose | Parameters |
 | --- | --- | --- |
 | `search_nearby_properties` | Find properties within `radius_km` of a point, sorted by distance. | `latitude`:number, `longitude`:number, `radius_km`?:number=5.0, `use_type`?:optional, `category`?:optional, `max_price`?:optional, `limit`?:integer=20 |
-| `search_properties` | Search properties with hierarchical and numeric filters. | `city`?:optional, `scheme`?:optional, `use_type`?:optional, `category`?:optional, `min_price`?:optional, `max_price`?:optional, `bedrooms`?:optional, `min_marla`?:optional, `max_marla`?:optional, `featured`?:optional, `status`?:optional, `limit`?:integer=20 |
+| `search_properties` | Search properties with hierarchical and numeric filters. | `city`?:optional, `scheme`?:optional, `use_type`?:optional, `category`?:optional, `min_price`?:optional, `max_price`?:optional, `bedrooms`?:optional, `min_marla`?:optional, `max_marla`?:optional, `featured`?:optional, `status`?:optional, `limit`?:integer=20, `min_bathrooms`?:optional, `feature`?:optional, `near`?:optional, `near_km`?:number=2.0 |
 
 ## tools
 

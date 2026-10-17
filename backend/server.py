@@ -833,6 +833,7 @@ def add_property(
     featured: bool = False,
     agent_id: Optional[str] = None,
     owner_user_id: Optional[str] = None,
+    amenities: Optional[List[str]] = None,
 ) -> str:
     """Create a property. Areas auto-derive between total_area / marla / kanal."""
     if not find_city(city_id):
@@ -862,10 +863,21 @@ def add_property(
         featured=featured,
         agent_id=agent_id,
         owner_user_id=owner_user_id,
+        amenities=_clean_amenities(amenities),
     )
     derive_areas(p)
     properties_db.append(p)
     return dump_model(p)
+
+
+def _clean_amenities(items: Optional[List[str]]) -> List[str]:
+    """Trimmed, de-duplicated amenity names (case-insensitive), at most 30."""
+    seen: Dict[str, str] = {}
+    for item in items or []:
+        name = " ".join(str(item).split())[:60]
+        if name and name.lower() not in seen:
+            seen[name.lower()] = name
+    return list(seen.values())[:30]
 
 
 @mcp.tool()
@@ -917,6 +929,7 @@ def update_property(
     latitude: Optional[float] = None,
     longitude: Optional[float] = None,
     featured: Optional[bool] = None,
+    amenities: Optional[List[str]] = None,
 ) -> str:
     """Update editable fields of a property (only the provided fields change)."""
     p = find_property(property_id)
@@ -937,6 +950,7 @@ def update_property(
         "latitude": latitude,
         "longitude": longitude,
         "featured": featured,
+        "amenities": _clean_amenities(amenities) if amenities is not None else None,
     }
     for key, value in fields.items():
         if value is not None:
@@ -972,10 +986,21 @@ def search_properties(
     status: Optional[str] = None,
     limit: int = 20,
     min_bathrooms: Optional[int] = None,
+    feature: Optional[str] = None,
+    near: Optional[str] = None,
+    near_km: float = 2.0,
 ) -> str:
-    """Search properties with hierarchical and numeric filters."""
+    """Search properties with hierarchical and numeric filters.
+
+    ``feature`` matches the listing's own amenities / description (e.g. "solar",
+    "basement", "pool"). ``near`` keeps listings with that kind of place within
+    ``near_km`` (school, mosque, hospital, mall, market, park, bank, restaurant,
+    transport, fuel — or a POI category)."""
     c = resolve_city(city) if city else None
     s = resolve_scheme(scheme) if scheme else None
+    near_cat = NEAR_CATEGORIES.get(near.strip().lower(), near.strip().lower()) if near else None
+    feature_q = feature.strip().lower() if feature else None
+    near_hits: Dict[str, Dict[str, Any]] = {}
     results = []
     for p in properties_db:
         if c and p.city_id != c.id:
@@ -1002,7 +1027,16 @@ def search_properties(
             continue
         if status and p.status.lower() != status.lower():
             continue
+        if feature_q and feature_q not in " | ".join([*p.amenities, p.description or "", p.title]).lower():
+            continue
+        if near_cat:
+            hit = _nearest_poi(p, near_cat, near_km)
+            if hit is None:
+                continue
+            near_hits[p.id] = hit
         results.append(p)
+    if near_cat:  # closest first
+        results.sort(key=lambda p: near_hits[p.id]["distance_km"])
 
     long_term_memory["search_history"].append(
         {
@@ -1023,8 +1057,70 @@ def search_properties(
     for p in results[: max(0, limit)]:
         d = model_dict(p)
         d["city_name"] = city_name(p.city_id)
+        if p.id in near_hits:
+            d["nearby"] = near_hits[p.id]
         payload.append(d)
     return dump({"count": len(results), "returned": len(payload), "results": payload})
+
+
+# What people say -> POI category ("school ke paas", "masjid ke qareeb", "near the mall").
+NEAR_CATEGORIES: Dict[str, str] = {
+    "school": "education", "college": "education", "university": "education", "education": "education",
+    "mosque": "worship", "masjid": "worship", "worship": "worship",
+    "hospital": "health", "clinic": "health", "health": "health",
+    "mall": "shopping", "market": "shopping", "shopping": "shopping", "shop": "shopping",
+    "park": "park", "bank": "bank", "atm": "bank", "restaurant": "restaurant", "cafe": "restaurant",
+    "transport": "transport", "metro": "transport", "bus": "transport", "station": "transport",
+    "fuel": "fuel", "petrol": "fuel", "government": "government",
+}
+# Plain names for each POI category, used in answers and on the listing page.
+NEAR_LABELS: Dict[str, str] = {
+    "education": "School / college", "worship": "Mosque", "health": "Hospital / clinic",
+    "shopping": "Mall / market", "park": "Park", "bank": "Bank", "restaurant": "Restaurant",
+    "transport": "Public transport", "fuel": "Fuel station", "government": "Government office",
+}
+
+
+def _poi_hit(poi: "PointOfInterest", meters: float) -> Dict[str, Any]:
+    return {
+        "category": poi.category,
+        "kind": NEAR_LABELS.get(poi.category, poi.category.title()),
+        "name": poi.name,
+        "distance_km": round(meters / 1000.0, 2),
+        "walk_minutes": round(meters / 80.0),  # ~4.8 km/h
+    }
+
+
+def _nearest_poi(p: "Property", category: str, within_km: float) -> Optional[Dict[str, Any]]:
+    """The closest POI of ``category`` within ``within_km`` of a listing, or None."""
+    if p.latitude is None or p.longitude is None:
+        return None
+    best: Optional[Tuple[float, "PointOfInterest"]] = None
+    for poi in pois_db:
+        if poi.category != category:
+            continue
+        d = gis.haversine_m(p.latitude, p.longitude, poi.latitude, poi.longitude)
+        if d <= within_km * 1000.0 and (best is None or d < best[0]):
+            best = (d, poi)
+    return _poi_hit(best[1], best[0]) if best else None
+
+
+@mcp.tool()
+def property_nearby(property_id: str, radius_km: float = 3.0) -> str:
+    """Nearby places for a listing: the closest school, mosque, hospital, mall, park,
+    transport, etc. within ``radius_km``, closest first (from the portal's POI data)."""
+    p = find_property(property_id)
+    if not p:
+        return dump({"error": f"Property not found: {property_id}"})
+    if p.latitude is None or p.longitude is None:
+        return dump({"property_id": p.id, "radius_km": radius_km, "nearby": [], "note": "This listing has no map location."})
+    best: Dict[str, Tuple[float, PointOfInterest]] = {}
+    for poi in pois_db:
+        d = gis.haversine_m(p.latitude, p.longitude, poi.latitude, poi.longitude)
+        if d <= radius_km * 1000.0 and (poi.category not in best or d < best[poi.category][0]):
+            best[poi.category] = (d, poi)
+    rows = sorted((_poi_hit(poi, d) for d, poi in best.values()), key=lambda r: r["distance_km"])
+    return dump({"property_id": p.id, "radius_km": radius_km, "nearby": rows})
 
 
 # ---------- GIS ----------
@@ -15477,6 +15573,7 @@ def init_sample_data() -> None:
     prop(
         title="Modern 10 Marla House",
         description="Brand-new 5-bed house in a gated community with a basement and solar system.",
+        amenities=["Gated community", "Basement", "Solar system"],
         price=45_000_000, use_type="residential", category="house",
         marla_area=10, bedrooms=5, bathrooms=6, floors=2, featured=True,
         city_id=lahore.id, scheme_id=lsc.id, block_zone_area_id=blocks[0].id,
@@ -15485,6 +15582,7 @@ def init_sample_data() -> None:
     prop(
         title="1 Kanal Corner House",
         description="1 kanal corner house with a large lawn in DHA Phase 6.",
+        amenities=["Corner plot", "Large lawn"],
         price=95_000_000, use_type="residential", category="house",
         kanal_area=1, bedrooms=6, bathrooms=7, floors=2, featured=True,
         city_id=lahore.id, scheme_id=dha_lhr.id, block_zone_area_id=blocks[5].id,
@@ -15493,6 +15591,7 @@ def init_sample_data() -> None:
     prop(
         title="Luxury Sea-View Apartment",
         description="4-bedroom sea-facing apartment with a gym and rooftop pool.",
+        amenities=["Sea view", "Gym", "Rooftop pool"],
         price=55_000_000, use_type="residential", category="apartment",
         total_area=2600, bedrooms=4, bathrooms=4,
         city_id=karachi.id, scheme_id=dha_khi.id, block_zone_area_id=blocks[8].id,
@@ -15501,6 +15600,7 @@ def init_sample_data() -> None:
     prop(
         title="Ground Floor Commercial Shop",
         description="Corner shop on a high-footfall commercial road, ideal for retail.",
+        amenities=["Corner", "Main road"],
         price=15_000_000, use_type="commercial", category="shop",
         marla_area=2, city_id=lahore.id, scheme_id=lsc.id, block_zone_area_id=blocks[2].id,
         latitude=31.4480, longitude=74.2790, street_address="M.M. Alam Road",
@@ -15508,6 +15608,7 @@ def init_sample_data() -> None:
     prop(
         title="10 Marla Residential Plot",
         description="Possession-ready 10 marla plot in a developed block.",
+        amenities=["Possession ready", "Developed block"],
         price=20_000_000, use_type="residential", category="plot",
         marla_area=10, city_id=lahore.id, scheme_id=garden.id, block_zone_area_id=blocks[3].id,
         latitude=31.5025, longitude=74.3379, plot_number="412",
@@ -15515,6 +15616,7 @@ def init_sample_data() -> None:
     prop(
         title="3,000 sqft Corporate Office",
         description="Fitted office floor in a Grade-A tower with parking.",
+        amenities=["Fitted", "Parking"],
         price=50_000_000, use_type="commercial", category="office",
         total_area=3000, city_id=lahore.id, latitude=31.5400, longitude=74.3700,
         street_address="Main Boulevard Gulberg",
@@ -15522,6 +15624,7 @@ def init_sample_data() -> None:
     prop(
         title="5 Kanal Farmhouse",
         description="Farmhouse with orchard and swimming pool on the Islamabad outskirts.",
+        amenities=["Orchard", "Swimming pool"],
         price=85_000_000, use_type="residential", category="house",
         kanal_area=5, bedrooms=5, bathrooms=5, floors=1, featured=True,
         city_id=islamabad.id, latitude=33.7000, longitude=73.1500, street_address="Murree Road",
@@ -15565,6 +15668,7 @@ def init_sample_data() -> None:
     prop(
         title="Bahria Karachi Villa",
         description="3-bed villa in a secure gated precinct.",
+        amenities=["Gated community", "Security"],
         price=52_000_000, use_type="residential", category="house",
         total_area=1800, marla_area=7, bedrooms=3, bathrooms=4, floors=2,
         city_id=karachi.id, scheme_id=bahria_khi.id, block_zone_area_id=blocks[9].id,

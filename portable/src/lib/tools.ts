@@ -5,7 +5,7 @@
  * to ask the person to press a button. Definitions live on the backend
  * (openai_voice.REALTIME_TOOLS, served at GET /ai/tools).
  */
-import type { Property, PropertyList } from "@/types";
+import type { NearbyList, NearbyPlace, Property, PropertyList } from "@/types";
 import { get, post } from "./api";
 import type { ListingDraft } from "./intent";
 import { money, t, type Lang } from "./lang";
@@ -35,10 +35,15 @@ const brief = (p: Property) => ({
   size_marla: p.marla_area ?? undefined,
   bedrooms: p.bedrooms ?? undefined,
   bathrooms: p.bathrooms ?? undefined,
+  features: p.amenities?.length ? p.amenities : undefined,
+  nearby: p.nearby ? `${p.nearby.name} (${p.nearby.kind}), ${p.nearby.distance_km} km` : undefined,
   status: p.status,
 });
 
-const SEARCH_KEYS = ["city", "category", "use_type", "min_price", "max_price", "bedrooms", "min_bathrooms", "min_marla", "max_marla", "featured"];
+/** "Faisal Mosque (Mosque), 0.4 km, ~5 min walk" for the model. */
+const nearbyLine = (n: NearbyPlace) => `${n.name} (${n.kind}), ${n.distance_km} km, ~${n.walk_minutes} min walk`;
+
+const SEARCH_KEYS = ["city", "category", "use_type", "min_price", "max_price", "bedrooms", "min_bathrooms", "min_marla", "max_marla", "featured", "feature", "near", "near_km"];
 
 /** "Open listing" (+ "Request a call" while it's for sale/rent) under a listing's card. */
 function listingButtons(p: Property, lang: Lang): ChatAction[] {
@@ -59,11 +64,16 @@ export async function runAgentTool(name: string, args: Record<string, unknown>, 
     };
   }
   if (name === "get_listing") {
-    const p = await get<Property>(`/properties/${String(args.id ?? "")}`);
+    const id = String(args.id ?? "");
+    const [p, near] = await Promise.all([
+      get<Property>(`/properties/${id}`),
+      get<NearbyList>(`/properties/${id}/nearby`).catch(() => null),
+    ]);
     return {
       output: {
         ...brief(p),
         description: p.description,
+        nearby_places: near?.nearby.map(nearbyLine) ?? [],
         location: [p.block_name, p.scheme_name, p.city_name].filter(Boolean).join(", "),
         shown_on_screen: `This listing's card with '${tr.openListing}' and '${tr.requestCall}' buttons (say the button names exactly like this).`,
       },

@@ -24,6 +24,8 @@ export interface Property {
   longitude?: number | null;
   image_urls?: string[];
   amenities?: string[];
+  /** Set by /search?near=…: the matching place and how far it is. */
+  nearby?: NearbyPlace;
   agent_id?: string | null;
   owner_user_id?: string | null;
   created_at?: string;
@@ -51,4 +53,18 @@ export interface City {
 
 export interface Hierarchy {
   tree: { id: string; name: string; schemes: { id: string; name: string; blocks: { id: string; name: string; area_type: string }[] }[] }[];
+}
+
+/** A place near a listing (GET /properties/{id}/nearby, or /search?near=…). */
+export interface NearbyPlace {
+  category: string;
+  kind: string;
+  name: string;
+  distance_km: number;
+  walk_minutes: number;
+}
+export interface NearbyList {
+  property_id: string;
+  radius_km: number;
+  nearby: NearbyPlace[];
 }

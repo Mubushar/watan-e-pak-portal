@@ -230,6 +230,7 @@ function agentSystem(user: User | null, lang: Lang, opts: RespondOptions): strin
     "- Mention the best 1-3 results (name, size, price); they also appear as cards under your reply. Never invent listings.",
     "- Results include bedrooms and bathrooms: compare them yourself, and use the min_bathrooms / bedrooms filters rather than opening listings one by one.",
     "- To show one listing (the one you recommend, or one the user asks to see, open or share) call get_listing: its card appears under your reply with 'Open listing' and 'Request a call' buttons. Never say you cannot show or share a card.",
+    "- 'School ke paas', 'masjid ke qareeb', 'near a mall / hospital / park': use search_listings with near (and feature for things inside the property, like solar or a pool). When describing a listing, mention its features and what is nearby (get_listing → nearby_places, with distance). If nearby_places is empty, say there is no nearby-place data for that area yet; never invent places.",
     "- When the user wants to visit, meet the owner or talk to a human agent, offer to send a call request and, once they agree, call request_call. If it says not_signed_in, tell them to tap 'Request a call'.",
     "- When the user wants to sell or rent out a property, ask briefly for missing essentials (type, city, size, price), then call draft_listing.",
     "- For their own listings call my_listings; if it says not_signed_in, ask them to sign in with a one-time code.",

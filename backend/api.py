@@ -147,6 +147,7 @@ class PropertyCreate(BaseModel):
     longitude: Optional[float] = None
     featured: bool = False
     agent_id: Optional[str] = None
+    amenities: Optional[List[str]] = None
 
 
 class PropertyUpdate(BaseModel):
@@ -164,6 +165,7 @@ class PropertyUpdate(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     featured: Optional[bool] = None
+    amenities: Optional[List[str]] = None
 
 
 class LeadCreate(BaseModel):
@@ -262,6 +264,9 @@ def search(
     min_marla: Optional[float] = None,
     max_marla: Optional[float] = None,
     featured: Optional[bool] = None,
+    feature: Optional[str] = None,
+    near: Optional[str] = None,
+    near_km: float = 2.0,
     limit: int = 20,
 ) -> Any:
     return j(
@@ -273,6 +278,9 @@ def search(
             max_price=max_price,
             bedrooms=bedrooms,
             min_bathrooms=min_bathrooms,
+            feature=feature,
+            near=near,
+            near_km=near_km,
             min_marla=min_marla,
             max_marla=max_marla,
             featured=featured,
@@ -294,6 +302,15 @@ def nearby(
             latitude=lat, longitude=lon, radius_km=radius_km, use_type=use_type, limit=limit
         )
     )
+
+
+@app.get("/properties/{property_id}/nearby", tags=["properties"])
+def property_nearby(property_id: str, radius_km: float = 3.0) -> Any:
+    """Closest school, mosque, hospital, mall, park, transport… around a listing."""
+    result = j(core.property_nearby(property_id, radius_km=radius_km))
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
 
 
 @app.get("/properties/{property_id}", tags=["properties"])

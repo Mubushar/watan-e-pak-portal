@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Bath, BedDouble, Bot, Building2, CalendarDays, Layers, MapPin, Navigation, PhoneCall, Ruler, Share2, Sparkles, Tag } from "lucide-react";
 import { Share } from "@capacitor/share";
 import { toast } from "sonner";
-import type { Property } from "@/types";
+import type { NearbyList, Property } from "@/types";
 import { useApi } from "@/hooks/useApi";
 import { post } from "@/lib/api";
 import { area, date, num, pkr, pkrShort, titleCase } from "@/lib/format";
@@ -16,6 +16,7 @@ import { FavoriteButton, locationOf } from "@/components/PropertyCard";
 export default function PropertyDetail() {
   const { id } = useParams();
   const q = useApi<Property>(id ? `/properties/${id}` : null);
+  const near = useApi<NearbyList>(id ? `/properties/${id}/nearby` : null);
   const [slide, setSlide] = useState(0);
   // ?enquire=1 (the assistant's "Request a call" button) opens the call request straight away.
   const [params] = useSearchParams();
@@ -157,6 +158,27 @@ export default function PropertyDetail() {
                 </Badge>
               ))}
             </div>
+          </section>
+        )}
+
+        {!!near.data?.nearby.length && (
+          <section className="mt-6">
+            <h2 className="section-title text-lg">Nearby</h2>
+            <ul className="mt-2 divide-y divide-black/5 rounded-2xl bg-brand-50/60 px-4 dark:divide-white/10 dark:bg-white/5">
+              {near.data.nearby.map((n) => (
+                <li key={n.category} className="flex items-center gap-3 py-2.5">
+                  <MapPin className="h-4 w-4 shrink-0 text-brand-600 dark:text-brand-300" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold">{n.name}</span>
+                    <span className="block text-xs text-ink-mute">{n.kind}</span>
+                  </span>
+                  <span className="shrink-0 text-end text-xs text-ink-mute">
+                    <span className="block font-semibold text-ink dark:text-white">{n.distance_km < 1 ? `${Math.round(n.distance_km * 1000)} m` : `${n.distance_km} km`}</span>
+                    ~{n.walk_minutes} min walk
+                  </span>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 

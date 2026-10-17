@@ -1254,6 +1254,24 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         r = client.get("/search", params={"min_bathrooms": 6, "limit": 50})
         baths = [x.get("bathrooms") for x in r.json().get("results", [])] if r.status_code == 200 else []
         check("GET /search?min_bathrooms=6", bool(baths) and all((b or 0) >= 6 for b in baths), str(baths))
+        r = client.get("/search", params={"near": "school", "limit": 50})
+        hits = [x.get("nearby") or {} for x in r.json().get("results", [])] if r.status_code == 200 else []
+        check("GET /search?near=school (school within 2 km, closest first)",
+              bool(hits) and all(h.get("category") == "education" and h.get("distance_km", 99) <= 2 for h in hits)
+              and [h["distance_km"] for h in hits] == sorted(h["distance_km"] for h in hits), str(hits[:3]))
+        r = client.get("/search", params={"near": "masjid", "near_km": 0.5})
+        cats = {(x.get("nearby") or {}).get("category") for x in r.json().get("results", [])}
+        check("GET /search?near=masjid (Urdu word -> mosque)", r.status_code == 200 and cats == {"worship"}, str(cats))
+        r = client.get("/search", params={"feature": "solar"})
+        titles = [x["title"] for x in r.json().get("results", [])]
+        check("GET /search?feature=solar (listing amenities)", titles == ["Modern 10 Marla House"], str(titles))
+        modern = next((x for x in client.get("/search", params={"limit": 50}).json()["results"]
+                       if x["title"] == "Modern 10 Marla House"), None)
+        r = client.get(f"/properties/{modern['id']}/nearby") if modern else None
+        kinds = [n["category"] for n in r.json().get("nearby", [])] if r is not None and r.status_code == 200 else []
+        check("GET /properties/{id}/nearby", {"education", "worship", "health", "shopping"} <= set(kinds), str(kinds))
+        r = client.get("/properties/does-not-exist/nearby")
+        check("GET /properties/{id}/nearby (unknown -> 404)", r.status_code == 404, str(r.status_code))
         if not voice.get("provider"):  # no OPENAI_API_KEY in the test environment
             r = client.post("/ai/transcribe", json={"audio_base64": "AAAA"})
             check("POST /ai/transcribe (no OpenAI key -> 501)", r.status_code == 501, str(r.status_code))

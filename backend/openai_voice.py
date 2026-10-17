@@ -195,6 +195,14 @@ REALTIME_TOOLS: List[Dict[str, Any]] = [
                 "max_price": {"type": "number", "description": "Maximum price in rupees"},
                 "bedrooms": {"type": "integer", "description": "Minimum bedrooms"},
                 "min_bathrooms": {"type": "integer", "description": "Minimum bathrooms"},
+                "feature": {"type": "string", "description": "A feature of the property itself, in English, e.g. solar, "
+                            "basement, pool, lawn, corner, parking, gated community, sea view"},
+                "near": {"type": "string", "enum": ["school", "mosque", "hospital", "mall", "market", "park", "bank",
+                                                    "restaurant", "transport", "fuel"],
+                         "description": "Only listings with this kind of place nearby, e.g. 'school ke paas' -> school, "
+                                        "'masjid ke qareeb' -> mosque, 'near the mall' -> mall. Each result then says "
+                                        "which place it is and how far."},
+                "near_km": {"type": "number", "description": "How close the place must be, in km (default 2)"},
                 "min_marla": {"type": "number"},
                 "max_marla": {"type": "number"},
                 "featured": {"type": "boolean"},
@@ -205,7 +213,8 @@ REALTIME_TOOLS: List[Dict[str, Any]] = [
     {
         "type": "function",
         "name": "get_listing",
-        "description": "Show one listing to the user and get its full details. Puts the listing's card on the user's "
+        "description": "Show one listing to the user and get its full details: features (amenities) and nearby places "
+                       "(closest school, mosque, hospital, mall, park, transport…) with distances. Puts the listing's card on the user's "
                        "screen with 'Open listing' and 'Request a call' buttons. Call it whenever the user wants to see, open "
                        "or share a listing, and for the listing you recommend, so its card is the one on screen.",
         "parameters": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"], "additionalProperties": False},
@@ -264,16 +273,18 @@ _LANGUAGE_POLICY = {
         "Urdu (or Urdu mixed with English words) -> natural Pakistani Urdu; English -> English. "
         "The moment the user switches language, switch with them, even if your earlier replies were in the other "
         "language. Listing titles and tool results are in English; still answer in the user's language. "
-        "If a turn has no clear language (only a number or a place name), keep the language of their previous turn."
+        "If a turn has no clear language (only a number or a place name), keep the language of their previous turn. "
+        "Your words are also shown on screen as captions, so speak Urdu as Urdu script (اردو), never Roman Urdu."
     ),
-    "ur": "Speak only natural Pakistani Urdu, even when the user uses English words. Never switch to another language.",
+    "ur": "Speak only natural Pakistani Urdu, even when the user uses English words. Never switch to another language. "
+          "Your words are also shown on screen as captions, so use Urdu script (اردو), never Roman Urdu.",
     "en": "Speak only English, even when the user speaks Urdu. Never switch to another language.",
 }
 
 
 # Repeated last: realtime models drift into English (tool results are English) unless reminded.
 _LANGUAGE_REMINDER = {
-    "auto": "Always answer in the language the user used in their most recent turn: Urdu if they just spoke Urdu, English if they just spoke English.",
+    "auto": "Always answer in the language the user used in their most recent turn: Urdu (in Urdu script) if they just spoke Urdu, English if they just spoke English.",
     "ur": "Always answer in Urdu.",
     "en": "Always answer in English.",
 }
@@ -303,6 +314,10 @@ def realtime_instructions(user: Optional[Dict[str, Any]], reply_lang: str) -> st
         "- Every listing a tool returns appears on the user's screen as a card they can tap to open. To show a listing "
         "(the one you recommend, or one the user asks to see, open or share), call get_listing: its card then appears "
         "with 'Open listing' and 'Request a call' buttons. Never say you cannot show or share a card.",
+        "- 'School ke paas', 'masjid ke qareeb', 'near a mall / hospital / park': use search_listings with near (and "
+        "feature for things inside the property, like solar or a pool). When describing a listing, mention its features "
+        "and what is nearby (from get_listing: nearby_places, with distance or walking minutes). If nearby_places is empty, "
+        "say the portal has no nearby-place data for that area yet; never invent schools, mosques or other places.",
         "- When the user wants to visit, see the property, meet the owner or talk to a human agent, offer to send a call "
         "request; once they agree, call request_call. If it says not_signed_in, tell them to tap 'Request a call' on screen.",
         "- Use my_listings when the user asks about their own listings. If it reports they are not signed in, tell them to sign in with a one-time code.",

@@ -18,7 +18,7 @@ OpenAI-compatible facade and error handling. For the MCP surface, see the
 | OpenAPI schema | `/openapi.json` |
 | MCP (mounted) | `/mcp` |
 | OpenAI facade | `/v1` |
-| Routes | **629** across **37 tags** |
+| Routes | **630** across **37 tags** |
 
 Every route calls a plain-Python function that the matching MCP tool also calls, so the
 two surfaces are guaranteed equivalent.
@@ -132,7 +132,18 @@ curl "http://127.0.0.1:8000/properties/PROP-0001/compare/PROP-0002"
 # correct coordinates
 curl -X PUT "http://127.0.0.1:8000/properties/PROP-0001/coordinates" `
   -H "Content-Type: application/json" -d '{"latitude":31.52,"longitude":74.35}'
+# houses within 1 km of a school / mosque / mall / hospital / park ... (closest first)
+curl "http://127.0.0.1:8000/search?category=house&near=school&near_km=1"
+# listings with a feature (matches amenities and description)
+curl "http://127.0.0.1:8000/search?feature=solar&min_bathrooms=4"
+# nearest school, mosque, hospital, mall, park, transport ... around one listing
+curl "http://127.0.0.1:8000/properties/PROP-0001/nearby?radius_km=3"
 ```
+
+`near` takes `school`, `mosque` (or `masjid`), `hospital`, `mall`, `market`, `park`, `bank`,
+`restaurant`, `transport` or `fuel`, or a POI category. Nearby places come from the portal's
+POI data (`/poi`); add POIs for areas that have none. Listings carry an `amenities` list that
+`/me/listings` and `PUT /properties/{id}` accept.
 
 #### My listings (signed-in account)
 

@@ -228,12 +228,19 @@ mints a 10-minute client secret (`/v1/realtime/client_secrets`) carrying:
 - the agent's instructions, including the signed-in user's name and role;
 - the reply language (`auto`, `ur` or `en`);
 - the voice, the semantic turn detection that lets users interrupt, and Urdu/English captions;
-- five tools: `search_listings`, `get_listing` (shows the listing's card with *Open listing* and *Request a call*), `request_call` (sends the owner / agent a call-back request as a CRM lead, from the signed-in user's account), `my_listings`, `draft_listing`.
+- five tools: `search_listings` (also by features such as *solar*, and by places nearby: *school ke paas*, *masjid ke qareeb*, *near a mall*), `get_listing` (shows the listing's card with *Open listing* and *Request a call*, and returns its amenities and nearby places), `request_call` (sends the owner / agent a call-back request as a CRM lead, from the signed-in user's account), `my_listings`, `draft_listing`.
 
 The app then opens a WebRTC call directly to OpenAI with that secret. The real API key
 never leaves the server. The app runs the tool calls against this backend, using the
 user's own session, and returns the results to the model. One call can last at most 60
 minutes.
+
+**Nearby places.** "Near a school / mosque / mall" answers and the listing page's *Nearby*
+section use the portal's POI data, not a map service. A listing far from any POI gets no
+nearby answer, and the agent says so rather than guessing. Add POIs for each area you list
+in (`POST /poi`, or the `poi_*` MCP tools) with a name, category (`education`, `worship`,
+`health`, `shopping`, `park`, `bank`, `restaurant`, `transport`, `fuel`, `government`) and
+coordinates. Listings also need coordinates.
 
 **Custom voice.** OpenAI creates voices from your own recordings only for eligible
 customers; you request access through OpenAI sales. You record a fixed consent phrase

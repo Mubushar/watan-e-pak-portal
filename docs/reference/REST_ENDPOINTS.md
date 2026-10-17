@@ -1,6 +1,6 @@
 # REST endpoint reference
 
-Auto-generated from the FastAPI app — **629 routes** across **37 tags**. Every route calls the same function the MCP tool of the same name calls, so behaviour can never drift.
+Auto-generated from the FastAPI app — **630 routes** across **37 tags**. Every route calls the same function the MCP tool of the same name calls, so behaviour can never drift.
 
 | Tag | Routes |
 | --- | --- |
@@ -13,9 +13,9 @@ Auto-generated from the FastAPI app — **629 routes** across **37 tags**. Every
 | [construction](#construction) | 24 |
 | [gis](#gis) | 24 |
 | [gis-analysis](#gis-analysis) | 18 |
+| [properties](#properties) | 18 |
 | [auth](#auth) | 17 |
 | [commercial](#commercial) | 17 |
-| [properties](#properties) | 17 |
 | [roles](#roles) | 16 |
 | [transactions](#transactions) | 16 |
 | [agents](#agents) | 15 |
@@ -730,7 +730,7 @@ Auto-generated from the FastAPI app — **629 routes** across **37 tags**. Every
 
 ## properties
 
-17 routes.
+18 routes.
 
 | Method(s) | Path | Purpose |
 | --- | --- | --- |
@@ -750,6 +750,7 @@ Auto-generated from the FastAPI app — **629 routes** across **37 tags**. Every
 | PUT | `/properties/{property_id}/coordinates` | Set (or correct) the coordinates of a property. |
 | GET | `/properties/{property_id}/images` |  |
 | GET | `/properties/{property_id}/investment` |  |
+| GET | `/properties/{property_id}/nearby` | Closest school, mosque, hospital, mall, park, transport… around a listing. |
 | GET | `/search` |  |
 
 ## property-intelligence

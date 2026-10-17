@@ -44,6 +44,8 @@ interface Form {
   bedrooms: number;
   bathrooms: number;
   price: number;
+  /** Comma-separated: "Solar system, Basement, Gated community". */
+  amenities: string;
   photos: string[];
 }
 
@@ -69,6 +71,7 @@ export default function ListingForm() {
     bedrooms: 3,
     bathrooms: 3,
     price: 0,
+    amenities: "",
     photos: [],
   });
   const set = (patch: Partial<Form>) => setF((x) => ({ ...x, ...patch }));
@@ -165,6 +168,8 @@ export default function ListingForm() {
     }
   };
 
+  const amenityList = f.amenities.split(/[,،\n]/).map((a) => a.trim()).filter(Boolean);
+
   const publish = async () => {
     setBusy("Publishing…");
     try {
@@ -180,6 +185,7 @@ export default function ListingForm() {
         bedrooms: isLand ? undefined : f.bedrooms,
         bathrooms: isLand ? undefined : f.bathrooms,
         price: f.price,
+        amenities: amenityList.length ? amenityList : undefined,
       });
       for (let i = 0; i < f.photos.length; i++) {
         setBusy(`Uploading photo ${i + 1} of ${f.photos.length}…`);
@@ -282,6 +288,9 @@ export default function ListingForm() {
                 </Field>
                 <Field label="Description">
                   <Textarea value={f.description} onChange={(e) => set({ description: e.target.value })} placeholder="Highlights, condition, nearby landmarks, possession…" />
+                </Field>
+                <Field label="Amenities" hint="Separate with commas — buyers can search for these">
+                  <Input value={f.amenities} onChange={(e) => set({ amenities: e.target.value })} placeholder="e.g. Solar system, Basement, Gated community, Parking" />
                 </Field>
               </>
             )}
@@ -412,6 +421,7 @@ export default function ListingForm() {
                     ))}
                   </div>
                   {f.description && <p className="whitespace-pre-line text-sm text-ink-soft dark:text-slate-300">{f.description}</p>}
+                  {!!amenityList.length && <p className="text-sm text-ink-soft dark:text-slate-300">{amenityList.join(" · ")}</p>}
                 </div>
               </div>
             )}
