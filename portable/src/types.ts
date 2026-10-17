@@ -68,3 +68,23 @@ export interface NearbyList {
   radius_km: number;
   nearby: NearbyPlace[];
 }
+
+/** A map card: a listing or place with nearby places (GET /places/map). */
+export interface MapMarker {
+  name: string;
+  kind: string;
+  category: string;
+  group: string;
+  latitude: number;
+  longitude: number;
+  distance_km?: number;
+  walk_minutes?: number;
+}
+export interface MapView {
+  focus: { type: "listing" | "place"; id?: string; name: string; latitude: number; longitude: number; price?: number; city?: string };
+  radius_km: number;
+  kinds: string[];
+  markers: MapMarker[];
+  listings?: { id: string; name: string; latitude: number; longitude: number; price: number; distance_km: number }[];
+  tiles: { url: string; attribution: string };
+}

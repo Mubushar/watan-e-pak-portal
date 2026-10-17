@@ -64,6 +64,18 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<!-- AdMob app id: Google's SAMPLE id (test ads only). Replace with your own before publishing. -->
+	<key>GADApplicationIdentifier</key>
+	<string>ca-app-pub-3940256099942544~1458002511</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>Arz-e-Pak uses this to show ads that are more relevant to you. The app works the same if you say no.</string>
+	<key>SKAdNetworkItems</key>
+	<array>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>cstr6suwn9.skadnetwork</string>
+		</dict>
+	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Arz-e-Pak uses the microphone for voice notes and live conversations with the AI property assistant.</string>
 	<key>NSCameraUsageDescription</key>

@@ -5,7 +5,7 @@
  * to ask the person to press a button. Definitions live on the backend
  * (openai_voice.REALTIME_TOOLS, served at GET /ai/tools).
  */
-import type { NearbyList, NearbyPlace, Property, PropertyList } from "@/types";
+import type { MapView, NearbyList, NearbyPlace, Property, PropertyList } from "@/types";
 import { get, post } from "./api";
 import type { ListingDraft } from "./intent";
 import { money, t, type Lang } from "./lang";
@@ -16,6 +16,8 @@ import type { ChatAction } from "./assistant";
 export interface ToolEffect {
   listings?: Property[];
   actions?: ChatAction[];
+  /** A map card (show_map). */
+  map?: MapView;
 }
 
 export interface ToolRun {
@@ -35,6 +37,7 @@ const brief = (p: Property) => ({
   size_marla: p.marla_area ?? undefined,
   bedrooms: p.bedrooms ?? undefined,
   bathrooms: p.bathrooms ?? undefined,
+  distance_km: (p as Property & { distance_km?: number }).distance_km,
   features: p.amenities?.length ? p.amenities : undefined,
   nearby: p.nearby ? `${p.nearby.name} (${p.nearby.kind}), ${p.nearby.distance_km} km` : undefined,
   status: p.status,
@@ -43,7 +46,11 @@ const brief = (p: Property) => ({
 /** "Faisal Mosque (Mosque), 0.4 km, ~5 min walk" for the model. */
 const nearbyLine = (n: NearbyPlace) => `${n.name} (${n.kind}), ${n.distance_km} km, ~${n.walk_minutes} min walk`;
 
-const SEARCH_KEYS = ["city", "category", "use_type", "min_price", "max_price", "bedrooms", "min_bathrooms", "min_marla", "max_marla", "featured", "feature", "near", "near_km"];
+const SEARCH_KEYS = ["city", "category", "use_type", "min_price", "max_price", "bedrooms", "min_bathrooms", "min_marla", "max_marla", "featured", "feature", "near", "near_km", "near_place"];
+
+const PLACE_KEYS = ["kind", "area", "near", "radius_km", "name"];
+const pick = (args: Record<string, unknown>, keys: string[]) =>
+  Object.fromEntries(Object.entries(args).filter(([k, v]) => keys.includes(k) && v !== undefined && v !== null && v !== "")) as Record<string, string | number>;
 
 /** "Open listing" (+ "Request a call" while it's for sale/rent) under a listing's card. */
 function listingButtons(p: Property, lang: Lang): ChatAction[] {
@@ -55,13 +62,51 @@ function listingButtons(p: Property, lang: Lang): ChatAction[] {
 export async function runAgentTool(name: string, args: Record<string, unknown>, lang: Lang): Promise<ToolRun> {
   const tr = t(lang);
   if (name === "search_listings") {
-    const query = Object.fromEntries(Object.entries(args).filter(([k, v]) => SEARCH_KEYS.includes(k) && v !== undefined && v !== null && v !== "")) as Record<string, string | number | boolean>;
-    const r = await get<PropertyList>("/search", { ...query, limit: 6 });
-    const q = new URLSearchParams(Object.entries(query).map(([k, v]) => [k, String(v)]));
+    const query = pick(args, SEARCH_KEYS);
+    const r = await get<PropertyList & { near_place?: unknown; nearest_outside_radius?: Property[]; note?: string }>("/search", { ...query, limit: 6 });
+    const { near_place: _np, ...browse } = query;
+    const q = new URLSearchParams(Object.entries(browse).map(([k, v]) => [k, String(v)]));
+    const nearest = r.nearest_outside_radius ?? [];
     return {
-      output: { count: r.count, results: r.results.map(brief), searched_with: query },
-      effect: { listings: r.results, actions: r.count ? [{ label: tr.seeAll(r.count), to: `/explore?${q}`, primary: true }] : [{ label: tr.browseAll, to: "/explore" }] },
+      output: {
+        count: r.count,
+        results: r.results.map(brief),
+        searched_with: query,
+        ...(r.near_place ? { near_place: r.near_place } : {}),
+        ...(nearest.length ? { nearest_outside_radius: nearest.map(brief) } : {}),
+        ...(r.note ? { note: r.note } : {}),
+      },
+      effect: {
+        listings: r.results.length ? r.results : nearest.length ? nearest : r.results,
+        actions: r.count ? [{ label: tr.seeAll(r.count), to: `/explore?${q}`, primary: true }] : [{ label: tr.browseAll, to: "/explore" }],
+      },
     };
+  }
+  if (name === "find_places") {
+    const r = await get<Record<string, unknown>>("/places/find", { ...pick(args, PLACE_KEYS), limit: 15 });
+    return { output: r, effect: {} };
+  }
+  if (name === "area_info") {
+    const r = await get<Record<string, unknown>>("/areas/profile", { area: String(args.area ?? "") });
+    return { output: r, effect: {} };
+  }
+  if (name === "show_map") {
+    const kinds = Array.isArray(args.kinds) ? (args.kinds as string[]).join(",") : undefined;
+    const view = await get<MapView>("/places/map", {
+      listing_id: args.listing_id ? String(args.listing_id) : undefined,
+      place: !args.listing_id && args.place ? String(args.place) : undefined,
+      kinds,
+      radius_km: typeof args.radius_km === "number" ? args.radius_km : undefined,
+    });
+    const shown = view.markers.map((m) => `${m.name} (${m.kind}, ${m.distance_km} km)`);
+    return {
+      output: { ok: true, shown_on_screen: `A map of ${view.focus.name} with ${view.markers.length} nearby places marked.`, radius_km: view.radius_km, marked: shown },
+      effect: { map: view },
+    };
+  }
+  if (name === "web_lookup") {
+    const r = await post<{ answer: string; sources: { site: string; url: string }[] }>("/ai/web-lookup", { question: String(args.question ?? "") }, { timeoutMs: 90_000 });
+    return { output: { answer: r.answer, sources: r.sources.map((x) => x.site) }, effect: {} };
   }
   if (name === "get_listing") {
     const id = String(args.id ?? "");
@@ -147,5 +192,5 @@ export function mergeEffects(a: ToolEffect, b: ToolEffect): ToolEffect {
   const belongsToCards = (x: ChatAction) => !!x.to && /^\/(explore|property\/|signin\?next=\/property)/.test(x.to);
   const keep = b.listings ? (a.actions ?? []).filter((x) => !belongsToCards(x)) : a.actions ?? [];
   const actions = [...keep, ...(b.actions ?? [])].filter((x, i, all) => all.findIndex((y) => y.label === x.label) === i);
-  return { listings: b.listings ?? a.listings, actions: actions.length ? actions : undefined };
+  return { listings: b.listings ?? a.listings, actions: actions.length ? actions : undefined, map: b.map ?? a.map };
 }

@@ -1,6 +1,6 @@
 # REST endpoint reference
 
-Auto-generated from the FastAPI app — **630 routes** across **37 tags**. Every route calls the same function the MCP tool of the same name calls, so behaviour can never drift.
+Auto-generated from the FastAPI app — **640 routes** across **38 tags**. Every route calls the same function the MCP tool of the same name calls, so behaviour can never drift.
 
 | Tag | Routes |
 | --- | --- |
@@ -16,24 +16,25 @@ Auto-generated from the FastAPI app — **630 routes** across **37 tags**. Every
 | [properties](#properties) | 18 |
 | [auth](#auth) | 17 |
 | [commercial](#commercial) | 17 |
+| [ads](#ads) | 16 |
 | [roles](#roles) | 16 |
 | [transactions](#transactions) | 16 |
 | [agents](#agents) | 15 |
 | [content](#content) | 14 |
-| [ads](#ads) | 13 |
 | [intelligence](#intelligence) | 13 |
 | [marketing](#marketing) | 13 |
 | [poi](#poi) | 13 |
 | [leasing](#leasing) | 12 |
 | [portal](#portal) | 12 |
 | [aoi](#aoi) | 11 |
-| [hierarchy](#hierarchy) | 10 |
+| [hierarchy](#hierarchy) | 11 |
 | [big-projects](#big-projects) | 9 |
+| [ai](#ai) | 8 |
 | [finance](#finance) | 8 |
 | [routing](#routing) | 8 |
-| [ai](#ai) | 7 |
 | [news](#news) | 6 |
 | [other](#other) | 5 |
+| [places](#places) | 5 |
 | [broker](#broker) | 4 |
 | [images](#images) | 4 |
 | [memory](#memory) | 4 |
@@ -83,14 +84,16 @@ Auto-generated from the FastAPI app — **630 routes** across **37 tags**. Every
 
 ## ads
 
-13 routes.
+16 routes.
 
 | Method(s) | Path | Purpose |
 | --- | --- | --- |
 | GET | `/ads` | List advertisement creatives. |
 | POST | `/ads` | Create an advertisement creative. |
+| GET | `/ads.txt` | The ads.txt file Google requires at the web site's root (when AdSense is set up). |
 | GET | `/ads/active` | Live, in-window, on-target creatives (weighted rotation). |
 | GET | `/ads/categories` | Advertisement categories. |
+| GET | `/ads/config` | Ad setup for the apps: direct (sponsored) ads, plus Google AdSense (web) and |
 | GET | `/ads/performance` | Impression / click / CTR performance for one ad or the whole book. |
 | GET | `/ads/preview` | HTML preview of an advertisement slot. |
 | GET | `/ads/report` | Printable advertising report (all slots + delivery performance). |
@@ -99,6 +102,7 @@ Auto-generated from the FastAPI app — **630 routes** across **37 tags**. Every
 | GET | `/ads/{ad_id}` | Fetch one advertisement. |
 | PUT | `/ads/{ad_id}` | Update an advertisement. |
 | DELETE | `/ads/{ad_id}` | Delete an advertisement. |
+| POST | `/ads/{ad_id}/event` | Report that the app showed (``impression``) or a person tapped (``click``) an ad. |
 | POST | `/ads/{ad_id}/track` | Record an impression / click / spend event. |
 
 ## agents
@@ -125,7 +129,7 @@ Auto-generated from the FastAPI app — **630 routes** across **37 tags**. Every
 
 ## ai
 
-7 routes.
+8 routes.
 
 | Method(s) | Path | Purpose |
 | --- | --- | --- |
@@ -134,6 +138,7 @@ Auto-generated from the FastAPI app — **630 routes** across **37 tags**. Every
 | POST | `/ai/speak` | Text-to-speech for voice-note replies (OpenAI ``OPENAI_TTS_MODEL`` with ``OPENAI_VOICE`` / |
 | GET | `/ai/tools` | The assistant's tools in Chat Completions format (the same ones the live agent gets). |
 | POST | `/ai/transcribe` | Speech-to-text for voice notes (OpenAI ``OPENAI_TRANSCRIBE_MODEL``; Urdu, English or mixed). |
+| POST | `/ai/web-lookup` | Answer a factual question from the web (OpenAI web search), with source links. |
 | GET | `/rag/search` |  |
 | POST | `/rag/search` |  |
 
@@ -387,7 +392,7 @@ Auto-generated from the FastAPI app — **630 routes** across **37 tags**. Every
 
 ## hierarchy
 
-10 routes.
+11 routes.
 
 | Method(s) | Path | Purpose |
 | --- | --- | --- |
@@ -401,6 +406,7 @@ Auto-generated from the FastAPI app — **630 routes** across **37 tags**. Every
 | GET | `/hierarchy` |  |
 | GET | `/schemes` |  |
 | POST | `/schemes` | Add a housing scheme / society. |
+| PUT | `/schemes/{scheme_id}` | Update a housing scheme — e.g. development_status, approval_authority, possession_status, |
 
 ## images
 
@@ -620,6 +626,18 @@ Auto-generated from the FastAPI app — **630 routes** across **37 tags**. Every
 | WEBSOCKET | `/mcp` |  |
 | GET, HEAD | `/redoc` |  |
 | WEBSOCKET | `/ws/messaging/{conversation_id}` |  |
+
+## places
+
+5 routes.
+
+| Method(s) | Path | Purpose |
+| --- | --- | --- |
+| GET | `/areas/profile` | Population, development level, facilities and nearby housing areas of an area / society. |
+| GET | `/geo/locate` | Find a named place or area on the map. |
+| GET | `/geo/summary` | What place / area / population data is loaded. |
+| GET | `/places/find` | Find and count places (schools, malls, hospitals, mosques …) in an area or near a place. |
+| GET | `/places/map` | A listing (or a place) with the nearest schools, mosques, parks, malls … for a map card. |
 
 ## pmo
 

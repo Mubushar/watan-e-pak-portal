@@ -81,6 +81,13 @@ AD_SLOTS: Dict[str, str] = {
 
 AD_STATUSES = ["active", "paused", "draft", "expired"]
 
+# How an advertiser pays: a fixed fee, per 1,000 impressions, or per click (rate in PKR).
+AD_PRICING: Dict[str, str] = {
+    "flat": "Fixed fee",
+    "cpm": "Per 1,000 impressions",
+    "cpc": "Per click",
+}
+
 CONTENT_CATEGORIES = [
     "about", "mission", "services", "why-us", "team", "faq", "careers",
     "policy", "legal", "help", "news",
@@ -238,6 +245,9 @@ class Advertisement(BaseModel):
     valid_until: Optional[str] = None
     budget: float = 0.0
     spend: float = 0.0
+    pricing: str = "flat"                       # flat | cpm | cpc
+    rate: float = 0.0                           # PKR per 1,000 impressions (cpm) or per click (cpc)
+    sample: bool = False                        # demo creative, not a real advertiser
     impressions: int = 0
     clicks: int = 0
     created_at: str = Field(default_factory=_now)
@@ -402,17 +412,22 @@ def record_ad_event(ad_id: str, event: str = "impression", count: int = 1) -> Di
     count = max(1, int(count))
     if event in ("impression", "view", "views"):
         ad.impressions += count
-        if ad.budget > 0 and ad.spend >= ad.budget:
-            ad.status = "paused"
+        if ad.pricing == "cpm" and ad.rate > 0:
+            ad.spend = round(ad.spend + ad.rate * count / 1000.0, 2)
     elif event in ("click", "clicks"):
         ad.clicks += count
+        if ad.pricing == "cpc" and ad.rate > 0:
+            ad.spend = round(ad.spend + ad.rate * count, 2)
     elif event in ("spend", "charge"):
         ad.spend = round(ad.spend + count, 2)
     else:
         return {"error": "event must be one of: impression, click, spend"}
+    # A spent budget stops delivery until the advertiser tops it up.
+    if ad.budget > 0 and ad.spend >= ad.budget and ad.status == "active":
+        ad.status = "paused"
     return {"id": ad.id, "event": event, "count": count,
             "impressions": ad.impressions, "clicks": ad.clicks,
-            "ctr": _ctr(ad), "status": ad.status}
+            "ctr": _ctr(ad), "spend": ad.spend, "status": ad.status}
 
 
 def _ctr(ad: Advertisement) -> float:
@@ -425,6 +440,8 @@ def ad_view(ad: Advertisement) -> Dict[str, Any]:
     view["slot_label"] = AD_SLOTS.get(ad.slot, ad.slot)
     view["ctr"] = _ctr(ad)
     view["remaining_budget"] = round(max(0.0, ad.budget - ad.spend), 2)
+    view["pricing_label"] = AD_PRICING.get(ad.pricing, ad.pricing)
+    view["sponsored_label"] = ADS_CONFIG["sponsored_label"]
     view["live"] = is_live(ad)
     return view
 

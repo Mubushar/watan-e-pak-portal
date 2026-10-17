@@ -10,6 +10,7 @@ import { resetServerVoice, serverVoice, type ServerVoice } from "@/lib/voice";
 import { roleLabel, useAuth } from "@/store/auth";
 import { usePrefs, type ReplyLang, type Theme } from "@/store/prefs";
 import { Avatar, Badge, Button, Field, Input, Segmented, TopBar } from "@/components/ui";
+import { AdvertiseWithUs } from "@/components/Ads";
 
 export default function Profile() {
   const nav = useNavigate();
@@ -175,6 +176,8 @@ export default function Profile() {
           </div>
         </section>
 
+        <AdvertiseWithUs />
+
         {user && (
           <Button variant="outline" size="lg" className="w-full text-red-600 dark:text-red-400" icon={<LogOut className="h-4 w-4" />} onClick={() => void signOut()}>
             Sign out
@@ -183,6 +186,12 @@ export default function Profile() {
 
         <p className="pb-4 text-center text-xs text-ink-mute">
           Arz-e-Pak AI Real Estate · {runtimeLabel[runtime]} app v{window.arzepak?.version ?? "1.0.0"}
+          <br />
+          Map data ©{" "}
+          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="underline">
+            OpenStreetMap contributors
+          </a>{" "}
+          · Population © Kontur
         </p>
       </div>
     </div>

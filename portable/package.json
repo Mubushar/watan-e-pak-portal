@@ -25,6 +25,7 @@
     "assets": "capacitor-assets generate --android --ios --iconBackgroundColor \"#f6f8f6\" --iconBackgroundColorDark \"#0d1f16\" --splashBackgroundColor \"#f6f8f6\" --splashBackgroundColorDark \"#07130d\""
   },
   "dependencies": {
+    "@capacitor-community/admob": "^8.2.1",
     "@capacitor/android": "^8.5.3",
     "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.5.3",
@@ -40,6 +41,7 @@
     "@tanstack/react-query": "^5.104.3",
     "clsx": "^2.1.1",
     "framer-motion": "^11.18.2",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -51,6 +53,7 @@
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.5.3",
+    "@types/leaflet": "^1.9.12",
     "@types/node": "^22.20.5",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",

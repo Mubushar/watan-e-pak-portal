@@ -18,7 +18,7 @@ OpenAI-compatible facade and error handling. For the MCP surface, see the
 | OpenAPI schema | `/openapi.json` |
 | MCP (mounted) | `/mcp` |
 | OpenAI facade | `/v1` |
-| Routes | **630** across **37 tags** |
+| Routes | **640** across **38 tags** |
 
 Every route calls a plain-Python function that the matching MCP tool also calls, so the
 two surfaces are guaranteed equivalent.
@@ -138,12 +138,22 @@ curl "http://127.0.0.1:8000/search?category=house&near=school&near_km=1"
 curl "http://127.0.0.1:8000/search?feature=solar&min_bathrooms=4"
 # nearest school, mosque, hospital, mall, park, transport ... around one listing
 curl "http://127.0.0.1:8000/properties/PROP-0001/nearby?radius_km=3"
+# listings within 3 km of a named place (nearest ones outside the radius if none inside)
+curl "http://127.0.0.1:8000/search?near_place=Rawalpindi%20Medical%20University&near_km=3"
+# places in an area, or around a place — with a count
+curl "http://127.0.0.1:8000/places/find?kind=mall&area=Bahria%20Phase%208%20Rawalpindi"
+curl "http://127.0.0.1:8000/places/find?kind=high%20school&area=DHA%202%20Islamabad"
+# population, development level, facilities and nearby housing areas
+curl "http://127.0.0.1:8000/areas/profile?area=G-13%20Islamabad"
+# a listing (or ?place=…) with the nearest schools, mosques, parks, malls … for a map card
+curl "http://127.0.0.1:8000/places/map?listing_id=PROP-0001&kinds=school,mosque,park,mall"
 ```
 
 `near` takes `school`, `mosque` (or `masjid`), `hospital`, `mall`, `market`, `park`, `bank`,
 `restaurant`, `transport` or `fuel`, or a POI category. Nearby places come from the portal's
-POI data (`/poi`); add POIs for areas that have none. Listings carry an `amenities` list that
-`/me/listings` and `PUT /properties/{id}` accept.
+POI data (`/poi`) and the bundled OpenStreetMap data; place, area and population answers
+use the OpenStreetMap and Kontur data (Administration Guide §4.6). Listings carry an
+`amenities` list that `/me/listings` and `PUT /properties/{id}` accept.
 
 #### My listings (signed-in account)
 

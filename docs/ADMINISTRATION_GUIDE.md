@@ -279,6 +279,139 @@ If OpenAI itself refuses a request, the app gets a readable error:
 - rejected API key: `502` "check OPENAI_API_KEY";
 - OpenAI unreachable: `502`.
 
+### 4.6 Places, areas and population (what the assistant knows about a location)
+
+The assistant answers questions like these:
+- "Which malls are in Bahria Phase 8?"
+- "How many high schools are in DHA 2 Islamabad?"
+- "I need a room near Rawalpindi Medical University."
+- "How developed is G-13, and how many people live there?"
+
+It answers from data bundled in `backend/geodata/` for Islamabad/Rawalpindi, Lahore and
+Karachi:
+
+| File | What | Source |
+| --- | --- | --- |
+| `places.json.gz` | ~12,000 named places: schools, colleges, universities, hospitals, clinics, mosques, malls, markets, parks, banks, restaurants, stations, fuel | OpenStreetMap |
+| `areas.json.gz` | ~2,000 sectors, phases, neighbourhoods and housing societies, with outlines and estimated population | OpenStreetMap, Nominatim |
+| `population.json.gz` | people per ~0.74 km² hexagon | Kontur Population 2023 |
+
+The agent's tools:
+- **`find_places`** (`GET /places/find`): lists and counts places of a kind inside an area
+  or around a place.
+- **`area_info`** (`GET /areas/profile`): gives an area's population estimate, density, size
+  and development level (from population density and mapped facilities), plus counts of
+  schools, mosques, hospitals, malls and parks, notable places, portal listings with
+  average prices, and nearby housing areas with their population.
+- **`search_listings`** with `near_place`: finds listings around a named place. When none
+  are close enough, it returns the nearest ones.
+- **`show_map`** (`GET /places/map`): puts a map card in the chat. It shows a listing, or a
+  named place, with the nearest schools, mosques, parks, malls and hospitals as coloured
+  markers, plus an "Open in Google Maps" link. On the outskirts the radius widens until a
+  few places show. Each listing page has the same map.
+- **`web_lookup`** (`POST /ai/web-lookup`): uses OpenAI web search, with sources, for facts
+  the data can't hold, such as approval authority, possession status or news.
+
+Area names are matched loosely, so "DHA 2", "Phase-VIII" and "G13" work. A city word
+narrows the search. Names the bundled data doesn't know are looked up on Nominatim when
+`GEO_ONLINE_LOOKUP=1`.
+
+**Your own society data.** Staff can record what maps can't know: `development_status`,
+`approval_authority`, `possession_status`, `utilities` and `population` on a housing scheme
+(`update_housing_scheme` MCP tool, or `PUT /schemes/{id}`). `area_info` includes them
+whenever the scheme matches.
+
+**Map tiles.** Map cards use OpenStreetMap's tile server, which is fine for testing and
+light use. Its usage policy forbids heavy traffic, so before launch set `MAP_TILE_URL` and
+`MAP_TILE_ATTRIBUTION` to a tile provider's (MapTiler, Stadia Maps, Thunderforest …).
+
+**Accuracy.** Counts cover places that volunteers have mapped on OpenStreetMap, so small
+or new ones can be missing. Population is a modelled estimate, not a census. The agent is
+told to say both.
+
+**Refreshing the data** (a few times a year):
+
+```powershell
+cd backend
+# 1. Download "Pakistan: Population Density for 400m H3 Hexagons" (Kontur, CC BY 4.0) from
+#    data.humdata.org and unzip it, then:
+uv run python geodata/build_geodata.py --kontur C:\path\kontur_population_PK_20231101.gpkg
+```
+
+To add a city, add its bounding box to `REGIONS` (and well-known societies to
+`SOCIETIES`) in `geodata/build_geodata.py`, then rebuild.
+
+**Licences.** Show the attribution wherever the data appears; the app's Profile page
+already does. Map data © OpenStreetMap contributors (ODbL 1.0). Population © Kontur
+(CC BY 4.0).
+
+### 4.7 Advertising (earning from ads)
+
+The apps carry ad slots on Home (rotating banners), Explore (one card after every 6
+listings), each listing page and Profile ("Advertise with Arz-e-Pak"). Each slot first
+shows a **sponsored ad you sold directly**. If no advertiser has booked that slot, it
+falls back to **Google**:
+
+| App | Fallback | Why |
+| --- | --- | --- |
+| Web build (hosted site) | Google AdSense | AdSense is only allowed on web sites. |
+| Android / iOS | Google AdMob banner above the tab bar | Google's ad network for apps. |
+| Windows / macOS desktop | none (sponsored ads only) | Google allows neither network in desktop apps. |
+
+Every ad is labelled *Sponsored*. The Assistant, sign-in and listing form screens never
+show ads.
+
+**Direct (sponsored) ads.** These usually pay the most because you keep all the money.
+Sell the space to developers, banks, builders, solar and interior companies. Then create
+the ad (`POST /ads`, or the `ad_*` MCP tools):
+
+```powershell
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/ads" -ContentType "application/json" -Body '{
+  "title": "Spring offer", "headline": "Solar for every home", "advertiser": "Your client",
+  "category": "solar_energy", "slot": "hero", "cta_label": "Get a quote", "cta_url": "https://client.example",
+  "pricing": "cpm", "rate": 400, "budget": 200000, "city": "Lahore"}'
+```
+
+- `slot`: `hero` (Home carousel), `banner` (second Home banner), `infeed` (Explore),
+  `sidebar` (listing page), `footer` and `newsletter` (web portal).
+- `pricing`: `flat` (a fixed fee you invoice yourself), `cpm` (`rate` PKR per 1,000 views)
+  or `cpc` (`rate` PKR per click). Spend builds up as the apps report views and clicks.
+  The ad pauses itself when it reaches `budget`.
+- A view is counted when at least half the ad has been on screen for a second. Each
+  viewer counts once per ad per 10 minutes (views) or 30 minutes (clicks), so refreshing
+  doesn't bill the advertiser twice.
+- `GET /ads/performance` and `GET /ads/report` give the views, clicks, CTR and spend to
+  invoice from. Optional targeting: `city`, `scheme`, `lang`, `valid_from` / `valid_until`.
+- The ads seeded with the portal are **samples**: fictional advertisers, links to
+  example.com, marked *Sample* in the app. Pause or delete them
+  (`PUT /ads/{id}` with `"status": "paused"`) once real advertisers are booked.
+
+**Google AdSense (web build).**
+1. Host the web build on your own domain and apply at adsense.google.com. Google reviews
+   the site, and needs a privacy policy page.
+2. Set `ADS_ADSENSE_CLIENT=ca-pub-…` and create one display ad unit each for
+   `ADS_ADSENSE_SLOT_HOME`, `_EXPLORE` and `_DETAIL`.
+3. Publish `ads.txt` at the root of the site. `GET /ads.txt` returns the exact line.
+
+**Google AdMob (Android / iOS).**
+1. Create the two apps at admob.google.com and a *banner* ad unit for each.
+2. Replace Google's **sample** app ids, which only show test ads:
+   - Android: `com.google.android.gms.ads.APPLICATION_ID` in
+     `portable/android/app/src/main/AndroidManifest.xml`;
+   - iOS: `GADApplicationIdentifier` in `portable/ios/App/App/Info.plist`.
+
+   Then rebuild the apps.
+3. Set `ADS_ADMOB_ANDROID_BANNER` and `ADS_ADMOB_IOS_BANNER`, then `ADS_ADMOB_TESTING=0`.
+   Leave testing on (the default) while developing: test ads are safe, but they earn nothing.
+4. Publish `app-ads.txt` on the developer website listed in your store pages. AdMob shows
+   the line to use.
+
+The apps ask for consent where the law needs it, using Google's consent form (EU/UK).
+iOS also asks the tracking question. Never click your own ads: Google bans accounts for it.
+
+> **Before launch:** `POST/PUT/DELETE /ads` need no sign-in yet, like the property
+> routes (§10). Restrict them to staff before real advertisers' money is involved.
+
 ---
 
 ## 5. Data, storage & backups
@@ -442,6 +575,11 @@ plausible-but-wrong data.
 - [ ] Back up the database and object store; test restores.
 - [ ] Review messaging retention and moderation policy with legal/compliance.
 - [ ] Restrict CORS/host settings at the proxy for the deployment domain.
+- [ ] Put sign-in (staff roles) on the write routes that are still open:
+      `POST/PUT/DELETE /properties` and `POST/PUT/DELETE /ads` (and `/ads/{id}/track`).
+      The apps don't need them: they use `/me/listings` (sign-in required) and
+      `/ads/{id}/event` (counts each viewer once).
+- [ ] Replace AdMob's sample app ids and set `ADS_ADMOB_TESTING=0` only in release builds (§4.7).
 
 ---
 

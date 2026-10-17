@@ -8,6 +8,7 @@ import { cityImage, HERO } from "@/lib/images";
 import { roleLabel, useAuth } from "@/store/auth";
 import { Avatar, Logo, SectionHead, Skeleton } from "@/components/ui";
 import { PropertyCard, PropertyRow } from "@/components/PropertyCard";
+import { AdSlot, BannerSpacer, useNativeBanner } from "@/components/Ads";
 
 type Action = { icon: typeof HomeIcon; label: string; to: string; tone?: "gold" };
 
@@ -65,6 +66,7 @@ export default function Home() {
   const latest = useApi<PropertyList>("/properties", { limit: 6 });
   const cities = useApi<{ cities: City[] }>("/cities");
   const first = user?.name?.split(" ")[0];
+  useNativeBanner();
 
   return (
     <div>
@@ -156,6 +158,9 @@ export default function Home() {
           </div>
         </section>
 
+        {/* ---------- sponsored (rotating) ---------- */}
+        <AdSlot slot="hero" placement="home" variant="banner" rotate className="mt-6" />
+
         {/* ---------- AI banner ---------- */}
         <Link to="/assistant" className="mt-6 flex items-center gap-4 overflow-hidden rounded-2xl bg-brand-gradient p-4 text-white shadow-soft">
           <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15">
@@ -187,6 +192,8 @@ export default function Home() {
           </div>
         </section>
 
+        <AdSlot slot="banner" placement="home" variant="banner" rotate className="mt-8" />
+
         {/* ---------- latest ---------- */}
         <section className="mt-8">
           <SectionHead title="Just listed" to="/explore" />
@@ -194,6 +201,7 @@ export default function Home() {
             {latest.isLoading ? [0, 1, 2].map((i) => <Skeleton key={i} className="m-2 h-16" />) : latest.data?.results.map((p) => <PropertyRow key={p.id} p={p} />)}
           </div>
         </section>
+        <BannerSpacer />
       </div>
     </div>
   );

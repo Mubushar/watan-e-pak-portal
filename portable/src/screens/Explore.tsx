@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Bot, LayoutGrid, List, SearchX, SlidersHorizontal, X } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -7,6 +7,10 @@ import { useApi } from "@/hooks/useApi";
 import { pkrShort, titleCase } from "@/lib/format";
 import { Button, EmptyState, Field, Segmented, Select, Sheet, Skeleton, TopBar } from "@/components/ui";
 import { PropertyCard, PropertyRow } from "@/components/PropertyCard";
+import { AdSlot, BannerSpacer, useNativeBanner } from "@/components/Ads";
+
+/** Listings between in-feed ads. */
+const AD_EVERY = 6;
 
 const CATEGORIES = ["house", "apartment", "plot", "shop", "office", "floor", "building"];
 const PRICE_STEPS = [0, 2_500_000, 5_000_000, 10_000_000, 20_000_000, 35_000_000, 50_000_000, 100_000_000, 250_000_000];
@@ -17,6 +21,7 @@ export default function Explore() {
   const [sp, setSp] = useSearchParams();
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"grid" | "list">("grid");
+  useNativeBanner();
   const filters: Filters = Object.fromEntries(FILTER_KEYS.map((k) => [k, sp.get(k) ?? undefined]).filter(([, v]) => v));
   const [draft, setDraft] = useState<Filters>(filters);
   const cities = useApi<{ cities: City[] }>("/cities");
@@ -119,17 +124,24 @@ export default function Explore() {
           </EmptyState>
         ) : view === "grid" ? (
           <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {q.data.results.map((p) => (
-              <PropertyCard key={p.id} p={p} />
+            {q.data.results.map((p, i) => (
+              <Fragment key={p.id}>
+                <PropertyCard p={p} />
+                {(i + 1) % AD_EVERY === 0 && <AdSlot slot="infeed" placement="explore" index={(i + 1) / AD_EVERY - 1} />}
+              </Fragment>
             ))}
           </div>
         ) : (
           <div className="card mt-3 divide-y divide-black/5 p-1.5 dark:divide-white/5">
-            {q.data.results.map((p) => (
-              <PropertyRow key={p.id} p={p} />
+            {q.data.results.map((p, i) => (
+              <Fragment key={p.id}>
+                <PropertyRow p={p} />
+                {(i + 1) % AD_EVERY === 0 && <AdSlot slot="infeed" placement="explore" variant="row" index={(i + 1) / AD_EVERY - 1} />}
+              </Fragment>
             ))}
           </div>
         )}
+        <BannerSpacer />
       </div>
 
       <Sheet open={open} onClose={() => setOpen(false)} title="Filters">

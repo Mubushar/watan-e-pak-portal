@@ -1250,7 +1250,8 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         r = client.get("/ai/tools")
         names = [t["function"]["name"] for t in r.json().get("tools", [])] if r.status_code == 200 else []
         check("GET /ai/tools (chat tool definitions)",
-              names == ["search_listings", "get_listing", "request_call", "my_listings", "draft_listing"], str(names))
+              names == ["search_listings", "get_listing", "request_call", "find_places", "area_info", "show_map",
+                        "web_lookup", "my_listings", "draft_listing"], str(names))
         r = client.get("/search", params={"min_bathrooms": 6, "limit": 50})
         baths = [x.get("bathrooms") for x in r.json().get("results", [])] if r.status_code == 200 else []
         check("GET /search?min_bathrooms=6", bool(baths) and all((b or 0) >= 6 for b in baths), str(baths))
@@ -1270,6 +1271,7 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         r = client.get(f"/properties/{modern['id']}/nearby") if modern else None
         kinds = [n["category"] for n in r.json().get("nearby", [])] if r is not None and r.status_code == 200 else []
         check("GET /properties/{id}/nearby", {"education", "worship", "health", "shopping"} <= set(kinds), str(kinds))
+        run_geo_checks(client)
         r = client.get("/properties/does-not-exist/nearby")
         check("GET /properties/{id}/nearby (unknown -> 404)", r.status_code == 404, str(r.status_code))
         if not voice.get("provider"):  # no OPENAI_API_KEY in the test environment
@@ -1670,6 +1672,45 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
 
             r = client.delete(f"/ads/{rest_ad_id}")
             check("DELETE /ads/{ad_id}", r.status_code == 200, str(r.status_code))
+
+        # --- ads in the apps: network config, billing, deduplicated tracking ---
+        import ads_network
+        ads_network.reset()
+        r = client.get("/ads/config")
+        cfg = r.json() if r.status_code == 200 else {}
+        check("GET /ads/config", cfg.get("direct") is True and "advertise" in cfg
+              and (cfg.get("admob") is None or "banner" in cfg["admob"]), str(cfg)[:200])
+        r = client.get("/ads.txt")
+        check("GET /ads.txt (no AdSense -> 404)", r.status_code == (200 if ads_network.ADSENSE_CLIENT else 404), str(r.status_code))
+        r = client.post("/ads", json={"title": "CPC Ad", "headline": "Pay per click", "category": "solar_energy",
+                                      "slot": "infeed", "pricing": "cpc", "rate": 50, "budget": 100})
+        cpc_id = r.json().get("id") if r.status_code == 201 else None
+        check("POST /ads (cpc pricing)", bool(cpc_id) and r.json().get("pricing") == "cpc", r.text[:120])
+        r = client.post("/ads", json={"title": "Bad", "headline": "Bad", "pricing": "per-hour"})
+        check("POST /ads (unknown pricing rejected)", "error" in r.json(), r.text[:120])
+        if cpc_id:
+            r1 = client.post(f"/ads/{cpc_id}/event", json={"event": "click"}).json()
+            r2 = client.post(f"/ads/{cpc_id}/event", json={"event": "click"}).json()
+            check("POST /ads/{id}/event (click billed once per viewer)",
+                  r1.get("counted") is True and r1.get("spend") == 50 and r2.get("counted") is False, f"{r1} {r2}")
+            r = client.post(f"/ads/{cpc_id}/event", json={"event": "impression"}).json()
+            check("POST /ads/{id}/event (impression)", r.get("counted") is True and r.get("impressions") == 1, str(r))
+            ads_network.reset()
+            r = client.post(f"/ads/{cpc_id}/event", json={"event": "click"}).json()
+            check("ads: budget spent -> paused", r.get("spend") == 100 and r.get("status") == "paused", str(r))
+            client.delete(f"/ads/{cpc_id}")
+        r = client.post("/ads/does-not-exist/event", json={"event": "click"})
+        check("POST /ads/{id}/event (unknown -> 404)", r.status_code == 404, str(r.status_code))
+        r = client.post("/ads/does-not-exist/event", json={"event": "like"})
+        check("POST /ads/{id}/event (bad event -> 422)", r.status_code == 422, str(r.status_code))
+        r = client.get("/ads", params={"limit": 200})
+        seeded = [a for a in r.json().get("advertisements", []) if a.get("sample")]
+        names = " ".join(f"{a['title']} {a['advertiser']} {a.get('cta_url') or ''}" for a in seeded)
+        check("seed ads are fictional samples linking to example.com",
+              len(seeded) >= 20 and not any(b in names for b in ("HBL", "Habib", "State Bank", "TPL", ".pk/"))
+              and all((a.get("cta_url") or "https://example.com").startswith("https://example.com") for a in seeded),
+              names[:200])
+        ads_network.reset()
 
         r = client.get("/ads/preview", params={"slot": "hero"})
         check("GET /ads/preview", r.status_code == 200 and "ad-card" in r.text, str(r.status_code))
@@ -2382,6 +2423,80 @@ async def run_products_checks() -> None:
 # ============================================================
 # 2b) Agentic products (REST)
 # ============================================================
+
+
+def run_geo_checks(client: TestClient) -> None:
+    """Places, areas and population from the bundled geodata (offline: no Nominatim)."""
+    import geo
+    geo.ONLINE_LOOKUP = False
+    check("geo: 'DHA 2' -> 'dha phase 2'", geo.normalize("DHA 2") == "dha phase 2", geo.normalize("DHA 2"))
+    check("geo: 'Bahria Town Phase-VIII' -> 'bahria phase 8'",
+          geo.normalize("Bahria Town Phase-VIII") == "bahria phase 8", geo.normalize("Bahria Town Phase-VIII"))
+    check("geo: 'G13' -> 'g-13'", geo.normalize("G13 Islamabad") == "g-13 islamabad", geo.normalize("G13 Islamabad"))
+    r = client.get("/geo/summary").json()
+    check("GET /geo/summary (data loaded)", r.get("places", 0) > 5000 and r.get("areas", 0) > 500
+          and r.get("population_cells", 0) > 5000, str(r)[:200])
+
+    r = client.get("/places/find", params={"kind": "mall", "area": "Bahria Phase 8 Rawalpindi"})
+    j = r.json()
+    check("GET /places/find (malls in Bahria Phase 8)", r.status_code == 200
+          and any("phase 8" in geo.normalize(a) for a in j.get("matched_areas", [])) and j.get("count", -1) >= 0, str(j)[:300])
+    r = client.get("/places/find", params={"kind": "high school", "area": "DHA 2 Islamabad"})
+    j = r.json()
+    check("GET /places/find (high schools in DHA 2)", r.status_code == 200
+          and any("DHA Phase 2" in a for a in j.get("matched_areas", []))
+          and all("high" in p["name"].lower() for p in j.get("places", [])), str(j)[:300])
+    r = client.get("/places/find", params={"kind": "hospital", "near": "Rawalpindi Medical University", "radius_km": 3})
+    j = r.json()
+    check("GET /places/find (near RMU, alias)", r.status_code == 200 and "Rawalpindi Medical" in j.get("near", "")
+          and j.get("count", 0) > 0, str(j)[:300])
+    r = client.get("/places/find", params={"kind": "spaceport", "area": "G-13"})
+    check("GET /places/find (unknown kind -> 422)", r.status_code == 422, str(r.status_code))
+
+    r = client.get("/search", params={"near_place": "Rawalpindi Medical University", "near_km": 3})
+    j = r.json()
+    np = j.get("near_place") or {}
+    check("GET /search?near_place (room near RMU)", np.get("found") is True and "Rawalpindi Medical" in np.get("name", "")
+          and (j["count"] > 0 or bool(j.get("nearest_outside_radius"))), str(j)[:300])
+    r = client.get("/search", params={"near_place": "Atlantis Underwater City"})
+    check("GET /search?near_place (unknown place)", r.json().get("near_place", {}).get("found") is False, r.text[:200])
+
+    r = client.get("/areas/profile", params={"area": "G-13 Islamabad"})
+    j = r.json()
+    check("GET /areas/profile (population & development)", r.status_code == 200 and j.get("found") is True
+          and j.get("population_estimate", 0) > 10_000 and j.get("development_level")
+          and isinstance(j.get("nearby_housing_areas"), list), str(j)[:300])
+    schemes = client.get("/schemes").json().get("schemes", [])
+    lsc = next((x for x in schemes if x.get("name") == "Lahore Smart City"), None)
+    if lsc:
+        r = client.put(f"/schemes/{lsc['id']}", json={"development_status": "under development",
+                                                      "approval_authority": "LDA", "utilities": ["electricity", "gas"]})
+        check("PUT /schemes/{id} (development details)", r.status_code == 200
+              and r.json().get("approval_authority") == "LDA", r.text[:200])
+        r = client.put(f"/schemes/{lsc['id']}", json={"colour": "green"})
+        check("PUT /schemes/{id} (unknown field -> 422)", r.status_code == 422, str(r.status_code))
+    r = client.get("/areas/profile", params={"area": "Lahore Smart City"})
+    ps = r.json().get("portal_scheme", {})
+    check("GET /areas/profile (portal scheme details)", ps.get("approval_authority") == "LDA"
+          and ps.get("development_status") == "under development", r.text[:300])
+    listing = next(x for x in client.get("/search", params={"limit": 50}).json()["results"]
+                   if x["title"] == "Modern 10 Marla House")
+    r = client.get("/places/map", params={"listing_id": listing["id"]})
+    j = r.json()
+    groups = {m["group"] for m in j.get("markers", [])}
+    check("GET /places/map (listing + nearby places)", r.status_code == 200 and j["focus"]["type"] == "listing"
+          and {"school", "mosque", "park"} <= groups and "{z}" in j.get("tiles", {}).get("url", ""), str(j)[:300])
+    r = client.get("/places/map", params={"place": "Centaurus Mall Islamabad", "kinds": "hospital,bank"})
+    j = r.json()
+    check("GET /places/map (named place, chosen kinds)", r.status_code == 200 and j["focus"]["type"] == "place"
+          and {m["group"] for m in j["markers"]} <= {"hospital", "bank"} and j["markers"], str(j)[:300])
+    r = client.get("/places/map", params={"listing_id": listing["id"], "kinds": "spaceport"})
+    check("GET /places/map (unknown kind -> 422)", r.status_code == 422, str(r.status_code))
+    r = client.get("/places/map")
+    check("GET /places/map (nothing to show -> 422)", r.status_code == 422, str(r.status_code))
+    r = client.get("/geo/locate", params={"q": "Centaurus Mall Islamabad"})
+    check("GET /geo/locate", r.json().get("found") is True, r.text[:200])
+    geo.ONLINE_LOOKUP = True
 
 
 def run_ai_guard_checks() -> None:

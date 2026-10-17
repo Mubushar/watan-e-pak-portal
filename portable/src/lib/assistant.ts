@@ -10,7 +10,7 @@
  * conversation) are phrased to be heard rather than read.
  */
 import { create } from "zustand";
-import type { Property, PropertyList } from "@/types";
+import type { MapView, Property, PropertyList } from "@/types";
 import { get, post } from "./api";
 import { draftFromIntent, parseIntent, searchQuery, type Intent, type ListingDraft } from "./intent";
 import { city as cityName, describe, detectLang, money, t, type Lang } from "./lang";
@@ -43,6 +43,8 @@ export interface ChatMsg {
   durationMs?: number;
   listings?: Property[];
   actions?: ChatAction[];
+  /** A map card under the reply (show_map). */
+  map?: MapView;
   pending?: boolean;
   /** What the agent looked up for this reply (shown to the model on later turns, not to the user). */
   context?: string;
@@ -133,6 +135,7 @@ export interface Reply {
   lang: Lang;
   listings?: Property[];
   actions?: ChatAction[];
+  map?: MapView;
   context?: string;
 }
 
@@ -231,6 +234,11 @@ function agentSystem(user: User | null, lang: Lang, opts: RespondOptions): strin
     "- Results include bedrooms and bathrooms: compare them yourself, and use the min_bathrooms / bedrooms filters rather than opening listings one by one.",
     "- To show one listing (the one you recommend, or one the user asks to see, open or share) call get_listing: its card appears under your reply with 'Open listing' and 'Request a call' buttons. Never say you cannot show or share a card.",
     "- 'School ke paas', 'masjid ke qareeb', 'near a mall / hospital / park': use search_listings with near (and feature for things inside the property, like solar or a pool). When describing a listing, mention its features and what is nearby (get_listing → nearby_places, with distance). If nearby_places is empty, say there is no nearby-place data for that area yet; never invent places.",
+    "- 'Room / house near <a named place>' (a university, hospital, mall, sector): search_listings with near_place and only the filters the user gave. If nothing is within range, say so and ALWAYS name the nearest listings it returns (nearest_outside_radius) with their distance, and offer to widen the search.",
+    "- Answer every part of the user's question. Don't stop at 'none found': if find_places finds none, use 'broader' (e.g. how many schools there are when none is named 'High School') and 'closest_outside_area' (nearest ones just outside, with distance); for well-known facts the map may lack, also use web_lookup.",
+    "- Questions about an area (which malls / schools / hospitals are in it, how many, population, how developed, what's around it): use find_places and area_info. Give real names and numbers; say counts come from the map and may miss small places, and that population is an estimate.",
+    "- When the user wants a map, a map screenshot, or to see a listing and the schools / mosques / parks / malls around it, call show_map (with the listing's id, or a place name): a map card appears under your reply. Never say you can't show a map.",
+    "- For approval status, possession, developer, news or anything the tools don't cover, use web_lookup and name the source website. Never guess facts.",
     "- When the user wants to visit, meet the owner or talk to a human agent, offer to send a call request and, once they agree, call request_call. If it says not_signed_in, tell them to tap 'Request a call'.",
     "- When the user wants to sell or rent out a property, ask briefly for missing essentials (type, city, size, price), then call draft_listing.",
     "- For their own listings call my_listings; if it says not_signed_in, ask them to sign in with a one-time code.",
@@ -262,7 +270,7 @@ async function agentReply(text: string, history: ChatMsg[], user: User | null, l
       // Drop any [context: …] note the model copied from earlier turns.
       const content = (msg.content ?? "").replace(/\s*\[context:[^\]]*\]/gi, "").trim();
       if (!content) throw new Error("empty reply");
-      return { lang, content, listings: effect.listings, actions: effect.actions, context: notes.join(" | ") || undefined };
+      return { lang, content, listings: effect.listings, actions: effect.actions, map: effect.map, context: notes.join(" | ") || undefined };
     }
     messages.push({ role: "assistant", content: msg.content ?? null, tool_calls: msg.tool_calls });
     for (const call of msg.tool_calls) {

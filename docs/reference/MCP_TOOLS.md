@@ -1,6 +1,6 @@
 # MCP tool reference
 
-Auto-generated from `server.py` — **595 tools** across **30 groups**. Regenerate with `uv run python docs/_gen/gen_docs.py` from the repository root's `backend/`.
+Auto-generated from `server.py` — **600 tools** across **30 groups**. Regenerate with `uv run python docs/_gen/gen_docs.py` from the repository root's `backend/`.
 
 Legend: `?` = optional parameter. Types are the JSON-Schema types the server advertises to MCP clients.
 
@@ -14,17 +14,17 @@ Legend: `?` = optional parameter. Types are the JSON-Schema types the server adv
 | [accounting](#accounting) | 32 |
 | [crm](#crm) | 28 |
 | [maintenance](#maintenance) | 27 |
-| [hierarchy](#hierarchy) | 25 |
+| [hierarchy](#hierarchy) | 26 |
 | [construction](#construction) | 23 |
 | [commercial](#commercial) | 16 |
 | [transactions](#transactions) | 16 |
 | [content](#content) | 15 |
+| [general](#general) | 15 |
 | [agents](#agents) | 14 |
 | [advertising](#advertising) | 13 |
 | [poi](#poi) | 13 |
 | [marketing](#marketing) | 12 |
 | [aoi](#aoi) | 11 |
-| [general](#general) | 11 |
 | [leasing](#leasing) | 11 |
 | [intelligence](#intelligence) | 10 |
 | [portal](#portal) | 9 |
@@ -84,7 +84,7 @@ Legend: `?` = optional parameter. Types are the JSON-Schema types the server adv
 | --- | --- | --- |
 | `ad_active` | The live, in-window, on-target creatives for a slot — priority- and | `slot`?:optional, `category`?:optional, `city`?:optional, `scheme`?:optional, `lang`?:optional, `limit`?:optional |
 | `ad_categories` | Advertisement categories (smart technology, construction techniques, materials …). | — |
-| `ad_create` | Create an advertisement creative (a sponsored card placed in a slot). | `title`:string, `headline`:string, `advertiser`?:string="", `category`?:string="services", `slot`?:string="infeed", `body`?:optional, `keywords`?:optional, `cta_label`?:optional, `cta_url`?:optional, `media_url`?:optional, `image_url`?:optional, `tags`?:optional, `contact`?:optional, `phone`?:optional, `price_text`?:optional, `offer`?:optional, `city`?:optional, `scheme`?:optional, `lang`?:optional, `priority`?:integer=100, `weight`?:number=1.0, `status`?:string="active", `valid_from`?:optional, `valid_until`?:optional, `budget`?:number=0.0 |
+| `ad_create` | Create an advertisement creative (a sponsored card placed in a slot). | `title`:string, `headline`:string, `advertiser`?:string="", `category`?:string="services", `slot`?:string="infeed", `body`?:optional, `keywords`?:optional, `cta_label`?:optional, `cta_url`?:optional, `media_url`?:optional, `image_url`?:optional, `tags`?:optional, `contact`?:optional, `phone`?:optional, `price_text`?:optional, `offer`?:optional, `city`?:optional, `scheme`?:optional, `lang`?:optional, `priority`?:integer=100, `weight`?:number=1.0, `status`?:string="active", `valid_from`?:optional, `valid_until`?:optional, `budget`?:number=0.0, `pricing`?:string="flat", `rate`?:number=0.0 |
 | `ad_delete` | Delete an advertisement creative. | `ad_id`:string |
 | `ad_get` | Fetch one advertisement by id. | `ad_id`:string |
 | `ad_list` | List advertisement creatives with their live status and performance counters. | `category`?:optional, `slot`?:optional, `status`?:optional, `advertiser`?:optional, `tag`?:optional, `limit`?:integer=100 |
@@ -94,7 +94,7 @@ Legend: `?` = optional parameter. Types are the JSON-Schema types the server adv
 | `ad_section` | Build one advertisement *section* (heading + resolved creatives) as data. | `slot`?:string="infeed", `category`?:optional, `city`?:optional, `scheme`?:optional, `lang`?:optional, `limit`?:optional, `heading`?:optional |
 | `ad_slots` | Advertisement slots (hero, banner, sidebar, in-feed, footer, newsletter). | — |
 | `ad_track` | Record ``impression`` / ``click`` / ``spend`` events for an advertisement. | `ad_id`:string, `event`?:string="impression", `count`?:integer=1 |
-| `ad_update` | Update an advertisement creative (including pausing/resuming it). | `ad_id`:string, `title`?:optional, `headline`?:optional, `body`?:optional, `advertiser`?:optional, `category`?:optional, `slot`?:optional, `cta_label`?:optional, `cta_url`?:optional, `image_url`?:optional, `contact`?:optional, `phone`?:optional, `price_text`?:optional, `offer`?:optional, `tags`?:optional, `lang`?:optional, `priority`?:optional, `weight`?:optional, `status`?:optional, `valid_from`?:optional, `valid_until`?:optional, `budget`?:optional |
+| `ad_update` | Update an advertisement creative (including pausing/resuming it). | `ad_id`:string, `title`?:optional, `headline`?:optional, `body`?:optional, `advertiser`?:optional, `category`?:optional, `slot`?:optional, `cta_label`?:optional, `cta_url`?:optional, `image_url`?:optional, `contact`?:optional, `phone`?:optional, `price_text`?:optional, `offer`?:optional, `tags`?:optional, `lang`?:optional, `priority`?:optional, `weight`?:optional, `status`?:optional, `valid_from`?:optional, `valid_until`?:optional, `budget`?:optional, `pricing`?:optional, `rate`?:optional |
 
 ## agents
 
@@ -305,17 +305,21 @@ Legend: `?` = optional parameter. Types are the JSON-Schema types the server adv
 
 ## general
 
-11 tools.
+15 tools.
 
 | Tool | Purpose | Parameters |
 | --- | --- | --- |
+| `area_profile` | Population (estimate), size, density, development level, facilities, portal listings | `area`:string |
 | `calculate_distance` | Haversine distance between two coordinates, in km and miles. | `lat1`:number, `lon1`:number, `lat2`:number, `lon2`:number |
 | `convert_area` | Convert an area between sqft, sqm, sqyd, marla, kanal and acre. | `value`:number, `from_unit`:string, `to_unit`:string |
 | `fastapi_info` | Describe the FastAPI integration layer and its REST endpoints. | — |
+| `geo_locate` | Where a named place or area is (centre point and the matched areas). | `query`:string |
 | `global_search` | Federated search across the whole portal: hierarchy, projects, POIs, AOIs, news, CRM and tools. | `query`:string, `limit`?:integer=10 |
 | `health_check` | Liveness probe. | — |
+| `map_view` | A map of a listing (or a named place / area) with the nearest schools, mosques, parks, | `listing_id`?:optional, `place`?:optional, `kinds`?:optional, `radius_km`?:number=2.0, `per_kind`?:integer=3 |
 | `market_insights` | Aggregate market statistics for a city. | `city`:string |
 | `market_trends` | Market trends for a market: pricing, factor index, news momentum, forecast and yields. | `city`?:optional, `scheme`?:optional, `years`?:integer=5, `days`?:integer=180 |
+| `places_find` | Find and count real places (schools, malls, hospitals, mosques, universities, parks …) | `kind`?:optional, `area`?:optional, `near`?:optional, `radius_km`?:number=2.0, `name`?:optional, `limit`?:integer=15 |
 | `property_availability` | Availability breakdown of the listing book (by status / use / category) with the listings. | `city`?:optional, `scheme`?:optional, `use_type`?:optional, `category`?:optional, `status`?:optional, `limit`?:integer=50 |
 | `property_nearby` | Nearby places for a listing: the closest school, mosque, hospital, mall, park, | `property_id`:string, `radius_km`?:number=3.0 |
 | `server_info` | Server metadata: version, capability counts and the data model. | — |
@@ -381,14 +385,14 @@ Legend: `?` = optional parameter. Types are the JSON-Schema types the server adv
 
 ## hierarchy
 
-25 tools.
+26 tools.
 
 | Tool | Purpose | Parameters |
 | --- | --- | --- |
 | `add_big_project` | Create a big project (mall, tower, mixed-use, compound, plaza, office complex). | `name`:string, `city_id`:string, `project_type`?:string="mall", `description`?:optional, `status`?:string="planned", `floor_count`?:integer=0, `total_area`?:optional, `total_units`?:optional, `scheme_id`?:optional, `block_zone_area_id`?:optional, `latitude`?:optional, `longitude`?:optional, `developer`?:optional, `start_date`?:optional, `completion_date`?:optional |
 | `add_block_zone_area` | Create a block/zone/area inside a housing scheme. | `name`:string, `scheme_id`:string, `description`?:optional, `area_type`?:string="residential" |
 | `add_city` | Create a city. | `name`:string, `state`?:optional, `country`?:string="Pakistan", `latitude`?:optional, `longitude`?:optional, `description`?:optional |
-| `add_housing_scheme` | Create a housing scheme/society inside a city. | `name`:string, `city_id`:string, `description`?:optional, `total_units`?:optional, `established_year`?:optional, `developer`?:optional, `latitude`?:optional, `longitude`?:optional |
+| `add_housing_scheme` | Create a housing scheme/society inside a city (with optional development details). | `name`:string, `city_id`:string, `description`?:optional, `total_units`?:optional, `established_year`?:optional, `developer`?:optional, `latitude`?:optional, `longitude`?:optional, `development_status`?:optional, `approval_authority`?:optional, `possession_status`?:optional, `utilities`?:optional, `population`?:optional |
 | `add_project_amenity` | Add an amenity to a big project. | `project_id`:string, `amenity`:string |
 | `add_project_floor_plan` | Attach a floor plan to a big project. | `project_id`:string, `floor_plan_url`:string |
 | `add_project_map` | Attach a map/location image to a big project. | `project_id`:string, `map_url`:string |
@@ -409,6 +413,7 @@ Legend: `?` = optional parameter. Types are the JSON-Schema types the server adv
 | `list_owned_properties` | List the properties a portal account has published (newest first). | `owner_user_id`:string, `status`?:optional, `limit`?:integer=100 |
 | `list_schemes` | List housing schemes/societies, optionally filtered by city (id or name). | `city`?:optional |
 | `update_big_project` | Update editable fields of a big project. | `project_id`:string, `name`?:optional, `description`?:optional, `status`?:optional, `floor_count`?:optional, `total_area`?:optional, `total_units`?:optional, `occupancy_rate`?:optional, `developer`?:optional, `completion_date`?:optional, `total_parking_spaces`?:optional, `total_retail_space`?:optional, `total_office_space`?:optional, `total_residential_units`?:optional |
+| `update_housing_scheme` | Update a housing scheme's details, e.g. its development / approval / possession status. | `scheme_id`:string, `description`?:optional, `total_units`?:optional, `established_year`?:optional, `developer`?:optional, `latitude`?:optional, `longitude`?:optional, `development_status`?:optional, `approval_authority`?:optional, `possession_status`?:optional, `utilities`?:optional, `population`?:optional |
 | `update_property` | Update editable fields of a property (only the provided fields change). | `property_id`:string, `title`?:optional, `description`?:optional, `price`?:optional, `use_type`?:optional, `category`?:optional, `status`?:optional, `bedrooms`?:optional, `bathrooms`?:optional, `total_area`?:optional, `marla_area`?:optional, `kanal_area`?:optional, `latitude`?:optional, `longitude`?:optional, `featured`?:optional, `amenities`?:optional |
 
 ## images
@@ -741,7 +746,7 @@ Legend: `?` = optional parameter. Types are the JSON-Schema types the server adv
 | Tool | Purpose | Parameters |
 | --- | --- | --- |
 | `search_nearby_properties` | Find properties within `radius_km` of a point, sorted by distance. | `latitude`:number, `longitude`:number, `radius_km`?:number=5.0, `use_type`?:optional, `category`?:optional, `max_price`?:optional, `limit`?:integer=20 |
-| `search_properties` | Search properties with hierarchical and numeric filters. | `city`?:optional, `scheme`?:optional, `use_type`?:optional, `category`?:optional, `min_price`?:optional, `max_price`?:optional, `bedrooms`?:optional, `min_marla`?:optional, `max_marla`?:optional, `featured`?:optional, `status`?:optional, `limit`?:integer=20, `min_bathrooms`?:optional, `feature`?:optional, `near`?:optional, `near_km`?:number=2.0 |
+| `search_properties` | Search properties with hierarchical and numeric filters. | `city`?:optional, `scheme`?:optional, `use_type`?:optional, `category`?:optional, `min_price`?:optional, `max_price`?:optional, `bedrooms`?:optional, `min_marla`?:optional, `max_marla`?:optional, `featured`?:optional, `status`?:optional, `limit`?:integer=20, `min_bathrooms`?:optional, `feature`?:optional, `near`?:optional, `near_km`?:number=2.0, `near_place`?:optional |
 
 ## tools
 

@@ -26,6 +26,7 @@ import { useAuth } from "@/store/auth";
 import { usePrefs } from "@/store/prefs";
 import { Markdown } from "@/components/Markdown";
 import { PropertyRow } from "@/components/PropertyCard";
+import { MapCard } from "@/components/MapCard";
 import { TopBar } from "@/components/ui";
 import { OnScreenKeyboard, phoneticKeyDown } from "@/components/UrduKeyboard";
 
@@ -399,6 +400,7 @@ export default function Assistant() {
                       ))}
                     </div>
                   )}
+                  {m.map && <MapCard view={m.map} className="mt-2" />}
                   {!!m.actions?.length && (
                     <div className="mt-2.5 flex flex-wrap gap-2" dir="auto">
                       {m.actions.map((a) => (

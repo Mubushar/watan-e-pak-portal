@@ -53,6 +53,7 @@ import auth
 import commercial
 import construction
 import content
+import geo
 import gis
 import intelligence
 import leasing
@@ -126,6 +127,12 @@ class HousingScheme(MediaMixin):
     developer: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    # Development details (entered by staff; the assistant adds map-based estimates).
+    development_status: Optional[str] = None   # e.g. developed, under development, planned
+    approval_authority: Optional[str] = None   # e.g. RDA, CDA, LDA, KDA
+    possession_status: Optional[str] = None    # e.g. possession given, partial, not yet
+    utilities: List[str] = Field(default_factory=list)  # electricity, gas, water, sewerage …
+    population: Optional[int] = None           # residents, if the society publishes it
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
@@ -660,6 +667,8 @@ def list_schemes(city: Optional[str] = None) -> str:
                 "city": city_name(s.city_id),
                 "total_units": s.total_units,
                 "established_year": s.established_year,
+                "development_status": s.development_status,
+                "approval_authority": s.approval_authority,
                 "blocks": len([b for b in block_zone_areas_db if b.scheme_id == s.id]),
             }
         )
@@ -771,8 +780,13 @@ def add_housing_scheme(
     developer: Optional[str] = None,
     latitude: Optional[float] = None,
     longitude: Optional[float] = None,
+    development_status: Optional[str] = None,
+    approval_authority: Optional[str] = None,
+    possession_status: Optional[str] = None,
+    utilities: Optional[List[str]] = None,
+    population: Optional[int] = None,
 ) -> str:
-    """Create a housing scheme/society inside a city."""
+    """Create a housing scheme/society inside a city (with optional development details)."""
     if not find_city(city_id):
         return dump({"error": f"City not found: {city_id}"})
     s = HousingScheme(
@@ -784,8 +798,45 @@ def add_housing_scheme(
         developer=developer,
         latitude=latitude,
         longitude=longitude,
+        development_status=development_status,
+        approval_authority=approval_authority,
+        possession_status=possession_status,
+        utilities=utilities or [],
+        population=population,
     )
     housing_schemes_db.append(s)
+    return dump_model(s)
+
+
+@mcp.tool()
+def update_housing_scheme(
+    scheme_id: str,
+    description: Optional[str] = None,
+    total_units: Optional[int] = None,
+    established_year: Optional[int] = None,
+    developer: Optional[str] = None,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
+    development_status: Optional[str] = None,
+    approval_authority: Optional[str] = None,
+    possession_status: Optional[str] = None,
+    utilities: Optional[List[str]] = None,
+    population: Optional[int] = None,
+) -> str:
+    """Update a housing scheme's details, e.g. its development / approval / possession status."""
+    s = find_scheme(scheme_id) or resolve_scheme(scheme_id)
+    if not s:
+        return dump({"error": f"Housing scheme not found: {scheme_id}"})
+    fields = {
+        "description": description, "total_units": total_units, "established_year": established_year,
+        "developer": developer, "latitude": latitude, "longitude": longitude,
+        "development_status": development_status, "approval_authority": approval_authority,
+        "possession_status": possession_status, "utilities": utilities, "population": population,
+    }
+    for key, value in fields.items():
+        if value is not None:
+            setattr(s, key, value)
+    s.updated_at = datetime.now()
     return dump_model(s)
 
 
@@ -989,13 +1040,16 @@ def search_properties(
     feature: Optional[str] = None,
     near: Optional[str] = None,
     near_km: float = 2.0,
+    near_place: Optional[str] = None,
 ) -> str:
     """Search properties with hierarchical and numeric filters.
 
     ``feature`` matches the listing's own amenities / description (e.g. "solar",
     "basement", "pool"). ``near`` keeps listings with that kind of place within
     ``near_km`` (school, mosque, hospital, mall, market, park, bank, restaurant,
-    transport, fuel — or a POI category)."""
+    transport, fuel — or a POI category). ``near_place`` keeps listings within
+    ``near_km`` of a named place or area ("Rawalpindi Medical University", "G-13");
+    when none are that close, the nearest ones are returned as ``nearest_outside_radius``."""
     c = resolve_city(city) if city else None
     s = resolve_scheme(scheme) if scheme else None
     near_cat = NEAR_CATEGORIES.get(near.strip().lower(), near.strip().lower()) if near else None
@@ -1037,6 +1091,21 @@ def search_properties(
         results.append(p)
     if near_cat:  # closest first
         results.sort(key=lambda p: near_hits[p.id]["distance_km"])
+    place_info: Optional[Dict[str, Any]] = None
+    place_dist: Dict[str, float] = {}
+    outside: List[Property] = []
+    if near_place:
+        loc = geo.locate(near_place)
+        if not loc:
+            return dump({"count": 0, "returned": 0, "results": [], "near_place": {"query": near_place, "found": False},
+                         "note": f"Couldn't find '{near_place}' on the map."})
+        place_dist = {p.id: haversine_km(loc["lat"], loc["lon"], p.latitude, p.longitude)
+                      for p in results if p.latitude is not None and p.longitude is not None}
+        ranked = sorted((p for p in results if p.id in place_dist), key=lambda p: place_dist[p.id])
+        results = [p for p in ranked if place_dist[p.id] <= near_km]
+        outside = [p for p in ranked if place_dist[p.id] > near_km]
+        place_info = {"query": near_place, "found": True, "name": loc["name"], "latitude": round(loc["lat"], 5),
+                      "longitude": round(loc["lon"], 5), "radius_km": near_km}
 
     long_term_memory["search_history"].append(
         {
@@ -1059,8 +1128,21 @@ def search_properties(
         d["city_name"] = city_name(p.city_id)
         if p.id in near_hits:
             d["nearby"] = near_hits[p.id]
+        if p.id in place_dist:
+            d["distance_km"] = round(place_dist[p.id], 2)
         payload.append(d)
-    return dump({"count": len(results), "returned": len(payload), "results": payload})
+    out: Dict[str, Any] = {"count": len(results), "returned": len(payload), "results": payload}
+    if place_info:
+        out["near_place"] = place_info
+        if not results and outside:
+            rows = []
+            for p in outside[:3]:
+                d = model_dict(p)
+                d["city_name"] = city_name(p.city_id)
+                d["distance_km"] = round(place_dist[p.id], 2)
+                rows.append(d)
+            out["nearest_outside_radius"] = rows
+    return dump(out)
 
 
 # What people say -> POI category ("school ke paas", "masjid ke qareeb", "near the mall").
@@ -1092,7 +1174,8 @@ def _poi_hit(poi: "PointOfInterest", meters: float) -> Dict[str, Any]:
 
 
 def _nearest_poi(p: "Property", category: str, within_km: float) -> Optional[Dict[str, Any]]:
-    """The closest POI of ``category`` within ``within_km`` of a listing, or None."""
+    """The closest place of ``category`` within ``within_km`` of a listing (the portal's
+    POIs and the OpenStreetMap place data), or None."""
     if p.latitude is None or p.longitude is None:
         return None
     best: Optional[Tuple[float, "PointOfInterest"]] = None
@@ -1102,7 +1185,16 @@ def _nearest_poi(p: "Property", category: str, within_km: float) -> Optional[Dic
         d = gis.haversine_m(p.latitude, p.longitude, poi.latitude, poi.longitude)
         if d <= within_km * 1000.0 and (best is None or d < best[0]):
             best = (d, poi)
+    mapped = geo.nearest_places(p.latitude, p.longitude, within_km, category=category, limit=1)
+    if mapped and (best is None or mapped[0]["distance_km"] * 1000.0 < best[0]):
+        return _map_hit(mapped[0])
     return _poi_hit(best[1], best[0]) if best else None
+
+
+def _map_hit(row: Dict[str, Any]) -> Dict[str, Any]:
+    """A geo.nearest_places row in the same shape as _poi_hit."""
+    return {"category": row["category"], "kind": row["kind"], "name": row["name"],
+            "distance_km": row["distance_km"], "walk_minutes": row["walk_minutes"]}
 
 
 @mcp.tool()
@@ -1114,13 +1206,99 @@ def property_nearby(property_id: str, radius_km: float = 3.0) -> str:
         return dump({"error": f"Property not found: {property_id}"})
     if p.latitude is None or p.longitude is None:
         return dump({"property_id": p.id, "radius_km": radius_km, "nearby": [], "note": "This listing has no map location."})
-    best: Dict[str, Tuple[float, PointOfInterest]] = {}
+    best: Dict[str, Dict[str, Any]] = {}
     for poi in pois_db:
         d = gis.haversine_m(p.latitude, p.longitude, poi.latitude, poi.longitude)
-        if d <= radius_km * 1000.0 and (poi.category not in best or d < best[poi.category][0]):
-            best[poi.category] = (d, poi)
-    rows = sorted((_poi_hit(poi, d) for d, poi in best.values()), key=lambda r: r["distance_km"])
-    return dump({"property_id": p.id, "radius_km": radius_km, "nearby": rows})
+        if d <= radius_km * 1000.0 and (poi.category not in best or d / 1000.0 < best[poi.category]["distance_km"]):
+            best[poi.category] = _poi_hit(poi, d)
+    mapped = geo.nearest_places(p.latitude, p.longitude, radius_km, limit=2000)
+    counts: Dict[str, int] = {}
+    for row in mapped:
+        counts[row["kind"]] = counts.get(row["kind"], 0) + 1
+        if row["category"] not in best or row["distance_km"] < best[row["category"]]["distance_km"]:
+            best[row["category"]] = _map_hit(row)
+    rows = sorted(best.values(), key=lambda r: r["distance_km"])
+    return dump({"property_id": p.id, "radius_km": radius_km, "nearby": rows, "counts_within_radius": counts})
+
+
+@mcp.tool()
+def places_find(kind: Optional[str] = None, area: Optional[str] = None, near: Optional[str] = None,
+                radius_km: float = 2.0, name: Optional[str] = None, limit: int = 15) -> str:
+    """Find and count real places (schools, malls, hospitals, mosques, universities, parks …)
+    inside an area ("Bahria Town Phase 8 Rawalpindi", "DHA Phase 2 Islamabad", "G-13") or
+    within ``radius_km`` of a named place ("Rawalpindi Medical University")."""
+    return dump(geo.find_places(kind=kind, name=name, area=area, near=near, radius_km=radius_km, limit=limit))
+
+
+@mcp.tool()
+def area_profile(area: str) -> str:
+    """Population (estimate), size, density, development level, facilities, portal listings
+    and nearby housing areas of a society, sector, phase or neighbourhood — plus the
+    portal's own development details when it is a registered housing scheme."""
+    result = geo.area_profile(area, properties_db)
+    scheme = resolve_scheme(area)
+    if not scheme:
+        q = geo.tokens(area)
+        scheme = next((s for s in housing_schemes_db if q and all(w in geo.tokens(s.name) for w in q)), None)
+    if scheme:
+        result["portal_scheme"] = {k: v for k, v in model_dict(scheme).items() if k in (
+            "name", "developer", "established_year", "total_units", "development_status", "approval_authority",
+            "possession_status", "utilities", "population", "description") and v not in (None, [], "")}
+        result["portal_scheme"]["city"] = city_name(scheme.city_id)
+    return dump(result)
+
+
+@mcp.tool()
+def map_view(listing_id: Optional[str] = None, place: Optional[str] = None, kinds: Optional[List[str]] = None,
+             radius_km: float = 2.0, per_kind: int = 3) -> str:
+    """A map of a listing (or a named place / area) with the nearest schools, mosques, parks,
+    malls, hospitals … as markers — what the apps draw as a map card."""
+    kinds = [k.strip().lower() for k in (kinds or geo.MAP_KINDS) if k and k.strip()]
+    unknown = [k for k in kinds if k not in geo.KINDS]
+    if unknown:
+        return dump({"error": f"Unknown kinds {unknown}. Use: {', '.join(geo.KINDS)}"})
+    focus: Dict[str, Any]
+    if listing_id:
+        p = find_property(listing_id)
+        if not p:
+            return dump({"error": f"Property not found: {listing_id}"})
+        if p.latitude is None or p.longitude is None:
+            return dump({"error": "This listing has no map location yet."})
+        focus = {"type": "listing", "id": p.id, "name": p.title, "latitude": p.latitude, "longitude": p.longitude,
+                 "price": p.price, "city": city_name(p.city_id)}
+    elif place:
+        loc = geo.locate(place)
+        if not loc:
+            return dump({"error": f"Couldn't find '{place}' on the map."})
+        focus = {"type": "place", "name": loc["name"], "latitude": round(loc["lat"], 6), "longitude": round(loc["lon"], 6)}
+    else:
+        return dump({"error": "Give a listing_id or a place."})
+    lat, lon = focus["latitude"], focus["longitude"]
+    per_kind = max(1, min(per_kind, 10))
+    markers = geo.map_markers(lat, lon, kinds, radius_km=radius_km, per_kind=per_kind)
+    while len(markers) < 3 and radius_km < 6:  # outskirts: look a little further
+        radius_km = min(6.0, radius_km * 2)
+        markers = geo.map_markers(lat, lon, kinds, radius_km=radius_km, per_kind=per_kind)
+    listings = []
+    if focus["type"] == "place":  # listings around a place
+        for p in properties_db:
+            if p.latitude is not None and haversine_km(lat, lon, p.latitude, p.longitude) <= radius_km:
+                listings.append({"id": p.id, "name": p.title, "latitude": p.latitude, "longitude": p.longitude,
+                                 "price": p.price, "distance_km": round(haversine_km(lat, lon, p.latitude, p.longitude), 2)})
+    return dump({"focus": focus, "radius_km": radius_km, "kinds": kinds, "markers": markers, "listings": listings,
+                 "tiles": {"url": geo.TILE_URL, "attribution": geo.TILE_ATTRIBUTION},
+                 "attribution": geo.ATTRIBUTION})
+
+
+@mcp.tool()
+def geo_locate(query: str) -> str:
+    """Where a named place or area is (centre point and the matched areas)."""
+    loc = geo.locate(query)
+    if not loc:
+        return dump({"found": False, "query": query})
+    return dump({"found": True, "query": query, "name": loc["name"], "kind": loc["kind"],
+                 "latitude": round(loc["lat"], 5), "longitude": round(loc["lon"], 5),
+                 "matched_areas": loc.get("areas"), "source": loc["source"]})
 
 
 # ---------- GIS ----------
@@ -13117,8 +13295,16 @@ def ad_create(
     valid_from: Optional[str] = None,
     valid_until: Optional[str] = None,
     budget: float = 0.0,
+    pricing: str = "flat",
+    rate: float = 0.0,
 ) -> str:
-    """Create an advertisement creative (a sponsored card placed in a slot)."""
+    """Create an advertisement creative (a sponsored card placed in a slot).
+
+    ``pricing`` is ``flat`` (fixed fee), ``cpm`` (``rate`` PKR per 1,000 impressions) or
+    ``cpc`` (``rate`` PKR per click); spend accrues as the app reports views and clicks
+    and the ad pauses when it reaches ``budget``."""
+    if pricing not in content.AD_PRICING:
+        return dump({"error": f"pricing must be one of {list(content.AD_PRICING)}"})
     if category not in content.AD_CATEGORIES:
         return dump({"error": f"category must be one of {list(content.AD_CATEGORIES)}"})
     if slot not in content.AD_SLOTS:
@@ -13134,6 +13320,7 @@ def ad_create(
         price_text=price_text, offer=offer, city_id=city_obj.id if city_obj else None,
         scheme_id=scheme_obj.id if scheme_obj else None, lang=lang, priority=priority,
         weight=weight, status=status, valid_from=valid_from, valid_until=valid_until, budget=budget,
+        pricing=pricing, rate=max(0.0, rate),
     )
     content.ads_db.append(ad)
     return dump(content.ad_view(ad))
@@ -13183,11 +13370,15 @@ def ad_update(
     valid_from: Optional[str] = None,
     valid_until: Optional[str] = None,
     budget: Optional[float] = None,
+    pricing: Optional[str] = None,
+    rate: Optional[float] = None,
 ) -> str:
     """Update an advertisement creative (including pausing/resuming it)."""
     ad = content.find_ad(ad_id)
     if not ad:
         return dump({"error": f"Advertisement not found: {ad_id}"})
+    if pricing is not None and pricing not in content.AD_PRICING:
+        return dump({"error": f"pricing must be one of {list(content.AD_PRICING)}"})
     if category is not None and category not in content.AD_CATEGORIES:
         return dump({"error": f"category must be one of {list(content.AD_CATEGORIES)}"})
     if slot is not None and slot not in content.AD_SLOTS:
@@ -13200,6 +13391,7 @@ def ad_update(
         "image_url": image_url, "contact": contact, "phone": phone, "price_text": price_text,
         "offer": offer, "tags": tags, "lang": lang, "priority": priority, "weight": weight,
         "status": status, "valid_from": valid_from, "valid_until": valid_until, "budget": budget,
+        "pricing": pricing, "rate": max(0.0, rate) if rate is not None else None,
     }
     for name, value in fields.items():
         if value is not None:
@@ -14732,7 +14924,7 @@ def _seed_content() -> None:
              advertiser="SmartNest Pakistan", category="smart_technology", slot="hero",
              body="Smart switches, app-controlled lighting, smart locks and AI-assisted CCTV — "
                   "installed and warrantied across Lahore, Karachi and Islamabad.",
-             cta_label="Get a free demo", cta_url="https://smartnest.pk/demo",
+             cta_label="Get a free demo", cta_url="https://example.com/demo",
              phone="+92 21 111 111 111", price_text="Packages from Rs 185,000",
              offer="20% off during launch month", priority=10, weight=2.0,
              budget=1_500_000, spend=420_000, impressions=18_400, clicks=510,
@@ -14742,7 +14934,7 @@ def _seed_content() -> None:
              advertiser="BuildTech Pakistan", category="construction_technique", slot="banner",
              body="Aluminium tunnel formwork and jump-form systems that cut slab cycles and "
                   "improve finish quality for high-rise residential towers.",
-             cta_label="See case studies", cta_url="https://buildtech.pk/formwork",
+             cta_label="See case studies", cta_url="https://example.com/formwork",
              phone="+92 42 222 222 222", price_text="Consultation free",
              offer="Feasibility study included", priority=20, weight=1.4,
              budget=900_000, spend=180_000, impressions=11_200, clicks=286,
@@ -14752,7 +14944,7 @@ def _seed_content() -> None:
              advertiser="InsulBuild Systems", category="construction_technique", slot="infeed",
              body="Insulated concrete formwork and precast wall panels deliver thermal efficiency "
                   "and monsoon resilience with dramatically reduced on-site labour.",
-             cta_label="Request a quote", cta_url="https://insulbuild.pk/quote",
+             cta_label="Request a quote", cta_url="https://example.com/quote",
              phone="+92 51 333 333 333", price_text="From Rs 3,100 / sq ft",
              priority=30, weight=1.2, budget=600_000, spend=95_000,
              impressions=8_400, clicks=167, keywords=["icf", "precast", "insulation"],
@@ -14761,7 +14953,7 @@ def _seed_content() -> None:
              advertiser="PakBuild Materials", category="materials", slot="sidebar",
              body="OPC and sulphate-resistant cement, Grade-60 steel and A-class bricks with "
                   "same-week delivery and quantity certification.",
-             cta_label="Check live rates", cta_url="https://pakbuild.pk/rates",
+             cta_label="Check live rates", cta_url="https://example.com/rates",
              phone="+92 42 444 444 444", price_text="Cement from Rs 1,285 / bag",
              offer="Bulk discount above 500 bags", priority=15, weight=1.6,
              budget=750_000, spend=210_000, impressions=14_900, clicks=402,
@@ -14771,7 +14963,7 @@ def _seed_content() -> None:
              advertiser="MachineryLink Pakistan", category="tools_equipment", slot="infeed",
              body="Boom pumps, transit mixers, tower cranes and telehandlers on daily or "
                   "project terms with trained operators.",
-             cta_label="Browse fleet", cta_url="https://machinerylink.pk/fleet",
+             cta_label="Browse fleet", cta_url="https://example.com/fleet",
              phone="+92 21 555 555 555", price_text="Crane from Rs 42,000 / day",
              priority=35, weight=1.1, budget=500_000, spend=60_000,
              impressions=6_300, clicks=121, keywords=["crane", "pump", "equipment"],
@@ -14780,7 +14972,7 @@ def _seed_content() -> None:
              advertiser="SolarMax Energy", category="solar_energy", slot="infeed",
              body="Tier-1 panels, hybrid inverters and net-metering paperwork handled end to "
                   "end — from 5 kW homes to 100 kW buildings.",
-             cta_label="Calculate savings", cta_url="https://solarmax.pk/savings",
+             cta_label="Calculate savings", cta_url="https://example.com/savings",
              phone="+92 42 666 666 666", price_text="10 kW from Rs 1,150,000",
              offer="Free shading analysis", priority=18, weight=1.8,
              budget=1_200_000, spend=330_000, impressions=16_700, clicks=498,
@@ -14790,7 +14982,7 @@ def _seed_content() -> None:
              advertiser="AquaPure Pakistan", category="water", slot="sidebar",
              body="Whole-building filtration, RO plants and pressure systems with annual "
                   "maintenance for homes, mosques and housing societies.",
-             cta_label="Book a survey", cta_url="https://aquapure.pk/survey",
+             cta_label="Book a survey", cta_url="https://example.com/survey",
              phone="+92 21 777 777 777", price_text="RO plant from Rs 95,000",
              priority=40, weight=1.0, budget=350_000, spend=42_000,
              impressions=5_100, clicks=88, keywords=["water", "filtration", "ro"],
@@ -14799,7 +14991,7 @@ def _seed_content() -> None:
              advertiser="SecureVision", category="security", slot="banner",
              body="Biometric gates, ANPR vehicle recognition, visitor management and "
                   "24/7 monitoring integrated into one control room.",
-             cta_label="Talk to sales", cta_url="https://securevision.pk/contact",
+             cta_label="Talk to sales", cta_url="https://example.com/contact",
              phone="+92 51 888 888 888", price_text="Societies from Rs 2.4M",
              priority=25, weight=1.3, budget=800_000, spend=150_000,
              impressions=9_800, clicks=214, keywords=["security", "biometric", "anpr"],
@@ -14808,7 +15000,7 @@ def _seed_content() -> None:
              advertiser="Elevate Engineering", category="elevators", slot="infeed",
              body="Passenger and freight lifts, car stackers and basement parking systems "
                   "with 24/7 service contracts.",
-             cta_label="Get engineered spec", cta_url="https://elevate.pk/spec",
+             cta_label="Get engineered spec", cta_url="https://example.com/spec",
              phone="+92 42 999 999 999", price_text="Lifts from Rs 3,600,000",
              priority=45, weight=1.0, budget=400_000, spend=55_000,
              impressions=4_600, clicks=73, keywords=["lift", "elevator", "parking"],
@@ -14817,7 +15009,7 @@ def _seed_content() -> None:
              advertiser="Interior Studio", category="interiors", slot="infeed",
              body="Design, joinery, flooring, kitchens and wardrobes delivered as one "
                   "turnkey package with a fixed timeline.",
-             cta_label="See portfolio", cta_url="https://interiorstudio.pk/portfolio",
+             cta_label="See portfolio", cta_url="https://example.com/portfolio",
              phone="+92 21 121 212 121", price_text="From Rs 1,850 / sq ft",
              offer="Free 3D concept", priority=50, weight=1.0, budget=450_000,
              spend=48_000, impressions=5_900, clicks=140,
@@ -14826,35 +15018,35 @@ def _seed_content() -> None:
              advertiser="GreenScape Lahore", category="landscaping", slot="footer",
              body="Drought-tolerant planting, irrigation design, lawns and hardscape for "
                   "homes and society green belts.",
-             cta_label="Request design", cta_url="https://greenscape.pk/design",
+             cta_label="Request design", cta_url="https://example.com/design",
              phone="+92 42 313 131 313", price_text="Lawns from Rs 220 / sq ft",
              priority=60, weight=1.0, budget=250_000, spend=22_000,
              impressions=3_400, clicks=51, keywords=["landscape", "garden", "lawn"],
              tags=["landscaping"], lang="en"),
-        dict(title="HBL Islamic Home Finance", headline="Own your home the halal way",
-             advertiser="Habib Bank Limited", category="finance", slot="hero",
+        dict(title="Noor Islamic Home Finance", headline="Own your home the halal way",
+             advertiser="Noor Home Finance", category="finance", slot="hero",
              body="Shariah-compliant Diminishing Musharakah home finance with tenures up "
                   "to 25 years and fast pre-approval for verified listings.",
-             cta_label="Check eligibility", cta_url="https://hbl.com/home-finance",
+             cta_label="Check eligibility", cta_url="https://example.com/home-finance",
              phone="+92 21 111 111 425", price_text="Mark-up from 12.5% p.a.",
              offer="Processing fee waived this quarter", priority=8, weight=2.2,
              budget=2_000_000, spend=640_000, impressions=24_600, clicks=812,
              keywords=["mortgage", "home finance", "islamic"], tags=["finance", "mortgage"],
              lang="en"),
-        dict(title="SBP Mark-up Subsidy Scheme", headline="Subsidised finance for first homes",
-             advertiser="State Bank of Pakistan", category="finance", slot="banner",
+        dict(title="Mark-up Subsidy Guide", headline="Subsidised finance for first homes",
+             advertiser="HomeStart Advisory", category="finance", slot="banner",
              body="Low-income and middle-income housing finance tiers with subsidised "
                   "mark-up for eligible first-time buyers.",
-             cta_label="Read the tiers", cta_url="https://sbp.org.pk/housing",
+             cta_label="Read the tiers", cta_url="https://example.com/housing",
              price_text="Mark-up from 5% (subsidised)",
              priority=12, weight=1.5, budget=0, impressions=13_100, clicks=356,
              keywords=["subsidy", "affordable housing", "sbp"], tags=["finance", "policy"],
              lang="en"),
-        dict(title="TPL Property Insurance", headline="Protect the asset, not just the loan",
-             advertiser="TPL Insurance", category="insurance", slot="sidebar",
+        dict(title="SafeNest Property Insurance", headline="Protect the asset, not just the loan",
+             advertiser="SafeNest Insurance", category="insurance", slot="sidebar",
              body="Fire, theft, flood and title-risk cover with claims support for "
                   "homeowners, landlords and societies.",
-             cta_label="Get a premium", cta_url="https://tplinsurance.com/property",
+             cta_label="Get a premium", cta_url="https://example.com/property",
              phone="+92 21 111 000 880", price_text="Buildings from Rs 12,000 / year",
              priority=55, weight=1.0, budget=300_000, spend=33_000,
              impressions=4_100, clicks=64, keywords=["insurance", "property", "cover"],
@@ -14863,7 +15055,7 @@ def _seed_content() -> None:
              advertiser="Shield Legal Services", category="legal", slot="infeed",
              body="Title verification, NOC checks, mutation and transfer documentation "
                   "handled by property-law specialists.",
-             cta_label="Book a title check", cta_url="https://shieldlegal.pk/title-check",
+             cta_label="Book a title check", cta_url="https://example.com/title-check",
              phone="+92 42 005 555 005", price_text="Title check from Rs 25,000",
              priority=48, weight=1.1, budget=200_000, spend=19_000,
              impressions=3_700, clicks=97, keywords=["title", "legal", "noc"],
@@ -14872,7 +15064,7 @@ def _seed_content() -> None:
              advertiser="MoveEasy Pakistan", category="services", slot="footer",
              body="Packing, moving, storage and utility transfers with insured handling "
                   "across all major cities.",
-             cta_label="Book a move", cta_url="https://moveeasy.pk/book",
+             cta_label="Book a move", cta_url="https://example.com/book",
              phone="+92 21 616 161 616", price_text="Local moves from Rs 45,000",
              priority=65, weight=1.0, budget=150_000, spend=14_000,
              impressions=2_900, clicks=47, keywords=["moving", "relocation", "storage"],
@@ -14881,7 +15073,7 @@ def _seed_content() -> None:
              advertiser="FixIt Pakistan", category="services", slot="newsletter",
              body="Vetted electricians, plumbers, AC technicians and handymen on demand, "
                   "with a workmanship guarantee.",
-             cta_label="Subscribe & book", cta_url="https://fixit.pk/plans",
+             cta_label="Subscribe & book", cta_url="https://example.com/plans",
              price_text="Annual plan from Rs 18,000", priority=58, weight=1.2,
              budget=220_000, spend=26_000, impressions=4_800, clicks=112,
              keywords=["maintenance", "repair", "services"], tags=["services", "maintenance"],
@@ -14890,7 +15082,7 @@ def _seed_content() -> None:
              advertiser="SmartNest Pakistan", category="smart_technology", slot="infeed",
              body="اسمارٹ سوئچ، اسمارٹ لاک اور مصنوعی ذہانت والے کیمرے — لاہور، کراچی اور "
                   "اسلام آباد میں تنصیب کے ساتھ۔",
-             cta_label="مفت ڈیمو لیں", cta_url="https://smartnest.pk/ur",
+             cta_label="مفت ڈیمو لیں", cta_url="https://example.com/ur",
              phone="+92 21 111 111 111", price_text="پیکج 185,000 روپے سے",
              priority=11, weight=1.4, budget=400_000, spend=58_000,
              impressions=6_700, clicks=158, keywords=["اسمارٹ", "سیکیورٹی"],
@@ -14899,7 +15091,7 @@ def _seed_content() -> None:
              advertiser="PakBuild Materials", category="materials", slot="banner",
              body="او پی سی سیمنٹ، گریڈ 60 سریا اور اے کلاس اینٹیں — مقدار کی تصدیق کے "
                   "ساتھ ہفتے کے اندر ڈیلیوری۔",
-             cta_label="آج کے ریٹ دیکھیں", cta_url="https://pakbuild.pk/ur",
+             cta_label="آج کے ریٹ دیکھیں", cta_url="https://example.com/ur",
              phone="+92 42 444 444 444", price_text="سیمنٹ 1,285 روپے فی بوری سے",
              priority=16, weight=1.3, budget=350_000, spend=44_000,
              impressions=5_400, clicks=126, keywords=["سیمنٹ", "سریا", "میٹریل"],
@@ -14908,16 +15100,16 @@ def _seed_content() -> None:
              advertiser="SolarMax Energy", category="solar_energy", slot="infeed",
              body="ٹائر-1 سولر پینل، ہائبرڈ انورٹر اور نیٹ میٹرنگ کی مکمل کارروائی — گھر "
                   "سے بڑی عمارتوں تک۔",
-             cta_label="بچت معلوم کریں", cta_url="https://solarmax.pk/ur",
+             cta_label="بچت معلوم کریں", cta_url="https://example.com/ur",
              phone="+92 42 666 666 666", price_text="10 کلو واٹ 1,150,000 روپے سے",
              priority=19, weight=1.5, budget=500_000, spend=61_000,
              impressions=7_200, clicks=174, keywords=["سولر", "بجلی"], tags=["solar_energy", "urdu"],
              lang="ur"),
         dict(title="اسلامی ہوم فنانس", headline="شرعی اصولوں کے مطابق اپنا گھر بنائیں",
-             advertiser="Habib Bank Limited", category="finance", slot="sidebar",
+             advertiser="Noor Home Finance", category="finance", slot="sidebar",
              body="مشارکہ پر مبنی ہوم فنانس، 25 سال تک کی آسانیاں اور تصدیق شدہ "
                   "لسٹنگز پر فوری منظوری۔",
-             cta_label="اہلیت چیک کریں", cta_url="https://hbl.com/ur-home-finance",
+             cta_label="اہلیت چیک کریں", cta_url="https://example.com/ur-home-finance",
              phone="+92 21 111 111 425", price_text="منافع 12.5% سالانہ سے",
              priority=14, weight=1.4, budget=450_000, spend=52_000,
              impressions=6_100, clicks=141, keywords=["فنانس", "مورگیج"], tags=["finance", "urdu"],
@@ -14926,7 +15118,7 @@ def _seed_content() -> None:
              advertiser="SecureVision", category="security", slot="footer",
              body="بائیو میٹرک گیٹ، نمبر پلیٹ سے گاڑی کی شناخت اور وزٹر مینجمنٹ — ایک "
                   "کنٹرول روم سے۔",
-             cta_label="ہم سے رابطہ کریں", cta_url="https://securevision.pk/ur",
+             cta_label="ہم سے رابطہ کریں", cta_url="https://example.com/ur",
              phone="+92 51 888 888 888", price_text="سوسائٹی پیکج 2.4 ملین سے",
              priority=27, weight=1.1, budget=250_000, spend=28_000,
              impressions=3_900, clicks=79, keywords=["سیکیورٹی", "گیٹ"], tags=["security", "urdu"],
@@ -14935,7 +15127,7 @@ def _seed_content() -> None:
              advertiser="Arz-e-Pak", category="services", slot="newsletter",
              body="Put your brand in front of verified buyers, landlords, investors and "
                   "developers across four cities — with transparent performance reporting.",
-             cta_label="Request the media kit", cta_url="https://arzeapak.pk/advertise",
+             cta_label="Request the media kit", cta_url="https://example.com/advertise",
              phone="+92 42 111 000 000", price_text="Campaigns from Rs 150,000 / month",
              priority=90, weight=1.0, status="active", budget=0,
              impressions=1_900, clicks=38, keywords=["advertise", "media kit"],
@@ -14943,6 +15135,10 @@ def _seed_content() -> None:
     ]
     for row in ads:
         row.setdefault("city_id", None)
+        # Demo creatives: in-feed cards bill per click, the rest per 1,000 impressions.
+        row.setdefault("sample", True)
+        row.setdefault("pricing", "cpc" if row.get("slot") == "infeed" else "cpm")
+        row.setdefault("rate", 25.0 if row.get("slot") == "infeed" else 400.0)
         content.ads_db.append(content.Advertisement(**row))
 
 

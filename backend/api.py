@@ -29,10 +29,13 @@ import httpx
 from fastapi import (Depends, FastAPI, Header, HTTPException, Query, Request, WebSocket,
                      WebSocketDisconnect)
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, Response
-from pydantic import BaseModel
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
+from pydantic import BaseModel, Field
 
 import server as core
+import ads_network
+import geo
+import web_lookup
 import ai_guard
 import openai_voice
 import openai_facade
@@ -267,6 +270,7 @@ def search(
     feature: Optional[str] = None,
     near: Optional[str] = None,
     near_km: float = 2.0,
+    near_place: Optional[str] = None,
     limit: int = 20,
 ) -> Any:
     return j(
@@ -281,6 +285,7 @@ def search(
             feature=feature,
             near=near,
             near_km=near_km,
+            near_place=near_place,
             min_marla=min_marla,
             max_marla=max_marla,
             featured=featured,
@@ -302,6 +307,50 @@ def nearby(
             latitude=lat, longitude=lon, radius_km=radius_km, use_type=use_type, limit=limit
         )
     )
+
+
+@app.get("/places/find", tags=["places"])
+def places_find(kind: Optional[str] = None, area: Optional[str] = None, near: Optional[str] = None,
+                radius_km: float = 2.0, name: Optional[str] = None, limit: int = 15) -> Any:
+    """Find and count places (schools, malls, hospitals, mosques …) in an area or near a place."""
+    result = j(core.places_find(kind=kind, area=area, near=near, radius_km=radius_km, name=name, limit=min(limit, 100)))
+    if "error" in result:
+        raise HTTPException(status_code=422, detail=result["error"])
+    return result
+
+
+@app.get("/areas/profile", tags=["places"])
+def areas_profile(area: str) -> Any:
+    """Population, development level, facilities and nearby housing areas of an area / society."""
+    result = j(core.area_profile(area))
+    if "error" in result:
+        raise HTTPException(status_code=503, detail=result["error"])
+    return result
+
+
+@app.get("/places/map", tags=["places"])
+def places_map(listing_id: Optional[str] = None, place: Optional[str] = None, kinds: Optional[str] = None,
+               radius_km: float = 2.0, per_kind: int = 3) -> Any:
+    """A listing (or a place) with the nearest schools, mosques, parks, malls … for a map card.
+    ``kinds`` is comma-separated (default school,mosque,park,mall,hospital)."""
+    result = j(core.map_view(listing_id=listing_id, place=place, radius_km=radius_km, per_kind=per_kind,
+                             kinds=[k for k in (kinds or "").split(",") if k.strip()] or None))
+    if "error" in result:
+        raise HTTPException(status_code=404 if "not found" in result["error"].lower() or "find" in result["error"] else 422,
+                            detail=result["error"])
+    return result
+
+
+@app.get("/geo/locate", tags=["places"])
+def geo_locate(q: str) -> Any:
+    """Find a named place or area on the map."""
+    return j(core.geo_locate(q))
+
+
+@app.get("/geo/summary", tags=["places"])
+def geo_summary() -> Any:
+    """What place / area / population data is loaded."""
+    return geo.summary()
 
 
 @app.get("/properties/{property_id}/nearby", tags=["properties"])
@@ -501,6 +550,22 @@ async def ai_speak(payload: SpeakRequest, request: Request) -> Any:
     except openai_voice.VoiceError as exc:
         raise HTTPException(status_code=exc.status, detail=str(exc))
     return {"audio_base64": base64.b64encode(audio).decode(), "mime_type": mime, "provider": "openai"}
+
+
+class WebLookupRequest(BaseModel):
+    question: str = Field(..., min_length=3, max_length=1000)
+
+
+@app.post("/ai/web-lookup", tags=["ai"])
+async def ai_web_lookup(payload: WebLookupRequest, request: Request) -> Any:
+    """Answer a factual question from the web (OpenAI web search), with source links."""
+    if not openai_voice.configured():
+        raise HTTPException(status_code=501, detail="Web lookup needs OPENAI_API_KEY in backend/.env")
+    ai_guard.check(request, "chat")
+    try:
+        return await asyncio.to_thread(web_lookup.lookup, payload.question)
+    except (web_lookup.WebLookupError, openai_voice.VoiceError) as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc))
 
 
 @app.post("/ai/realtime/session", tags=["ai"])
@@ -1479,6 +1544,19 @@ def get_city_coordinates(city: str) -> Any:
 def add_housing_scheme(payload: Dict[str, Any]) -> Any:
     """Add a housing scheme / society."""
     return j(core.add_housing_scheme(**payload))
+
+
+@app.put("/schemes/{scheme_id}", tags=["hierarchy"])
+def update_housing_scheme(scheme_id: str, payload: Dict[str, Any]) -> Any:
+    """Update a housing scheme — e.g. development_status, approval_authority, possession_status,
+    utilities, population, developer."""
+    try:
+        result = j(core.update_housing_scheme(scheme_id, **payload))
+    except TypeError as exc:  # an unknown field
+        raise HTTPException(status_code=422, detail=str(exc))
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
 
 
 @app.get("/blocks", tags=["hierarchy"])
@@ -2734,6 +2812,8 @@ class AdCreateRequest(BaseModel):
     valid_from: Optional[str] = None
     valid_until: Optional[str] = None
     budget: float = 0.0
+    pricing: str = "flat"
+    rate: float = 0.0
 
 
 class AdUpdateRequest(BaseModel):
@@ -2761,6 +2841,29 @@ class AdUpdateRequest(BaseModel):
     valid_from: Optional[str] = None
     valid_until: Optional[str] = None
     budget: Optional[float] = None
+    pricing: Optional[str] = None
+    rate: Optional[float] = None
+
+
+class AdEventRequest(BaseModel):
+    event: str = "impression"
+
+
+@app.get("/ads/config", tags=["ads"])
+def ad_config() -> Any:
+    """Ad setup for the apps: direct (sponsored) ads, plus Google AdSense (web) and
+    AdMob (Android / iOS) to fill slots no advertiser has bought."""
+    cfg = core.content.ADS_CONFIG
+    return ads_network.config(cfg["house_ad_title"], cfg["house_ad_body"], cfg["sponsored_label"])
+
+
+@app.get("/ads.txt", tags=["ads"], response_class=PlainTextResponse)
+def ads_txt() -> PlainTextResponse:
+    """The ads.txt file Google requires at the web site's root (when AdSense is set up)."""
+    body = ads_network.ads_txt()
+    if body is None:
+        raise HTTPException(status_code=404, detail="AdSense is not configured (ADS_ADSENSE_CLIENT)")
+    return PlainTextResponse(body)
 
 
 @app.get("/ads/categories", tags=["ads"])
@@ -2840,6 +2943,23 @@ def ad_update(ad_id: str, payload: AdUpdateRequest) -> Any:
 def ad_delete(ad_id: str) -> Any:
     """Delete an advertisement."""
     return j(core.ad_delete(ad_id))
+
+
+@app.post("/ads/{ad_id}/event", tags=["ads"])
+def ad_event(ad_id: str, payload: AdEventRequest, request: Request) -> Any:
+    """Report that the app showed (``impression``) or a person tapped (``click``) an ad.
+
+    One viewer counts once per ad per 10 minutes (impressions) / 30 minutes (clicks),
+    so refreshes and repeated taps don't bill the advertiser twice."""
+    event = payload.event.strip().lower()
+    if event not in ads_network.WINDOWS:
+        raise HTTPException(status_code=422, detail="event must be 'impression' or 'click'")
+    if core.content.find_ad(ad_id) is None:
+        raise HTTPException(status_code=404, detail=f"Unknown advertisement: {ad_id}")
+    viewer, _ = ai_guard._caller(request)
+    if not ads_network.first_time(viewer, ad_id, event):
+        return {"id": ad_id, "event": event, "counted": False}
+    return {**core.content.record_ad_event(ad_id, event=event), "counted": True}
 
 
 @app.post("/ads/{ad_id}/track", tags=["ads"])

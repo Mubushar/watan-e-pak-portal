@@ -176,6 +176,8 @@ def speak(text: str, language: Optional[str] = None) -> Tuple[bytes, str]:
 
 #: Functions the live agent can call. The app runs them (against this backend's REST
 #: API, with the user's own session) and sends the results back to the model.
+KIND_ENUM = ['school', 'high school', 'primary school', 'college', 'university', 'medical college', 'kindergarten', 'hospital', 'clinic', 'pharmacy', 'mosque', 'mall', 'supermarket', 'market', 'park', 'sports', 'bank', 'restaurant', 'cafe', 'transport', 'fuel', 'police', 'government']
+
 REALTIME_TOOLS: List[Dict[str, Any]] = [
     {
         "type": "function",
@@ -203,6 +205,9 @@ REALTIME_TOOLS: List[Dict[str, Any]] = [
                                         "'masjid ke qareeb' -> mosque, 'near the mall' -> mall. Each result then says "
                                         "which place it is and how far."},
                 "near_km": {"type": "number", "description": "How close the place must be, in km (default 2)"},
+                "near_place": {"type": "string", "description": "Only listings around a NAMED place or area, e.g. "
+                               "'Rawalpindi Medical University', 'Centaurus Mall', 'G-13 Islamabad' (radius near_km). "
+                               "If none are that close, the result lists the nearest listings outside the radius."},
                 "min_marla": {"type": "number"},
                 "max_marla": {"type": "number"},
                 "featured": {"type": "boolean"},
@@ -235,6 +240,72 @@ REALTIME_TOOLS: List[Dict[str, Any]] = [
                 "message": {"type": "string", "description": "Anything the user wants the owner/agent to know, in English"},
             },
             "required": ["listing_id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "find_places",
+        "description": "Find and count real places (from the map: OpenStreetMap) inside an area — a society, phase, sector "
+                       "or neighbourhood — or around a named place. Examples: 'which malls are in Bahria Phase 8 Rawalpindi' "
+                       "-> kind mall, area 'Bahria Town Phase 8 Rawalpindi'; 'how many high schools are in DHA 2 Islamabad' "
+                       "-> kind 'high school', area 'DHA Phase 2 Islamabad'; 'hospitals near Centaurus' -> kind hospital, "
+                       "near 'Centaurus Mall'. Returns the count and names.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "kind": {"type": "string", "enum": KIND_ENUM},
+                "area": {"type": "string", "description": "Area name with the city, e.g. 'Bahria Town Phase 8 Rawalpindi', 'G-13 Islamabad'"},
+                "near": {"type": "string", "description": "A named place to search around (instead of area)"},
+                "radius_km": {"type": "number", "description": "Radius around 'near', default 2"},
+                "name": {"type": "string", "description": "Words the place's name must contain"},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "area_info",
+        "description": "Everything about a society, phase, sector or neighbourhood: estimated population and density, size, "
+                       "development level, counts of schools / mosques / hospitals / malls / parks, notable places, listings "
+                       "on the portal with average prices, the portal's own development details (developer, approval, "
+                       "possession, utilities) when it has them, and nearby housing areas with their population.",
+        "parameters": {
+            "type": "object",
+            "properties": {"area": {"type": "string", "description": "Area name with the city, e.g. 'DHA Phase 2 Islamabad'"}},
+            "required": ["area"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "show_map",
+        "description": "Put a map in the chat: a listing (or a named place / area) with the nearest schools, mosques, parks, "
+                       "malls, hospitals … as markers, plus an 'Open in Google Maps' button. Use it whenever the user wants "
+                       "to see something on a map, a map screenshot, or where a listing is compared with schools, mosques "
+                       "and so on. Never say you can't show a map.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "listing_id": {"type": "string", "description": "A listing id from search_listings / get_listing"},
+                "place": {"type": "string", "description": "Or a named place / area, e.g. 'Rawalpindi Medical University'"},
+                "kinds": {"type": "array", "items": {"type": "string", "enum": KIND_ENUM},
+                          "description": "What to mark (default: school, mosque, park, mall, hospital)"},
+                "radius_km": {"type": "number", "description": "How far around to look, default 2"},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "web_lookup",
+        "description": "Search the web for facts the other tools don't have: a society's approval status (RDA, CDA, LDA, KDA), "
+                       "development or possession progress, its developer, recent news, rules, or a place the map doesn't "
+                       "know. Takes about 10 seconds, so tell the user you are checking. Mention the source website.",
+        "parameters": {
+            "type": "object",
+            "properties": {"question": {"type": "string", "description": "A specific question in English, with the area and city"}},
+            "required": ["question"],
             "additionalProperties": False,
         },
     },
@@ -302,7 +373,9 @@ def realtime_instructions(user: Optional[Dict[str, Any]], reply_lang: str) -> st
         _LANGUAGE_POLICY.get(reply_lang, _LANGUAGE_POLICY["auto"]),
         "",
         "# Style",
-        "- This is a spoken conversation: keep each turn short (1-3 sentences), warm and natural, like a helpful local agent.",
+        "- This is a spoken conversation: keep each turn short (1-3 sentences), warm and natural, like a helpful local agent. "
+        "When the user asks about an area, give the key numbers and names (up to about 5 sentences).",
+        "- Answer every part of the user's question; if they ask three things, cover all three.",
         "- Say prices in crore/lakh and sizes in marla/kanal. Never read out ids, links or long numbers digit by digit.",
         "- If the user interrupts, stop and listen.",
         "",
@@ -318,6 +391,22 @@ def realtime_instructions(user: Optional[Dict[str, Any]], reply_lang: str) -> st
         "feature for things inside the property, like solar or a pool). When describing a listing, mention its features "
         "and what is nearby (from get_listing: nearby_places, with distance or walking minutes). If nearby_places is empty, "
         "say the portal has no nearby-place data for that area yet; never invent schools, mosques or other places.",
+        "- 'Room / house near <a named place>' (a university, hospital, mall, sector): search_listings with near_place "
+        "and only the filters the user gave. If nothing is within range, say so and ALWAYS name the nearest listings it "
+        "returns (nearest_outside_radius) with their distance, and offer to widen the search. The portal has houses, "
+        "flats, portions and plots; if the user wants a single room, say so and offer the closest homes for rent.",
+        "- Questions about an area — which malls / schools / hospitals are in it, how many, population, how developed, "
+        "what's around it: use find_places (lists and counts) and area_info (population, development, facilities, "
+        "nearby housing areas). Give real names and numbers; say counts come from the map and may miss small places; "
+        "say population is an estimate.",
+        "- Don't stop at 'none found'. If find_places finds none, use what it also returns: 'broader' (e.g. how many "
+        "schools there are when none is named 'High School') and 'closest_outside_area' (the nearest ones just outside, "
+        "with distance). For well-known facts the map may lack (a society's commercial areas, a new mall), also use "
+        "web_lookup.",
+        "- When the user wants a map, a map screenshot, or to see a listing and the schools / mosques / parks / malls "
+        "around it, call show_map (with the listing's id, or a place name): a map card appears in the chat.",
+        "- For approval status, possession, developer, news or anything the tools don't cover, use web_lookup and "
+        "name the source website. Never guess facts.",
         "- When the user wants to visit, see the property, meet the owner or talk to a human agent, offer to send a call "
         "request; once they agree, call request_call. If it says not_signed_in, tell them to tap 'Request a call' on screen.",
         "- Use my_listings when the user asks about their own listings. If it reports they are not signed in, tell them to sign in with a one-time code.",

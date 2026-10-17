@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Bath, BedDouble, Bot, Building2, CalendarDays, Layers, MapPin, Navigation, PhoneCall, Ruler, Share2, Sparkles, Tag } from "lucide-react";
 import { Share } from "@capacitor/share";
 import { toast } from "sonner";
-import type { NearbyList, Property } from "@/types";
+import type { MapView, NearbyList, Property } from "@/types";
 import { useApi } from "@/hooks/useApi";
 import { post } from "@/lib/api";
 import { area, date, num, pkr, pkrShort, titleCase } from "@/lib/format";
@@ -12,11 +12,14 @@ import { isNative } from "@/lib/platform";
 import { useAuth } from "@/store/auth";
 import { Badge, Button, EmptyState, Field, Input, Sheet, Skeleton, statusTone, Textarea, TopBar } from "@/components/ui";
 import { FavoriteButton, locationOf } from "@/components/PropertyCard";
+import { AdSlot } from "@/components/Ads";
+import { MapCard } from "@/components/MapCard";
 
 export default function PropertyDetail() {
   const { id } = useParams();
   const q = useApi<Property>(id ? `/properties/${id}` : null);
   const near = useApi<NearbyList>(id ? `/properties/${id}/nearby` : null);
+  const mapView = useApi<MapView>(id ? "/places/map" : null, id ? { listing_id: id } : undefined);
   const [slide, setSlide] = useState(0);
   // ?enquire=1 (the assistant's "Request a call" button) opens the call request straight away.
   const [params] = useSearchParams();
@@ -161,6 +164,13 @@ export default function PropertyDetail() {
           </section>
         )}
 
+        {mapView.data && (
+          <section className="mt-6">
+            <h2 className="section-title text-lg">On the map</h2>
+            <MapCard view={mapView.data} className="mt-2" height={280} />
+          </section>
+        )}
+
         {!!near.data?.nearby.length && (
           <section className="mt-6">
             <h2 className="section-title text-lg">Nearby</h2>
@@ -181,6 +191,8 @@ export default function PropertyDetail() {
             </ul>
           </section>
         )}
+
+        <AdSlot slot="sidebar" placement="detail" className="mt-6" index={p.title.length} />
 
         <Link to={askAi} className="mt-6 flex items-center gap-3 rounded-2xl bg-brand-gradient p-4 text-white shadow-soft">
           <Bot className="h-6 w-6 shrink-0 text-gold-200" />
