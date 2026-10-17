@@ -7,7 +7,7 @@ import { post } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useAuth, type Session } from "@/store/auth";
 import { Button, Field, Input } from "@/components/ui";
-import { AuthShell, DevOtpHint, OtpInput } from "./AuthShell";
+import { announceCode, AuthShell, DevOtpHint, OtpInput, type OtpHint } from "./AuthShell";
 
 const ROLES = [
   { value: "buyer", label: "Buyer", icon: Home },
@@ -21,7 +21,15 @@ const ROLES = [
 ];
 
 interface SignupResult {
-  verification: { sent_to: string[]; channels: string[]; dev_otp?: Record<string, string> | null };
+  verification: {
+    sent_to: string[];
+    channels: string[];
+    /** Per identifier: "sent" (real provider) or "simulated" (server test mode). */
+    delivery?: Record<string, "sent" | "simulated">;
+    /** Channels the code could not be delivered on (the account still works through the others). */
+    failed?: string[];
+    dev_otp?: Record<string, string> | null;
+  };
 }
 
 function strength(pw: string) {
@@ -41,7 +49,7 @@ export default function Signup() {
   const [sent, setSent] = useState<SignupResult["verification"] | null>(null);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
-  const identifier = sent?.sent_to[0] ?? form.email ?? form.mobile;
+  const identifier = sent?.sent_to[0] ?? (form.email || form.mobile);
   const s = strength(form.password);
 
   const submit = async () => {
@@ -54,9 +62,12 @@ export default function Signup() {
         password: form.password,
         role: form.role,
       });
-      setSent(r.verification);
+      const v = r.verification;
+      setSent(v);
       setStep("verify");
-      toast.success(`Verification code sent to ${r.verification.sent_to.join(" & ")}`);
+      if (v.sent_to.some((t) => v.delivery?.[t] === "sent")) toast.success(`Verification code sent to ${v.sent_to.join(" & ")}`);
+      else toast.info("Test mode: the server didn’t send a real message — use the code shown below.");
+      for (const f of v.failed ?? []) if (f) toast.warning(f);
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -188,10 +199,10 @@ export default function Signup() {
                 type="button"
                 className="font-semibold text-brand-700 hover:underline dark:text-brand-300"
                 onClick={() =>
-                  post<{ dev_otp?: string }>("/auth/resend-otp", { identifier, code: "", purpose: "signup" })
+                  post<OtpHint>("/auth/resend-otp", { identifier, code: "", purpose: "signup" })
                     .then((r) => {
                       if (r.dev_otp) setSent((x) => (x ? { ...x, dev_otp: { [identifier]: r.dev_otp! } } : x));
-                      toast.success("New code sent");
+                      announceCode(r, identifier);
                     })
                     .catch((e: Error) => toast.error(e.message))
                 }

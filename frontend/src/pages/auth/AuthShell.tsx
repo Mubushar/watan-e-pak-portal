@@ -1,6 +1,7 @@
 import { useRef, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Bot, LineChart, MapPinned, ShieldCheck } from "lucide-react";
+import { toast } from "sonner";
 import { HERO } from "@/lib/images";
 import { Logo } from "@/components/layout/Chrome";
 
@@ -94,12 +95,32 @@ export function OtpInput({ value, onChange, length = 6 }: { value: string; onCha
 }
 
 /** Development helper: the backend exposes OTPs when PORTAL_AUTH_EXPOSE_OTP is on. */
+/** What the backend says about an issued code (`/auth/otp/request`, `/auth/password/reset-request`, …). */
+export interface OtpHint {
+  sent_to?: string;
+  channel?: string;
+  /** "sent" = delivered by a real SMS / e-mail provider; "simulated" = no provider configured. */
+  delivery?: "sent" | "simulated";
+  /** Only returned for simulated channels (or when PORTAL_AUTH_EXPOSE_OTP is on). */
+  dev_otp?: string | null;
+}
+
+export const channelWord = (to: string) => (to.includes("@") ? "e-mail" : "SMS");
+
+/** Toast for a freshly issued code: real delivery, or the server's test mode. */
+export function announceCode(r: OtpHint, fallbackTo?: string) {
+  const to = r.sent_to ?? fallbackTo;
+  if (r.delivery === "simulated" || (r.dev_otp && r.delivery !== "sent"))
+    toast.info("Test mode: the server didn’t send a real message — use the code shown below.");
+  else toast.success(to ? `Code sent by ${channelWord(to)} to ${to}` : "Code sent");
+}
+
 export function DevOtpHint({ code, onUse }: { code?: string | null; onUse: (c: string) => void }) {
   if (!code) return null;
   return (
     <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-dashed border-gold-300 bg-gold-50 px-3 py-2 text-xs text-gold-800 dark:border-gold-500/30 dark:bg-gold-500/10 dark:text-gold-200">
       <span>
-        Dev mode — code sent: <b className="font-mono text-sm">{code}</b>
+        Test mode — your code is <b className="font-mono text-sm">{code}</b>
       </span>
       <button type="button" className="font-semibold underline" onClick={() => onUse(code)}>
         Use it

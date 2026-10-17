@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { ApiError, post } from "@/lib/api";
 import { DEMO_ACCOUNTS, useAuth, type Session } from "@/store/auth";
 import { Button, Field, Input, Segmented } from "@/components/ui";
-import { AuthShell, DevOtpHint, OtpInput } from "./AuthShell";
+import { announceCode, AuthShell, DevOtpHint, OtpInput, type OtpHint } from "./AuthShell";
 
 type Mode = "password" | "otp";
 
@@ -32,11 +32,13 @@ export default function Login() {
     try {
       finish(await post<Session>("/auth/login", { identifier: id, password: pw }));
     } catch (e) {
-      const d = e instanceof ApiError ? (e.detail as { otp_required?: boolean; dev_otp?: string }) : undefined;
+      const d = e instanceof ApiError ? (e.detail as (OtpHint & { otp_required?: boolean }) | undefined) : undefined;
       if (d?.otp_required) {
         setOtpSent({ purpose: "signup", dev: d.dev_otp });
         setMode("otp");
-        toast.info("Your account isn’t verified yet — enter the code we just sent.");
+        toast.info(
+          d.delivery === "simulated" ? "Your account isn’t verified yet — use the test code shown below." : "Your account isn’t verified yet — enter the code we just sent.",
+        );
       } else toast.error((e as Error).message);
     } finally {
       setBusy(false);
@@ -46,9 +48,9 @@ export default function Login() {
   const requestOtp = async () => {
     setBusy(true);
     try {
-      const r = await post<{ dev_otp?: string | null; sent_to?: string; channel?: string }>("/auth/otp/request", { identifier });
+      const r = await post<OtpHint>("/auth/otp/request", { identifier });
       setOtpSent({ purpose: "login", dev: r.dev_otp });
-      toast.success(`Code sent via ${r.channel ?? "SMS/e-mail"}`);
+      announceCode(r);
     } catch (e) {
       toast.error((e as Error).message);
     } finally {

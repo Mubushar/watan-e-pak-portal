@@ -4,7 +4,7 @@ import { KeyRound, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { post } from "@/lib/api";
 import { Button, Field, Input } from "@/components/ui";
-import { AuthShell, DevOtpHint, OtpInput } from "./AuthShell";
+import { announceCode, AuthShell, DevOtpHint, OtpInput, type OtpHint } from "./AuthShell";
 
 export default function Forgot() {
   const nav = useNavigate();
@@ -17,9 +17,10 @@ export default function Forgot() {
   const request = async () => {
     setBusy(true);
     try {
-      const r = await post<{ dev_otp?: string | null; note?: string }>("/auth/password/reset-request", { identifier });
+      const r = await post<OtpHint & { note?: string }>("/auth/password/reset-request", { identifier });
       setSent({ dev: r.dev_otp });
-      toast.success(r.note ?? "Reset code sent");
+      if (r.note) toast.success(r.note);
+      else announceCode(r);
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
