@@ -8,7 +8,6 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Building2, CheckCircle2, Eye, ImagePlus, Pencil, Plus, RotateCcw, Trash2, Wallet } from "lucide-react";
-import { toast } from "sonner";
 import type { Property, PropertyList } from "@/types";
 import { useApi, useMutate } from "@/hooks/useApi";
 import { del, post, put } from "@/lib/api";
@@ -164,7 +163,7 @@ function ListingRow({ p, onEdit, onDelete, onStatus, busy }: { p: Property; onEd
         onChange={(e) => {
           const files = Array.from(e.target.files ?? []);
           e.target.value = "";
-          if (files.length) addPhotos.mutate(files, { onSettled: () => setUploading(null), onError: () => toast.error("Some photos couldn’t be uploaded") });
+          if (files.length) addPhotos.mutate(files, { onSettled: () => setUploading(null) });
         }}
       />
       <div className="flex flex-wrap gap-2 xl:justify-end">
