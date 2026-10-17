@@ -42,6 +42,7 @@ import { cn } from "@/lib/utils";
 import { PortalMap, PIN_STYLES, pin } from "@/components/map/PortalMap";
 import { Badge, BarList, Button, EmptyState, ErrorState, Input, ScoreRing, Select, Segmented, Skeleton, Slider, Tabs, Toggle } from "@/components/ui";
 import { ChipRow, FilterChip, MapClick, MiniStat, ReportButton, ReportModal, fitTo, type ReportRef } from "@/components/gis/kit";
+import { MasterPlanLayers, MasterPlanPanel, useMasterPlans, type PlanLabel } from "@/components/gis/MasterPlans";
 import type { Aoi, AoiStats, GisLayer, GisLayerDetail, Poi, PoiCategory, RingResult, RouteResult } from "@/components/gis/types";
 
 type TabKey = "properties" | "places" | "layers" | "areas" | "analyse";
@@ -149,6 +150,9 @@ export default function MapExplorer() {
 
   // -------------------------------------------------------------- layers
   const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const plansQ = useMasterPlans();
+  const [planShown, setPlanShown] = useState<Set<string>>(new Set());
+  const [planHit, setPlanHit] = useState<PlanLabel | null>(null);
   const [layerOpacity, setLayerOpacity] = useState(70);
   useEffect(() => {
     if (!layers.length) return;
@@ -256,6 +260,9 @@ export default function MapExplorer() {
   return (
     <div className={cn("relative h-[calc(100dvh-110px)] min-h-[540px] w-full overflow-hidden bg-brand-950", analysing && "[&_.leaflet-container]:cursor-crosshair")}>
       <PortalMap height="100%" className="rounded-none" scrollWheelZoom onReady={onReady} zoom={5}>
+        {/* ----------------------------------------------------- DHA master plans */}
+        {vis.layers && <MasterPlanLayers plans={plansQ.data?.plans ?? []} shown={planShown} opacity={layerOpacity / 100} hit={planHit} />}
+
         {/* ----------------------------------------------------- GIS layers */}
         {vis.layers &&
           layerDetails.map((q, i) => {
@@ -620,6 +627,20 @@ export default function MapExplorer() {
                         </div>
                         <Slider value={layerOpacity} min={10} max={100} step={5} onChange={setLayerOpacity} />
                       </div>
+                      <MasterPlanPanel
+                        map={map}
+                        shown={planShown}
+                        setShown={(s) => {
+                          setPlanShown(s);
+                          setVis((v) => ({ ...v, layers: true }));
+                        }}
+                        onHit={(h) => {
+                          setPlanHit(h);
+                          if (window.innerWidth < 768) setOpen(false);
+                        }}
+                        pad={sidePad}
+                      />
+                      <p className="pt-2 text-xs font-bold uppercase tracking-wider text-ink-mute">Portal GIS layers</p>
                       {layersQ.isLoading ? (
                         <ListSkeleton />
                       ) : layersQ.error ? (
