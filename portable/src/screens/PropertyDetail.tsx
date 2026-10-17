@@ -5,7 +5,7 @@ import { Share } from "@capacitor/share";
 import { toast } from "sonner";
 import type { MapView, NearbyList, Property } from "@/types";
 import { useApi } from "@/hooks/useApi";
-import { post } from "@/lib/api";
+import { apiBase, post } from "@/lib/api";
 import { area, date, num, pkr, pkrShort, titleCase } from "@/lib/format";
 import { gallery } from "@/lib/images";
 import { isNative } from "@/lib/platform";
@@ -15,11 +15,20 @@ import { FavoriteButton, locationOf } from "@/components/PropertyCard";
 import { AdSlot } from "@/components/Ads";
 import { MapCard } from "@/components/MapCard";
 
+/** GET /masterplans/view — a close-up of the master plan around the listing. */
+interface PlanView {
+  plan: string;
+  snapshot_url: string;
+  on_the_plan?: { features?: Record<string, string[]>; plot_sizes?: { size: string; count: number }[]; note?: string };
+}
+
 export default function PropertyDetail() {
   const { id } = useParams();
   const q = useApi<Property>(id ? `/properties/${id}` : null);
   const near = useApi<NearbyList>(id ? `/properties/${id}/nearby` : null);
-  const mapView = useApi<MapView>(id ? "/places/map" : null, id ? { listing_id: id } : undefined);
+  // Both 404 / 422 when the listing has no location or isn't on a DHA master plan; the sections are then left out.
+  const mapView = useApi<MapView>(id ? "/places/map" : null, id ? { listing_id: id } : undefined, { retry: false });
+  const plan = useApi<PlanView>(id ? "/masterplans/view" : null, id ? { listing_id: id, radius_m: 250 } : undefined, { retry: false, staleTime: 10 * 60_000 });
   const [slide, setSlide] = useState(0);
   // ?enquire=1 (the assistant's "Request a call" button) opens the call request straight away.
   const [params] = useSearchParams();
@@ -168,6 +177,32 @@ export default function PropertyDetail() {
           <section className="mt-6">
             <h2 className="section-title text-lg">On the map</h2>
             <MapCard view={mapView.data} className="mt-2" height={280} />
+          </section>
+        )}
+
+        {plan.data && (
+          <section className="mt-6">
+            <h2 className="section-title text-lg">On the {plan.data.plan} master plan</h2>
+            <a href={`${apiBase()}${plan.data.snapshot_url}`} target="_blank" rel="noreferrer" className="mt-2 block overflow-hidden rounded-2xl">
+              <img src={`${apiBase()}${plan.data.snapshot_url}`} alt={`${plan.data.plan} master plan around this listing`} className="max-h-72 w-full object-cover" loading="lazy" />
+            </a>
+            {!!plan.data.on_the_plan?.plot_sizes?.length && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {plan.data.on_the_plan.plot_sizes.map((s) => (
+                  <Badge key={s.size} tone="gray">
+                    {s.size} × {s.count}
+                  </Badge>
+                ))}
+              </div>
+            )}
+            {Object.entries(plan.data.on_the_plan?.features ?? {})
+              .slice(0, 4)
+              .map(([kind, names]) => (
+                <p key={kind} className="mt-1.5 text-sm">
+                  <span className="font-semibold capitalize">{kind}:</span> <span className="text-ink-mute dark:text-slate-400">{names.join(", ")}</span>
+                </p>
+              ))}
+            {plan.data.on_the_plan?.note && <p className="mt-1.5 text-xs text-ink-mute">{plan.data.on_the_plan.note}</p>}
           </section>
         )}
 
