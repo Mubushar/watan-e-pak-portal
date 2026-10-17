@@ -33,6 +33,18 @@ uv run python main.py
 Then sign in with a seeded demo account (`admin@portal.pk` / `Admin@12345`) — see the
 [User Manual](docs/USER_MANUAL.md#22-demo-accounts-seeded).
 
+### Web frontend
+
+```powershell
+cd frontend
+npm install
+npm run dev                 # http://localhost:5173  (proxies /api -> :8000)
+```
+
+A React + TypeScript portal covering every wing — listings, GIS map, market insights,
+AI agents and an MCP console, tools, CRM, accounting, PMO, messaging, advertising and
+more. See [`frontend/README.md`](frontend/README.md).
+
 ---
 
 ## Documentation
@@ -76,6 +88,7 @@ resources, prompts, REST endpoints, agents, messaging catalogs and settings — 
 backend/     single source of truth: server.py (MCP) + api.py (FastAPI) + framework-free
              domain modules (gis, accounting, crm, construction, maintenance, tools, pmo,
              messaging, agents, transactions, intelligence, leasing, marketing, …)
+frontend/    React + TypeScript web portal (Vite, Tailwind) — talks to the REST/MCP surface
 portable/    cross-platform app (Android, iOS, Windows, macOS): OTP sign-in, listings,
              voice + text AI assistant — see portable/README.md
 docs/        manuals + generated reference (this documentation set)

@@ -1,0 +1,174 @@
+@import "leaflet/dist/leaflet.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-[#f6f8f6] text-ink antialiased font-sans dark:bg-[#07130d] dark:text-slate-100;
+  }
+  h1, h2, h3, h4 {
+    @apply font-display tracking-tight;
+  }
+  /* Latin glyphs keep the brand fonts; Urdu glyphs fall through to Nastaliq. */
+  [dir="rtl"] body {
+    font-family: "Plus Jakarta Sans", "Noto Nastaliq Urdu", sans-serif;
+  }
+  [dir="rtl"] h1,
+  [dir="rtl"] h2,
+  [dir="rtl"] h3 {
+    font-family: "Outfit", "Noto Nastaliq Urdu", sans-serif;
+  }
+  ::selection {
+    @apply bg-gold-200 text-brand-900;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(15, 90, 57, 0.35) transparent;
+  }
+}
+
+@layer components {
+  /* ---------- buttons ---------- */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 active:scale-[.98] whitespace-nowrap;
+  }
+  .btn-sm { @apply px-3 py-1.5 text-xs rounded-lg; }
+  .btn-lg { @apply px-6 py-3.5 text-base rounded-2xl; }
+  .btn-primary { @apply bg-brand-700 text-white shadow-soft hover:bg-brand-800 dark:bg-brand-600 dark:hover:bg-brand-500; }
+  .btn-gold { @apply bg-gold-gradient text-brand-950 shadow-glow hover:brightness-105; }
+  .btn-outline { @apply border border-brand-200 bg-white text-brand-800 hover:border-brand-400 hover:bg-brand-50 dark:border-white/15 dark:bg-white/5 dark:text-brand-100 dark:hover:bg-white/10; }
+  .btn-ghost { @apply text-brand-800 hover:bg-brand-50 dark:text-brand-100 dark:hover:bg-white/10; }
+  .btn-soft { @apply bg-brand-50 text-brand-800 hover:bg-brand-100 dark:bg-brand-900/40 dark:text-brand-100 dark:hover:bg-brand-900/70; }
+  .btn-danger { @apply bg-red-600 text-white hover:bg-red-700; }
+  .btn-icon { @apply h-10 w-10 p-0 rounded-xl; }
+
+  /* ---------- surfaces ---------- */
+  .card {
+    @apply rounded-2xl border border-black/5 bg-white shadow-card dark:border-white/10 dark:bg-[#0d1f16];
+  }
+  .card-hover { @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-soft; }
+  .glass {
+    @apply border border-white/40 bg-white/70 backdrop-blur-xl dark:border-white/10 dark:bg-[#0d1f16]/70;
+  }
+  .glass-dark { @apply border border-white/10 bg-brand-950/55 text-white backdrop-blur-xl; }
+  .surface-muted { @apply bg-brand-50/60 dark:bg-white/5; }
+
+  /* ---------- forms ---------- */
+  .label { @apply mb-1.5 block text-xs font-semibold uppercase tracking-wider text-ink-mute dark:text-slate-400; }
+  .input {
+    @apply w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-mute/70 transition focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500;
+  }
+  select.input { @apply appearance-none bg-no-repeat pr-9; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%236b7a72' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-position: right .7rem center; }
+  [dir="rtl"] select.input { background-position: left .7rem center; @apply pl-9 pr-3.5; }
+
+  /* ---------- misc ---------- */
+  .chip { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold; }
+  .section-eyebrow { @apply text-xs font-bold uppercase tracking-[.2em] text-gold-600 dark:text-gold-300; }
+  .section-title { @apply font-display text-3xl font-bold text-brand-900 sm:text-4xl dark:text-white; }
+  .text-gradient { @apply bg-gold-gradient bg-clip-text text-transparent; }
+  .link { @apply font-semibold text-brand-700 underline-offset-4 hover:underline dark:text-brand-300; }
+  .kbd { @apply rounded-md border border-black/10 bg-black/5 px-1.5 py-0.5 font-mono text-[10px] dark:border-white/15 dark:bg-white/10; }
+  .divider { @apply h-px w-full bg-black/5 dark:bg-white/10; }
+  .scroll-x { @apply flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { scrollbar-width: none; }
+  .prose-portal p { @apply mb-4 leading-relaxed text-ink-soft dark:text-slate-300; }
+}
+
+/* ---------- range slider ---------- */
+.range {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+}
+.range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  pointer-events: all;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background: #fff;
+  border: 3px solid #146f45;
+  box-shadow: 0 2px 8px rgba(9, 58, 38, 0.35);
+  cursor: grab;
+}
+.range::-moz-range-thumb {
+  pointer-events: all;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #fff;
+  border: 3px solid #146f45;
+  cursor: grab;
+}
+.range-single {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 9999px;
+  background: linear-gradient(to right, #146f45 var(--fill, 50%), rgba(15, 90, 57, 0.15) var(--fill, 50%));
+}
+.range-single::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background: #fff;
+  border: 3px solid #146f45;
+  box-shadow: 0 2px 8px rgba(9, 58, 38, 0.35);
+}
+.range-single::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #fff;
+  border: 3px solid #146f45;
+}
+
+/* ---------- leaflet tweaks ---------- */
+.leaflet-container {
+  font-family: inherit;
+  border-radius: inherit;
+  z-index: 0;
+}
+.leaflet-popup-content-wrapper {
+  border-radius: 16px;
+  padding: 0;
+  overflow: hidden;
+}
+.leaflet-popup-content {
+  margin: 0;
+  width: 240px !important;
+}
+.arz-pin {
+  background: transparent;
+  border: none;
+}
+.dark .leaflet-tile-pane {
+  filter: brightness(0.75) contrast(1.1) saturate(0.85);
+}
+
+/* ---------- ticker ---------- */
+.ticker-mask {
+  mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
+}
+.paused .animate-marquee {
+  animation-play-state: paused;
+}
