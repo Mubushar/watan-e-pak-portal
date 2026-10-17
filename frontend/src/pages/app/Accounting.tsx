@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { post } from "@/lib/api";
 import { useApi, useMutate } from "@/hooks/useApi";
-import { compact, date, num, pct, pkr, pkrShort, titleCase } from "@/lib/format";
+import { date, num, pct, pkr, pkrShort, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
   Badge,

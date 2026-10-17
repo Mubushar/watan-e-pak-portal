@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { useApi } from "@/hooks/useApi";
 import { useAuth } from "@/store/auth";
-import { compact, num, pct, pkrShort, titleCase } from "@/lib/format";
+import { num, pct, pkrShort, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Badge, Bars, ButtonLink, Donut, EmptyState, Legendish, PageHeader, Progress, QueryState, Skeleton, StatCard, StatusBadge } from "@/components/ui";
 import { MiniStat, Panel, SkeletonGrid, bandTone, crShort, stagger, rs } from "@/components/biz/ops-kit";

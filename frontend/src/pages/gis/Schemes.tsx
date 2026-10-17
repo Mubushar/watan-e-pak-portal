@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import type { Property, PropertyList, Scheme } from "@/types";
 import { useApi } from "@/hooks/useApi";
-import { compact, num, pct, pkrShort, titleCase } from "@/lib/format";
+import { compact, num, pct, pkrShort } from "@/lib/format";
 import { HERO, themedImage } from "@/lib/images";
 import { cn } from "@/lib/utils";
 import { Badge, Button, Card, CardBody, CardHeader, EmptyState, ErrorState, Input, JsonView, PageHeader, ScoreRing, Skeleton, StatCard } from "@/components/ui";

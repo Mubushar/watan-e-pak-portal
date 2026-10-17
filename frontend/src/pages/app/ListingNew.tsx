@@ -4,7 +4,7 @@
  *   POST /me/listings/{id}/photos     (one call per photo, JPEG data URL)
  */
 import { useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Marker, useMapEvents } from "react-leaflet";
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Home, ImagePlus, ListChecks, MapPin, Plus, Ruler, Sparkles, Trash2, Wand2 } from "lucide-react";
@@ -42,7 +42,6 @@ function ClickToPlace({ onPick }: { onPick: (lat: number, lon: number) => void }
 }
 
 export default function ListingNew() {
-  const nav = useNavigate();
   const user = useAuth((s) => s.user);
   const cities = useApi<{ cities: City[] }>("/cities");
   const tree = useApi<Tree>("/hierarchy");
