@@ -1,10 +1,11 @@
 /**
- * Voice for the AI assistant — OpenAI only, through our backend (the API key never
- * ships in the app):
+ * Voice for the AI assistant, through our backend (API keys never ship in the app):
  *   - Voice notes / dictation: record with the microphone → POST /ai/transcribe
  *     (OpenAI speech-to-text; Urdu comes back in Urdu script, English in English).
  *   - Spoken replies: POST /ai/speak (OpenAI text-to-speech) → play the clip.
- *   - Live conversation: lib/realtime.ts (OpenAI Realtime API over WebRTC).
+ *   - Live conversation: lib/realtime.ts (OpenAI Realtime over WebRTC), or
+ *     lib/gemini-live.ts (Gemini Live over a WebSocket) when the backend runs with
+ *     VOICE_PROVIDER=gemini for testing.
  * Works the same on Android, iOS, Windows, macOS and the web.
  */
 import { get, post } from "./api";
@@ -14,12 +15,14 @@ export interface ServerVoice {
   stt: boolean;
   /** Text-to-speech available (voice-note replies). */
   tts: boolean;
-  /** Live voice agent (OpenAI Realtime) available. */
+  /** Live voice agent available. */
   realtime: boolean;
   provider: "openai" | null;
+  /** Which service runs the live conversation. */
+  liveProvider: "openai" | "gemini" | null;
 }
 
-const NO_SERVER_VOICE: ServerVoice = { stt: false, tts: false, realtime: false, provider: null };
+const NO_SERVER_VOICE: ServerVoice = { stt: false, tts: false, realtime: false, provider: null, liveProvider: null };
 let voiceCaps: { at: number; value: ServerVoice } | null = null;
 
 /** What the backend offers for voice (cached for a minute). */
@@ -27,8 +30,9 @@ export async function serverVoice(): Promise<ServerVoice> {
   if (voiceCaps && Date.now() - voiceCaps.at < 60_000) return voiceCaps.value;
   let value = NO_SERVER_VOICE;
   try {
-    const caps = await get<{ voice?: Partial<ServerVoice> }>("/ai/capabilities", undefined, { noFallback: true });
-    value = { stt: !!caps.voice?.stt, tts: !!caps.voice?.tts, realtime: !!caps.voice?.realtime, provider: caps.voice?.provider ?? null };
+    const caps = await get<{ voice?: Partial<ServerVoice> & { live_provider?: "openai" | "gemini" | null } }>("/ai/capabilities", undefined, { noFallback: true });
+    const v = caps.voice;
+    value = { stt: !!v?.stt, tts: !!v?.tts, realtime: !!v?.realtime, provider: v?.provider ?? null, liveProvider: v?.live_provider ?? (v?.realtime ? "openai" : null) };
   } catch {
     /* backend unreachable */
   }
@@ -42,6 +46,8 @@ export function resetServerVoice() {
 }
 
 export const NOT_CONFIGURED = "Voice needs OpenAI on the server — add OPENAI_API_KEY to backend/.env and restart it.";
+export const LIVE_NOT_CONFIGURED =
+  "The live voice agent isn't set up on the server — add OPENAI_API_KEY (or VOICE_PROVIDER=gemini with GEMINI_API_KEY) to backend/.env and restart it.";
 
 export const canRecord = () => typeof MediaRecorder !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
 

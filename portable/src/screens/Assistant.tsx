@@ -18,8 +18,9 @@ import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { chatMode, newId, respond, suggestionsFor, useChat, welcomeFor, type ChatAction, type ChatMsg, type MsgKind, type Reply } from "@/lib/assistant";
 import { detectLang, speechTag, type Lang } from "@/lib/lang";
 import { RealtimeAgent, type AgentState } from "@/lib/realtime";
+import { GeminiLiveAgent } from "@/lib/gemini-live";
 import { mergeEffects, runAgentTool, type ToolEffect } from "@/lib/tools";
-import { NOT_CONFIGURED, playAudio, recordVoiceNote, serverVoice, speak, stopSpeaking, synthesize, type ServerVoice, type VoiceNoteSession } from "@/lib/voice";
+import { LIVE_NOT_CONFIGURED, NOT_CONFIGURED, playAudio, recordVoiceNote, serverVoice, speak, stopSpeaking, synthesize, type ServerVoice, type VoiceNoteSession } from "@/lib/voice";
 import { isNative } from "@/lib/platform";
 import { cn, isUrdu } from "@/lib/utils";
 import { useAuth } from "@/store/auth";
@@ -64,7 +65,7 @@ export default function Assistant() {
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [showKeyboard, setShowKeyboard] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const agent = useRef<RealtimeAgent | null>(null);
+  const agent = useRef<RealtimeAgent | GeminiLiveAgent | null>(null);
   /** Cards / buttons produced by tool calls, waiting for the agent's spoken answer. */
   const liveExtras = useRef(new Map<string, Partial<ChatMsg>>());
   // Cards from the live agent's tool calls wait here until it gives its answer, so they
@@ -183,7 +184,7 @@ export default function Assistant() {
     setPhase("idle");
   }, [ask, inConversation, note, update]);
 
-  // ------------------------------------------------------------- live conversation (OpenAI Realtime)
+  // ------------------------------------------------------------- live conversation (OpenAI Realtime or Gemini Live)
   /** Add or update a live caption bubble. */
   const upsert = useCallback(
     (id: string, patch: Partial<ChatMsg> & { role: ChatMsg["role"] }) => {
@@ -243,14 +244,15 @@ export default function Assistant() {
   const startConversation = useCallback(async () => {
     if (agent.current || busy.current || note) return;
     const v = await serverVoice();
-    if (!v.realtime) return void toast.error(NOT_CONFIGURED);
+    if (!v.realtime) return void toast.error(LIVE_NOT_CONFIGURED);
     await stopSpeaking();
     haptic();
     setMuted(false);
     liveExtras.current.clear();
     turnCards.current = {};
     toolResponses.current.clear();
-    const a = new RealtimeAgent({
+    const Agent = v.liveProvider === "gemini" ? GeminiLiveAgent : RealtimeAgent;
+    const a = new Agent({
       onState: setLive,
       onUserText: (itemId, text, final) =>
         upsert(`rt-u-${itemId}`, { role: "user", content: text || (final ? "…" : ""), lang: text ? detectLang(text) : undefined, pending: !final && !text }),
