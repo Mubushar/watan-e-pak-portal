@@ -51,7 +51,7 @@ export default function MyListings() {
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard label="Active" value={active.length} icon={<Building2 className="h-5 w-5" />} />
         <StatCard label="Sold / rented" value={all.filter(isClosed).length} icon={<CheckCircle2 className="h-5 w-5" />} tone="gold" />
-        <StatCard label="Active value" value={pkrShort(active.reduce((s, p) => s + p.price, 0)) || "—"} icon={<Wallet className="h-5 w-5" />} tone="blue" />
+        <StatCard label="Active value" value={active.length ? pkrShort(active.reduce((s, p) => s + p.price, 0), false) : "—"} icon={<Wallet className="h-5 w-5" />} tone="blue" />
       </div>
 
       <Segmented
@@ -142,7 +142,7 @@ function ListingRow({ p, onEdit, onDelete, onStatus, busy }: { p: Property; onEd
   );
   const where = [p.block_name, p.scheme_name, p.city_name].filter(Boolean).join(", ");
   return (
-    <Card className="flex flex-col gap-4 p-3 sm:flex-row sm:items-center">
+    <Card className="flex flex-col gap-3 p-3 xl:flex-row xl:items-center">
       <Link to={`/properties/${p.id}`} className="flex min-w-0 flex-1 items-center gap-4">
         <img src={coverImage(p)} alt="" className="h-20 w-28 shrink-0 rounded-xl object-cover" />
         <div className="min-w-0">
@@ -167,7 +167,7 @@ function ListingRow({ p, onEdit, onDelete, onStatus, busy }: { p: Property; onEd
           if (files.length) addPhotos.mutate(files, { onSettled: () => setUploading(null), onError: () => toast.error("Some photos couldn’t be uploaded") });
         }}
       />
-      <div className="flex flex-wrap gap-2 sm:justify-end">
+      <div className="flex flex-wrap gap-2 xl:justify-end">
         <ButtonLink to={`/properties/${p.id}`} variant="ghost" size="sm" icon={<Eye className="h-4 w-4" />}>
           View
         </ButtonLink>

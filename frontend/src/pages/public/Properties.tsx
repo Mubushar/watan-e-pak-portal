@@ -448,7 +448,15 @@ export default function Properties() {
             </Button>
             <Segmented size="sm" value={f.purpose} onChange={(v) => set({ purpose: v })} options={[{ value: "buy", label: "Buy" }, { value: "rent", label: "Rent" }]} />
             <p className="text-sm text-ink-mute">
-              <b className="text-ink dark:text-white">{results.length}</b> of {all.length} properties
+              {serverSearch ? (
+                <>
+                  <b className="text-ink dark:text-white">{results.length}</b> matching
+                </>
+              ) : (
+                <>
+                  <b className="text-ink dark:text-white">{results.length}</b> of {all.length} properties
+                </>
+              )}
             </p>
             <div className="ms-auto flex items-center gap-2">
               <select value={f.sort} onChange={(e) => set({ sort: e.target.value })} className="input w-auto py-2 text-sm">
