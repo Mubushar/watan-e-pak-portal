@@ -5,6 +5,7 @@ import {
   Bot,
   BriefcaseBusiness,
   Building,
+  Building2,
   Calculator,
   ChevronsLeft,
   FileSignature,
@@ -55,6 +56,7 @@ export function useDashboardNav(unread: number): { title: string; items: NavItem
       title: "Sales & Leasing",
       items: [
         { to: "/app/crm", label: "CRM", icon: Users },
+        { to: "/app/listings", label: "My listings", icon: Building2, end: true },
         { to: "/app/listings/new", label: "List a property", icon: PlusSquare },
         { to: "/app/transactions", label: "Transactions", icon: FileSignature },
         { to: "/app/leasing", label: "Leasing", icon: KeyRound },

@@ -26,7 +26,13 @@ export interface Property {
   longitude?: number | null;
   image_urls?: string[];
   amenities?: string[];
+  /** Set by /search?near=…: the closest matching place. */
+  nearby?: NearbyPlace;
+  /** Set by /search?near_place=…: km from that place. */
+  distance_km?: number;
   agent_id?: string | null;
+  /** Portal account that published it (`/me/listings`). */
+  owner_user_id?: string | null;
   created_at?: string;
   city_name?: string | null;
   scheme_name?: string | null;
@@ -38,6 +44,38 @@ export interface PropertyList {
   count: number;
   returned: number;
   results: Property[];
+  /** Present when searching with `near_place`. */
+  near_place?: { query: string; found: boolean; name?: string; latitude?: number; longitude?: number; radius_km?: number };
+  /** With `near_place` and nothing inside the radius: the closest listings outside it. */
+  nearest_outside_radius?: Property[];
+  note?: string;
+}
+
+/** A place near a listing (GET /properties/{id}/nearby, or /search?near=…). */
+export interface NearbyPlace {
+  category: string;
+  kind: string;
+  name: string;
+  distance_km: number;
+  walk_minutes: number;
+}
+export interface NearbyList {
+  property_id: string;
+  radius_km: number;
+  nearby: NearbyPlace[];
+  counts_within_radius?: Record<string, number>;
+  note?: string;
+}
+
+/** A georeferenced DHA master plan laid over the map (GET /places/map, /masterplans). */
+export interface MapOverlay {
+  key: string;
+  name: string;
+  tile_url: string;
+  bounds: [number, number, number, number];
+  min_zoom: number;
+  max_native_zoom: number;
+  attribution: string;
 }
 
 export interface City {

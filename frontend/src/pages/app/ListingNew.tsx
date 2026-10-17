@@ -1,13 +1,19 @@
-import { useMemo, useState } from "react";
+/**
+ * Create-listing wizard: Basics → Location → Size & price → Photos → Review.
+ *   POST /me/listings                 (owned by the signed-in account; agents attributed automatically)
+ *   POST /me/listings/{id}/photos     (one call per photo, JPEG data URL)
+ */
+import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Marker, useMapEvents } from "react-leaflet";
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, Home, ImagePlus, MapPin, Ruler, Sparkles, Wand2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, Home, ImagePlus, ListChecks, MapPin, Plus, Ruler, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import type { City, Property } from "@/types";
 import { useApi } from "@/hooks/useApi";
 import { post } from "@/lib/api";
 import { pkr, pkrShort, titleCase } from "@/lib/format";
+import { compressImage } from "@/lib/images";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/store/auth";
 import { Badge, Button, Card, CardBody, Field, Input, PageHeader, Select, Slider, Textarea, Toggle } from "@/components/ui";
@@ -26,6 +32,9 @@ const STEPS = [
   { key: "review", label: "Review", icon: CheckCircle2 },
 ] as const;
 const MARLA_SQFT = 272.25;
+const MAX_PHOTOS = 10;
+/** Common features buyers search for (`/search?feature=…` matches these). */
+const AMENITY_PRESETS = ["Solar system", "Basement", "Servant quarter", "Gas", "Corner", "Park facing", "Gated community", "Parking", "Lawn", "Furnished", "Lift", "Backup generator"];
 
 function ClickToPlace({ onPick }: { onPick: (lat: number, lon: number) => void }) {
   useMapEvents({ click: (e) => onPick(e.latlng.lat, e.latlng.lng) });
@@ -39,7 +48,9 @@ export default function ListingNew() {
   const tree = useApi<Tree>("/hierarchy");
   const [step, setStep] = useState(0);
   const [created, setCreated] = useState<Property | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [custom, setCustom] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
   const [f, setF] = useState({
     title: "",
     description: "",
@@ -55,7 +66,8 @@ export default function ListingNew() {
     bathrooms: 4,
     price: 35_000_000,
     featured: false,
-    images: [] as string[],
+    amenities: [] as string[],
+    photos: [] as string[],
   });
   const set = (patch: Partial<typeof f>) => setF((x) => ({ ...x, ...patch }));
 
@@ -63,13 +75,28 @@ export default function ListingNew() {
   const schemes = tree.data?.tree.find((c) => c.id === f.city_id)?.schemes ?? [];
   const blocks = schemes.find((s) => s.id === f.scheme_id)?.blocks ?? [];
   const isLand = f.category === "plot";
-  const library = useMemo(() => {
-    const cat = f.category === "house" && f.marla_area >= 20 ? "villa" : f.category;
-    const ext = [1, 2, 3, 4].map((n) => `/seed/properties/${cat}-${n}.svg`);
-    const int = isLand ? [] : [1, 2, 3, 4, 5, 6].map((n) => `/seed/interiors/interior-${n}.svg`);
-    const plans = isLand ? [] : [1, 2, 3].map((n) => `/seed/plans/plan-${n}.svg`);
-    return [...ext, ...int, ...plans];
-  }, [f.category, f.marla_area, isLand]);
+  const toggleAmenity = (a: string) => setF((x) => ({ ...x, amenities: x.amenities.includes(a) ? x.amenities.filter((i) => i !== a) : [...x.amenities, a] }));
+  const addCustom = () => {
+    const a = custom.trim();
+    if (a && !f.amenities.some((x) => x.toLowerCase() === a.toLowerCase())) set({ amenities: [...f.amenities, a] });
+    setCustom("");
+  };
+
+  const addPhotos = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setBusy("Preparing photos…");
+    try {
+      const room = MAX_PHOTOS - f.photos.length;
+      const out = await Promise.all(Array.from(files).slice(0, room).map((file) => compressImage(file)));
+      setF((x) => ({ ...x, photos: [...x.photos, ...out] }));
+      if (files.length > room) toast.info(`Up to ${MAX_PHOTOS} photos per listing`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(null);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
 
   const canNext = [
     f.title.trim().length >= 5,
@@ -94,9 +121,9 @@ export default function ListingNew() {
   };
 
   const publish = async () => {
-    setBusy(true);
+    setBusy("Publishing…");
     try {
-      const p = await post<Property>("/properties", {
+      const p = await post<Property>("/me/listings", {
         title: f.title,
         description: f.description || undefined,
         price: f.price,
@@ -113,15 +140,20 @@ export default function ListingNew() {
         latitude: f.latitude || city?.latitude,
         longitude: f.longitude || city?.longitude,
         featured: f.featured,
-        agent_id: user?.agent_id ?? undefined,
+        amenities: f.amenities.length ? f.amenities : undefined,
       });
-      await Promise.all(f.images.map((url, i) => post("/images", { entity_type: "property", entity_id: p.id, image_url: url, is_primary: i === 0 }).catch(() => null)));
+      let failed = 0;
+      for (let i = 0; i < f.photos.length; i++) {
+        setBusy(`Uploading photo ${i + 1} of ${f.photos.length}…`);
+        await post(`/me/listings/${p.id}/photos`, { data_url: f.photos[i], is_primary: false }).catch(() => failed++);
+      }
       setCreated(p);
-      toast.success("Listing published");
+      if (failed) toast.warning(`Listing published, but ${failed} photo${failed > 1 ? "s" : ""} couldn’t be uploaded`);
+      else toast.success("Listing published");
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
@@ -137,10 +169,13 @@ export default function ListingNew() {
           <Link to={`/properties/${created.id}`} className="btn btn-primary">
             View listing
           </Link>
+          <Link to="/app/listings" className="btn btn-outline">
+            <ListChecks className="h-4 w-4" /> My listings
+          </Link>
           <Link to={`/ai/agents/seller_pricing_agent?objective=${encodeURIComponent(`Price and market ${created.title}`)}`} className="btn btn-gold">
             <Sparkles className="h-4 w-4" /> Get AI pricing & marketing kit
           </Link>
-          <Button variant="outline" onClick={() => { setCreated(null); setStep(0); set({ title: "", description: "", images: [] }); }}>
+          <Button variant="outline" onClick={() => { setCreated(null); setStep(0); set({ title: "", description: "", amenities: [], photos: [] }); }}>
             List another
           </Button>
         </div>
@@ -279,30 +314,63 @@ export default function ListingNew() {
                         {pkr(Math.round(f.price / f.marla_area))} per marla · {pkr(Math.round(f.price / (f.marla_area * MARLA_SQFT)))} per sqft
                       </p>
                     </div>
+                    <div>
+                      <p className="label">Features & amenities</p>
+                      <div className="flex flex-wrap gap-2">
+                        {[...AMENITY_PRESETS, ...f.amenities.filter((a) => !AMENITY_PRESETS.includes(a))].map((a) => (
+                          <button key={a} type="button" onClick={() => toggleAmenity(a)} className={cn("chip px-3 py-1.5 ring-1 transition", f.amenities.includes(a) ? "bg-brand-700 text-white ring-brand-700" : "ring-black/10 hover:ring-brand-300 dark:ring-white/10")}>
+                            {f.amenities.includes(a) && <Check className="h-3 w-3" />} {a}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="mt-2 flex gap-2">
+                        <Input
+                          value={custom}
+                          onChange={(e) => setCustom(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addCustom();
+                            }
+                          }}
+                          placeholder="Add another, e.g. Swimming pool"
+                        />
+                        <Button variant="outline" type="button" onClick={addCustom} disabled={!custom.trim()} icon={<Plus className="h-4 w-4" />}>
+                          Add
+                        </Button>
+                      </div>
+                      <p className="mt-2 text-xs text-ink-mute">Buyers can search by these (e.g. “solar”, “basement”), and the AI assistant mentions them.</p>
+                    </div>
                     <Toggle checked={f.featured} onChange={(v) => set({ featured: v })} label={<span className="text-sm font-medium">Feature this listing on the home page</span>} />
                   </>
                 )}
                 {step === 3 && (
                   <>
-                    <p className="text-sm text-ink-mute">Pick images from the seeded media library (real uploads plug into the same images API). The first selected becomes the cover.</p>
+                    <p className="text-sm text-ink-mute">Add up to {MAX_PHOTOS} photos (JPEG, PNG or WebP). The first one is the cover. No photos? The portal shows a matching illustration until you add some.</p>
+                    <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={(e) => void addPhotos(e.target.files)} />
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                      {library.map((src) => {
-                        const idx = f.images.indexOf(src);
-                        return (
-                          <button key={src} onClick={() => setF((x) => ({ ...x, images: x.images.includes(src) ? x.images.filter((i) => i !== src) : [...x.images, src] }))} className={cn("relative aspect-[4/3] overflow-hidden rounded-xl ring-2 transition", idx >= 0 ? "ring-gold-400" : "ring-transparent hover:ring-brand-200")}>
-                            <img src={src} alt="" className="h-full w-full object-cover" />
-                            {idx >= 0 && <span className="absolute end-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-gold-400 text-xs font-bold text-brand-950">{idx + 1}</span>}
-                            {idx === 0 && <span className="chip absolute bottom-2 start-2 bg-white/90 text-[10px] text-brand-800">Cover</span>}
+                      {f.photos.map((src, i) => (
+                        <div key={i} className="relative aspect-[4/3] overflow-hidden rounded-xl ring-1 ring-black/5 dark:ring-white/10">
+                          <img src={src} alt={`Photo ${i + 1}`} className="h-full w-full object-cover" />
+                          {i === 0 && <span className="chip absolute bottom-2 start-2 bg-white/90 text-[10px] text-brand-800">Cover</span>}
+                          <button type="button" onClick={() => set({ photos: f.photos.filter((_, j) => j !== i) })} className="absolute end-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/80" aria-label="Remove photo">
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
-                        );
-                      })}
+                        </div>
+                      ))}
+                      {f.photos.length < MAX_PHOTOS && (
+                        <button type="button" onClick={() => fileRef.current?.click()} disabled={!!busy} className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-black/10 text-sm font-semibold text-ink-mute transition hover:border-brand-300 hover:text-brand-700 dark:border-white/15">
+                          <ImagePlus className="h-6 w-6" />
+                          {busy === "Preparing photos…" ? busy : "Add photos"}
+                        </button>
+                      )}
                     </div>
                   </>
                 )}
                 {step === 4 && (
                   <div className="space-y-4">
                     <div className="overflow-hidden rounded-2xl border border-black/5 dark:border-white/10">
-                      {f.images[0] && <img src={f.images[0]} alt="" className="aspect-[16/7] w-full object-cover" />}
+                      {f.photos[0] && <img src={f.photos[0]} alt="" className="aspect-[16/7] w-full object-cover" />}
                       <div className="p-5">
                         <div className="flex flex-wrap gap-2">
                           <Badge tone="green">{titleCase(f.use_type)}</Badge>
@@ -313,9 +381,11 @@ export default function ListingNew() {
                         <p className="text-sm text-ink-mute">{[blocks.find((b) => b.id === f.block_zone_area_id)?.name, schemes.find((s) => s.id === f.scheme_id)?.name, city?.name].filter(Boolean).join(", ")}</p>
                         <p className="mt-2 font-display text-2xl font-bold text-brand-700 dark:text-gold-300">{pkrShort(f.price)}</p>
                         <p className="mt-3 text-sm text-ink-soft dark:text-slate-300">{f.description}</p>
+                        {!!f.amenities.length && <p className="mt-2 text-sm text-ink-mute">{f.amenities.join(" · ")}</p>}
+                        <p className="mt-2 text-xs text-ink-mute">{f.photos.length ? `${f.photos.length} photo${f.photos.length > 1 ? "s" : ""}` : "No photos yet — you can add them later from My listings"}</p>
                       </div>
                     </div>
-                    <p className="text-xs text-ink-mute">Publishing creates the listing via the REST API (and the same engine the MCP tools use), so it’s instantly available to search, maps and agents.</p>
+                    <p className="text-xs text-ink-mute">Publishing creates the listing under your account (the same engine the MCP tools use), so it’s instantly available to search, maps and agents — and you can manage it from My listings.</p>
                   </div>
                 )}
               </motion.div>
@@ -330,8 +400,8 @@ export default function ListingNew() {
                 Continue <ArrowRight className="h-4 w-4 rtl:rotate-180" />
               </Button>
             ) : (
-              <Button variant="gold" loading={busy} onClick={publish}>
-                Publish listing
+              <Button variant="gold" loading={!!busy} onClick={publish}>
+                {busy && busy !== "Preparing photos…" ? busy : "Publish listing"}
               </Button>
             )}
           </div>

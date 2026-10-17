@@ -51,6 +51,7 @@ const P: Record<string, ComponentType> = {
   Admin: lazy(() => import("@/pages/app/Admin")),
   Profile: lazy(() => import("@/pages/app/Profile")),
   ListingNew: lazy(() => import("@/pages/app/ListingNew")),
+  MyListings: lazy(() => import("@/pages/app/MyListings")),
   NotFound: lazy(() => import("@/pages/NotFound")),
 };
 
@@ -110,6 +111,7 @@ export default function App() {
             <Route path="construction" element={<P.Construction />} />
             <Route path="admin" element={<P.Admin />} />
             <Route path="profile" element={<P.Profile />} />
+            <Route path="listings" element={<P.MyListings />} />
             <Route path="listings/new" element={<P.ListingNew />} />
             <Route path="*" element={<P.NotFound />} />
           </Route>
