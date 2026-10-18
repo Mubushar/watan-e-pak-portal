@@ -273,6 +273,10 @@ export default function MapExplorer() {
     });
   };
   const endZoomDraw = useCallback(() => setZoomDraw(false), []);
+  // Starting another map tool (directions, picking a point, a side-panel tab) switches the zoom tool off.
+  useEffect(() => {
+    setZoomDraw(false);
+  }, [nav.routing, nav.picking, tab]);
 
   // ---- infrastructure mega projects
   const megaQ = useMegaProjects();

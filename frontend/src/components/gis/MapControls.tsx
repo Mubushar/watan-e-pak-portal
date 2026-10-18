@@ -262,11 +262,16 @@ export function MapControls({
   const all = groups.flatMap((g) => g.items);
   const activeCount = all.filter((i) => i.on).length;
   const setAll = (v: boolean) => groups.forEach((g) => g.items.forEach((i) => i.on !== v && i.onChange(v)));
+  // Using any other tool switches the zoom tool off.
+  const other = (fn: () => void) => () => {
+    if (zoomDraw) onZoomDraw(false);
+    fn();
+  };
 
   return (
     <div ref={ref} className="absolute end-3 top-3 z-[400] flex flex-col items-end gap-2">
       <ToolGroup label="Map">
-        <Btn icon={Layers} text="Base" title="Base map" active={open === "base"} onClick={() => setOpen(open === "base" ? null : "base")} />
+        <Btn icon={Layers} text="Base" title="Base map" active={open === "base"} onClick={other(() => setOpen(open === "base" ? null : "base"))} />
         <Btn
           icon={Layers3}
           text="Portal"
@@ -274,12 +279,12 @@ export function MapControls({
           title="Layers — turn any layer on or off"
           active={open === "layers"}
           badge={activeCount}
-          onClick={() => setOpen(open === "layers" ? null : "layers")}
+          onClick={other(() => setOpen(open === "layers" ? null : "layers"))}
         />
-        <Btn icon={Languages} text="Lang" title="Map label language — English / اردو" active={open === "lang"} onClick={() => setOpen(open === "lang" ? null : "lang")} />
+        <Btn icon={Languages} text="Lang" title="Map label language — English / اردو" active={open === "lang"} onClick={other(() => setOpen(open === "lang" ? null : "lang"))} />
       </ToolGroup>
       <ToolGroup label="View">
-        {onFit && <Btn icon={Globe} text="Full" title="Fit to listings" onClick={onFit} />}
+        {onFit && <Btn icon={Globe} text="Full" title="Fit to listings" onClick={other(onFit)} />}
         <Btn
           icon={SquareDashedMousePointer}
           text="Zoom"
@@ -295,7 +300,7 @@ export function MapControls({
             text="Select"
             title={drawMode ? "Cancel drawing" : "Draw a study area — circle, rectangle or polygon — for a case-study report"}
             active={!!drawMode || open === "draw"}
-            onClick={() => (drawMode ? onDraw(null) : setOpen(open === "draw" ? null : "draw"))}
+            onClick={other(() => (drawMode ? onDraw(null) : setOpen(open === "draw" ? null : "draw")))}
           />
         </ToolGroup>
       )}
