@@ -617,7 +617,7 @@ export default function MapExplorer() {
         )}
 
         <MapClick enabled={analysing && !zoomDraw && !drawMode && !nav.picking} onClick={onMapClick} />
-        <ZoomArea active={zoomDraw} onDone={endZoomDraw} padding={sidePad()} />
+        <ZoomArea active={zoomDraw} onDone={endZoomDraw} padding={sidePad()} sticky />
         <AreaDraw mode={drawMode} shape={studyShape} onShape={onStudyShape} onCancel={cancelDraw} />
       </PortalMap>
 
@@ -826,7 +826,7 @@ export default function MapExplorer() {
           <motion.div key="zoom" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
             <div className="glass-dark flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold shadow-soft">
               <SquareDashedMousePointer className="h-4 w-4 text-gold-300" />
-              Drag a box over the area to zoom in · Esc to cancel
+              Zoom tool on: drag boxes to zoom in · click Zoom again (or Esc) to turn it off
             </div>
           </motion.div>
         )}

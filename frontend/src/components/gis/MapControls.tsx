@@ -283,7 +283,7 @@ export function MapControls({
         <Btn
           icon={SquareDashedMousePointer}
           text="Zoom"
-          title={zoomDraw ? "Cancel zoom to area" : "Zoom to area: drag a box on the map"}
+          title={zoomDraw ? "Zoom tool is on — click to turn it off" : "Zoom tool: drag boxes on the map to zoom in (stays on until you click again)"}
           active={zoomDraw}
           onClick={() => onZoomDraw(!zoomDraw)}
         />

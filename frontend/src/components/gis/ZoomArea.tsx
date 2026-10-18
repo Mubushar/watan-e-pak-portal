@@ -4,6 +4,8 @@
  *   release          zoom to the box
  *   Esc              cancel
  * Render inside the map; `active` turns it on, `onDone` is called when it zooms or is cancelled.
+ * With `sticky` the tool stays on after each zoom (draw box after box) until it is switched off
+ * (or Esc); while it is on, dragging draws boxes instead of panning.
  * (Leaflet's own Shift + drag box zoom keeps working too.)
  */
 import { useEffect, useRef, useState } from "react";
@@ -12,7 +14,17 @@ import L from "leaflet";
 
 const STYLE = { color: "#c99a22", weight: 2.5, dashArray: "6 5", fillColor: "#f2dd8f", fillOpacity: 0.18 };
 
-export function ZoomArea({ active, onDone, padding }: { active: boolean; onDone: () => void; padding?: { start?: number; bottom?: number } }) {
+export function ZoomArea({
+  active,
+  onDone,
+  padding,
+  sticky = false,
+}: {
+  active: boolean;
+  onDone: () => void;
+  padding?: { start?: number; bottom?: number };
+  sticky?: boolean;
+}) {
   const map = useMap();
   const [box, setBox] = useState<L.LatLngBounds | null>(null);
   const start = useRef<L.LatLng | null>(null);
@@ -59,8 +71,8 @@ export function ZoomArea({ active, onDone, padding }: { active: boolean; onDone:
       const s = 24 + (padding?.start ?? 0);
       const bottom = 24 + (padding?.bottom ?? 0);
       map.flyToBounds(bounds, { paddingTopLeft: [rtl ? 24 : s, 24], paddingBottomRight: [rtl ? s : 24, bottom], maxZoom: 19, duration: 0.8 });
-      // Turn the tool off after this gesture's click has been swallowed.
-      setTimeout(onDone, 0);
+      // One-shot mode: turn the tool off after this gesture's click has been swallowed.
+      if (!sticky) setTimeout(onDone, 0);
     };
     const key = (e: KeyboardEvent) => e.key === "Escape" && onDone();
     // Move / release are watched on the window so a drag that ends outside the map still finishes.
@@ -82,7 +94,7 @@ export function ZoomArea({ active, onDone, padding }: { active: boolean; onDone:
       el.style.cursor = "";
       el.style.touchAction = "";
     };
-  }, [active, map, onDone, padding?.start, padding?.bottom]);
+  }, [active, map, onDone, sticky, padding?.start, padding?.bottom]);
 
   return active && box ? <Rectangle bounds={box} pathOptions={STYLE} interactive={false} /> : null;
 }
