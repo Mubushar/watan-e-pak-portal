@@ -100,7 +100,7 @@ export default function Login() {
         }}
       >
         <Field label="E-mail or mobile">
-          <Input icon={<Mail className="h-4 w-4" />} value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="you@example.com or 03xx xxxxxxx" autoComplete="username" required />
+          <Input icon={<Mail className="h-4 w-4" />} value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="E-mail, mobile (03xx xxxxxxx) or username" autoComplete="username" required />
         </Field>
         {mode === "password" ? (
           <Field label={<span className="flex justify-between">Password <Link to="/forgot" className="normal-case tracking-normal text-brand-700 dark:text-brand-300">Forgot?</Link></span>}>

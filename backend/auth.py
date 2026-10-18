@@ -246,6 +246,7 @@ ROLE_CATALOG: Dict[str, Dict[str, Any]] = {
 class User(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: Optional[str] = None
+    username: Optional[str] = None  # optional sign-in name (lower-case, no spaces)
     email: Optional[str] = None
     mobile: Optional[str] = None
     password_hash: Optional[str] = None
@@ -431,11 +432,17 @@ def find_user_by_id(user_id: Optional[str]) -> Optional[User]:
     return next((u for u in users_db if u.id == user_id), None)
 
 
+def normalize_username(value: Optional[str]) -> Optional[str]:
+    v = (value or "").strip().lower()
+    return v if re.fullmatch(r"[a-z0-9][a-z0-9._-]{2,31}", v) else None
+
+
 def find_user(identifier: Optional[str]) -> Optional[User]:
     ident = normalize_identifier(identifier)
-    if not ident:
-        return None
-    return next((u for u in users_db if u.email == ident or u.mobile == ident), None)
+    if ident:
+        return next((u for u in users_db if u.email == ident or u.mobile == ident), None)
+    name = normalize_username(identifier)
+    return next((u for u in users_db if name and u.username == name), None) if name else None
 
 
 def log_event(event: str, identifier: Optional[str] = None, user_id: Optional[str] = None,
@@ -755,7 +762,7 @@ def signup(email: Optional[str] = None, mobile: Optional[str] = None, password: 
 
 
 def login(identifier: str, password: Optional[str] = None) -> Dict[str, Any]:
-    ident = normalize_identifier(identifier)
+    ident = normalize_identifier(identifier) or normalize_username(identifier)
     user = find_user(ident) if ident else None
     if user is None:
         log_event("login_failed", ident, None, "unknown identifier")
@@ -1277,6 +1284,30 @@ def seed_users() -> None:
     log_event("seed", None, None, f"{len(seeded)} demo users across {len(ROLE_CATALOG)} roles")
 
 
+def seed_owner() -> Optional[User]:
+    """The portal owner's own super-admin account, from the environment (``backend/.env``,
+    never committed): ``PORTAL_OWNER_USERNAME`` and ``PORTAL_OWNER_PASSWORD``, optionally
+    ``PORTAL_OWNER_EMAIL``, ``PORTAL_OWNER_MOBILE`` and ``PORTAL_OWNER_NAME``. Signs in with the
+    username, e-mail or mobile. Re-applied on every start, so changing the password in .env works."""
+    username = normalize_username(os.environ.get("PORTAL_OWNER_USERNAME"))
+    password = os.environ.get("PORTAL_OWNER_PASSWORD", "")
+    if not username or not password:
+        return None
+    email = normalize_email(os.environ.get("PORTAL_OWNER_EMAIL", ""))
+    mobile = normalize_mobile(os.environ.get("PORTAL_OWNER_MOBILE", ""))
+    user = next((u for u in users_db if u.username == username), None)
+    password_hash, salt = hash_password(password)
+    if user is None:
+        user = User(username=username, name=os.environ.get("PORTAL_OWNER_NAME") or username.title(),
+                    email=email, mobile=mobile, roles=["super_admin"], role="super_admin", status="active",
+                    verified=True, email_verified=bool(email), mobile_verified=bool(mobile))
+        users_db.append(user)
+    user.password_hash, user.password_salt = password_hash, salt
+    user.roles, user.role, user.status, user.verified = ["super_admin"], "super_admin", "active", True
+    log_event("seed", None, user.id, "owner super-admin account")
+    return user
+
+
 __all__ = [
     "AUTH_CONFIG", "USER_ROLES", "USER_STATUSES", "SIGNUP_ROLES", "PORTAL_AREAS",
     "PERMISSIONS", "ROLE_CATALOG", "User", "Role", "OtpCode", "SessionToken",
@@ -1288,7 +1319,7 @@ __all__ = [
     "verify_login_otp", "request_password_reset", "reset_password", "set_password",
     "issue_token", "resolve_token", "current_user", "me", "logout", "refresh", "revoke_all",
     "link_customer", "link_agent", "set_status", "set_role", "list_users", "list_otps",
-    "list_notifications", "list_events", "get_config", "seed_users",
+    "list_notifications", "list_events", "get_config", "seed_users", "seed_owner", "normalize_username",
     # RBAC
     "role_permissions", "get_role", "role_level", "role_view", "list_roles", "list_permissions",
     "user_roles", "user_permissions", "has_permission", "check_permission", "set_roles",

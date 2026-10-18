@@ -208,6 +208,25 @@ answers instead, and responses say `source: "ai"`.
 | `POST /crm/webhooks/lead?source=` | Inbound leads from website forms, Facebook / Instagram lead ads (via Zapier / Make; `field_data` understood) and portals. De-duplicated by phone or e-mail and routed to an agent by region and load. Optional `PORTAL_CRM_WEBHOOK_SECRET` (header `X-Webhook-Secret`) |
 | `GET/POST /crm/webhooks/whatsapp` | Meta WhatsApp Cloud webhook: verification (`PORTAL_WHATSAPP_VERIFY_TOKEN`) and incoming messages, which land on the sender's lead |
 
+**Who can use it** (`access.py`, one middleware over /crm, /marketing, /broker, /agents and
+/messaging):
+
+| Rule | Routes |
+| --- | --- |
+| Public | Enquiry and viewing requests from a property page (`POST /crm/leads`, `POST /crm/appointments`, 20 per IP per minute); the agent contact card (`GET /crm/agents`, public fields only); the listing marketing kit; the AI Hub catalogue; inbound webhooks |
+| Signed in | Running Agentic-OS agents. Team messaging, where the ids a request acts as (`author_id`, `actor_id`, `created_by`, `uploaded_by`, `user_id`) must be the signed-in user's unless they're an admin; the live WebSocket needs `?token=` |
+| `crm.view` / `crm.manage` | Reading / changing the CRM, marketing and broker data (agent, agency manager, customer support, admins; moderator and auditor read only) |
+
+A user whose CRM role is only **agent** works their own book: lists, the dashboard, insights,
+the timeline and the copilot cover their leads, deals and tasks, and other agents' records
+return 403. Link the account to its CRM agent with `link_agent` (the demo `agent@portal.pk` is
+linked to the seeded agent of the same name).
+
+**Owner account:** set `PORTAL_OWNER_USERNAME` and `PORTAL_OWNER_PASSWORD` (optionally
+`PORTAL_OWNER_EMAIL`, `_MOBILE`, `_NAME`) in `backend/.env` to get your own super-admin. It
+signs in with the username (or e-mail / mobile), and changing the password in `.env` takes
+effect on the next start. Keep it out of git; `.env` is ignored.
+
 To turn real sending on:
 - **E-mail:** the `PORTAL_SMTP_*` settings.
 - **SMS:** `PORTAL_SMS_PROVIDER=twilio` or `webhook`.

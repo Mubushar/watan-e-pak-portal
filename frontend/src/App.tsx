@@ -1,3 +1,4 @@
+import { RequirePermission } from "@/components/layout/RequirePermission";
 import { lazy, Suspense, type ComponentType } from "react";
 import { Route, Routes } from "react-router-dom";
 import { PublicLayout } from "@/components/layout/PublicLayout";
@@ -100,12 +101,12 @@ export default function App() {
           <Route path="app" element={<DashboardLayout />}>
             <Route index element={<P.Overview />} />
             <Route path="agents" element={<P.AgentOps />} />
-            <Route path="crm" element={<P.Crm />} />
+            <Route path="crm" element={<RequirePermission perm="crm.view" area="the CRM"><P.Crm /></RequirePermission>} />
             <Route path="accounting" element={<P.Accounting />} />
             <Route path="transactions" element={<P.Transactions />} />
             <Route path="leasing" element={<P.Leasing />} />
             <Route path="maintenance" element={<P.Maintenance />} />
-            <Route path="marketing" element={<P.Marketing />} />
+            <Route path="marketing" element={<RequirePermission perm="crm.view" area="Marketing"><P.Marketing /></RequirePermission>} />
             <Route path="pmo" element={<P.Pmo />} />
             <Route path="pmo/:id" element={<P.PmoProject />} />
             <Route path="messages" element={<P.Messages />} />

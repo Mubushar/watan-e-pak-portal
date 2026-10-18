@@ -17,7 +17,7 @@ import base64
 import json
 import logging
 import os
-from typing import Any, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 from mcp import Client
 from fastapi.testclient import TestClient
@@ -876,9 +876,70 @@ async def run_wing_checks() -> None:
 # ============================================================
 
 
+_GUARDED = ("/crm", "/marketing", "/broker", "/agents", "/messaging")
+
+
+def _sign_in_guarded(client: TestClient) -> str:
+    """The CRM family needs a signed-in user: add the seeded admin's token to those calls unless a
+    check passes its own Authorization header (negative checks pass an empty one)."""
+    token = client.post("/auth/login", json={"identifier": "admin@portal.pk", "password": "Admin@12345"}).json()["token"]
+    plain = client.request
+
+    def request(method: str, url: Any, *args: Any, **kwargs: Any) -> Any:
+        if str(url).startswith(_GUARDED):
+            headers = dict(kwargs.get("headers") or {})
+            headers.setdefault("Authorization", f"Bearer {token}")
+            kwargs["headers"] = headers
+        return plain(method, url, *args, **kwargs)
+
+    client.request = request  # type: ignore[method-assign]
+    STATE["admin_token"] = token
+    return token
+
+
+def run_access_checks(client: TestClient) -> None:
+    """Sign-in and roles on the CRM family (access.py)."""
+    anon = {"Authorization": ""}
+
+    def login(ident: str, pw: str) -> Dict[str, str]:
+        return {"Authorization": "Bearer " + client.post("/auth/login", json={"identifier": ident, "password": pw}).json()["token"]}
+
+    check("access: GET /crm/leads without sign-in -> 401", client.get("/crm/leads", headers=anon).status_code == 401)
+    check("access: GET /crm/insights without sign-in -> 401", client.get("/crm/insights", headers=anon).status_code == 401)
+    check("access: GET /messaging/overview without sign-in -> 401", client.get("/messaging/overview", headers=anon).status_code == 401)
+    r = client.get("/crm/agents", headers=anon)
+    check("access: public agent card has contact fields only", r.status_code == 200
+          and "commission_rate" not in r.json()["agents"][0] and "phone" in r.json()["agents"][0], str(r.status_code))
+    r = client.post("/crm/leads", headers=anon, json={"name": "Portal visitor", "phone": "03001112233", "source": "website"})
+    check("access: public enquiry (POST /crm/leads) still works", r.status_code == 201, str(r.status_code))
+    check("access: AI Hub catalogue is public", client.get("/agents/catalog", headers=anon).status_code == 200)
+    check("access: agent tools need sign-in", client.get("/agents/smart-actions", headers=anon).status_code == 401)
+    buyer = login("bilal@example.com", "Buyer@12345")
+    check("access: buyer has no CRM role -> 403", client.get("/crm/leads", headers=buyer).status_code == 403)
+    me = client.get("/auth/me", headers=buyer).json()["user"]["id"]
+    check("access: messaging - own unread summary", client.get(f"/messaging/unread-summary/{me}", headers=buyer).status_code == 200)
+    check("access: messaging - someone else's -> 403", client.get("/messaging/unread-summary/not-me", headers=buyer).status_code == 403)
+    r = client.post("/messaging/presence", headers=buyer, json={"user_id": "not-me", "status": "online"})
+    check("access: messaging - acting as another user -> 403", r.status_code == 403, str(r.status_code))
+    agent = login("agent@portal.pk", "Agent@12345")
+    aid = client.get("/auth/me", headers=agent).json()["user"].get("agent_id")
+    leads = client.get("/crm/leads", headers=agent).json().get("leads", [])
+    check("access: demo agent is linked to a CRM agent", bool(aid))
+    check("access: agent sees only own leads", bool(leads) and all(x.get("assigned_agent_id") == aid for x in leads), str(len(leads)))
+    other = next((x for x in core.leads_db if x.assigned_agent_id != aid), None)
+    check("access: agent can't open another agent's lead", other is not None and client.get(f"/crm/leads/{other.id}", headers=agent).status_code == 403)
+    check("access: agent can't brief another agent's lead", other is not None and client.post(f"/crm/ai/lead-brief/{other.id}", headers=agent).status_code == 403)
+    ins = client.get("/crm/insights", headers=agent).json()
+    check("access: agent insights cover own book", ins["kpis"]["leads_total"] == len(leads), str(ins["kpis"]["leads_total"]))
+    support = login("support@portal.pk", "Support@12345")
+    check("access: customer support sees the whole CRM", client.get("/crm/leads", headers=support).json()["count"] >= len(leads))
+
+
 def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> None:
     print("\n=== FastAPI / REST ===")
     with TestClient(app) as client:
+        _sign_in_guarded(client)
+        run_access_checks(client)
         r = client.get("/health")
         check("GET /health", r.status_code == 200 and r.json().get("status") == "ok", str(r.status_code))
 
@@ -4295,7 +4356,7 @@ def run_messaging_rest_checks(client: TestClient) -> None:
 
         # --- real-time feed ---
         try:
-            with client.websocket_connect(f"/ws/messaging/{dm_id}?user_id=rest_u1") as ws:
+            with client.websocket_connect(f"/ws/messaging/{dm_id}?user_id=rest_u1&token={STATE['admin_token']}") as ws:
                 ready = ws.receive_json()
                 check("WS /ws/messaging/{id} (ready)", ready["event"] == "ready", str(ready))
                 ws.send_text("unread")
@@ -4305,11 +4366,17 @@ def run_messaging_rest_checks(client: TestClient) -> None:
         except Exception as exc:  # pragma: no cover - transport failures
             check("WS /ws/messaging/{id} (ready)", False, repr(exc))
         try:
-            with client.websocket_connect(f"/ws/messaging/{dm_id}?user_id=nobody") as ws:
+            with client.websocket_connect(f"/ws/messaging/{dm_id}?user_id=nobody&token={STATE['admin_token']}") as ws:
                 ws.receive_json()
             check("WS /ws/messaging/{id} (denied)", False, "expected close")
         except Exception:
             check("WS /ws/messaging/{id} (denied)", True)
+        try:
+            with client.websocket_connect(f"/ws/messaging/{dm_id}?user_id=rest_u1") as ws:
+                ws.receive_json()
+            check("WS /ws/messaging/{id} (no token -> refused)", False, "expected close")
+        except Exception:
+            check("WS /ws/messaging/{id} (no token -> refused)", True)
 
         r = client.post("/messaging/revoke-access", json={"user_id": "rest_u2",
                                                           "actor_id": "rest_u1",

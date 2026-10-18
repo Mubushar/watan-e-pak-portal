@@ -16491,8 +16491,9 @@ def init_sample_data() -> None:
         ]
     )
 
-    # ---- Authentication: demo accounts ----
+    # ---- Authentication: demo accounts (+ the owner's super-admin from .env) ----
     auth.seed_users()
+    auth.seed_owner()
 
     # ---- Accounting: chart of accounts + ~14 months of transactions ----
     _seed_accounting()

@@ -42,6 +42,7 @@ import ai_guard
 import directions as routing
 import megaprojects
 import roads
+import access
 import crm_ai
 import crm_channels
 import water
@@ -86,6 +87,34 @@ app.router.routes.extend(mcp_http_app.routes)
 # `capacitor://localhost` / `https://localhost`) and any separately hosted UI.
 # Auth is a bearer header (no cookies), so a wildcard is safe; set
 # PORTAL_CORS_ORIGINS to a comma-separated allow-list to lock it down.
+def _resolve_user(token: Optional[str]) -> Optional[Dict[str, Any]]:
+    user = core.auth.current_user(token) if token else None
+    return core.auth.public_user(user) if user else None
+
+
+def _owner_of(kind: str, record_id: str) -> Tuple[bool, Optional[str]]:
+    """(found, owning CRM agent id) for the agent-sees-own-book check in access.AccessGuard."""
+    db, field = {"lead": (core.leads_db, "assigned_agent_id"), "customer": (core.customers_db, "assigned_agent_id"),
+                 "deal": (core.deals_db, "agent_id"), "task": (core.tasks_db, "assigned_agent_id")}.get(kind, (None, None))
+    rec = next((r for r in db if r.id == record_id), None) if db is not None else None
+    return (rec is not None, getattr(rec, field, None) if rec else None)
+
+
+# Sign-in and roles for /crm, /marketing, /broker, /agents and /messaging (see access.py). Added
+# before CORS so that CORS wraps it and 401 / 403 replies still carry CORS headers.
+app.add_middleware(access.AccessGuard, resolve_user=_resolve_user, owner_of=_owner_of)
+
+
+def _link_demo_agent() -> None:
+    """The demo agent account (agent@portal.pk) works the seeded CRM agent of the same name."""
+    user = core.auth.find_user("agent@portal.pk")
+    agent = next((a for a in core.agents_db if user and a.name == user.name), None)
+    if user and agent and not user.agent_id:
+        core.auth.link_agent(user.id, agent.id)
+
+
+_link_demo_agent()
+
 _cors_origins = [o.strip() for o in os.getenv("PORTAL_CORS_ORIGINS", "*").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
@@ -957,12 +986,37 @@ def unit_convert(value: float, from_unit: str, to_unit: str) -> Any:
 
 @app.get("/crm/dashboard", tags=["crm"])
 def crm_dashboard() -> Any:
-    return j(core.crm_dashboard())
+    mine = access.agent_scope()
+    if not mine:
+        return j(core.crm_dashboard())
+    leads = [x for x in core.leads_db if x.assigned_agent_id == mine]
+    deals = [d for d in core.deals_db if d.agent_id == mine]
+    tasks = [t for t in core.tasks_db if t.assigned_agent_id == mine]
+    by_status: Dict[str, int] = {}
+    for x in leads:
+        by_status[x.status] = by_status.get(x.status, 0) + 1
+    return {
+        "agents": 1,
+        "leads": {"total": len(leads), "by_status": by_status},
+        "customers": sum(1 for c in core.customers_db if c.assigned_agent_id == mine),
+        "deals": {"total": len(deals), "open_value": round(sum(d.amount for d in deals if not d.stage.startswith("closed")), 2),
+                  "won_value": round(sum(d.amount for d in deals if d.stage == "closed_won"), 2)},
+        "tasks": {"total": len(tasks), "open": sum(1 for t in tasks if t.status in ("open", "in_progress"))},
+        "appointments": sum(1 for a in core.appointments_db if a.agent_id == mine),
+        "properties": len(core.properties_db),
+    }
+
+
+_PUBLIC_AGENT_FIELDS = ("id", "name", "email", "phone", "region", "specialization", "active", "rating")
 
 
 @app.get("/crm/agents", tags=["crm"])
 def crm_agents(active_only: bool = False) -> Any:
-    return j(core.crm_list_agents(active_only=active_only))
+    """CRM agents. Visitors (the property page's contact card) get the public contact fields only."""
+    data = j(core.crm_list_agents(active_only=active_only))
+    if not access.can(access.current(), "crm.view"):
+        data["agents"] = [{k: a.get(k) for k in _PUBLIC_AGENT_FIELDS} for a in data.get("agents", [])]
+    return data
 
 
 @app.get("/crm/leads", tags=["crm"])
@@ -972,6 +1026,7 @@ def crm_leads(
     city: Optional[str] = None,
     min_score: Optional[int] = None,
 ) -> Any:
+    agent_id = access.agent_scope() or agent_id
     return j(core.crm_list_leads(status=status, agent_id=agent_id, city=city, min_score=min_score))
 
 
@@ -998,12 +1053,16 @@ def crm_convert_lead(lead_id: str, customer_type: str = "buyer") -> Any:
 
 @app.get("/crm/customers", tags=["crm"])
 def crm_customers(type: Optional[str] = None) -> Any:
-    return j(core.crm_list_customers(type=type))
+    data = j(core.crm_list_customers(type=type))
+    if (mine := access.agent_scope()):
+        data["customers"] = [c for c in data["customers"] if c.get("assigned_agent_id") == mine]
+        data["count"] = len(data["customers"])
+    return data
 
 
 @app.get("/crm/deals", tags=["crm"])
 def crm_deals(stage: Optional[str] = None, agent_id: Optional[str] = None) -> Any:
-    return j(core.crm_list_deals(stage=stage, agent_id=agent_id))
+    return j(core.crm_list_deals(stage=stage, agent_id=access.agent_scope() or agent_id))
 
 
 @app.post("/crm/deals", tags=["crm"], status_code=201)
@@ -1016,12 +1075,23 @@ def crm_create_deal(payload: DealCreate) -> Any:
 
 @app.get("/crm/pipeline", tags=["crm"])
 def crm_pipeline() -> Any:
-    return j(core.crm_pipeline_summary())
+    mine = access.agent_scope()
+    if not mine:
+        return j(core.crm_pipeline_summary())
+    deals = [d for d in core.deals_db if d.agent_id == mine]
+    by_stage: Dict[str, Dict[str, Any]] = {}
+    for d in deals:
+        e = by_stage.setdefault(d.stage, {"count": 0, "value": 0.0, "weighted": 0.0})
+        e["count"] += 1
+        e["value"] = round(e["value"] + d.amount, 2)
+        e["weighted"] = round(e["weighted"] + d.amount * d.probability / 100, 2)
+    return {"stages": by_stage, "open_pipeline_value": round(sum(e["value"] for s, e in by_stage.items() if not s.startswith("closed")), 2),
+            "won_value": round(by_stage.get("closed_won", {}).get("value", 0.0), 2), "total_deals": len(deals)}
 
 
 @app.get("/crm/tasks", tags=["crm"])
 def crm_tasks(status: Optional[str] = None, agent_id: Optional[str] = None) -> Any:
-    return j(core.crm_list_tasks(status=status, agent_id=agent_id))
+    return j(core.crm_list_tasks(status=status, agent_id=access.agent_scope() or agent_id))
 
 
 @app.post("/crm/tasks", tags=["crm"], status_code=201)
@@ -1034,7 +1104,11 @@ def crm_create_task(payload: TaskCreate) -> Any:
 
 @app.get("/crm/appointments", tags=["crm"])
 def crm_appointments(status: Optional[str] = None) -> Any:
-    return j(core.crm_list_appointments(status=status))
+    data = j(core.crm_list_appointments(status=status))
+    if (mine := access.agent_scope()):
+        data["appointments"] = [a for a in data["appointments"] if a.get("agent_id") == mine]
+        data["count"] = len(data["appointments"])
+    return data
 
 
 # ------------------------------------------------------------------
@@ -2128,7 +2202,7 @@ def crm_insights(days: int = 30, agent_id: Optional[str] = None) -> Any:
     won value, tasks, appointments), daily trend, sources, statuses, cities, channel mix, funnel,
     pipeline by stage, agent leaderboard, priority leads with next best action, at-risk deals,
     today's agenda and which messaging channels are live. ``agent_id`` limits it to one agent's book."""
-    return crm_ai.insights(max(7, min(days, 365)), agent_id)
+    return crm_ai.insights(max(7, min(days, 365)), access.agent_scope() or agent_id)
 
 
 @app.get("/crm/channels", tags=["crm"])
@@ -2225,7 +2299,7 @@ async def crm_ai_ask(payload: CrmAskRequest, request: Request) -> Any:
         raise HTTPException(status_code=422, detail="Ask a question")
     if crm_ai.ai_available():
         ai_guard.check(request, "chat")
-    out = await asyncio.to_thread(crm_ai.ask, question, payload.lang)
+    out = await asyncio.to_thread(crm_ai.ask, question, payload.lang, access.agent_scope())
     out["question"] = question
     out["transcript"] = transcript
     if payload.speak and openai_voice.configured():
@@ -2307,8 +2381,15 @@ def crm_assign_lead(lead_id: str, payload: Dict[str, Any]) -> Any:
 
 @app.get("/crm/interactions", tags=["crm"])
 def crm_list_interactions(entity_id: Optional[str] = None, limit: int = 200) -> Any:
-    """List interactions for an entity, or the latest across the CRM (newest first)."""
-    return j(core.crm_list_interactions(entity_id=entity_id, limit=limit))
+    """List interactions for an entity, or the latest across the CRM (newest first). Agents see
+    the timeline of their own leads and customers."""
+    mine = access.agent_scope()
+    data = j(core.crm_list_interactions(entity_id=entity_id, limit=limit if not mine else 2000))
+    if mine:
+        own = {x.id for x in core.leads_db if x.assigned_agent_id == mine} | {c.id for c in core.customers_db if c.assigned_agent_id == mine}
+        data["interactions"] = [i for i in data["interactions"] if i.get("entity_id") in own or i.get("agent_id") == mine][:limit]
+        data["count"] = len(data["interactions"])
+    return data
 
 
 @app.post("/crm/interactions", tags=["crm"], status_code=201)
@@ -6869,11 +6950,17 @@ def messaging_portal_html(lang: str = Depends(ui_lang), theme: str = Depends(ui_
 
 @app.websocket("/ws/messaging/{conversation_id}")
 async def messaging_socket(websocket: WebSocket, conversation_id: str,
-                           user_id: Optional[str] = None) -> None:
+                           user_id: Optional[str] = None, token: Optional[str] = None) -> None:
     """Live conversation feed: new messages, edits, reactions, actions and read state.
 
-    The caller must pass ``?user_id=``; access is re-checked on every connection.
+    The caller passes ``?token=`` (its sign-in token; browsers can't set headers on a WebSocket)
+    and ``?user_id=``, which must be the signed-in user; access is re-checked on every connection.
     """
+    me = _resolve_user(token)
+    if me is None or (user_id and user_id != me["id"] and not access.is_admin(me)):
+        await websocket.close(code=4401)
+        return
+    user_id = user_id or me["id"]
     conv = core.messaging._get(core.messaging.conversations_db, "id", conversation_id)
     if conv is None or not core.messaging.can_access(conv, user_id):
         await websocket.close(code=4403)

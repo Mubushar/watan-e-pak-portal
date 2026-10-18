@@ -40,10 +40,14 @@ interface NavItem {
   icon: LucideIcon;
   end?: boolean;
   badge?: number;
+  /** Shown only to users with this permission. */
+  perm?: string;
 }
 
 export function useDashboardNav(unread: number): { title: string; items: NavItem[] }[] {
-  return [
+  const can = useAuth((s) => s.can);
+  useAuth((s) => s.user); // re-render when the user (and so their permissions) changes
+  const groups: { title: string; items: NavItem[] }[] = [
     {
       title: "Overview",
       items: [
@@ -55,12 +59,12 @@ export function useDashboardNav(unread: number): { title: string; items: NavItem
     {
       title: "Sales & Leasing",
       items: [
-        { to: "/app/crm", label: "CRM", icon: Users },
+        { to: "/app/crm", label: "CRM", icon: Users, perm: "crm.view" },
         { to: "/app/listings", label: "My listings", icon: Building2, end: true },
         { to: "/app/listings/new", label: "List a property", icon: PlusSquare },
         { to: "/app/transactions", label: "Transactions", icon: FileSignature },
         { to: "/app/leasing", label: "Leasing", icon: KeyRound },
-        { to: "/app/marketing", label: "Marketing", icon: Target },
+        { to: "/app/marketing", label: "Marketing", icon: Target, perm: "crm.view" },
       ],
     },
     {
@@ -86,6 +90,7 @@ export function useDashboardNav(unread: number): { title: string; items: NavItem
       ],
     },
   ];
+  return groups.map((g) => ({ ...g, items: g.items.filter((i) => !i.perm || can(i.perm)) })).filter((g) => g.items.length);
 }
 
 function Sidebar({ collapsed, onToggle, unread }: { collapsed: boolean; onToggle?: () => void; unread: number }) {

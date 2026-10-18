@@ -558,19 +558,21 @@ def apply_note(analysis: Dict[str, Any], transcript: str, entity_type: str, enti
 # ============================================================ copilot
 
 
-def _snapshot() -> Dict[str, Any]:
-    ins = insights(30)
+def _snapshot(agent_id: Optional[str] = None) -> Dict[str, Any]:
+    ins = insights(30, agent_id)
     leads = [{"id": x.id, "name": x.name, "status": x.status, "score": x.score, "source": x.source, "city": _city(x.city_id),
-              "budget_max": x.budget_max, "agent": getattr(_agent(x.assigned_agent_id), "name", None)} for x in core.leads_db[:80]]
+              "budget_max": x.budget_max, "agent": getattr(_agent(x.assigned_agent_id), "name", None)}
+             for x in core.leads_db if not agent_id or x.assigned_agent_id == agent_id][:80]
     return {"kpis": ins["kpis"], "priority_leads": ins["priority_leads"][:8], "at_risk_deals": ins["at_risk_deals"][:5],
             "agenda": ins["agenda"], "agents": ins["agents"], "pipeline": ins["pipeline"], "leads": leads}
 
 
-def ask(question: str, lang: str = "en") -> Dict[str, Any]:
+def ask(question: str, lang: str = "en", agent_id: Optional[str] = None) -> Dict[str, Any]:
+    """Answer from CRM data; ``agent_id`` limits it to one agent's book."""
     q = question.strip()
     if not q:
         return {"error": "Ask a question"}
-    snap = _snapshot()
+    snap = _snapshot(agent_id)
     ai = llm_json(
         "You are the CRM copilot of a Pakistani real-estate portal, talking to a sales agent or manager. Answer from the CRM data given — "
         "never invent leads or numbers. Be brief and actionable (bullets welcome). Money in PKR lakh/crore. "

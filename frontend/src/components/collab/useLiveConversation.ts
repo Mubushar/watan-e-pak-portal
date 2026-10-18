@@ -8,6 +8,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { wsUrl } from "@/lib/api";
+import { useAuth } from "@/store/auth";
 
 export type LiveMode = "connecting" | "live" | "polling" | "off";
 
@@ -38,7 +39,7 @@ export function useLiveConversation(conversationId: string | null | undefined, u
       setMode((m) => (m === "polling" ? m : "connecting"));
       let opened = false;
       try {
-        ws = new WebSocket(wsUrl(`/ws/messaging/${conversationId}`, { user_id: userId }));
+        ws = new WebSocket(wsUrl(`/ws/messaging/${conversationId}`, { user_id: userId, token: useAuth.getState().token ?? undefined }));
       } catch {
         schedule(false);
         return;
