@@ -99,7 +99,12 @@ function errorMessage(detail: unknown, fallback: string): string {
     return detail
       .map((d) => (typeof d === "object" && d && "msg" in d ? `${(d as { loc?: unknown[] }).loc?.slice(-1)[0] ?? ""}: ${(d as { msg: string }).msg}` : String(d)))
       .join("; ");
-  if (typeof detail === "object" && detail && "error" in detail) return String((detail as { error: unknown }).error);
+  if (typeof detail === "object" && detail && "error" in detail) {
+    // Our engine reports {"error": "..."}; OpenAI-style bodies are {"error": {"message": "..."}}.
+    const err = (detail as { error: unknown }).error;
+    if (typeof err === "object" && err && "message" in err) return String((err as { message: unknown }).message);
+    return String(err);
+  }
   return fallback;
 }
 

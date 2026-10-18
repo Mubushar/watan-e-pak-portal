@@ -11,7 +11,8 @@
  */
 import { create } from "zustand";
 import type { ChatImage, MapView, Property, PropertyList } from "@/types";
-import { get, post } from "./api";
+import { toast } from "sonner";
+import { ApiError, get, post } from "./api";
 import { draftFromIntent, parseIntent, searchQuery, type Intent, type ListingDraft } from "./intent";
 import { city as cityName, describe, detectLang, money, t, type Lang } from "./lang";
 import { mergeEffects, runAgentTool, type ToolEffect } from "./tools";
@@ -84,6 +85,7 @@ export function suggestionsFor(role: string | undefined, lang: Lang): string[] {
 
 // ------------------------------------------------------------------ capabilities
 let caps: Promise<{ chat_mode: "local" | "upstream"; chat_model: string }> | null = null;
+let aiWarned = false;
 function capabilities() {
   caps ??= get<{ chat_mode: "local" | "upstream"; chat_model: string }>("/ai/capabilities", undefined, { noFallback: true }).catch(() => {
     caps = null;
@@ -167,8 +169,12 @@ export async function respond(text: string, history: ChatMsg[], user: User | nul
   if (chat_mode === "upstream") {
     try {
       return await agentReply(text, history, user, lang, opts, chat_model);
-    } catch {
-      /* fall back to the built-in replies below */
+    } catch (e) {
+      // Fall back to the built-in replies below; say why once if the AI itself refused (e.g. no credit).
+      if (e instanceof ApiError && e.status >= 400 && e.status !== 413 && !aiWarned) {
+        aiWarned = true;
+        toast.warning(`AI unavailable — answering from listing search for now. ${e.message}`);
+      }
     }
   }
 

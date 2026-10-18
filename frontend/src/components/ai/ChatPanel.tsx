@@ -15,7 +15,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Bot, Calculator, Map as MapIcon, Send, Sparkles, User as UserIcon, Wand2 } from "lucide-react";
 import type { Property } from "@/types";
 import { agentReply, capabilities, type AgentEffect } from "@/lib/agent";
-import { get, post } from "@/lib/api";
+import { toast } from "sonner";
+import { ApiError, get, post } from "@/lib/api";
 import { pkrShort, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { PropertyRow } from "@/components/property/PropertyCard";
@@ -42,6 +43,8 @@ interface Msg extends AgentEffect {
   hits?: RagHit[];
   pending?: boolean;
 }
+
+let aiWarned = false;
 
 export const SUGGESTIONS = [
   "10 marla house in DHA Lahore under 5 crore",
@@ -91,8 +94,12 @@ export function ChatPanel({ compact, className, initial }: { compact?: boolean; 
         setMsgs([...history, { role: "assistant", ...reply }]);
         setBusy(false);
         return;
-      } catch {
-        /* fall back to the local answer below */
+      } catch (e) {
+        // Fall back to the local answer below; say why once if the AI itself refused (e.g. no credit).
+        if (e instanceof ApiError && e.status >= 400 && !aiWarned) {
+          aiWarned = true;
+          toast.warning(`AI unavailable — answering from portal data for now. ${e.message}`);
+        }
       }
     }
     const [chat, rag] = await Promise.allSettled([
