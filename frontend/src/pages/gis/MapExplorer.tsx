@@ -15,7 +15,9 @@ import {
   Eye,
   FileBarChart,
   Footprints,
+  Globe2,
   Home,
+  LandPlot,
   Layers3,
   Map as MapIcon,
   MapPin,
@@ -31,7 +33,6 @@ import {
   Square,
   Star,
   Target,
-  Globe,
   SquareDashedMousePointer,
 } from "lucide-react";
 import type { City, Property, PropertyList, Scheme } from "@/types";
@@ -40,15 +41,20 @@ import { useApi } from "@/hooks/useApi";
 import { compact, num, pkrShort, titleCase } from "@/lib/format";
 import { coverImage } from "@/lib/images";
 import { cn } from "@/lib/utils";
-import { PortalMap, PIN_STYLES, pin } from "@/components/map/PortalMap";
+import { PortalMap, PIN_STYLES, pin, type BaseMapKey } from "@/components/map/PortalMap";
 import { Badge, BarList, Button, EmptyState, ErrorState, Input, ScoreRing, Select, Segmented, Skeleton, Slider, Tabs, Toggle } from "@/components/ui";
 import { ChipRow, FilterChip, MapClick, MiniStat, ReportButton, ReportModal, fitTo, type ReportRef } from "@/components/gis/kit";
 import { ZoomArea } from "@/components/gis/ZoomArea";
+import { MapControls } from "@/components/gis/MapControls";
+import { CityLabels, ProvinceLayer, type MapLang } from "@/components/gis/PakistanLayers";
+import { NavigatorLayer, NavigatorPanel, useNavigator } from "@/components/gis/Navigator";
+import { POI_CATEGORIES, POI_MIN_ZOOM, PoiLayer } from "@/components/gis/PoiLayer";
+import { usePrefs } from "@/store/prefs";
 import { LABEL_MIN_ZOOM, MasterPlanLayers, MasterPlanPanel, PlanLabels, useMasterPlans, type PlanLabel } from "@/components/gis/MasterPlans";
 import type { Aoi, AoiStats, GisLayer, GisLayerDetail, Poi, PoiCategory, RingResult, RouteResult } from "@/components/gis/types";
 
 type TabKey = "properties" | "places" | "layers" | "areas" | "analyse";
-type Vis = { props: boolean; pois: boolean; layers: boolean; aois: boolean };
+type Vis = { props: boolean; pois: boolean; layers: boolean; aois: boolean; provinces: boolean; cities: boolean };
 type AnalyseMode = "radius" | "route" | "rings";
 type LatLon = [number, number];
 
@@ -97,7 +103,7 @@ export default function MapExplorer() {
   const [map, setMap] = useState<L.Map | null>(null);
   const [tab, setTab] = useState<TabKey>("properties");
   const [open, setOpen] = useState(true);
-  const [vis, setVis] = useState<Vis>({ props: true, pois: false, layers: true, aois: false });
+  const [vis, setVis] = useState<Vis>({ props: true, pois: false, layers: true, aois: false, provinces: true, cities: true });
   const [report, setReport] = useState<ReportRef | null>(null);
   const markerRefs = useRef(new Map<string, L.Marker>());
   const zoomMoved = useRef(false);
@@ -210,6 +216,46 @@ export default function MapExplorer() {
   const dRadii = useDebounced(radii, 600);
   const analysing = tab === "analyse";
   const [zoomDraw, setZoomDraw] = useState(false);
+  const [baseMap, setBaseMap] = useState<BaseMapKey>("streets");
+  const appLang = usePrefs((s) => s.lang);
+  const [mapLang, setMapLang] = useState<MapLang>(appLang === "ur" ? "both" : "en");
+  const nav = useNavigator();
+  const [osmCats, setOsmCats] = useState<Set<string>>(new Set());
+  const [poiStatus, setPoiStatus] = useState<{ count: number; total: number; zoomIn: boolean } | null>(null);
+  const togglePoiCat = (k: string, on: boolean) =>
+    setOsmCats((s) => {
+      const n = new Set(s);
+      if (on) n.add(k);
+      else n.delete(k);
+      return n;
+    });
+  const setLayerHidden = (id: string, on: boolean) => {
+    setVis((v) => ({ ...v, layers: true }));
+    setHidden((h) => {
+      const n = new Set(h);
+      if (on) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  };
+  const setPlanOn = (key: string, on: boolean) => {
+    setVis((v) => ({ ...v, layers: true }));
+    setPlanShown((s) => {
+      const n = new Set(s);
+      if (on) n.add(key);
+      else n.delete(key);
+      return n;
+    });
+  };
+  const setLabelOn = (id: string, on: boolean) => {
+    setVis((v) => ({ ...v, layers: true }));
+    setLabelsOn((s) => {
+      const n = new Set(s);
+      if (on) n.add(id);
+      else n.delete(id);
+      return n;
+    });
+  };
   const endZoomDraw = useCallback(() => setZoomDraw(false), []);
 
   const nearPoiQ = useApi<{ pois: Poi[]; count: number }>(
@@ -297,7 +343,13 @@ export default function MapExplorer() {
   // ================================================================== render
   return (
     <div className={cn("relative h-[calc(100dvh-110px)] min-h-[540px] w-full overflow-hidden bg-brand-950", analysing && "[&_.leaflet-container]:cursor-crosshair")}>
-      <PortalMap height="100%" className="rounded-none" scrollWheelZoom onReady={onReady} zoom={5}>
+      <PortalMap height="100%" className="rounded-none" scrollWheelZoom onReady={onReady} zoom={5} switcher={false} baseKey={baseMap}>
+        {/* ----------------------------------------------------- Pakistan reference layers */}
+        {vis.provinces && <ProvinceLayer map={map} lang={mapLang} zoom={zoom} />}
+        {vis.cities && <CityLabels zoom={zoom} lang={mapLang} />}
+        {osmCats.size > 0 && <PoiLayer categories={osmCats} lang={mapLang} onStatus={setPoiStatus} />}
+        <NavigatorLayer nav={nav} />
+
         {/* ----------------------------------------------------- DHA master plans */}
         {vis.layers && (
           <MasterPlanLayers
@@ -468,60 +520,97 @@ export default function MapExplorer() {
           </>
         )}
 
-        <MapClick enabled={analysing && !zoomDraw} onClick={onMapClick} />
+        <MapClick enabled={analysing && !zoomDraw && !nav.picking} onClick={onMapClick} />
         <ZoomArea active={zoomDraw} onDone={endZoomDraw} padding={sidePad()} />
       </PortalMap>
 
-      {/* ------------------------------------------------------- overlay toggles */}
-      <div className="absolute end-3 top-16 z-[390] flex flex-col gap-1.5">
-        {(
-          [
-            ["props", Home, "Listings"],
-            ["pois", MapPin, "Places"],
-            ["layers", Shapes, "GIS layers"],
-            ["aois", Square, "Areas of interest"],
-          ] as const
-        ).map(([k, Icon, label]) => (
-          <button
-            key={k}
-            onClick={() => setVis((v) => ({ ...v, [k]: !v[k] }))}
-            title={`${vis[k] ? "Hide" : "Show"} ${label}`}
-            aria-label={`${vis[k] ? "Hide" : "Show"} ${label}`}
-            aria-pressed={vis[k]}
-            className={cn(
-              "flex h-10 w-10 items-center justify-center rounded-xl shadow-soft ring-1 ring-black/5 transition",
-              vis[k] ? "bg-brand-700 text-white" : "bg-white text-brand-800 hover:bg-brand-50 dark:bg-brand-950 dark:text-white",
-            )}
-          >
-            <Icon className="h-[18px] w-[18px]" />
-          </button>
-        ))}
-        <button
-          onClick={() => setZoomDraw((v) => !v)}
-          title={zoomDraw ? "Cancel zoom to area" : "Zoom to area: drag a box on the map"}
-          aria-label="Zoom to an area: drag a box"
-          aria-pressed={zoomDraw}
-          className={cn(
-            "flex h-10 w-10 items-center justify-center rounded-xl shadow-soft ring-1 ring-black/5 transition",
-            zoomDraw ? "bg-gold-gradient text-brand-950" : "bg-white text-brand-800 hover:bg-brand-50 dark:bg-brand-950 dark:text-white",
-          )}
-        >
-          <SquareDashedMousePointer className="h-[18px] w-[18px]" />
-        </button>
-        {properties.length > 0 && (
-          <button
-            onClick={() => fitTo(map, filtered.map((p) => [p.latitude!, p.longitude!]), 13, sidePad())}
-            title="Fit to listings"
-            aria-label="Fit to listings"
-            className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-brand-800 shadow-soft ring-1 ring-black/5 transition hover:bg-brand-50 dark:bg-brand-950 dark:text-white"
-          >
-            <Globe className="h-[18px] w-[18px]" />
-          </button>
-        )}
-      </div>
+      {/* ------------------------------------------------------- map controls (grouped) */}
+      <MapControls
+        base={baseMap}
+        onBase={setBaseMap}
+        zoomDraw={zoomDraw}
+        onZoomDraw={setZoomDraw}
+        onFit={properties.length ? () => fitTo(map, filtered.map((p) => [p.latitude!, p.longitude!]), 13, sidePad()) : undefined}
+        lang={mapLang}
+        onLang={setMapLang}
+        groups={[
+          {
+            key: "portal",
+            title: "Portal data",
+            icon: Home,
+            items: [
+              { key: "props", label: "Listings", hint: `${filtered.length} properties for sale & rent`, icon: Home, on: vis.props, onChange: (v) => setVis((x) => ({ ...x, props: v })) },
+              { key: "pois", label: "Featured places", hint: "Curated places with ratings", icon: Star, on: vis.pois, onChange: (v) => setVis((x) => ({ ...x, pois: v })) },
+              { key: "aois", label: "Areas of interest", hint: "Saved study areas", icon: Square, on: vis.aois, onChange: (v) => setVis((x) => ({ ...x, aois: v })) },
+            ],
+          },
+          {
+            key: "poi",
+            title: "Points of interest",
+            icon: MapPin,
+            items: POI_CATEGORIES.map((c) => ({ key: `poi-${c.key}`, label: c.label, color: c.color, on: osmCats.has(c.key), onChange: (v: boolean) => togglePoiCat(c.key, v) })),
+            note:
+              osmCats.size === 0
+                ? "Map data for Islamabad / Rawalpindi, Lahore and Karachi."
+                : zoom < POI_MIN_ZOOM || poiStatus?.zoomIn
+                  ? `Zoom in (level ${POI_MIN_ZOOM}+) to see places.`
+                  : poiStatus
+                    ? `${poiStatus.count.toLocaleString()} places in view${poiStatus.total > poiStatus.count ? ` (of ${poiStatus.total.toLocaleString()} — zoom in for all)` : ""}.`
+                    : undefined,
+          },
+          {
+            key: "reference",
+            title: "Reference",
+            icon: Globe2,
+            items: [
+              { key: "provinces", label: "Province boundaries", hint: "Provinces & territories, with listing counts", icon: MapIcon, on: vis.provinces, onChange: (v) => setVis((x) => ({ ...x, provinces: v })) },
+              { key: "cities", label: "City names", hint: "Main cities; gold dots have a city page", icon: Building2, on: vis.cities, onChange: (v) => setVis((x) => ({ ...x, cities: v })) },
+            ],
+          },
+          {
+            key: "plans",
+            title: "DHA master plans",
+            icon: LandPlot,
+            items: (plansQ.data?.plans ?? []).map((pl) => ({
+              key: `plan-${pl.key}`,
+              label: pl.name,
+              hint: pl.city,
+              icon: MapIcon,
+              on: vis.layers && planShown.has(pl.key),
+              onChange: (v: boolean) => setPlanOn(pl.key, v),
+              children: labelLayers
+                .filter((l) => l.name.startsWith(`${pl.name} — plan labels: `))
+                .map((l) => ({ key: l.id, label: `Labels: ${l.name.split(" — plan labels: ")[1]}`, on: labelsOn.has(l.id), onChange: (v: boolean) => setLabelOn(l.id, v) })),
+            })),
+            note: `Plan text appears from zoom ${LABEL_MIN_ZOOM}; plot numbers from zoom 17. Use the Layers tab to search a plan.`,
+          },
+          {
+            key: "gis",
+            title: "GIS layers",
+            icon: Shapes,
+            items: gisLayers.map((l) => ({
+              key: l.id,
+              label: l.name,
+              hint: titleCase(l.layer_type),
+              color: LAYER_COLORS[l.layer_type] ?? "#146f45",
+              on: vis.layers && !hidden.has(l.id),
+              onChange: (v: boolean) => setLayerHidden(l.id, v),
+            })),
+          },
+        ]}
+      />
 
-      {/* ------------------------------------------------------- analyse hint */}
-      <div className="pointer-events-none absolute start-1/2 top-3 z-[380] -translate-x-1/2 rtl:translate-x-1/2 md:start-[408px] md:translate-x-0 md:rtl:translate-x-0">
+      {/* ------------------------------------------------------- search bar / route finder */}
+      <NavigatorPanel
+        nav={nav}
+        className={cn(
+          "absolute start-3 end-[4.25rem] top-3 z-[450] md:end-auto md:w-[min(420px,calc(100%-30rem))]",
+          open ? "md:start-[404px]" : "md:start-3",
+        )}
+      />
+
+      {/* ------------------------------------------------------- tool hints */}
+      <div className="pointer-events-none absolute bottom-6 start-1/2 z-[380] -translate-x-1/2 rtl:translate-x-1/2 md:start-[calc(50%+190px)]">
       <AnimatePresence>
         {zoomDraw && (
           <motion.div key="zoom" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>

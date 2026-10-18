@@ -165,6 +165,78 @@
   filter: brightness(0.75) contrast(1.1) saturate(0.85);
 }
 
+/* ---------- map reference labels (provinces, cities) ---------- */
+.leaflet-tooltip.province-label {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  color: #0f172a;
+  font: 800 11px/1.25 "Plus Jakarta Sans", system-ui, sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 6px #fff;
+}
+.leaflet-tooltip.province-label::before {
+  display: none;
+}
+.province-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  text-align: center;
+}
+.province-count {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: 0.8;
+}
+.map-ur {
+  font-family: "Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", serif;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.6;
+}
+.city-label .city-name .map-ur {
+  display: block;
+  font-size: 12px;
+}
+.city-label {
+  background: transparent;
+  border: none;
+}
+.city-label .city-dot {
+  position: absolute;
+  left: -5px;
+  top: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  background: #0f172a;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
+}
+.city-label .city-dot.is-portal {
+  background: #c99a22;
+}
+.city-label .city-name {
+  position: absolute;
+  left: 9px;
+  top: -9px;
+  white-space: nowrap;
+  color: #0f172a;
+  font: 600 12px/1.4 "Plus Jakarta Sans", system-ui, sans-serif;
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 6px #fff;
+}
+.city-label .city-name.is-big {
+  font-weight: 800;
+  font-size: 13px;
+}
+
 /* ---------- ticker ---------- */
 .ticker-mask {
   mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);

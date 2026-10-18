@@ -102,6 +102,7 @@ export function PortalMap({
   children,
   fit,
   base: baseProp = "streets",
+  baseKey,
   switcher = true,
   scrollWheelZoom = false,
   follow,
@@ -114,13 +115,16 @@ export function PortalMap({
   children?: ReactNode;
   fit?: [number, number][];
   base?: BaseMapKey;
+  /** Controlled base map (the parent renders its own switcher; pass switcher={false}). */
+  baseKey?: BaseMapKey;
   switcher?: boolean;
   scrollWheelZoom?: boolean;
   /** Re-center when center/zoom props change. */
   follow?: boolean;
   onReady?: (map: L.Map) => void;
 }) {
-  const [base, setBase] = useState<BaseMapKey>(baseProp);
+  const [ownBase, setBase] = useState<BaseMapKey>(baseProp);
+  const base = baseKey ?? ownBase;
   const [open, setOpen] = useState(false);
   const bm = BASE_MAPS[base];
   // react-leaflet 4 re-creates the Leaflet map whenever its container ref re-attaches
