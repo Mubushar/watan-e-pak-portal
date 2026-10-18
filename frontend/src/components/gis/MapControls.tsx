@@ -1,8 +1,8 @@
 /**
  * The map explorer's control column, grouped like a GIS toolbar:
  *   Map    base map · layers (one panel with an on/off switch for every layer) · label language
- *   Full   fit to listings (the whole picture)
- *   Zoom   zoom to area (drag a box) · draw a case-study area (circle / rectangle / polygon)
+ *   View   fit to listings (full) · zoom to area (drag a box)
+ *   Study  draw a case-study area (circle / rectangle / polygon)
  *
  * The layers panel: a filter box, "All on / All off", then collapsible sections (Portal data,
  * Points of interest, Reference, DHA master plans, GIS layers). Each section has a master switch
@@ -278,14 +278,18 @@ export function MapControls({
         />
         <Btn icon={Languages} text="Lang" title="Map label language — English / اردو" active={open === "lang"} onClick={() => setOpen(open === "lang" ? null : "lang")} />
       </ToolGroup>
-      {onFit && (
-        <ToolGroup label="Full">
-          <Btn icon={Globe} title="Fit to listings" onClick={onFit} />
-        </ToolGroup>
-      )}
-      <ToolGroup label="Zoom">
-        <Btn icon={SquareDashedMousePointer} title={zoomDraw ? "Cancel zoom to area" : "Zoom to area: drag a box on the map"} active={zoomDraw} onClick={() => onZoomDraw(!zoomDraw)} />
-        {onDraw && (
+      <ToolGroup label="View">
+        {onFit && <Btn icon={Globe} text="Full" title="Fit to listings" onClick={onFit} />}
+        <Btn
+          icon={SquareDashedMousePointer}
+          text="Zoom"
+          title={zoomDraw ? "Cancel zoom to area" : "Zoom to area: drag a box on the map"}
+          active={zoomDraw}
+          onClick={() => onZoomDraw(!zoomDraw)}
+        />
+      </ToolGroup>
+      {onDraw && (
+        <ToolGroup label="Study">
           <Btn
             icon={PencilRuler}
             text="Study"
@@ -293,8 +297,8 @@ export function MapControls({
             active={!!drawMode || open === "draw"}
             onClick={() => (drawMode ? onDraw(null) : setOpen(open === "draw" ? null : "draw"))}
           />
-        )}
-      </ToolGroup>
+        </ToolGroup>
+      )}
 
       {open === "draw" && onDraw && (
         <Popover title="Draw a study area" onClose={() => setOpen(null)} wide>
