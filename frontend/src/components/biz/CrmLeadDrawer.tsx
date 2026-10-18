@@ -5,6 +5,7 @@ import { post, put } from "@/lib/api";
 import { useApi, useMutate } from "@/hooks/useApi";
 import { date, pkrShort, timeAgo, titleCase } from "@/lib/format";
 import { Avatar, Badge, Button, Drawer, EmptyState, ErrorState, Field, KeyValue, Progress, ScoreRing, Select, Skeleton, StatusBadge, Textarea } from "@/components/ui";
+import { LeadAiPanel } from "@/components/crm/LeadAiPanel";
 import { bandTone, ensure, sentence } from "./ops-kit";
 import { CUSTOMER_TYPES, INTERACTION_CHANNELS, LEAD_STATUSES, type Agent, type Deal, type Interaction, type Lead } from "./crm-types";
 
@@ -178,6 +179,9 @@ export function CrmLeadDrawer({ leadId, agents, onClose }: { leadId: string | nu
             ]}
           />
           {lead.notes && <p className="rounded-xl bg-gold-50/70 px-3 py-2 text-sm text-gold-800 dark:bg-gold-500/10 dark:text-gold-100">{lead.notes}</p>}
+
+          {/* AI: brief, drafts, send, voice notes */}
+          <LeadAiPanel key={lead.id} leadId={lead.id} name={lead.name} />
 
           {/* actions */}
           <div className="grid gap-4 sm:grid-cols-2">

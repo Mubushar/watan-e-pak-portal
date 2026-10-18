@@ -1601,6 +1601,48 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         r = client.post("/crm/interactions", json={"entity_type": "lead", "entity_id": mcp_lead_id,
                                                    "channel": "call", "summary": "REST logged call"})
         check("POST /crm/interactions", r.status_code == 201, f"{r.status_code} {r.text[:120]}")
+        r = client.get("/crm/interactions")
+        check("GET /crm/interactions lists the latest across the CRM", r.status_code == 200 and r.json().get("count", 0) >= 1, str(r.json())[:120])
+
+        # --- CRM intelligence, channels and webhooks (rules mode: no AI key in tests)
+        r = client.get("/crm/insights", params={"days": 30})
+        ins = r.json() if r.status_code == 200 else {}
+        check("GET /crm/insights", r.status_code == 200 and "kpis" in ins and "priority_leads" in ins and "agents" in ins, str(r.status_code))
+        r = client.get("/crm/channels")
+        check("GET /crm/channels", r.status_code == 200 and {"email", "sms", "whatsapp", "inbound"} <= set(r.json()), str(r.status_code))
+        r = client.post(f"/crm/ai/lead-brief/{mcp_lead_id}")
+        check("POST /crm/ai/lead-brief", r.status_code == 200 and r.json().get("next_best_action") and r.json().get("drafts", {}).get("whatsapp"), r.text[:160])
+        r = client.post(f"/crm/ai/lead-brief/{mcp_lead_id}", params={"lang": "ur"})
+        check("POST /crm/ai/lead-brief?lang=ur", r.status_code == 200 and "السلام" in r.json().get("drafts", {}).get("whatsapp", ""), r.text[:160])
+        r = client.post("/crm/ai/lead-brief/no-such-lead")
+        check("POST /crm/ai/lead-brief (404)", r.status_code == 404, str(r.status_code))
+        r = client.post("/crm/ai/draft", json={"entity_id": mcp_lead_id, "channel": "email", "goal": "site_visit"})
+        check("POST /crm/ai/draft", r.status_code == 200 and r.json().get("body") and r.json().get("subject"), r.text[:160])
+        tasks_before = len(core.tasks_db)
+        r = client.post("/crm/ai/note", json={"entity_id": mcp_lead_id, "text": "Budget 2.5 crore, wants a site visit tomorrow"})
+        note = r.json() if r.status_code == 200 else {}
+        check("POST /crm/ai/note (typed) -> analysis, interaction and task",
+              r.status_code == 200 and note["analysis"].get("budget_pkr") == 25_000_000 and len(core.tasks_db) == tasks_before + 1, r.text[:200])
+        r = client.post("/crm/ai/note", json={"audio_base64": "AAAA", "entity_id": mcp_lead_id})
+        check("POST /crm/ai/note (voice without OpenAI -> 501)", r.status_code == 501, str(r.status_code))
+        r = client.post("/crm/messages/send", json={"channel": "whatsapp", "body": "Test", "to": "0300 1234567", "entity_id": mcp_lead_id})
+        check("POST /crm/messages/send (simulated, logged)", r.status_code == 200 and r.json().get("status") == "simulated" and r.json().get("interaction"), r.text[:160])
+        r = client.post("/crm/messages/send", json={"channel": "email", "body": "Test", "to": "not-an-email"})
+        check("POST /crm/messages/send (bad address -> 502)", r.status_code == 502, str(r.status_code))
+        r = client.post("/crm/ai/ask", json={"question": "who should I call first?"})
+        check("POST /crm/ai/ask", r.status_code == 200 and r.json().get("answer"), r.text[:160])
+        r = client.post("/crm/webhooks/lead", params={"source": "facebook"}, json={
+            "field_data": [{"name": "full_name", "values": ["Webhook Lead"]}, {"name": "phone_number", "values": ["0321-7654321"]}]})
+        hook = r.json() if r.status_code == 200 else {}
+        check("POST /crm/webhooks/lead (Facebook lead ad)", hook.get("created") is True and hook.get("agent_id"), r.text[:160])
+        r = client.post("/crm/webhooks/lead", json={"name": "Webhook Lead", "phone": "+92 321 7654321"})
+        check("POST /crm/webhooks/lead de-duplicates by phone", r.status_code == 200 and r.json().get("created") is False and r.json().get("lead_id") == hook.get("lead_id"), r.text[:160])
+        r = client.post("/crm/webhooks/whatsapp", json={"entry": [{"changes": [{"value": {
+            "contacts": [{"wa_id": "923459998887", "profile": {"name": "WA Lead"}}],
+            "messages": [{"from": "923459998887", "type": "text", "text": {"body": "Is it available?"}}]}}]}]})
+        check("POST /crm/webhooks/whatsapp", r.status_code == 200 and r.json().get("handled") == 1, r.text[:160])
+        r = client.get("/crm/webhooks/whatsapp", params={"hub.mode": "subscribe", "hub.verify_token": "x", "hub.challenge": "1"})
+        check("GET /crm/webhooks/whatsapp (no verify token -> 403)", r.status_code == 403, str(r.status_code))
 
         r = client.post("/crm/agents", json={"name": "REST Agent", "email": "rest.agent@example.com",
                                              "region": "Lahore"})

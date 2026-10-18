@@ -1,7 +1,12 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
+  Bot,
   CalendarCheck,
+  Inbox,
+  LayoutDashboard,
+  RadioTower,
   CalendarClock,
   CheckCircle2,
   Circle,
@@ -27,6 +32,10 @@ import { Bars } from "@/components/ui/charts";
 import { FormGrid, MiniStat, Panel, ScoreBar, SkeletonGrid, Stars, bandTone, crShort, sentence, ensure, isoDay, numOr, stagger, useFormState, rs } from "@/components/biz/ops-kit";
 import { CrmLeadDrawer } from "@/components/biz/CrmLeadDrawer";
 import { CrmPipelineBoard } from "@/components/biz/CrmPipelineBoard";
+import { CrmDashboardTab } from "@/components/crm/CrmDashboardTab";
+import { CrmInboxTab } from "@/components/crm/CrmInboxTab";
+import { CrmChannelsTab } from "@/components/crm/CrmChannelsTab";
+import { CrmCopilot } from "@/components/crm/CrmCopilot";
 import {
   LEAD_SOURCES,
   LEAD_STATUSES,
@@ -43,7 +52,8 @@ import {
 } from "@/components/biz/crm-types";
 import type { City } from "@/types";
 
-type TabKey = "leads" | "pipeline" | "deals" | "customers" | "agents" | "tasks" | "appointments" | "broker";
+type TabKey = "dashboard" | "leads" | "pipeline" | "deals" | "customers" | "agents" | "tasks" | "appointments" | "inbox" | "channels" | "broker";
+const TAB_KEYS: TabKey[] = ["dashboard", "leads", "pipeline", "deals", "customers", "agents", "tasks", "appointments", "inbox", "channels", "broker"];
 
 interface CrmDashboard {
   agents: number;
@@ -57,7 +67,17 @@ interface CrmDashboard {
 const INVALIDATE = ["/crm", "/broker", "/portal", "/agents", "/marketing"];
 
 export default function Crm() {
-  const [tab, setTab] = useState<TabKey>("leads");
+  const [params, setParams] = useSearchParams();
+  const tabParam = params.get("tab") as TabKey | null;
+  const tab: TabKey = tabParam && TAB_KEYS.includes(tabParam) ? tabParam : "dashboard";
+  const setTab = (t: TabKey) => setParams((p) => {
+    const n = new URLSearchParams(p);
+    if (t === "dashboard") n.delete("tab");
+    else n.set("tab", t);
+    return n;
+  }, { replace: true });
+  const [copilot, setCopilot] = useState(false);
+  const [copilotQ, setCopilotQ] = useState<string | undefined>();
   const [leadId, setLeadId] = useState<string | null>(null);
   const [newLead, setNewLead] = useState(false);
   const [newTask, setNewTask] = useState(false);
@@ -70,9 +90,20 @@ export default function Crm() {
     <div className="space-y-6">
       <PageHeader
         title="CRM"
-        subtitle="Leads, pipeline, customers and your sales team"
+        subtitle="Smart sales hub — leads, pipeline, follow-ups, WhatsApp / e-mail / SMS and your AI copilot"
         actions={
           <>
+            <Button
+              variant="gold"
+              size="sm"
+              icon={<Bot className="h-4 w-4" />}
+              onClick={() => {
+                setCopilotQ(undefined);
+                setCopilot(true);
+              }}
+            >
+              AI copilot
+            </Button>
             <Button variant="outline" size="sm" icon={<ListTodo className="h-4 w-4" />} onClick={() => setNewTask(true)}>
               New task
             </Button>
@@ -83,6 +114,7 @@ export default function Crm() {
         }
       />
 
+      {tab !== "dashboard" && (
       <QueryState q={dash} skeleton={<SkeletonGrid n={4} />}>
         {(d) => (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -93,6 +125,7 @@ export default function Crm() {
           </div>
         )}
       </QueryState>
+      )}
 
       <Card className="overflow-hidden">
         <Tabs<TabKey>
@@ -100,6 +133,7 @@ export default function Crm() {
           value={tab}
           onChange={setTab}
           tabs={[
+            { value: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
             { value: "leads", label: "Leads", icon: <Users className="h-4 w-4" />, count: dash.data?.leads.total },
             { value: "pipeline", label: "Pipeline", icon: <KanbanSquare className="h-4 w-4" /> },
             { value: "deals", label: "Deals", icon: <Handshake className="h-4 w-4" />, count: dash.data?.deals.total },
@@ -107,10 +141,24 @@ export default function Crm() {
             { value: "agents", label: "Agents", icon: <Trophy className="h-4 w-4" />, count: dash.data?.agents },
             { value: "tasks", label: "Tasks", icon: <ListTodo className="h-4 w-4" />, count: dash.data?.tasks.open },
             { value: "appointments", label: "Appointments", icon: <CalendarClock className="h-4 w-4" />, count: dash.data?.appointments },
+            { value: "inbox", label: "Inbox", icon: <Inbox className="h-4 w-4" /> },
+            { value: "channels", label: "Channels", icon: <RadioTower className="h-4 w-4" /> },
             { value: "broker", label: "Broker intel", icon: <Radar className="h-4 w-4" /> },
           ]}
         />
         <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+          {tab === "dashboard" && (
+            <CrmDashboardTab
+              agents={agents}
+              onOpenLead={setLeadId}
+              onAsk={(question) => {
+                setCopilotQ(question || undefined);
+                setCopilot(true);
+              }}
+            />
+          )}
+          {tab === "inbox" && <CrmInboxTab onOpenLead={setLeadId} />}
+          {tab === "channels" && <CrmChannelsTab />}
           {tab === "leads" && <LeadsTab agents={agents} onOpen={setLeadId} />}
           {tab === "pipeline" && (
             <div className="p-4 sm:p-5">
@@ -127,6 +175,15 @@ export default function Crm() {
       </Card>
 
       <CrmLeadDrawer leadId={leadId} agents={agents} onClose={() => setLeadId(null)} />
+      <CrmCopilot
+        open={copilot}
+        initial={copilotQ}
+        onClose={() => setCopilot(false)}
+        onOpenLead={(id) => {
+          setCopilot(false);
+          setLeadId(id);
+        }}
+      />
       <NewLeadModal open={newLead} onClose={() => setNewLead(false)} agents={agents} />
       <NewTaskModal open={newTask} onClose={() => setNewTask(false)} agents={agents} />
     </div>

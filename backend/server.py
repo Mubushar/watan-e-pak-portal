@@ -4584,9 +4584,11 @@ def crm_log_interaction(
 
 
 @mcp.tool()
-def crm_list_interactions(entity_id: str) -> str:
-    """List interactions for a given entity."""
-    out = [model_dict(i) for i in interactions_db if i.entity_id == entity_id]
+def crm_list_interactions(entity_id: Optional[str] = None, limit: int = 200) -> str:
+    """List interactions for a given entity, or the latest ones across the CRM (newest first)."""
+    rows = [i for i in interactions_db if entity_id is None or i.entity_id == entity_id]
+    rows.sort(key=lambda i: str(i.occurred_at), reverse=True)
+    out = [model_dict(i) for i in rows[: max(1, limit)]]
     return dump({"count": len(out), "interactions": out})
 
 

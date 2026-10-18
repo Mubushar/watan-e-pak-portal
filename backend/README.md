@@ -188,6 +188,32 @@ The map's terrain layer (DTM elevation colours, hillshade and the elevation unde
 needs no backend data. The browser decodes the open AWS Terrain Tiles directly (Terrarium
 PNGs: SRTM 30 m over Pakistan).
 
+## CRM: dashboard, AI sales assistant, channels
+
+The portal's CRM page (`/app/crm`) opens on a dashboard and adds an AI copilot, an inbox and a
+channels view. The backend is in `crm_ai.py` (intelligence) and `crm_channels.py` (sending).
+Every feature works without AI credit using rules and templates. With a chat model configured
+(`OPENAI_API_KEY`, or `LLM_BASE_URL` for LM Studio), the model writes the briefs, drafts and
+answers instead, and responses say `source: "ai"`.
+
+| Endpoint | What it does |
+| --- | --- |
+| `GET /crm/insights?days=30&agent_id=` | Dashboard data: KPIs (new / hot / uncontacted leads, first-response time, conversion, weighted pipeline, won, tasks, visits), daily trend, sources, funnel, pipeline, channel mix, agent leaderboard, priority leads with next best action, at-risk deals, agenda |
+| `POST /crm/ai/lead-brief/{lead_id}?lang=en\|ur` | Summary, temperature, next best action (channel and urgency), follow-up date, talking points, risks, and WhatsApp / SMS / e-mail drafts |
+| `POST /crm/ai/draft` | One message by goal (follow-up, new matches, site visit, price update, proposal, re-engage, thank-you), tone and language |
+| `POST /crm/ai/note` | A voice note (`audio_base64`) or typed note: transcribed, summarised, then logged on the timeline with follow-up tasks, a filled budget and a suggested status |
+| `POST /crm/ai/ask` | Copilot. Ask in text or by voice; the answer comes from live CRM data and can be spoken back (`speak`) |
+| `POST /crm/messages/send` | WhatsApp, e-mail or SMS to a lead or customer, logged on their timeline. Simulated when the channel isn't configured |
+| `GET /crm/channels` | Which channels are live, and the inbound webhook URLs |
+| `POST /crm/webhooks/lead?source=` | Inbound leads from website forms, Facebook / Instagram lead ads (via Zapier / Make; `field_data` understood) and portals. De-duplicated by phone or e-mail and routed to an agent by region and load. Optional `PORTAL_CRM_WEBHOOK_SECRET` (header `X-Webhook-Secret`) |
+| `GET/POST /crm/webhooks/whatsapp` | Meta WhatsApp Cloud webhook: verification (`PORTAL_WHATSAPP_VERIFY_TOKEN`) and incoming messages, which land on the sender's lead |
+
+To turn real sending on:
+- **E-mail:** the `PORTAL_SMTP_*` settings.
+- **SMS:** `PORTAL_SMS_PROVIDER=twilio` or `webhook`.
+- **WhatsApp:** `WHATSAPP_TOKEN` and `WHATSAPP_PHONE_ID`. Free text only reaches people who messaged you in the last 24 hours; outside that window set `PORTAL_WHATSAPP_CRM_TEMPLATE` to an approved template with one body parameter.
+- **Voice notes and spoken answers:** `OPENAI_API_KEY`.
+
 ## Infrastructure mega projects and area case studies
 
 | Endpoint | What it returns |

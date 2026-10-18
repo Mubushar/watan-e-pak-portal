@@ -42,6 +42,8 @@ import ai_guard
 import directions as routing
 import megaprojects
 import roads
+import crm_ai
+import crm_channels
 import water
 import study_area
 import openai_voice
@@ -2061,6 +2063,212 @@ def crm_add_agent(payload: Dict[str, Any]) -> Any:
     return j(core.crm_add_agent(**payload))
 
 
+# ============================================================ CRM: insights, AI, channels, webhooks
+
+
+class CrmSendRequest(BaseModel):
+    channel: str  # whatsapp | email | sms
+    body: str = Field(..., min_length=1, max_length=4000)
+    subject: Optional[str] = None
+    to: Optional[str] = None  # defaults to the lead's / customer's phone or e-mail
+    entity_type: Optional[str] = "lead"
+    entity_id: Optional[str] = None
+    agent_id: Optional[str] = None
+
+
+class CrmDraftRequest(BaseModel):
+    entity_type: str = "lead"
+    entity_id: str
+    channel: str = "whatsapp"
+    goal: str = "follow_up"
+    lang: str = "en"
+    tone: str = "friendly"
+    notes: Optional[str] = None
+
+
+class CrmNoteRequest(BaseModel):
+    audio_base64: Optional[str] = None
+    mime_type: str = "audio/webm"
+    text: Optional[str] = None
+    entity_type: Optional[str] = "lead"
+    entity_id: Optional[str] = None
+    agent_id: Optional[str] = None
+    apply: bool = True
+
+
+class CrmAskRequest(BaseModel):
+    question: Optional[str] = None
+    audio_base64: Optional[str] = None
+    mime_type: str = "audio/webm"
+    lang: str = "en"
+    speak: bool = False
+
+
+async def _transcribe_b64(b64: str, mime: str, request: Request) -> str:
+    if not openai_voice.configured():
+        raise HTTPException(status_code=501, detail="Voice needs OPENAI_API_KEY in backend/.env — type the note instead")
+    if len(b64) > MAX_AUDIO_B64:
+        raise HTTPException(status_code=413, detail="Recording too long (25 MB max)")
+    ai_guard.check(request, "voice")
+    try:
+        audio = base64.b64decode(b64.split(",")[-1], validate=False)
+    except Exception:
+        raise HTTPException(status_code=400, detail="audio_base64 is not valid base64")
+    if not audio:
+        raise HTTPException(status_code=400, detail="Empty audio")
+    try:
+        return await asyncio.to_thread(openai_voice.transcribe, audio, mime)
+    except openai_voice.VoiceError as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc))
+
+
+@app.get("/crm/insights", tags=["crm"])
+def crm_insights(days: int = 30, agent_id: Optional[str] = None) -> Any:
+    """Everything the CRM dashboard shows: KPIs (leads, conversion, first-response time, pipeline,
+    won value, tasks, appointments), daily trend, sources, statuses, cities, channel mix, funnel,
+    pipeline by stage, agent leaderboard, priority leads with next best action, at-risk deals,
+    today's agenda and which messaging channels are live. ``agent_id`` limits it to one agent's book."""
+    return crm_ai.insights(max(7, min(days, 365)), agent_id)
+
+
+@app.get("/crm/channels", tags=["crm"])
+def crm_channels_status() -> Any:
+    """Which outbound channels really send (e-mail / SMS / WhatsApp) and the inbound webhooks."""
+    return {**crm_channels.status(), "ai": crm_ai.ai_available(), "voice": openai_voice.configured()}
+
+
+@app.post("/crm/messages/send", tags=["crm"])
+def crm_send_message(payload: CrmSendRequest) -> Any:
+    """Send a WhatsApp, e-mail or SMS to a lead / customer and log it on their timeline. Channels
+    that are not configured are simulated (logged, not delivered) — see GET /crm/channels."""
+    entity = None
+    if payload.entity_id:
+        entity, err = crm_ai._entity(payload.entity_type or "lead", payload.entity_id)
+        if err:
+            raise HTTPException(status_code=404, detail=err)
+    to = payload.to or (getattr(entity, "email", None) if payload.channel == "email" else getattr(entity, "phone", None))
+    if not to:
+        raise HTTPException(status_code=422, detail=f"No {'e-mail address' if payload.channel == 'email' else 'phone number'} for this contact")
+    res = crm_channels.send(payload.channel, to, payload.body, payload.subject)
+    interaction = None
+    if entity is not None and res["status"] in ("sent", "simulated"):
+        summary = (f"{payload.subject}: " if payload.subject else "") + payload.body
+        if res["status"] == "simulated":
+            summary += " (simulated — channel not configured)"
+        interaction = j(core.crm_log_interaction(entity_type=payload.entity_type or "lead", entity_id=entity.id, summary=summary[:1000],
+                                                 channel=payload.channel, direction="outbound",
+                                                 agent_id=payload.agent_id or getattr(entity, "assigned_agent_id", None)))
+        if getattr(entity, "status", None) == "new":
+            entity.status = "contacted"
+            entity.updated_at = crm_ai.datetime.now()
+    if res["status"] == "failed":
+        raise HTTPException(status_code=502, detail=res["error"] or "Sending failed")
+    return {**res, "interaction": interaction}
+
+
+@app.post("/crm/ai/lead-brief/{lead_id}", tags=["crm"])
+async def crm_ai_lead_brief(lead_id: str, request: Request, lang: str = "en") -> Any:
+    """AI lead brief: summary, temperature, next best action with channel and urgency, follow-up
+    date, talking points, risks, and ready-to-send WhatsApp / SMS / e-mail drafts (en or ur)."""
+    if crm_ai.ai_available():
+        ai_guard.check(request, "chat")
+    out = await asyncio.to_thread(crm_ai.lead_brief, lead_id, lang)
+    if "error" in out:
+        raise HTTPException(status_code=404, detail=out["error"])
+    return out
+
+
+@app.post("/crm/ai/draft", tags=["crm"])
+async def crm_ai_draft(payload: CrmDraftRequest, request: Request) -> Any:
+    """Draft one message for a lead / customer: goal follow_up | new_matches | site_visit |
+    price_update | re_engage | thank_you | proposal, any tone, English or Urdu."""
+    if crm_ai.ai_available():
+        ai_guard.check(request, "chat")
+    out = await asyncio.to_thread(crm_ai.draft_message, payload.entity_type, payload.entity_id, payload.channel,
+                                  payload.goal, payload.lang, payload.tone, payload.notes)
+    if "error" in out:
+        raise HTTPException(status_code=404, detail=out["error"])
+    return out
+
+
+@app.post("/crm/ai/note", tags=["crm"])
+async def crm_ai_note(payload: CrmNoteRequest, request: Request) -> Any:
+    """A voice note (``audio_base64``) or typed note about a client: transcribed, summarised and
+    turned into CRM data (sentiment, budget, next step, follow-up date, suggested status, tasks).
+    With ``apply`` and an entity it is logged on the timeline and its tasks are created."""
+    text = (payload.text or "").strip()
+    if payload.audio_base64:
+        text = (await _transcribe_b64(payload.audio_base64, payload.mime_type, request)).strip()
+    if not text:
+        raise HTTPException(status_code=422, detail="Record or type a note")
+    if crm_ai.ai_available():
+        ai_guard.check(request, "chat")
+    analysis = await asyncio.to_thread(crm_ai.analyse_note, text, payload.entity_type, payload.entity_id)
+    applied = None
+    if payload.apply and payload.entity_id:
+        applied = crm_ai.apply_note(analysis, text, payload.entity_type or "lead", payload.entity_id, payload.agent_id,
+                                    channel="voice_note" if payload.audio_base64 else "note")
+        if "error" in applied:
+            raise HTTPException(status_code=404, detail=applied["error"])
+    return {"transcript": text, "analysis": analysis, "applied": applied}
+
+
+@app.post("/crm/ai/ask", tags=["crm"])
+async def crm_ai_ask(payload: CrmAskRequest, request: Request) -> Any:
+    """CRM copilot: ask in text or by voice ("who should I call first?", "deals at risk?",
+    "leads in Lahore") and get an answer from live CRM data — spoken back with ``speak``."""
+    question = (payload.question or "").strip()
+    transcript = None
+    if payload.audio_base64:
+        transcript = question = (await _transcribe_b64(payload.audio_base64, payload.mime_type, request)).strip()
+    if not question:
+        raise HTTPException(status_code=422, detail="Ask a question")
+    if crm_ai.ai_available():
+        ai_guard.check(request, "chat")
+    out = await asyncio.to_thread(crm_ai.ask, question, payload.lang)
+    out["question"] = question
+    out["transcript"] = transcript
+    if payload.speak and openai_voice.configured():
+        try:
+            spoken = openai_voice.clean_for_speech(out["answer"])[:MAX_SPEAK_CHARS]
+            audio, mime = await asyncio.to_thread(openai_voice.speak, spoken, "ur" if payload.lang == "ur" else None)
+            out["audio_base64"], out["mime_type"] = base64.b64encode(audio).decode(), mime
+        except openai_voice.VoiceError:
+            pass
+    return out
+
+
+@app.post("/crm/webhooks/lead", tags=["crm"])
+def crm_webhook_lead(payload: Dict[str, Any], source: str = "website",
+                     x_webhook_secret: Optional[str] = Header(default=None)) -> Any:
+    """Inbound leads from website forms, Facebook / Instagram lead ads (via Zapier / Make; Meta
+    ``field_data`` is understood), property portals or any tool that can POST JSON. Recognises
+    name / full_name, phone / phone_number / mobile, email, message, city, budget, property_id.
+    De-duplicates by phone or e-mail and routes new leads to an agent. When
+    ``PORTAL_CRM_WEBHOOK_SECRET`` is set, send it in the ``X-Webhook-Secret`` header."""
+    secret = os.getenv("PORTAL_CRM_WEBHOOK_SECRET", "").strip()
+    if secret and x_webhook_secret != secret:
+        raise HTTPException(status_code=401, detail="Bad webhook secret")
+    return crm_ai.ingest_lead(payload, source)
+
+
+@app.get("/crm/webhooks/whatsapp", tags=["crm"])
+def crm_webhook_whatsapp_verify(request: Request) -> Any:
+    """Meta webhook verification (``hub.verify_token`` must equal ``PORTAL_WHATSAPP_VERIFY_TOKEN``)."""
+    q = request.query_params
+    token = os.getenv("PORTAL_WHATSAPP_VERIFY_TOKEN", "").strip()
+    if q.get("hub.mode") == "subscribe" and token and q.get("hub.verify_token") == token:
+        return PlainTextResponse(q.get("hub.challenge", ""))
+    raise HTTPException(status_code=403, detail="Verification failed")
+
+
+@app.post("/crm/webhooks/whatsapp", tags=["crm"])
+def crm_webhook_whatsapp(payload: Dict[str, Any]) -> Any:
+    """Incoming WhatsApp messages (Meta Cloud API webhook) land on the sender's lead timeline; a
+    new number becomes a new lead routed to an agent."""
+    return crm_ai.whatsapp_inbound(payload)
+
+
 @app.get("/crm/agents/{agent_id}", tags=["crm"])
 def crm_get_agent(agent_id: str) -> Any:
     """Fetch one agent with their pipeline."""
@@ -2098,9 +2306,9 @@ def crm_assign_lead(lead_id: str, payload: Dict[str, Any]) -> Any:
 
 
 @app.get("/crm/interactions", tags=["crm"])
-def crm_list_interactions(entity_id: Optional[str] = None) -> Any:
-    """List interactions, optionally filtered by related entity."""
-    return j(core.crm_list_interactions(entity_id=entity_id))
+def crm_list_interactions(entity_id: Optional[str] = None, limit: int = 200) -> Any:
+    """List interactions for an entity, or the latest across the CRM (newest first)."""
+    return j(core.crm_list_interactions(entity_id=entity_id, limit=limit))
 
 
 @app.post("/crm/interactions", tags=["crm"], status_code=201)
