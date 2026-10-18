@@ -266,7 +266,7 @@ export function MapControls({
   return (
     <div ref={ref} className="absolute end-3 top-3 z-[400] flex flex-col items-end gap-2">
       <ToolGroup label="Map">
-        <Btn icon={Layers} title="Base map" active={open === "base"} onClick={() => setOpen(open === "base" ? null : "base")} />
+        <Btn icon={Layers} text="Base" title="Base map" active={open === "base"} onClick={() => setOpen(open === "base" ? null : "base")} />
         <Btn
           icon={Layers3}
           text="Portal"
