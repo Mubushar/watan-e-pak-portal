@@ -1,13 +1,13 @@
 /**
  * Case-study report for an area drawn on the map (POST /geo/study-area).
- * A full-height panel: grade & scores, summary, people, facilities, market, master plan,
+ * A full-height panel: grade & scores, a map of the area, summary, people, facilities, market, master plan,
  * economics, 5-year outlook, risks and news. Print / save as PDF, save the area as an area of
  * interest, or ask the AI assistant about it.
  */
-import { lazy, Suspense, useCallback, useMemo, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
-import { AlertTriangle, Bot, Building2, CheckCircle2, Coins, Construction, FileText, Landmark, LineChart, MapPin, Newspaper, Printer, Save, Users, X } from "lucide-react";
+import { AlertTriangle, Bot, Building2, CheckCircle2, Coins, Construction, Download, FileText, Landmark, LineChart, Map as MapIcon, MapPin, Newspaper, Printer, Save, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { post } from "@/lib/api";
 import { compact, num, pkrShort } from "@/lib/format";
@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { BarList, Button, Input, ScoreRing, Skeleton } from "@/components/ui";
 import type { StudyShape } from "./AreaDraw";
 import { megaColor, StatusPill, type MegaProject } from "./MegaProjects";
+import { studyMapImage, type StudyMapBase } from "./studyMapImage";
 
 const AreaTrend = lazy(() => import("@/components/ui/charts").then((m) => ({ default: m.AreaTrend })));
 
@@ -97,6 +98,26 @@ export function StudyReport({
 }) {
   const [name, setName] = useState<string>(data?.name ?? "Study area");
   const [saving, setSaving] = useState(false);
+
+  // Map image of the area (part of the printed report).
+  const [mapBase, setMapBase] = useState<StudyMapBase>("streets");
+  const [mapImg, setMapImg] = useState<string | null>(null);
+  const [mapBusy, setMapBusy] = useState(false);
+  useEffect(() => {
+    if (!shape || !data) return;
+    let live = true;
+    setMapBusy(true);
+    const points = ((data.market?.listings_sample ?? []) as { latitude?: number; longitude?: number }[])
+      .filter((p) => p.latitude != null && p.longitude != null)
+      .map((p) => [p.latitude!, p.longitude!] as [number, number]);
+    studyMapImage(shape, { base: mapBase, points, title: data.name ?? "Study area" })
+      .then((url) => live && setMapImg(url))
+      .catch(() => live && setMapImg(null))
+      .finally(() => live && setMapBusy(false));
+    return () => {
+      live = false;
+    };
+  }, [shape, data, mapBase]);
   const fc = data?.forecast ?? {};
   const trend = useMemo(() => {
     const sc = fc.scenarios as
@@ -195,6 +216,35 @@ export function StudyReport({
                   </p>
                 </div>
               </div>
+
+              {/* ---- map of the study area */}
+              <Section icon={MapIcon} title="Location map">
+                <div className="mb-2 flex items-center gap-1.5 print:hidden">
+                  {(["streets", "satellite"] as StudyMapBase[]).map((b) => (
+                    <button
+                      key={b}
+                      type="button"
+                      onClick={() => setMapBase(b)}
+                      className={cn("rounded-full px-3 py-1 text-xs font-semibold", mapBase === b ? "bg-brand-700 text-white" : "bg-black/5 hover:bg-black/10 dark:bg-white/10")}
+                    >
+                      {b === "streets" ? "Streets" : "Satellite"}
+                    </button>
+                  ))}
+                  {mapImg && (
+                    <a href={mapImg} download={`${(d.name ?? "study-area").replace(/[^\w-]+/g, "-")}-map.${mapBase === "satellite" ? "jpg" : "png"}`} className="btn btn-ghost btn-sm ms-auto">
+                      <Download className="h-4 w-4" /> Image
+                    </a>
+                  )}
+                </div>
+                {mapImg ? (
+                  <img src={mapImg} alt={`Map of ${d.name ?? "the study area"}`} className={cn("w-full rounded-xl ring-1 ring-black/5 transition", mapBusy && "opacity-60")} />
+                ) : (
+                  <Skeleton className="aspect-[880/500] w-full" />
+                )}
+                <p className="mt-1.5 text-[11px] text-ink-mute">
+                  Purple: the study area · gold: its centre{d.market?.listings_sample?.length ? " · green: listings inside" : ""}. The area outside is dimmed.
+                </p>
+              </Section>
 
               {/* ---- scores */}
               <Section icon={LineChart} title="Scores">
