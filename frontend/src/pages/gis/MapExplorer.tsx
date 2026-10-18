@@ -32,6 +32,7 @@ import {
   Star,
   Target,
   ZoomIn,
+  SquareDashedMousePointer,
 } from "lucide-react";
 import type { City, Property, PropertyList, Scheme } from "@/types";
 import { get } from "@/lib/api";
@@ -42,6 +43,7 @@ import { cn } from "@/lib/utils";
 import { PortalMap, PIN_STYLES, pin } from "@/components/map/PortalMap";
 import { Badge, BarList, Button, EmptyState, ErrorState, Input, ScoreRing, Select, Segmented, Skeleton, Slider, Tabs, Toggle } from "@/components/ui";
 import { ChipRow, FilterChip, MapClick, MiniStat, ReportButton, ReportModal, fitTo, type ReportRef } from "@/components/gis/kit";
+import { ZoomArea } from "@/components/gis/ZoomArea";
 import { LABEL_MIN_ZOOM, MasterPlanLayers, MasterPlanPanel, PlanLabels, useMasterPlans, type PlanLabel } from "@/components/gis/MasterPlans";
 import type { Aoi, AoiStats, GisLayer, GisLayerDetail, Poi, PoiCategory, RingResult, RouteResult } from "@/components/gis/types";
 
@@ -207,6 +209,8 @@ export default function MapExplorer() {
   const [radii, setRadii] = useState("1,3,5");
   const dRadii = useDebounced(radii, 600);
   const analysing = tab === "analyse";
+  const [zoomDraw, setZoomDraw] = useState(false);
+  const endZoomDraw = useCallback(() => setZoomDraw(false), []);
 
   const nearPoiQ = useApi<{ pois: Poi[]; count: number }>(
     analysing && mode === "radius" && pt ? "/poi/nearby" : null,
@@ -320,7 +324,7 @@ export default function MapExplorer() {
           zoom >= LABEL_MIN_ZOOM &&
           labelLayers.map((l) => {
             const d = labelsOn.has(l.id) ? details.get(l.id) : undefined;
-            return d?.geojson ? <PlanLabels key={l.id} data={d.geojson} color={d.style?.color ?? "#1d4ed8"} /> : null;
+            return d?.geojson ? <PlanLabels key={l.id} data={d.geojson} color="#172554" /> : null;
           })}
 
         {/* ----------------------------------------------------- GIS layers */}
@@ -464,7 +468,8 @@ export default function MapExplorer() {
           </>
         )}
 
-        <MapClick enabled={analysing} onClick={onMapClick} />
+        <MapClick enabled={analysing && !zoomDraw} onClick={onMapClick} />
+        <ZoomArea active={zoomDraw} onDone={endZoomDraw} padding={sidePad()} />
       </PortalMap>
 
       {/* ------------------------------------------------------- overlay toggles */}
@@ -491,6 +496,18 @@ export default function MapExplorer() {
             <Icon className="h-[18px] w-[18px]" />
           </button>
         ))}
+        <button
+          onClick={() => setZoomDraw((v) => !v)}
+          title={zoomDraw ? "Cancel zoom to area" : "Zoom to area: drag a box on the map"}
+          aria-label="Zoom to an area: drag a box"
+          aria-pressed={zoomDraw}
+          className={cn(
+            "flex h-10 w-10 items-center justify-center rounded-xl shadow-soft ring-1 ring-black/5 transition",
+            zoomDraw ? "bg-gold-gradient text-brand-950" : "bg-white text-brand-800 hover:bg-brand-50 dark:bg-brand-950 dark:text-white",
+          )}
+        >
+          <SquareDashedMousePointer className="h-[18px] w-[18px]" />
+        </button>
         {properties.length > 0 && (
           <button
             onClick={() => fitTo(map, filtered.map((p) => [p.latitude!, p.longitude!]), 13, sidePad())}
@@ -506,8 +523,16 @@ export default function MapExplorer() {
       {/* ------------------------------------------------------- analyse hint */}
       <div className="pointer-events-none absolute start-1/2 top-3 z-[380] -translate-x-1/2 rtl:translate-x-1/2 md:start-[408px] md:translate-x-0 md:rtl:translate-x-0">
       <AnimatePresence>
-        {analysing && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+        {zoomDraw && (
+          <motion.div key="zoom" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+            <div className="glass-dark flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold shadow-soft">
+              <SquareDashedMousePointer className="h-4 w-4 text-gold-300" />
+              Drag a box over the area to zoom in · Esc to cancel
+            </div>
+          </motion.div>
+        )}
+        {analysing && !zoomDraw && (
+          <motion.div key="analyse" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
             <div className="glass-dark flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold shadow-soft">
               <Crosshair className="h-4 w-4 text-gold-300" />
               {mode === "route" ? (routePts.length === 0 ? "Click the map to set start A" : routePts.length === 1 ? "Now click destination B" : "Click again to start a new route") : "Click the map to drop an analysis point"}
