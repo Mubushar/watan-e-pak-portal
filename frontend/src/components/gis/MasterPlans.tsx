@@ -8,31 +8,31 @@
  * Plan tiles exist only for zooms 12–17, so each plan's boundary is also drawn as an
  * outline (visible at any zoom, click to zoom in) and the tiles are scaled down to zoom 9.
  */
-import { useMemo, useState } from "react";
-import L from "leaflet";
+import { useEffect, useState } from "react";
+import type L from "leaflet";
 import type { FeatureCollection } from "geojson";
-import { CircleMarker, GeoJSON, Polygon, Rectangle, TileLayer, Tooltip } from "react-leaflet";
+import { CircleMarker, Polygon, Rectangle, TileLayer, Tooltip, useMap } from "react-leaflet";
 import { Map as MapIcon, Search, Target } from "lucide-react";
 import { useApi } from "@/hooks/useApi";
 import { API_BASE } from "@/lib/api";
 import { Badge, Button, EmptyState, Input, Skeleton, Toggle } from "@/components/ui";
 import { fitTo } from "./kit";
 import type { GisLayer } from "./types";
+import { PlanTextLayer } from "./PlanTextLayer";
 
-/** Plan text labels are drawn from this zoom in (thousands of points per plan). */
-export const LABEL_MIN_ZOOM = 15;
+/** Plan text is drawn from this zoom in; smaller text (plot numbers) appears around zoom 17–18. */
+export const LABEL_MIN_ZOOM = 14;
 
-/** Master-plan text labels as small dots on one shared canvas, with the text on hover. */
+/** Master-plan text drawn as text, at the plan's own size and angle (see PlanTextLayer). */
 export function PlanLabels({ data, color }: { data: FeatureCollection; color: string }) {
-  const renderer = useMemo(() => L.canvas({ padding: 0.3 }), []);
-  return (
-    <GeoJSON
-      data={data}
-      pointToLayer={(f, ll) =>
-        L.circleMarker(ll, { renderer, radius: 3, color, weight: 1, fillColor: color, fillOpacity: 0.7 }).bindTooltip(String(f.properties?.text ?? ""), { direction: "top" })
-      }
-    />
-  );
+  const map = useMap();
+  useEffect(() => {
+    const layer = new PlanTextLayer(data, color).addTo(map);
+    return () => {
+      layer.remove();
+    };
+  }, [map, data, color]);
+  return null;
 }
 
 /** The label layers of one plan, from the GIS layer list ("<plan> — plan labels: <group>"). */
@@ -209,7 +209,8 @@ export function MasterPlanPanel({
             <div className="rounded-xl bg-brand-50/60 p-3 dark:bg-white/5">
               <p className="text-xs font-semibold">Text from the plans</p>
               <p className="mt-0.5 text-[11px] text-ink-mute">
-                Sector names, facilities and plot numbers as points you can hover. Drawn from zoom {LABEL_MIN_ZOOM}
+                Sector, road and park names, plot numbers and sizes, written on the map at the plan's own size — zoom in for the
+                smaller text (plot numbers from about zoom 17). Shown from zoom {LABEL_MIN_ZOOM}
                 {labels.on.size && !labels.zoomedIn ? " — zoom in to see them." : "."}
                 {labels.loading && " Loading…"}
               </p>

@@ -436,10 +436,26 @@ def collect_knowledge(keys: Optional[Iterable[str]] = None) -> Dict[str, Any]:
 
 # ------------------------------------------------------------------ GIS layers
 
+def _label_geometry(meta: Dict[str, Any]) -> Tuple[float, float]:
+    """(metres per PDF point, rotation of the plan image on the ground in degrees CCW)."""
+    m_per_pt = float((meta.get("pdf_alignment") or {}).get("scale") or 0) * float(meta.get("m_per_px") or 0)
+    g = meta.get("to_ground")
+    rot = math.degrees(math.atan2(g[1][0], g[0][0])) if g else 0.0
+    return m_per_pt, rot
+
+
 def geojson_labels(key: str, categories: Optional[Iterable[str]] = None) -> Dict[str, Any]:
+    """The plan's text labels as GeoJSON points.
+
+    ``angle`` is the text direction on the plan image (degrees CCW); ``rot`` is that direction
+    on the map (north-up, degrees CCW) and ``size_m`` the text height on the ground in metres,
+    so a map can draw each label at the plan's own scale and orientation."""
     cats = set(categories) if categories else None
+    meta = store().meta.get(key) or {}
+    m_per_pt, plan_rot = _label_geometry(meta)
     feats = [{"type": "Feature", "geometry": {"type": "Point", "coordinates": [r[3], r[2]]},
-              "properties": {"text": r[0], "category": r[1], "font_size": r[4], "angle": r[5]}}
+              "properties": {"text": r[0], "category": r[1], "font_size": r[4], "angle": r[5],
+                             "rot": round(r[5] + plan_rot, 1), "size_m": round(r[4] * m_per_pt, 2)}}
              for r in store().labels.get(key, []) if not cats or r[1] in cats]
     return {"type": "FeatureCollection", "features": feats}
 
