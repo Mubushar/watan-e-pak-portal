@@ -231,7 +231,7 @@ export function StudyReport({
                     </button>
                   ))}
                   {mapImg && (
-                    <a href={mapImg} download={`${(d.name ?? "study-area").replace(/[^\w-]+/g, "-")}-map.${mapBase === "satellite" ? "jpg" : "png"}`} className="btn btn-ghost btn-sm ms-auto">
+                    <a href={mapImg} download={`${(d.name ?? "study-area").replace(/[^\w-]+/g, "-")}-map.jpg`} className="btn btn-ghost btn-sm ms-auto">
                       <Download className="h-4 w-4" /> Image
                     </a>
                   )}

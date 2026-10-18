@@ -20,8 +20,9 @@ export const BASE_MAPS = {
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     attribution: "Tiles © Esri",
   },
-  light: { label: "Light", url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", attribution: "© OpenStreetMap © CARTO" },
-  dark: { label: "Dark", url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", attribution: "© OpenStreetMap © CARTO" },
+  // Light / Dark: OpenStreetMap tiles restyled with a CSS filter (CARTO's basemaps now need an API key).
+  light: { label: "Light", url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", attribution: "© OpenStreetMap", className: "tiles-light" },
+  dark: { label: "Dark", url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", attribution: "© OpenStreetMap", className: "tiles-dark" },
   terrain: { label: "Terrain", url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", attribution: "© OpenTopoMap" },
 } as const;
 export type BaseMapKey = keyof typeof BASE_MAPS;
@@ -157,7 +158,7 @@ export function PortalMap({
           }
         }}
       >
-        <TileLayer key={base} url={bm.url} attribution={bm.attribution} maxZoom={19} />
+        <TileLayer key={base} url={bm.url} attribution={bm.attribution} maxZoom={19} className={"className" in bm ? bm.className : undefined} />
         {fit && <FitPoints points={fit} />}
         {follow && <Recenter center={center} zoom={zoom} />}
         {children}

@@ -361,3 +361,11 @@
   text-transform: none;
   letter-spacing: 0;
 }
+
+/* ---- base maps restyled from OpenStreetMap tiles */
+.leaflet-layer.tiles-light {
+  filter: grayscale(1) brightness(1.06) contrast(0.88);
+}
+.leaflet-layer.tiles-dark {
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.92) saturate(0.6);
+}

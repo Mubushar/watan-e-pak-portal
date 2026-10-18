@@ -1,17 +1,20 @@
 /**
  * A static map image of a study area for the case-study report: base-map tiles fitted to the
  * drawn shape, the shape itself, its centre, listings inside, a scale bar, a north arrow and the
- * attribution — drawn on a canvas (2× for print) and returned as a data URL (PNG; JPEG for satellite).
+ * attribution — drawn on a canvas (2× for print) and returned as a JPEG data URL.
  */
 import type { StudyShape } from "./AreaDraw";
 
 export type StudyMapBase = "streets" | "satellite";
 
 const TILE = 256;
-const BASES: Record<StudyMapBase, { url: (z: number, x: number, y: number) => string; attribution: string; maxZoom: number }> = {
+// Keyless tile sources that allow canvas use (CORS). CARTO's basemaps now need an API key.
+type TileUrl = (z: number, x: number, y: number) => string;
+const BASES: Record<StudyMapBase, { url: TileUrl; fallback?: TileUrl; attribution: string; maxZoom: number }> = {
   streets: {
-    url: (z, x, y) => `https://${"abc"[(x + y) % 3]}.basemaps.cartocdn.com/rastertiles/voyager/${z}/${x}/${y}.png`,
-    attribution: "© OpenStreetMap contributors © CARTO",
+    url: (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`,
+    fallback: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${z}/${y}/${x}`,
+    attribution: "© OpenStreetMap contributors",
     maxZoom: 19,
   },
   satellite: {
@@ -105,9 +108,11 @@ export async function studyMapImage(
     for (let tx = Math.floor(left / TILE); tx <= Math.floor((left + cw) / TILE); tx++) {
       const wx = ((tx % max) + max) % max;
       tiles.push(
-        loadTile(base.url(zr, wx, ty)).then((img) => {
-          if (img) ctx.drawImage(img, tx * TILE - left, ty * TILE - top, TILE, TILE);
-        }),
+        loadTile(base.url(zr, wx, ty))
+          .then((img) => img ?? (base.fallback ? loadTile(base.fallback(zr, wx, ty)) : null))
+          .then((img) => {
+            if (img) ctx.drawImage(img, tx * TILE - left, ty * TILE - top, TILE, TILE);
+          }),
       );
     }
   }
@@ -212,6 +217,6 @@ export async function studyMapImage(
   ctx.fillStyle = "#334155";
   ctx.fillText(at, W - aw - 7, H - 5);
 
-  // Photos compress far better as JPEG (a satellite PNG runs to ~5 MB).
-  return opts.base === "satellite" ? canvas.toDataURL("image/jpeg", 0.86) : canvas.toDataURL("image/png");
+  // JPEG keeps a 2x map image around half a megabyte (a PNG runs to 4-5 MB).
+  return canvas.toDataURL("image/jpeg", opts.base === "satellite" ? 0.86 : 0.9);
 }
