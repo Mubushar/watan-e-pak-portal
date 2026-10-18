@@ -285,6 +285,75 @@ def available() -> bool:
     return bool(data().places or data().areas)
 
 
+def places_bbox(south: float, west: float, north: float, east: float, categories: Optional[Iterable[str]] = None,
+                limit: int = 2000) -> Tuple[List[Dict[str, Any]], int]:
+    """Places inside a lat/lon box (for a map's visible area), optionally only some categories.
+    Returns (places, total matched); at most ``limit`` are returned."""
+    d = data()
+    cats = set(categories) if categories else None
+    rows, total = [], 0
+    for i in _scan(d.place_grid, (south, west, north, east)):
+        p = d.places[i]
+        if not (south <= p["lat"] <= north and west <= p["lon"] <= east) or (cats and p["category"] not in cats):
+            continue
+        total += 1
+        if len(rows) < limit:
+            rows.append({"name": p["name"], "name_ur": p.get("name_ur"), "category": p["category"], "kind": p["kind"],
+                         "kind_label": KIND_LABELS.get(p["kind"], p["kind"].replace("_", " ").title()),
+                         "lat": p["lat"], "lon": p["lon"]})
+    return rows, total
+
+
+def _prefix_score(query: Sequence[str], name: str, name_tokens: Sequence[str]) -> float:
+    """Type-ahead match: every query word must start a word of the name (the last may be partial)."""
+    if not query:
+        return 0.0
+    for w in query:
+        if not any(t.startswith(w) for t in name_tokens):
+            return 0.0
+    norm = normalize(name)
+    q = " ".join(query)
+    return 3.0 if norm == q else 2.0 if norm.startswith(q) else 1.0
+
+
+def suggest_local(text: str, limit: int = 8) -> List[Dict[str, Any]]:
+    """Areas (sectors, societies, neighbourhoods) and places matching what is typed so far."""
+    q = tokens(text)
+    if not q or len(" ".join(q)) < 2:
+        return []
+    d = data()
+    out: List[Tuple[float, Dict[str, Any]]] = []
+    for a in d.areas:
+        s = _prefix_score(q, a["name"], a["tokens"])
+        if s:
+            region = d.regions.get(a.get("region", ""), {}).get("label", "")
+            parent = (a.get("parents") or [])[:1]
+            out.append((s + 0.6 + min(0.3, (a.get("population") or 0) / 1_000_000),
+                        {"type": "area", "label": a["name"], "sub": ", ".join([*parent, region] if region else parent),
+                         "lat": a["center"][0], "lon": a["center"][1], "zoom": 15 if (a.get("area_km2") or 1) < 3 else 14}))
+    for p in d.places:
+        s = _prefix_score(q, p["name"], p["tokens"])
+        if s:
+            region = d.regions.get(p.get("region", ""), {}).get("label", "")
+            kind = KIND_LABELS.get(p["kind"], p["kind"].replace("_", " ").title())
+            # A shop or school named "Faisal" shouldn't outrank Faisal Town.
+            out.append((s - 0.8, {"type": "place", "label": p["name"], "sub": f"{kind} · {region}" if region else kind,
+                            "lat": p["lat"], "lon": p["lon"], "zoom": 17, "category": p["category"]}))
+            if len(out) > 600:
+                break
+    out.sort(key=lambda x: -x[0])
+    seen, rows = set(), []
+    for _, r in out:
+        k = (r["label"].lower(), round(r["lat"], 3), round(r["lon"], 3))
+        if k in seen:
+            continue
+        seen.add(k)
+        rows.append(r)
+        if len(rows) >= limit:
+            break
+    return rows
+
+
 def _scan(grid: Dict[Tuple[int, int], List[int]], box: Tuple[float, float, float, float]) -> Iterable[int]:
     i0, j0 = _key(box[0], box[1])
     i1, j1 = _key(box[2], box[3])

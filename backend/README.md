@@ -131,6 +131,28 @@ GEMINI_VOICE=Kore
 **Back to OpenAI:** delete (or comment out) the `LLM_*` and `VOICE_PROVIDER` lines and
 restart the backend. No code changes.
 
+## Map search, places and directions
+
+The portal's map explorer uses these endpoints (all GET):
+
+| Endpoint | What it returns |
+| --- | --- |
+| `/geo/suggest?q=` | Type-ahead suggestions: cities, housing schemes, listings, sectors / societies, places |
+| `/geo/geocode?q=` | One address or place: local data first, then OpenStreetMap's Nominatim (cached, ≤ 1 request/s; `GEO_ONLINE_LOOKUP=0` turns it off) |
+| `/geo/places?south=&west=&north=&east=&categories=` | Points of interest in a map's visible box (Islamabad / Rawalpindi, Lahore, Karachi) |
+| `/geo/provinces` | Pakistan's provinces & territories (GeoJSON) with the number of portal listings in each |
+| `/geo/cities` | Pakistan's main cities with English and Urdu names, province and population |
+| `/geo/directions?from_lat=&from_lon=&to_lat=&to_lon=&mode=drive\|bike\|walk` | Routes on real roads with turn-by-turn steps, fastest first |
+
+Directions use the free OpenStreetMap routing servers (routing.openstreetmap.de, run by
+FOSSGIS — light use, with attribution). `ROUTING_ONLINE=0` keeps routing on the server's own
+approximate router; `ROUTING_URL` points at your own OSRM; `ROUTING_TRAFFIC_FACTOR` (1.25)
+scales driving times for city traffic.
+
+Data files in `geodata/`: `pk_provinces.geojson` (geoBoundaries gbOpen PAK ADM1, public
+domain) and `pk_cities.json` (Natural Earth populated places, public domain; Urdu names
+added).
+
 ## MCP HTTP mode
 
 `/mcp` runs in **stateless** mode by default (`PORTAL_MCP_STATELESS=1`). This

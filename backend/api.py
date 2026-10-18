@@ -38,6 +38,7 @@ import geo
 import masterplan
 import web_lookup
 import ai_guard
+import directions as routing
 import openai_voice
 import gemini_live
 import openai_facade
@@ -438,6 +439,118 @@ def geo_locate(q: str) -> Any:
 def geo_summary() -> Any:
     """What place / area / population data is loaded."""
     return geo.summary()
+
+
+# Pakistan-wide reference layers (small files committed in geodata/, see their attribution).
+_PK_FILES: Dict[str, Any] = {}
+
+
+def _pk_file(name: str) -> Any:
+    if name not in _PK_FILES:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "geodata", name), encoding="utf-8") as fh:
+            _PK_FILES[name] = json.load(fh)
+    return _PK_FILES[name]
+
+
+def _in_geometry(lat: float, lon: float, geom: Dict[str, Any]) -> bool:
+    """Point in a GeoJSON (Multi)Polygon (outer rings minus holes)."""
+    polys = geom["coordinates"] if geom["type"] == "MultiPolygon" else [geom["coordinates"]]
+    for rings in polys:
+        outer = [[y, x] for x, y in rings[0]]
+        if geo.point_in_ring(lat, lon, outer) and not any(
+                geo.point_in_ring(lat, lon, [[y, x] for x, y in hole]) for hole in rings[1:]):
+            return True
+    return False
+
+
+@app.get("/geo/provinces", tags=["places"])
+def geo_provinces() -> Any:
+    """Pakistan's provinces and territories as GeoJSON, each with the number of portal listings in it."""
+    data = _pk_file("pk_provinces.geojson")
+    points = [(p.latitude, p.longitude) for p in core.properties_db if p.latitude is not None and p.longitude is not None]
+    features = []
+    for f in data["features"]:
+        n = sum(1 for lat, lon in points if _in_geometry(lat, lon, f["geometry"]))
+        features.append({**f, "properties": {**f["properties"], "listings": n}})
+    return {"type": "FeatureCollection", "attribution": data.get("attribution"), "features": features}
+
+
+@app.get("/geo/places", tags=["places"])
+def geo_places(south: float, west: float, north: float, east: float, categories: Optional[str] = None,
+               limit: int = 1500) -> Any:
+    """Points of interest (schools, mosques, hospitals, markets, parks, banks …) inside a map's
+    visible box, from the portal's OpenStreetMap place data. ``categories`` is comma-separated
+    (education, worship, health, shopping, park, bank, restaurant, transport, fuel, government)."""
+    if north - south > 1.5 or east - west > 1.5:
+        return {"count": 0, "total": 0, "places": [], "note": "Zoom in to see places."}
+    cats = [c.strip() for c in (categories or "").split(",") if c.strip()] or None
+    rows, total = geo.places_bbox(south, west, north, east, cats, limit=max(1, min(limit, 3000)))
+    return {"count": len(rows), "total": total, "places": rows, "attribution": geo.ATTRIBUTION}
+
+
+@app.get("/geo/suggest", tags=["places"])
+def geo_suggest(q: str, limit: int = 8) -> Any:
+    """Type-ahead suggestions for the map's search box: cities, housing schemes, listings,
+    sectors / societies and places whose names start with what was typed."""
+    words = geo.tokens(q)
+    if not words or len(" ".join(words)) < 2:
+        return {"query": q, "suggestions": []}
+    limit = max(1, min(limit, 15))
+    scored: List[Tuple[float, Dict[str, Any]]] = []
+
+    def match(name: str) -> float:
+        return geo._prefix_score(words, name, geo.tokens(name))
+
+    for c in _pk_file("pk_cities.json")["cities"]:
+        s = match(c["name"])
+        if s:
+            scored.append((s + 2.0, {"type": "city", "label": c["name"], "sub": f"City · {c['province']}",
+                                     "lat": c["lat"], "lon": c["lon"], "zoom": 11}))
+    for s_ in core.housing_schemes_db:
+        s = match(s_.name)
+        if s and s_.latitude is not None and s_.longitude is not None:
+            scored.append((s + 1.5, {"type": "scheme", "label": s_.name, "sub": f"Housing scheme · {core.city_name(s_.city_id)}",
+                                     "lat": s_.latitude, "lon": s_.longitude, "zoom": 14, "id": s_.id}))
+    for p_ in core.properties_db:
+        s = match(p_.title)
+        if s and p_.latitude is not None and p_.longitude is not None:
+            scored.append((s + 1.0, {"type": "listing", "label": p_.title, "sub": f"Listing · {core.city_name(p_.city_id)}",
+                                     "lat": p_.latitude, "lon": p_.longitude, "zoom": 17, "id": p_.id}))
+    scored.sort(key=lambda x: -x[0])
+    rows = [r for _, r in scored][:limit]
+    if len(rows) < limit:
+        rows += geo.suggest_local(q, limit - len(rows))
+    return {"query": q, "suggestions": rows}
+
+
+@app.get("/geo/geocode", tags=["places"])
+def geo_geocode(q: str) -> Any:
+    """Find an address or place (local data first, then OpenStreetMap's Nominatim, once).
+    Used when the search box is submitted without picking a suggestion."""
+    loc = geo.locate(q)
+    if not loc:
+        raise HTTPException(status_code=404, detail=f"Couldn't find '{q}' on the map.")
+    box = loc["shape"].box if loc.get("shape") is not None and getattr(loc["shape"], "box", None) else None
+    return {"label": loc.get("name"), "sub": loc.get("label") or loc.get("kind"), "lat": loc["lat"], "lon": loc["lon"],
+            "bounds": list(box) if box else None, "source": loc.get("source")}
+
+
+@app.get("/geo/directions", tags=["routing"])
+def geo_directions(from_lat: float, from_lon: float, to_lat: float, to_lon: float, mode: str = "drive",
+                   alternatives: bool = True) -> Any:
+    """Turn-by-turn directions on real roads (car / bike / foot), fastest first with up to two
+    alternatives. Driving times include typical city traffic. Falls back to the portal's own
+    router when the online routing service is off or unreachable."""
+    return routing.directions((from_lat, from_lon), (to_lat, to_lon), mode=mode, alternatives=alternatives)
+
+
+@app.get("/geo/cities", tags=["places"])
+def geo_cities(min_population: int = 0) -> Any:
+    """Pakistan's main cities (name, province, population, position); ``portal`` marks cities with a portal page."""
+    data = _pk_file("pk_cities.json")
+    portal = {c.name.lower() for c in core.cities_db}
+    rows = [{**c, "portal": c["name"].lower() in portal} for c in data["cities"] if c["population"] >= min_population]
+    return {"count": len(rows), "attribution": data.get("attribution"), "cities": rows}
 
 
 @app.get("/properties/{property_id}/nearby", tags=["properties"])
