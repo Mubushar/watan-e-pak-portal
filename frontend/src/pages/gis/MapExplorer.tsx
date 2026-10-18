@@ -23,6 +23,7 @@ import {
   Layers3,
   Map as MapIcon,
   MapPin,
+  MessageSquareText,
   Navigation,
   PencilRuler,
   PanelLeftClose,
@@ -56,7 +57,7 @@ import { NavigatorLayer, NavigatorPanel, useNavigator } from "@/components/gis/N
 import { POI_CATEGORIES, POI_MIN_ZOOM, PoiLayer } from "@/components/gis/PoiLayer";
 import { AreaDraw, shapeAreaKm2, type DrawMode, type StudyShape } from "@/components/gis/AreaDraw";
 import { StudyReport, useStudyReport } from "@/components/gis/StudyReport";
-import { MEGA_TYPES, MegaProjectLayer, useMegaProjects } from "@/components/gis/MegaProjects";
+import { ANNOTATION_MIN_ZOOM, MEGA_TYPES, MegaProjectLayer, useMegaProjects } from "@/components/gis/MegaProjects";
 import { usePrefs } from "@/store/prefs";
 import { LABEL_MIN_ZOOM, MasterPlanLayers, MasterPlanPanel, PlanLabels, useMasterPlans, type PlanLabel } from "@/components/gis/MasterPlans";
 import type { Aoi, AoiStats, GisLayer, GisLayerDetail, Poi, PoiCategory, RingResult, RouteResult } from "@/components/gis/types";
@@ -269,6 +270,7 @@ export default function MapExplorer() {
   // ---- infrastructure mega projects
   const megaQ = useMegaProjects();
   const [megaTypes, setMegaTypes] = useState<Set<string>>(() => new Set(MEGA_TYPES.map((t) => t.key)));
+  const [megaAnnot, setMegaAnnot] = useState(true);
   const toggleMega = (k: string, on: boolean) =>
     setMegaTypes((s) => {
       const n = new Set(s);
@@ -396,7 +398,7 @@ export default function MapExplorer() {
       <PortalMap height="100%" className="rounded-none" scrollWheelZoom onReady={onReady} zoom={5} switcher={false} baseKey={baseMap}>
         {/* ----------------------------------------------------- Pakistan reference layers */}
         {vis.provinces && <ProvinceLayer map={map} lang={mapLang} zoom={zoom} />}
-        {megaTypes.size > 0 && <MegaProjectLayer projects={megaQ.data?.projects ?? []} types={megaTypes} lang={mapLang} zoom={zoom} labelZoom={11} />}
+        {megaTypes.size > 0 && <MegaProjectLayer projects={megaQ.data?.projects ?? []} types={megaTypes} lang={mapLang} zoom={zoom} labelZoom={11} annotate={megaAnnot} />}
         {vis.cities && <CityLabels zoom={zoom} lang={mapLang} />}
         {osmCats.size > 0 && <PoiLayer categories={osmCats} lang={mapLang} onStatus={setPoiStatus} />}
         <NavigatorLayer nav={nav} />
@@ -628,14 +630,24 @@ export default function MapExplorer() {
             key: "mega",
             title: "Infrastructure projects",
             icon: Construction,
-            items: MEGA_TYPES.filter((t) => (megaQ.data?.projects ?? []).some((p) => p.type === t.key)).map((t) => ({
-              key: `mega-${t.key}`,
-              label: t.label,
-              hint: `${(megaQ.data?.projects ?? []).filter((p) => p.type === t.key).length} projects`,
-              color: t.color,
-              on: megaTypes.has(t.key),
-              onChange: (v: boolean) => toggleMega(t.key, v),
-            })),
+            items: [
+              {
+                key: "mega-annotations",
+                label: "Annotations",
+                hint: `Name, status, completion and price effect · from zoom ${ANNOTATION_MIN_ZOOM}`,
+                icon: MessageSquareText,
+                on: megaAnnot,
+                onChange: setMegaAnnot,
+              },
+              ...MEGA_TYPES.filter((t) => (megaQ.data?.projects ?? []).some((p) => p.type === t.key)).map((t) => ({
+                key: `mega-${t.key}`,
+                label: t.label,
+                hint: `${(megaQ.data?.projects ?? []).filter((p) => p.type === t.key).length} projects`,
+                color: t.color,
+                on: megaTypes.has(t.key),
+                onChange: (v: boolean) => toggleMega(t.key, v),
+              })),
+            ],
             note: (
               <>
                 Ring roads, motorways, new sectors and economic zones that move land prices.{" "}
@@ -703,9 +715,9 @@ export default function MapExplorer() {
             <div className="glass-dark flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold shadow-soft">
               <PencilRuler className="h-4 w-4 text-gold-300" />
               {drawMode === "circle"
-                ? "Press at the centre and drag out the radius"
+                ? "Click the centre, then click again to set the radius"
                 : drawMode === "rectangle"
-                  ? "Drag from one corner to the opposite corner"
+                  ? "Click the four corners of the area"
                   : "Click each corner · double-click or Enter to finish · Backspace undoes"}{" "}
               · Esc cancels
             </div>

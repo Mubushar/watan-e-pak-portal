@@ -73,14 +73,21 @@ def _nearest_city(lat: float, lon: float) -> Optional[Dict[str, Any]]:
 def study(kind: str, *, name: Optional[str] = None, center: Optional[Tuple[float, float]] = None,
           radius_m: Optional[float] = None, bounds: Optional[Dict[str, float]] = None,
           coordinates: Optional[List[List[float]]] = None, save: bool = False) -> Dict[str, Any]:
-    """Build the case-study report. ``kind`` is circle | rectangle | polygon."""
+    """Build the case-study report. ``kind`` is circle | rectangle | polygon.
+
+    A rectangle is either ``bounds`` (south / west / north / east) or its four corners
+    clicked on the map as ``coordinates``."""
     aoi_kind = {"rectangle": "bbox", "circle": "circle", "polygon": "polygon"}.get(kind)
     if not aoi_kind:
         return {"error": "kind must be circle, rectangle or polygon"}
+    if aoi_kind == "bbox" and not bounds and coordinates:
+        if len(coordinates) != 4:
+            return {"error": "A rectangle needs its four corners"}
+        aoi_kind = "polygon"
     if aoi_kind == "circle" and (not center or not radius_m):
         return {"error": "A circle needs a centre and a radius"}
     if aoi_kind == "bbox" and not bounds:
-        return {"error": "A rectangle needs bounds"}
+        return {"error": "A rectangle needs bounds or four corners"}
     if aoi_kind == "polygon" and (not coordinates or len(coordinates) < 3):
         return {"error": "A polygon needs at least 3 corners"}
     if radius_m and radius_m > 25_000:

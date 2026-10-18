@@ -158,7 +158,7 @@ export default function Infrastructure() {
 
         <div id="infra-map" className="card overflow-hidden p-0">
           <PortalMap height={480} className="rounded-none" scrollWheelZoom zoom={5} onReady={setMap}>
-            <MegaProjectLayer projects={list} types={shown} lang={lang} zoom={zoom} selected={sel} />
+            <MegaProjectLayer projects={list} types={shown} lang={lang} zoom={zoom} selected={sel} annotate />
           </PortalMap>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-black/5 px-4 py-2.5 text-[11px] dark:border-white/10">
             {MEGA_TYPES.filter((t) => shown.has(t.key)).map((t) => (

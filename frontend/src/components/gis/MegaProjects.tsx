@@ -3,7 +3,8 @@
  * ring roads, motorways, expressways, mass transit, rail, new sectors, industrial / economic
  * zones, airports and business districts.
  *
- *   MegaProjectLayer   the projects on a Leaflet map, styled by type and status
+ *   MegaProjectLayer   the projects on a Leaflet map, styled by type and status, with
+ *                      optional annotations (name, status, completion, size, price effect)
  *   MegaProjectCard    a project's details (used in map popups and the Infrastructure page)
  */
 import { Fragment } from "react";
@@ -153,7 +154,32 @@ export function MegaProjectCard({ p, compact, onMap }: { p: MegaProject; compact
   );
 }
 
-/** The projects on the map. `types` limits which kinds are drawn; labels show from `labelZoom`. */
+/** Zoom from which annotations are shown (below it the map is too crowded). */
+export const ANNOTATION_MIN_ZOOM = 7;
+
+/** A project's annotation: name, then status · completion · size, then the price effect when zoomed in. */
+function Annotation({ p, label, zoom }: { p: MegaProject; label: string; zoom: number }) {
+  const size = p.length_km ? `${num(p.length_km)} km` : p.area_acres ? `${num(p.area_acres)} acres` : null;
+  return (
+    <div className="mega-annot-body" style={{ borderInlineStartColor: megaColor(p.type) }}>
+      <p className="mega-annot-name">{label}</p>
+      <p className="mega-annot-meta">
+        <span className="mega-annot-dot" style={{ background: p.status === "completed" ? "#059669" : p.status === "under_construction" ? "#d97706" : "#64748b" }} />
+        {[p.status_label, p.completion && p.completion !== "TBA" ? `→ ${p.completion}` : null, size].filter(Boolean).join(" · ")}
+      </p>
+      {zoom >= 10 && (
+        <p className="mega-annot-meta">
+          {p.type_label} · price effect {p.uplift}, ~{p.impact_radius_km} km
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The projects on the map. `types` limits which kinds are drawn. With `annotate`, each project
+ * carries an annotation from zoom 7; otherwise its name shows from `labelZoom` (or on hover).
+ */
 export function MegaProjectLayer({
   projects,
   types,
@@ -161,6 +187,7 @@ export function MegaProjectLayer({
   zoom,
   selected,
   labelZoom = 10,
+  annotate = false,
 }: {
   projects: MegaProject[];
   types?: Set<string>;
@@ -168,6 +195,7 @@ export function MegaProjectLayer({
   zoom: number;
   selected?: string | null;
   labelZoom?: number;
+  annotate?: boolean;
 }) {
   return (
     <>
@@ -179,8 +207,14 @@ export function MegaProjectLayer({
         const sel = selected === p.id;
         const dash = STATUS_STYLE[p.status]?.dash;
         const label = labelText(p.name, p.name_ur, lang);
-        const perm = zoom >= labelZoom || sel;
-        const tip = (
+        const annot = annotate && (zoom >= ANNOTATION_MIN_ZOOM || sel);
+        const perm = annot || zoom >= labelZoom || sel;
+        // `permanent` is fixed when a tooltip is created, so the key remounts it on change.
+        const tip = annot ? (
+          <Tooltip key={`annot-${zoom >= 10}`} permanent direction="top" offset={[0, -6]} className="mega-annot" opacity={1}>
+            <Annotation p={p} label={label} zoom={zoom} />
+          </Tooltip>
+        ) : (
           <Tooltip key={perm ? "label" : "hover"} permanent={perm} sticky={!perm} direction="top" className="mega-tip">
             {label}
           </Tooltip>

@@ -305,8 +305,8 @@ export function MapControls({
           <div className="p-2">
             {(
               [
-                ["circle", Circle, "Circle", "Press at the centre and drag out the radius"],
-                ["rectangle", RectangleHorizontal, "Rectangle", "Drag from one corner to the other"],
+                ["circle", Circle, "Circle", "Click the centre, then click again to set the radius"],
+                ["rectangle", RectangleHorizontal, "Rectangle", "Click the four corners"],
                 ["polygon", Hexagon, "Polygon", "Click each corner; double-click or Enter to finish"],
               ] as [DrawMode, LucideIcon, string, string][]
             ).map(([k, Icon, l, hint]) => (

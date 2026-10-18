@@ -4,7 +4,7 @@
  * economics, 5-year outlook, risks and news. Print / save as PDF, save the area as an area of
  * interest, or ask the AI assistant about it.
  */
-import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { AlertTriangle, Bot, Building2, CheckCircle2, Coins, Construction, FileText, Landmark, LineChart, MapPin, Newspaper, Printer, Save, Users, X } from "lucide-react";
@@ -41,12 +41,12 @@ const GRADE_COLOR: Record<string, string> = {
 export function useStudyReport() {
   const [data, setData] = useState<StudyReportData | null>(null);
   const [loading, setLoading] = useState(false);
-  const run = async (shape: StudyShape, name: string, save = false) => {
+  const run = useCallback(async (shape: StudyShape, name: string, save = false) => {
     setLoading(true);
     try {
       const body: Record<string, unknown> = { kind: shape.kind, name, save };
       if (shape.kind === "circle") Object.assign(body, { center: shape.center, radius_m: shape.radius_m });
-      if (shape.kind === "rectangle") body.bounds = shape.bounds;
+      if (shape.kind === "rectangle") body.coordinates = shape.coordinates;
       if (shape.kind === "polygon") body.coordinates = shape.coordinates;
       const r = await post<StudyReportData>("/geo/study-area", body);
       setData(r);
@@ -57,7 +57,7 @@ export function useStudyReport() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
   return { data, setData, loading, run };
 }
 

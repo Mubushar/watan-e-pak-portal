@@ -292,3 +292,41 @@
     break-inside: avoid;
   }
 }
+
+/* ---- map: infrastructure project annotations (callouts) */
+.leaflet-tooltip.mega-annot {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+.leaflet-tooltip.mega-annot::before {
+  border-top-color: rgba(255, 255, 255, 0.96);
+}
+.mega-annot-body {
+  background: rgba(255, 255, 255, 0.96);
+  border-inline-start: 4px solid #64748b;
+  border-radius: 8px;
+  padding: 3px 8px 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+  color: #0f172a;
+  line-height: 1.25;
+}
+.mega-annot-name {
+  font-size: 11px;
+  font-weight: 800;
+}
+.mega-annot-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #475569;
+}
+.mega-annot-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}

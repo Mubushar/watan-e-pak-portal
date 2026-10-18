@@ -949,6 +949,9 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         check("POST /geo/study-area leaves no AOI behind", len(core.aois_db) == aois_before, str(len(core.aois_db)))
         r = client.post("/geo/study-area", json={"kind": "rectangle", "bounds": {"south": 31.44, "west": 74.27, "north": 31.46, "east": 74.29}})
         check("POST /geo/study-area (rectangle)", r.status_code == 200 and r.json().get("shape", {}).get("area_km2", 0) > 0, str(r.status_code))
+        r = client.post("/geo/study-area", json={"kind": "rectangle", "coordinates": [[31.44, 74.27], [31.44, 74.29], [31.46, 74.29], [31.46, 74.27]]})
+        check("POST /geo/study-area (rectangle, four corners)",
+              r.status_code == 200 and r.json().get("shape", {}).get("kind") == "rectangle" and r.json()["shape"]["area_km2"] > 0, str(r.status_code))
         r = client.post("/geo/study-area", json={"kind": "polygon", "coordinates": [[31.44, 74.27], [31.46, 74.28]]})
         check("POST /geo/study-area (bad polygon -> 422)", r.status_code == 422, str(r.status_code))
 
