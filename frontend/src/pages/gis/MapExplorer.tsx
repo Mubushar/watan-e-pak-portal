@@ -31,7 +31,7 @@ import {
   Square,
   Star,
   Target,
-  ZoomIn,
+  Globe,
   SquareDashedMousePointer,
 } from "lucide-react";
 import type { City, Property, PropertyList, Scheme } from "@/types";
@@ -515,7 +515,7 @@ export default function MapExplorer() {
             aria-label="Fit to listings"
             className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-brand-800 shadow-soft ring-1 ring-black/5 transition hover:bg-brand-50 dark:bg-brand-950 dark:text-white"
           >
-            <ZoomIn className="h-[18px] w-[18px]" />
+            <Globe className="h-[18px] w-[18px]" />
           </button>
         )}
       </div>
