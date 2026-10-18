@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { useQueries } from "@tanstack/react-query";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
 import L from "leaflet";
 import type { GeoJsonObject } from "geojson";
 import { Circle, CircleMarker, GeoJSON, Marker, Polyline, Popup, Tooltip } from "react-leaflet";
@@ -42,7 +42,7 @@ import { cn } from "@/lib/utils";
 import { PortalMap, PIN_STYLES, pin } from "@/components/map/PortalMap";
 import { Badge, BarList, Button, EmptyState, ErrorState, Input, ScoreRing, Select, Segmented, Skeleton, Slider, Tabs, Toggle } from "@/components/ui";
 import { ChipRow, FilterChip, MapClick, MiniStat, ReportButton, ReportModal, fitTo, type ReportRef } from "@/components/gis/kit";
-import { MasterPlanLayers, MasterPlanPanel, useMasterPlans, type PlanLabel } from "@/components/gis/MasterPlans";
+import { LABEL_MIN_ZOOM, MasterPlanLayers, MasterPlanPanel, PlanLabels, useMasterPlans, type PlanLabel } from "@/components/gis/MasterPlans";
 import type { Aoi, AoiStats, GisLayer, GisLayerDetail, Poi, PoiCategory, RingResult, RouteResult } from "@/components/gis/types";
 
 type TabKey = "properties" | "places" | "layers" | "areas" | "analyse";
@@ -110,14 +110,15 @@ export default function MapExplorer() {
   const schemesQ = useApi<{ schemes: Scheme[] }>("/schemes");
 
   const properties = useMemo(() => (propsQ.data?.results ?? []).filter((p) => p.latitude != null && p.longitude != null), [propsQ.data]);
-  const layers = layersQ.data?.layers ?? [];
-  const layerDetails = useQueries({
-    queries: layers.map((l) => ({
-      queryKey: [`/gis/layers/${l.id}`, {}],
-      queryFn: ({ signal }: { signal: AbortSignal }) => get<GisLayerDetail>(`/gis/layers/${l.id}`, undefined, { signal }),
-      staleTime: 5 * 60_000,
-    })),
-  });
+  const layers = useMemo(() => layersQ.data?.layers ?? [], [layersQ.data]);
+  // Layers generated from the DHA master plans (outline, plan, text labels) are shown by the
+  // "DHA master plans" section; their labels (~100k points) load only when switched on.
+  const planSchemeIds = useMemo(
+    () => new Set(layers.filter((l) => l.layer_type === "master_plan" && l.image_url?.startsWith("/masterplans/")).map((l) => l.entity_id)),
+    [layers],
+  );
+  const gisLayers = useMemo(() => layers.filter((l) => !planSchemeIds.has(l.entity_id)), [layers, planSchemeIds]);
+  const labelLayers = useMemo(() => layers.filter((l) => planSchemeIds.has(l.entity_id) && l.layer_type === "annotation"), [layers, planSchemeIds]);
 
   // -------------------------------------------------------------- property filters
   const [useType, setUseType] = useState("all");
@@ -150,6 +151,30 @@ export default function MapExplorer() {
 
   // -------------------------------------------------------------- layers
   const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [labelsOn, setLabelsOn] = useState<Set<string>>(new Set());
+  // Only layers that are actually drawn are downloaded (each can be several MB).
+  const activeLayers = useMemo(
+    () => (vis.layers ? [...gisLayers.filter((l) => !hidden.has(l.id)), ...labelLayers.filter((l) => labelsOn.has(l.id))] : []),
+    [vis.layers, gisLayers, labelLayers, hidden, labelsOn],
+  );
+  const qc = useQueryClient();
+  const layerQuery = (id: string) => ({
+    queryKey: [`/gis/layers/${id}`, {}],
+    queryFn: ({ signal }: { signal: AbortSignal }) => get<GisLayerDetail>(`/gis/layers/${id}`, undefined, { signal }),
+    staleTime: 30 * 60_000,
+  });
+  const detailQs = useQueries({ queries: activeLayers.map((l) => layerQuery(l.id)) });
+  const details = new Map(activeLayers.map((l, i) => [l.id, detailQs[i]?.data] as const));
+  const [zoom, setZoom] = useState(5);
+  useEffect(() => {
+    if (!map) return;
+    const on = () => setZoom(map.getZoom());
+    on();
+    map.on("zoomend", on);
+    return () => {
+      map.off("zoomend", on);
+    };
+  }, [map]);
   const plansQ = useMasterPlans();
   const [planShown, setPlanShown] = useState<Set<string>>(new Set());
   // Every loaded master plan starts switched on (they can be hidden from the Layers tab).
@@ -164,8 +189,8 @@ export default function MapExplorer() {
   const [planHit, setPlanHit] = useState<PlanLabel | null>(null);
   const [layerOpacity, setLayerOpacity] = useState(70);
   useEffect(() => {
-    if (!layers.length) return;
-    setHidden(new Set(layers.filter((l) => !l.visible).map((l) => l.id)));
+    if (!gisLayers.length) return;
+    setHidden(new Set(gisLayers.filter((l) => !l.visible).map((l) => l.id)));
   }, [layersQ.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // -------------------------------------------------------------- AOIs
@@ -290,18 +315,25 @@ export default function MapExplorer() {
           />
         )}
 
+        {/* ----------------------------------------------------- master-plan text labels (zoomed in only) */}
+        {vis.layers &&
+          zoom >= LABEL_MIN_ZOOM &&
+          labelLayers.map((l) => {
+            const d = labelsOn.has(l.id) ? details.get(l.id) : undefined;
+            return d?.geojson ? <PlanLabels key={l.id} data={d.geojson} color={d.style?.color ?? "#1d4ed8"} /> : null;
+          })}
+
         {/* ----------------------------------------------------- GIS layers */}
         {vis.layers &&
-          layerDetails.map((q, i) => {
-            const l = layers[i];
-            const d = q.data;
-            if (!l || !d?.geojson || hidden.has(l.id)) return null;
+          gisLayers.map((l) => {
+            const d = details.get(l.id);
+            if (!d?.geojson || hidden.has(l.id)) return null;
             const color = LAYER_COLORS[l.layer_type] ?? d.style?.color ?? "#146f45";
             const isLine = l.layer_type === "road";
             const o = layerOpacity / 100;
             return (
               <GeoJSON
-                key={`${l.id}-${layerOpacity}`}
+                key={l.id}
                 data={d.geojson}
                 style={() => ({
                   color,
@@ -507,7 +539,7 @@ export default function MapExplorer() {
             <span className="min-w-0">
               <span className="block font-display text-base font-bold leading-tight text-brand-900 dark:text-white">GIS Explorer</span>
               <span className="block truncate text-[11px] text-ink-mute dark:text-slate-400">
-                {properties.length} listings · {poiQ.data?.pois.length ?? 0} places · {layers.length} layers
+                {properties.length} listings · {poiQ.data?.pois.length ?? 0} places · {gisLayers.length + (plansQ.data?.count ?? 0)} layers
               </span>
             </span>
           </button>
@@ -655,6 +687,21 @@ export default function MapExplorer() {
                         <Slider value={layerOpacity} min={10} max={100} step={5} onChange={setLayerOpacity} />
                       </div>
                       <MasterPlanPanel
+                        labels={{
+                          layers: labelLayers,
+                          on: labelsOn,
+                          loading: activeLayers.some((l, i) => labelsOn.has(l.id) && detailQs[i]?.isLoading),
+                          zoomedIn: zoom >= LABEL_MIN_ZOOM,
+                          toggle: (id) => {
+                            setVis((v) => ({ ...v, layers: true }));
+                            setLabelsOn((s) => {
+                              const n = new Set(s);
+                              if (n.has(id)) n.delete(id);
+                              else n.add(id);
+                              return n;
+                            });
+                          },
+                        }}
                         map={map}
                         shown={planShown}
                         setShown={(s) => {
@@ -672,11 +719,11 @@ export default function MapExplorer() {
                         <ListSkeleton />
                       ) : layersQ.error ? (
                         <ErrorState error={layersQ.error} onRetry={() => layersQ.refetch()} />
-                      ) : !layers.length ? (
+                      ) : !gisLayers.length ? (
                         <EmptyState title="No GIS layers yet" />
                       ) : (
-                        layers.map((l, i) => {
-                          const d = layerDetails[i]?.data;
+                        gisLayers.map((l) => {
+                          const d = details.get(l.id);
                           const color = LAYER_COLORS[l.layer_type] ?? d?.style?.color ?? "#146f45";
                           const on = !hidden.has(l.id);
                           return (
@@ -710,16 +757,15 @@ export default function MapExplorer() {
                                   size="sm"
                                   variant="soft"
                                   icon={<Target className="h-3.5 w-3.5" />}
-                                  disabled={!d?.geojson}
-                                  onClick={() => {
-                                    if (!d?.geojson) return;
+                                  onClick={async () => {
                                     setVis((v) => ({ ...v, layers: true }));
                                     setHidden((h) => {
                                       const n = new Set(h);
                                       n.delete(l.id);
                                       return n;
                                     });
-                                    fitTo(map, geoBounds(d.geojson), 16, sidePad());
+                                    const g = d?.geojson ?? (await qc.fetchQuery(layerQuery(l.id))).geojson;
+                                    fitTo(map, geoBounds(g), 16, sidePad());
                                     if (window.innerWidth < 768) setOpen(false);
                                   }}
                                 >

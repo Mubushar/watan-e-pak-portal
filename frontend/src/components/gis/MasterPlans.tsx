@@ -8,14 +8,41 @@
  * Plan tiles exist only for zooms 12–17, so each plan's boundary is also drawn as an
  * outline (visible at any zoom, click to zoom in) and the tiles are scaled down to zoom 9.
  */
-import { useState } from "react";
-import type L from "leaflet";
-import { CircleMarker, Polygon, Rectangle, TileLayer, Tooltip } from "react-leaflet";
+import { useMemo, useState } from "react";
+import L from "leaflet";
+import type { FeatureCollection } from "geojson";
+import { CircleMarker, GeoJSON, Polygon, Rectangle, TileLayer, Tooltip } from "react-leaflet";
 import { Map as MapIcon, Search, Target } from "lucide-react";
 import { useApi } from "@/hooks/useApi";
 import { API_BASE } from "@/lib/api";
 import { Badge, Button, EmptyState, Input, Skeleton, Toggle } from "@/components/ui";
 import { fitTo } from "./kit";
+import type { GisLayer } from "./types";
+
+/** Plan text labels are drawn from this zoom in (thousands of points per plan). */
+export const LABEL_MIN_ZOOM = 15;
+
+/** Master-plan text labels as small dots on one shared canvas, with the text on hover. */
+export function PlanLabels({ data, color }: { data: FeatureCollection; color: string }) {
+  const renderer = useMemo(() => L.canvas({ padding: 0.3 }), []);
+  return (
+    <GeoJSON
+      data={data}
+      pointToLayer={(f, ll) =>
+        L.circleMarker(ll, { renderer, radius: 3, color, weight: 1, fillColor: color, fillOpacity: 0.7 }).bindTooltip(String(f.properties?.text ?? ""), { direction: "top" })
+      }
+    />
+  );
+}
+
+/** The label layers of one plan, from the GIS layer list ("<plan> — plan labels: <group>"). */
+export interface PlanLabelControls {
+  layers: GisLayer[];
+  on: Set<string>;
+  loading: boolean;
+  zoomedIn: boolean;
+  toggle: (id: string) => void;
+}
 
 export interface MasterPlan {
   key: string;
@@ -122,7 +149,9 @@ export function MasterPlanPanel({
   setShown,
   onHit,
   pad,
+  labels,
 }: {
+  labels?: PlanLabelControls;
   map: L.Map | null;
   shown: Set<string>;
   setShown: (s: Set<string>) => void;
@@ -158,7 +187,7 @@ export function MasterPlanPanel({
                 <p className="text-sm font-semibold">{p.name}</p>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {p.city && <Badge tone="gray">{p.city}</Badge>}
-                  {p.accuracy?.rmse_m && <span className="text-[11px] text-ink-mute">± {Math.round(p.accuracy.rmse_m)} m</span>}
+                  {!!p.accuracy?.rmse_m && <span className="text-[11px] text-ink-mute">± {Math.round(p.accuracy.rmse_m)} m</span>}
                   {!p.tile_url && <span className="text-[11px] text-ink-mute">labels only</span>}
                 </div>
               </div>
@@ -176,6 +205,32 @@ export function MasterPlanPanel({
               <Toggle checked={shown.has(p.key)} onChange={(v) => show(p.key, v)} />
             </div>
           ))}
+          {!!labels?.layers.length && (
+            <div className="rounded-xl bg-brand-50/60 p-3 dark:bg-white/5">
+              <p className="text-xs font-semibold">Text from the plans</p>
+              <p className="mt-0.5 text-[11px] text-ink-mute">
+                Sector names, facilities and plot numbers as points you can hover. Drawn from zoom {LABEL_MIN_ZOOM}
+                {labels.on.size && !labels.zoomedIn ? " — zoom in to see them." : "."}
+                {labels.loading && " Loading…"}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {labels.layers.map((l) => {
+                  const on = labels.on.has(l.id);
+                  return (
+                    <button
+                      key={l.id}
+                      type="button"
+                      onClick={() => labels.toggle(l.id)}
+                      title={`${l.features.toLocaleString()} labels`}
+                      className={on ? "chip bg-brand-700 text-white" : "chip bg-white text-ink-soft ring-1 ring-black/10 dark:bg-white/5 dark:text-slate-300 dark:ring-white/10"}
+                    >
+                      {l.name.replace(" — plan labels: ", " · ")}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <form
             onSubmit={(e) => {
               e.preventDefault();
