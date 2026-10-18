@@ -1,0 +1,3563 @@
+[
+ {
+  "name": "DHA Islamabad-Rawalpindi Phase 1",
+  "name_ur": "ڈی ایچ اے فیز 1",
+  "city": "Rawalpindi",
+  "developer": "Defence Housing Authority Islamabad-Rawalpindi (DHAI-R)",
+  "approval_authority": "DHA (own act) - Defence Housing Authority Islamabad Act 2013 (XII of 2013)",
+  "approval_status": null,
+  "approval_note": "Statutory DHA scheme (DHA Islamabad Act 2013); not an entry on CDA/RDA private-scheme lists, so no list status assigned. RDA approved list records 'Army Welfare Housing Scheme (Defense-I), Morgah' as 'phase-i is merged in dha'.",
+  "established_year": 1992,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.5414,
+  "longitude": 73.0974,
+  "website": "https://dhai-r.com.pk",
+  "description": "First DHA Islamabad-Rawalpindi subdivision (DHA broke ground in May 1992), lying between Potohar Avenue (GT Road/N-5) and Bahria Town Phases VII-VIII and bordering the Soan River; falls in Rawalpindi district.",
+  "sources": [
+   {
+    "title": "Wikipedia - Defence Housing Authority, Islamabad",
+    "url": "https://en.wikipedia.org/wiki/Defence_Housing_Authority,_Islamabad"
+   },
+   {
+    "title": "RDA - Approved Housing Societies (rda.gop.pk/ahs; data via official API /backend/api/societies/approved)",
+    "url": "https://rda.gop.pk/ahs"
+   },
+   {
+    "title": "APP - Senate passes DHA Islamabad (Amendment) Bill 2023",
+    "url": "https://www.app.com.pk/national/senate-passes-the-defence-housing-authority-islamabad-amendment-bill-2023-to-enhance-governance-security/"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - DHA Phase 1",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=DHA+Phase+1"
+   }
+  ],
+  "aliases": [
+   "DHA Phase I"
+  ]
+ },
+ {
+  "name": "DHA Islamabad-Rawalpindi Phase 2",
+  "name_ur": "ڈی ایچ اے فیز II",
+  "city": "Islamabad",
+  "developer": "Defence Housing Authority Islamabad-Rawalpindi (DHAI-R)",
+  "approval_authority": "DHA (own act) - Defence Housing Authority Islamabad Act 2013 (XII of 2013)",
+  "approval_status": null,
+  "approval_note": "Statutory DHA scheme (DHA Islamabad Act 2013); not an entry on CDA/RDA private-scheme lists, so no list status assigned.",
+  "established_year": 1994,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.5273,
+  "longitude": 73.1609,
+  "website": "https://dhai-r.com.pk",
+  "description": "Largest DHA subdivision, commenced February 1994, near the Kahuta Triangle between Potohar Avenue (GT Road) to the south and the Islamabad Expressway to the north; in ICT Zone 5.",
+  "sources": [
+   {
+    "title": "Wikipedia - Defence Housing Authority, Islamabad",
+    "url": "https://en.wikipedia.org/wiki/Defence_Housing_Authority,_Islamabad"
+   },
+   {
+    "title": "APP - Senate passes DHA Islamabad (Amendment) Bill 2023",
+    "url": "https://www.app.com.pk/national/senate-passes-the-defence-housing-authority-islamabad-amendment-bill-2023-to-enhance-governance-security/"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - DHA Phase 2",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=DHA+Phase+2"
+   }
+  ],
+  "aliases": [
+   "DHA Phase II"
+  ]
+ },
+ {
+  "name": "DHA Islamabad-Rawalpindi Phase 3",
+  "name_ur": null,
+  "city": "Rawalpindi",
+  "developer": "Defence Housing Authority Islamabad-Rawalpindi (DHAI-R)",
+  "approval_authority": "DHA (own act) - Defence Housing Authority Islamabad Act 2013 (XII of 2013)",
+  "approval_status": null,
+  "approval_note": "Statutory DHA scheme (DHA Islamabad Act 2013); not an entry on CDA/RDA private-scheme lists, so no list status assigned. RDA illegal list carries 'Bahria Town Garden City (Seren City), Mouza Takhtat Pari, GT Road' with remark 'merged with dha'.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.4833,
+  "longitude": 73.1909,
+  "website": "https://dhai-r.com.pk",
+  "description": "Subdivision previously known as Bahria Serene City, east of Bahria Town Phase VIII off GT Road; OSM maps it in Mouza Bagga Sheikhan, Rawalpindi Cantonment tehsil.",
+  "sources": [
+   {
+    "title": "Wikipedia - Defence Housing Authority, Islamabad",
+    "url": "https://en.wikipedia.org/wiki/Defence_Housing_Authority,_Islamabad"
+   },
+   {
+    "title": "RDA - Illegal Housing Societies (rda.gop.pk/ihs; data via official API /backend/api/societies/illegal)",
+    "url": "https://rda.gop.pk/ihs"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - DHA Phase III",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=DHA+Phase+III"
+   }
+  ],
+  "aliases": [
+   "DHA Phase III"
+  ]
+ },
+ {
+  "name": "DHA Islamabad-Rawalpindi Phase 4",
+  "name_ur": null,
+  "city": "Rawalpindi",
+  "developer": "Defence Housing Authority Islamabad-Rawalpindi (DHAI-R)",
+  "approval_authority": "DHA (own act) - Defence Housing Authority Islamabad Act 2013 (XII of 2013)",
+  "approval_status": null,
+  "approval_note": "Statutory DHA scheme (DHA Islamabad Act 2013); not an entry on CDA/RDA private-scheme lists, so no list status assigned.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.5216,
+  "longitude": 73.0774,
+  "website": "https://dhai-r.com.pk",
+  "description": "Subdivision adjacent to the Orchard area and DHA Phase 1 along the Soan River; OSM maps it (as a construction area) in Rawalpindi Cantonment tehsil.",
+  "sources": [
+   {
+    "title": "Wikipedia - Defence Housing Authority, Islamabad",
+    "url": "https://en.wikipedia.org/wiki/Defence_Housing_Authority,_Islamabad"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - DHA Phase 4",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=DHA+Phase+4"
+   }
+  ]
+ },
+ {
+  "name": "DHA Islamabad-Rawalpindi Phase 5",
+  "name_ur": null,
+  "city": "Islamabad",
+  "developer": "Defence Housing Authority Islamabad-Rawalpindi (DHAI-R)",
+  "approval_authority": "DHA (own act) - Defence Housing Authority Islamabad Act 2013 (XII of 2013)",
+  "approval_status": null,
+  "approval_note": "Statutory DHA scheme (DHA Islamabad Act 2013); not an entry on CDA/RDA private-scheme lists, so no list status assigned.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": "https://dhai-r.com.pk",
+  "description": "DHA subdivision located on the Islamabad Expressway beside Phase 2; exact boundaries and coordinates not verified from an official source.",
+  "sources": [
+   {
+    "title": "Wikipedia - Defence Housing Authority, Islamabad",
+    "url": "https://en.wikipedia.org/wiki/Defence_Housing_Authority,_Islamabad"
+   },
+   {
+    "title": "APP - Senate passes DHA Islamabad (Amendment) Bill 2023",
+    "url": "https://www.app.com.pk/national/senate-passes-the-defence-housing-authority-islamabad-amendment-bill-2023-to-enhance-governance-security/"
+   }
+  ],
+  "aliases": [
+   "DHA Phase V"
+  ]
+ },
+ {
+  "name": "DHA Valley",
+  "name_ur": null,
+  "city": "Rawalpindi",
+  "developer": "DHA Islamabad-Rawalpindi in joint venture with Bahria Town and Habib Rafiq",
+  "approval_authority": "DHA (own act) - Defence Housing Authority Islamabad Act 2013 (XII of 2013)",
+  "approval_status": null,
+  "approval_note": "Statutory DHA scheme (DHA Islamabad Act 2013); not an entry on CDA/RDA private-scheme lists, so no list status assigned.",
+  "established_year": 2008,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "under development",
+  "possession_status": "Delayed; project was due by end-2014 and later possession plans were announced (Wikipedia, needs update)",
+  "utilities": [],
+  "latitude": 33.4897,
+  "longitude": 73.2808,
+  "website": "https://dhai-r.com.pk",
+  "description": "DHA project launched in 2008 east of DHA Phase 2/Rawat; coordinates are approximate, taken from the OSM 'DHA Homes' area (Rawalpindi Cantonment tehsil). The project has faced long delays and a NAB inquiry.",
+  "sources": [
+   {
+    "title": "Wikipedia - DHA Valley, Islamabad",
+    "url": "https://en.wikipedia.org/wiki/DHA_Valley,_Islamabad"
+   },
+   {
+    "title": "Wikipedia - Defence Housing Authority, Islamabad",
+    "url": "https://en.wikipedia.org/wiki/Defence_Housing_Authority,_Islamabad"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - DHA Homes",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=DHA+Homes"
+   }
+  ]
+ },
+ {
+  "name": "Bahria Town Phases 1-6 (Islamabad/Rawalpindi)",
+  "name_ur": "بحریہ ٹاؤن",
+  "city": "Islamabad",
+  "developer": "Bahria Town (Pvt) Ltd.",
+  "approval_authority": "CDA (ICT portions); RDA (Rawalpindi portions)",
+  "approval_status": "approved",
+  "approval_note": "CDA list: Phase II, III, V & VI (2501 kanal) LOP approved 08-08-2000, NOC issued 05-07-2001; Phase III-E & IV (2099 kanal) LOP approved, NOC not issued. RDA approved list: Phase I, II & III (partially) town planning approved over 2368.14 kanal.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.5499,
+  "longitude": 73.1331,
+  "website": "https://bahriatownislamabad.com",
+  "description": "Original Bahria Town community, Malik Riaz's first project, straddling the ICT (Zone 5) / Rawalpindi boundary off GT Road and the Islamabad Expressway; Wikipedia reports over 100,000 residents and its own electricity distribution company. Coordinates are for Phase 4 (OSM).",
+  "sources": [
+   {
+    "title": "CDA - Private Housing Schemes (approved list, all letters)",
+    "url": "https://cda.gov.pk/housing-schemes?letter=all"
+   },
+   {
+    "title": "CDA scheme page - Bahria Town Phase II, III, V & VI",
+    "url": "https://cda.gov.pk/housing-schemes/bahria-town-phase-iiiiiv-vi"
+   },
+   {
+    "title": "RDA - Approved Housing Societies (rda.gop.pk/ahs; data via official API /backend/api/societies/approved)",
+    "url": "https://rda.gop.pk/ahs"
+   },
+   {
+    "title": "Wikipedia - Bahria Town Rawalpindi",
+    "url": "https://en.wikipedia.org/wiki/Bahria_Town_Rawalpindi"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - Bahria Town Phase 4",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=Bahria+Town+Phase+4"
+   }
+  ]
+ },
+ {
+  "name": "Bahria Town Phase 7",
+  "name_ur": "بحریہ ٹاؤن فیز 7",
+  "city": "Islamabad",
+  "developer": "Bahria Town (Pvt) Ltd.",
+  "approval_authority": "CDA",
+  "approval_status": "approved",
+  "approval_note": "CDA list: Phase VII (879.53 kanal) LOP approved 11-02-2020, NOC not issued (sponsors failed to complete pre-requisites); Phase VII-E (711 kanal) LOP approved, NOC issued.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.5308,
+  "longitude": 73.118,
+  "website": "https://bahriatownislamabad.com",
+  "description": "Bahria Town phase in ICT Zone 5 along GT Road / Bahria Expressway.",
+  "sources": [
+   {
+    "title": "CDA - Private Housing Schemes (approved list, all letters)",
+    "url": "https://cda.gov.pk/housing-schemes?letter=all"
+   },
+   {
+    "title": "CDA scheme page - Bahria Town Phase VII",
+    "url": "https://cda.gov.pk/housing-schemes/bahria-town-phase-vii"
+   },
+   {
+    "title": "CDA scheme page - Bahria Town Phase VII-E",
+    "url": "https://cda.gov.pk/housing-schemes/bahria-town-phase-vii-e"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - Bahria Town Phase 7",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=Bahria+Town+Phase+7"
+   }
+  ]
+ },
+ {
+  "name": "Bahria Town Phase 8",
+  "name_ur": "بحریہ ٹاؤن فیز 8",
+  "city": "Rawalpindi",
+  "developer": "Bahria Town (Pvt) Ltd.",
+  "approval_authority": "RDA",
+  "approval_status": "partially_approved",
+  "approval_note": "RDA approved list: Phase-VIII (Shahpur) town planning approved over 5954 kanal; Phase-VIII (Gali) LOP approved over 11545.85 kanal. RDA illegal list includes 'Bahria Town Phase VIII Extension' (Mouza Dhara, Mar 2026) and 'Bahria Town Phase IX, VIII' (Lari Miana, Adyala Road).",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.5013,
+  "longitude": 73.0873,
+  "website": "https://bahriatownislamabad.com",
+  "description": "Large Rawalpindi-side Bahria phase (including Safari Valley blocks) south-west of Phase 7, reached from GT Road and the Bahria Expressway; extensions toward Adyala Road are on RDA's illegal list.",
+  "sources": [
+   {
+    "title": "RDA - Approved Housing Societies (rda.gop.pk/ahs; data via official API /backend/api/societies/approved)",
+    "url": "https://rda.gop.pk/ahs"
+   },
+   {
+    "title": "RDA - Illegal Housing Societies (rda.gop.pk/ihs; data via official API /backend/api/societies/illegal)",
+    "url": "https://rda.gop.pk/ihs"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - Bahria Town Phase 8",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=Bahria+Town+Phase+8"
+   }
+  ]
+ },
+ {
+  "name": "Bahria Garden City",
+  "name_ur": null,
+  "city": "Islamabad",
+  "developer": "Bahria Town (Pvt) Ltd.",
+  "approval_authority": "CDA",
+  "approval_status": "approved",
+  "approval_note": "CDA list: LOP first approved 17-10-2011, revised/extended LOP approved 29-10-2020 over 3232.4 kanal; NOC not issued (sponsors failed to complete pre-requisites); CDA final show-cause notice dated 14-09-2026.",
+  "established_year": null,
+  "area_acres": 404.1,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.5189,
+  "longitude": 73.1177,
+  "website": "https://bahriatownislamabad.com",
+  "description": "Bahria scheme in ICT Zone 5 off GT Road / Japan Road next to Bahria Town Phase 7; coordinates are for the Garden City Grand Masjid (OSM).",
+  "sources": [
+   {
+    "title": "CDA - Private Housing Schemes (approved list, all letters)",
+    "url": "https://cda.gov.pk/housing-schemes?letter=all"
+   },
+   {
+    "title": "CDA scheme page - Bahria Garden City",
+    "url": "https://cda.gov.pk/housing-schemes/bahria-garden-city"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - Bahria Garden City",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=Bahria+Garden+City"
+   }
+  ]
+ },
+ {
+  "name": "Bahria Enclave Islamabad",
+  "name_ur": "بحریہ انکلیو",
+  "city": "Islamabad",
+  "developer": "Bahria Town (Pvt) Ltd.",
+  "approval_authority": "CDA",
+  "approval_status": "approved",
+  "approval_note": "CDA list: Phase-I initial LOP 16-07-2011, cancelled 02-07-2013 for development without NOC, revised LOP over 12543.11 kanal approved 29-12-2020; NOC not issued. Bahria Enclave-II Phase-II (1180.04 kanal) and Enclave-II agro farming (2489.38 kanal) have NOC issued.",
+  "established_year": 2011,
+  "area_acres": 1567.9,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.6877,
+  "longitude": 73.214,
+  "website": "https://bahriatownislamabad.com",
+  "description": "Bahria scheme in ICT Zone 4 about 8 km from Chak Shahzad, reached from the Srinagar Highway/Park Road, Lehtrar Road and Islamabad Highway; Wikipedia gives conflicting launch years (2011/2013), the CDA first approved its layout in July 2011.",
+  "sources": [
+   {
+    "title": "CDA - Private Housing Schemes (approved list, all letters)",
+    "url": "https://cda.gov.pk/housing-schemes?letter=all"
+   },
+   {
+    "title": "CDA scheme page - Bahria Enclave Phase-I",
+    "url": "https://cda.gov.pk/housing-schemes/bahria-enclave-phase-i-housing-scheme"
+   },
+   {
+    "title": "Wikipedia - Bahria Town",
+    "url": "https://en.wikipedia.org/wiki/Bahria_Town"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - Bahria Enclave",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=Bahria+Enclave"
+   }
+  ]
+ },
+ {
+  "name": "Gulberg Greens",
+  "name_ur": null,
+  "city": "Islamabad",
+  "developer": "Intelligence Bureau Employees Co-operative Housing Society (IBECHS)",
+  "approval_authority": "CDA",
+  "approval_status": "noc_issued",
+  "approval_note": "CDA list: farm housing scheme 3862.85 kanal approved 26-08-2011; extended area of 18660.84 kanal approved 13-07-2018; NOC first issued 28-05-2012, revised NOC 26-06-2020.",
+  "established_year": null,
+  "area_acres": 2332.6,
+  "total_units": null,
+  "plot_sizes": [
+   "4 kanal (farmhouse)",
+   "5 kanal (farmhouse)",
+   "10 kanal (farmhouse)"
+  ],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.6019,
+  "longitude": 73.1564,
+  "website": "https://gulbergislamabad.com.pk",
+  "description": "Farm-housing scheme of IBECHS in ICT Zone 4 on the Islamabad Expressway; area figure is the CDA-approved extended area.",
+  "sources": [
+   {
+    "title": "CDA - Private Housing Schemes (approved list, all letters)",
+    "url": "https://cda.gov.pk/housing-schemes?letter=all"
+   },
+   {
+    "title": "CDA scheme page - Gulberg Greens Farm Housing Scheme",
+    "url": "https://cda.gov.pk/housing-schemes/gulberg-greens-farm-housing-scheme"
+   },
+   {
+    "title": "Gulberg Islamabad (developer) - Gulberg Residencia / Greens page",
+    "url": "https://gulbergislamabad.com.pk/gulberg-residencia-islamabad/"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - Gulberg",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=Gulberg"
+   }
+  ]
+ },
+ {
+  "name": "Gulberg Residencia",
+  "name_ur": null,
+  "city": "Islamabad",
+  "developer": "Intelligence Bureau Employees Co-operative Housing Society (IBECHS)",
+  "approval_authority": "CDA",
+  "approval_status": "noc_issued",
+  "approval_note": "CDA list: IBECHS Ph-III 3799.09 kanal approved 18-06-2010; revised/extended LOP over 19390.36 kanal approved 18-03-2018; NOC first issued 22-07-2011, revised NOC 01-06-2020. Developer cites a 2023 revised & extended plan of 30577.04 kanal not reflected in the CDA list.",
+  "established_year": null,
+  "area_acres": 2423.8,
+  "total_units": 12477,
+  "plot_sizes": [
+   "5 marla",
+   "7 marla",
+   "10 marla",
+   "12 marla",
+   "1 kanal",
+   "2 kanal"
+  ],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.5988,
+  "longitude": 73.2118,
+  "website": "https://gulbergislamabad.com.pk/gulberg-residencia-islamabad/",
+  "description": "Residential phase of IBECHS in ICT Zone 5 connected to the Islamabad Expressway by a main boulevard, entered past Gulberg Greens; total_units is the residential plot count in CDA's status sheet. Coordinates are for Gulberg Markaz (OSM).",
+  "sources": [
+   {
+    "title": "CDA - Private Housing Schemes (approved list, all letters)",
+    "url": "https://cda.gov.pk/housing-schemes?letter=all"
+   },
+   {
+    "title": "CDA scheme page - Gulberg Residencia",
+    "url": "https://cda.gov.pk/housing-schemes/gulberg-residencia-ibechs-ph-iii-housing-scheme"
+   },
+   {
+    "title": "CDA - Status of approved private housing schemes in Zone 2, 5 & E-11 (PDF)",
+    "url": "https://cda.gov.pk/Assets/pdf/status_of_housing_socities.pdf"
+   },
+   {
+    "title": "Gulberg Islamabad (developer) - Gulberg Residencia",
+    "url": "https://gulbergislamabad.com.pk/gulberg-residencia-islamabad/"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - Gulberg Residencia",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=Gulberg+Residencia"
+   }
+  ]
+ },
+ {
+  "name": "B-17 Multi Gardens (MPCHS) Phase I",
+  "name_ur": null,
+  "city": "Islamabad",
+  "developer": "Multi Professionals Cooperative Housing Society (MPCHS)",
+  "approval_authority": "CDA (ICT part); RDA (Punjab part)",
+  "approval_status": "noc_issued",
+  "approval_note": "CDA list: Multi Gardens Phase-I (4815.75 kanal) LOP first approved 27-09-2006, as-built/revised LOP 10-03-2022, NOC issued 30-01-2008. RDA approved list also records 'Multi Gardens' (Bhadana Khurd, Chokar, Dhok Jando, Thatha Khalil) approved over 19263.4 kanal, transfer & mortgage deed under process.",
+  "established_year": 2004,
+  "area_acres": 602.0,
+  "total_units": 2845,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.6904,
+  "longitude": 72.8286,
+  "website": "https://mpchs.org",
+  "description": "MPCHS scheme in sectors A-17/B-17 (ICT Zone 2) at the foot of the Margalla Hills, bordering GT Road and the M-1 Islamabad-Peshawar motorway; developer says it was inaugurated in 2004. Area and plot count (residential) are for the CDA-approved Phase I.",
+  "sources": [
+   {
+    "title": "CDA - Private Housing Schemes (approved list, all letters)",
+    "url": "https://cda.gov.pk/housing-schemes?letter=all"
+   },
+   {
+    "title": "CDA scheme page - Multi Gardens Phase-I",
+    "url": "https://cda.gov.pk/housing-schemes/multi-gardens-phase-i"
+   },
+   {
+    "title": "CDA - Status of approved private housing schemes in Zone 2, 5 & E-11 (PDF)",
+    "url": "https://cda.gov.pk/Assets/pdf/status_of_housing_socities.pdf"
+   },
+   {
+    "title": "RDA - Approved Housing Societies (rda.gop.pk/ahs; data via official API /backend/api/societies/approved)",
+    "url": "https://rda.gop.pk/ahs"
+   },
+   {
+    "title": "MPCHS official website",
+    "url": "https://mpchs.org"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - B-17",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=B-17"
+   }
+  ]
+ },
+ {
+  "name": "Multi Gardens Phase II (MPCHS, Chakri Road)",
+  "name_ur": null,
+  "city": "Rawalpindi",
+  "developer": "Multi Professionals Cooperative Housing Society (MPCHS)",
+  "approval_authority": "RDA",
+  "approval_status": "illegal",
+  "approval_note": "RDA illegal list (entry 2025): 'Multi garden phase-II' and 'Multi Professionals Cooperative Housing Society Phase II', Mouza Chahan, Khingar, Siyal, Sangral, Chakri Road. CDA list separately shows 'Multi Gardens, Phase-II' (4480 kanal) with only an NOC for planning (16-09-2010) and says a formal NOC must come from the local development agency.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": "https://mpchsphase2.com.pk",
+  "description": "Second MPCHS scheme on main Chakri Road near the Chakri interchange of the M-2, opposite Faisal Town Phase II, in Rawalpindi district.",
+  "sources": [
+   {
+    "title": "RDA - Illegal Housing Societies (rda.gop.pk/ihs; data via official API /backend/api/societies/illegal)",
+    "url": "https://rda.gop.pk/ihs"
+   },
+   {
+    "title": "CDA - Private Housing Schemes (approved list, all letters)",
+    "url": "https://cda.gov.pk/housing-schemes?letter=all"
+   },
+   {
+    "title": "CDA scheme page - Multi Gardens Phase-II",
+    "url": "https://cda.gov.pk/housing-schemes/multi-gardens-phase-ii"
+   },
+   {
+    "title": "MPCHS official website",
+    "url": "https://mpchs.org"
+   }
+  ]
+ },
+ {
+  "name": "Park View City Islamabad",
+  "name_ur": null,
+  "city": "Islamabad",
+  "developer": "Park View Enclave (Pvt) Ltd.",
+  "approval_authority": "CDA",
+  "approval_status": "approved",
+  "approval_note": "CDA letter of 11-07-2025 approved the revised & extended layout plan over 5828.75 kanal (Mouza Malote, Pind Begwal & Atthal, Zone-4), with NOC subject to further formalities; CDA list shows NOC 'Approved' dated 02-05-2014 for the earlier plan. RDA's illegal list has separate 'Park View City (Phase II), near T-chowk Rawat' and 'Park View City Rawalpindi (old Mega City Gujjar Khan)'.",
+  "established_year": null,
+  "area_acres": 728.6,
+  "total_units": 4108,
+  "plot_sizes": [
+   "25x45 ft",
+   "26x45 ft",
+   "26x50 ft",
+   "30x60 ft",
+   "35x65 ft",
+   "35x70 ft",
+   "50x90 ft",
+   "75x120 ft"
+  ],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.7194,
+  "longitude": 73.2095,
+  "website": "https://parkviewcity.com.pk",
+  "description": "Scheme in ICT Zone 4 in Mouza Malote/Pind Begwal/Atthal off Malot Road; the 2025 CDA-approved plan has 4108 residential and 432 commercial plots (main plot dimensions listed). Coordinates approximate (OSM area in Maloot).",
+  "sources": [
+   {
+    "title": "CDA letter - Revised & Extended Layout Plan of Park View City (Jul 2025, PDF)",
+    "url": "https://www.cda.gov.pk/Assets/pdf/2025-07-17.pdf"
+   },
+   {
+    "title": "CDA - Private Housing Schemes (approved list, all letters)",
+    "url": "https://cda.gov.pk/housing-schemes?letter=all"
+   },
+   {
+    "title": "CDA scheme page - Park View City Housing Scheme",
+    "url": "https://cda.gov.pk/housing-schemes/park-view-city-housing-scheme"
+   },
+   {
+    "title": "RDA - Illegal Housing Societies (rda.gop.pk/ihs; data via official API /backend/api/societies/illegal)",
+    "url": "https://rda.gop.pk/ihs"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - Park View",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=Park+View"
+   }
+  ]
+ },
+ {
+  "name": "Naval Anchorage Islamabad",
+  "name_ur": null,
+  "city": "Islamabad",
+  "developer": "Pakistan Navy (Naval Anchorage directorate / PN Benevolent Association)",
+  "approval_authority": "CDA",
+  "approval_status": "noc_issued",
+  "approval_note": "CDA list: LOP approved 27-02-2020, NOC issued 28-05-2020 over 3702.70 kanal; CDA final show-cause notices dated 01-06-2026. RDA illegal list has a separate 'Anchorage Islamabad Phase-II' (Mouza Thalian, Feb 2026).",
+  "established_year": 1989,
+  "area_acres": 462.8,
+  "total_units": null,
+  "plot_sizes": [
+   "5 marla",
+   "14 marla",
+   "1 kanal",
+   "2 kanal"
+  ],
+  "development_status": "under development",
+  "possession_status": null,
+  "utilities": [
+   "underground electricity"
+  ],
+  "latitude": 33.5696,
+  "longitude": 73.1959,
+  "website": null,
+  "description": "Pakistan Navy officers' housing scheme in ICT Zone 5 off the Islamabad Expressway next to Gulberg Greens, with Phase 1 (Blocks A-G) and Phase 1 Extension (Blocks J-M); launch year 1989 and plot sizes per ProPakistani's project profile.",
+  "sources": [
+   {
+    "title": "CDA - Private Housing Schemes (approved list, all letters)",
+    "url": "https://cda.gov.pk/housing-schemes?letter=all"
+   },
+   {
+    "title": "CDA scheme page - Naval Anchorage",
+    "url": "https://cda.gov.pk/housing-schemes/naval-anchorage"
+   },
+   {
+    "title": "RDA - Illegal Housing Societies (rda.gop.pk/ihs; data via official API /backend/api/societies/illegal)",
+    "url": "https://rda.gop.pk/ihs"
+   },
+   {
+    "title": "ProPakistani ProProperty - Naval Anchorage profile",
+    "url": "https://propakistani.pk/proproperty/?p=267"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - Naval Anchorage",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=Naval+Anchorage"
+   }
+  ]
+ },
+ {
+  "name": "Soan Garden",
+  "name_ur": null,
+  "city": "Islamabad",
+  "developer": "Civilian Employees Cooperative Housing Society (CECHS)",
+  "approval_authority": "CDA",
+  "approval_status": "approved",
+  "approval_note": "CDA list: LOP approved (approval date 15-06-1994); NOC issued 09-08-2004 and cancelled 2017 (CDA page dates cancellation 21/22-05-2017); CDA has sealed some commercial buildings for layout violations.",
+  "established_year": null,
+  "area_acres": 373.1,
+  "total_units": 2401,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [
+   "underground electricity",
+   "gas",
+   "water",
+   "sewerage"
+  ],
+  "latitude": 33.5625,
+  "longitude": 73.1535,
+  "website": "https://soangarden.org",
+  "description": "Cooperative scheme off the Islamabad Expressway in ICT Zone 5 near PWD Housing Society; developer site says Phase 1 is fully developed (its 'launched in 2004' claim conflicts with CDA's 1994 approval, so no launch year is given).",
+  "sources": [
+   {
+    "title": "CDA - Private Housing Schemes (approved list, all letters)",
+    "url": "https://cda.gov.pk/housing-schemes?letter=all"
+   },
+   {
+    "title": "CDA scheme page - Soan Garden Housing Scheme",
+    "url": "https://cda.gov.pk/housing-schemes/soan-garden-housing-scheme"
+   },
+   {
+    "title": "CDA - Status of approved private housing schemes in Zone 2, 5 & E-11 (PDF)",
+    "url": "https://cda.gov.pk/Assets/pdf/status_of_housing_socities.pdf"
+   },
+   {
+    "title": "Soan Garden official website",
+    "url": "https://soangarden.org/index.html"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - Soan Garden",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=Soan+Garden"
+   }
+  ]
+ },
+ {
+  "name": "CBR Town Phase I",
+  "name_ur": "سی بی آر ٹاؤن",
+  "city": "Islamabad",
+  "developer": "Central Board of Revenue Employees Cooperative Housing Society (CBR-ECHS)",
+  "approval_authority": "CDA",
+  "approval_status": "noc_issued",
+  "approval_note": "CDA list: LOP first approved 24-02-2007; revised, as-built and extended LOP approved 21-03-2023 over 1687.85 kanal; NOC issued 28-05-2009; CDA final show-cause notice 14-09-2026. RDA approved list has CBR Town Phase-II (Kot Kolian) over 1388.40 kanal; 'CBR Phase-II (Extension)' and 'CBR Residencia' are on RDA's illegal list.",
+  "established_year": null,
+  "area_acres": 211.0,
+  "total_units": 2070,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.5574,
+  "longitude": 73.1409,
+  "website": null,
+  "description": "Cooperative scheme of revenue employees off the Islamabad Expressway at Lohi Bher, ICT Zone 5; total_units is CDA's residential plot count.",
+  "sources": [
+   {
+    "title": "CDA - Private Housing Schemes (approved list, all letters)",
+    "url": "https://cda.gov.pk/housing-schemes?letter=all"
+   },
+   {
+    "title": "CDA scheme page - CBR Town",
+    "url": "https://cda.gov.pk/housing-schemes/cbr-town"
+   },
+   {
+    "title": "CDA - Status of approved private housing schemes in Zone 2, 5 & E-11 (PDF)",
+    "url": "https://cda.gov.pk/Assets/pdf/status_of_housing_socities.pdf"
+   },
+   {
+    "title": "RDA - Approved Housing Societies (rda.gop.pk/ahs; data via official API /backend/api/societies/approved)",
+    "url": "https://rda.gop.pk/ahs"
+   },
+   {
+    "title": "RDA - Illegal Housing Societies (rda.gop.pk/ihs; data via official API /backend/api/societies/illegal)",
+    "url": "https://rda.gop.pk/ihs"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - CBR Town",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=CBR+Town"
+   }
+  ]
+ },
+ {
+  "name": "Jinnah Garden",
+  "name_ur": "جناح گارڈن",
+  "city": "Islamabad",
+  "developer": "Federal Employees Cooperative Housing Society (FECHS) (Phase-I Extension jointly with NASECHS)",
+  "approval_authority": "CDA",
+  "approval_status": "partially_approved",
+  "approval_note": "CDA list: Phase-I (2548 kanal) LOP approved 09-04-2011 but cancelled/withdrawn 14-09-2018 (a revised LOP letter dated 23-01-2025 is posted); Phase-I Extension (1826.50 kanal) LOP approved 10-09-2021, NOC not issued; Phase-II (430 kanal, Kahuta Road) LOP approved, NOC not issued.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.568,
+  "longitude": 73.1749,
+  "website": null,
+  "description": "Federal employees' cooperative scheme off the Islamabad Expressway in ICT Zone 5 near Naval Anchorage and River Gardens; CDA status sheet lists 2397 plots in Phase I and 2552 in the Phase-I Extension.",
+  "sources": [
+   {
+    "title": "CDA - Private Housing Schemes (approved list, all letters)",
+    "url": "https://cda.gov.pk/housing-schemes?letter=all"
+   },
+   {
+    "title": "CDA scheme page - Jinnah Garden Phase-I",
+    "url": "https://cda.gov.pk/housing-schemes/jinnah-garden-phase-i"
+   },
+   {
+    "title": "CDA scheme page - Jinnah Garden Phase-1 Extension",
+    "url": "https://cda.gov.pk/housing-schemes/jinnah-garden-phase-1-extension"
+   },
+   {
+    "title": "CDA - Status of approved private housing schemes in Zone 2, 5 & E-11 (PDF)",
+    "url": "https://cda.gov.pk/Assets/pdf/status_of_housing_socities.pdf"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - Jinnah Garden",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=Jinnah+Garden"
+   }
+  ]
+ },
+ {
+  "name": "Ghauri Town",
+  "name_ur": null,
+  "city": "Islamabad",
+  "developer": null,
+  "approval_authority": "CDA",
+  "approval_status": "illegal",
+  "approval_note": "Listed on CDA's illegal housing schemes list as 'Ghouri Town, all Phases Islamabad Expressway'; CDA sealed its offices (Jul 2022) and issued a demolition notice for Phase-7 on 24-02-2026.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.623,
+  "longitude": 73.1249,
+  "website": null,
+  "description": "Multi-phase private scheme along the Islamabad Expressway/Islamabad Highway near Khanna; CDA has asked IESCO, SNGPL and PTCL to stop new connections and the district administration banned property transfers. Coordinates are for Phase 1 (OSM).",
+  "sources": [
+   {
+    "title": "CDA - Illegal Housing Schemes list",
+    "url": "https://cda.gov.pk/illegal-housing-schemes"
+   },
+   {
+    "title": "ProPakistani - CDA seals offices of a renowned housing society (Jul 2022)",
+    "url": "https://propakistani.pk/2022/07/22/cda-seals-offices-of-a-renowned-housing-society-in-islamabad/"
+   },
+   {
+    "title": "ProPakistani - CDA issues demolition notice for Ghouri Town Phase 7 (Feb 2026)",
+    "url": "https://propakistani.pk/2026/02/25/cda-issues-demolition-notice-for-illegal-development-in-ghouri-town-phase-7/amp/"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - Ghauri Town Islamabad",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=Ghauri+Town+Islamabad"
+   }
+  ]
+ },
+ {
+  "name": "National Police Foundation Housing Scheme, E-11",
+  "name_ur": null,
+  "city": "Islamabad",
+  "developer": "National Police Foundation (NPF)",
+  "approval_authority": "CDA",
+  "approval_status": "approved",
+  "approval_note": "CDA list: LOP approved 31-08-2004 (1325 kanal); NOC issued 2005 and cancelled 29-11-2008, but CDA's status sheet notes IHC (WP 1581/2008) suspended the cancellation. Dawn reported the cancellation was because more plots were sold than land available.",
+  "established_year": null,
+  "area_acres": 165.6,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": "https://www.npf.org.pk",
+  "description": "NPF's housing scheme in sector E-11, one of the cooperative/foundation schemes permitted in E-11 under ICT zoning; listed under the E-11 section of CDA's status sheet.",
+  "sources": [
+   {
+    "title": "CDA - Private Housing Schemes (approved list, all letters)",
+    "url": "https://cda.gov.pk/housing-schemes?letter=all"
+   },
+   {
+    "title": "CDA scheme page - National Police Foundation",
+    "url": "https://cda.gov.pk/housing-schemes/national-police-foundation"
+   },
+   {
+    "title": "CDA - Status of approved private housing schemes in Zone 2, 5 & E-11 (PDF)",
+    "url": "https://cda.gov.pk/Assets/pdf/status_of_housing_socities.pdf"
+   },
+   {
+    "title": "Dawn - NPF housing scheme: People asked to stay away",
+    "url": "https://www.dawn.com/news/645368"
+   }
+  ]
+ },
+ {
+  "name": "National Police Foundation O-9 (Eastridge Housing Scheme)",
+  "name_ur": "پولیس فاؤنڈیشن",
+  "city": "Islamabad",
+  "developer": "National Police Foundation (NPF)",
+  "approval_authority": null,
+  "approval_status": null,
+  "approval_note": "Not found on CDA approved or illegal lists (checked Oct 2026). RDA approved list has an 'Eastridge Housing Scheme', Mouza Kotha Kalan, town planning approved over 391.59 kanal; match with NPF O-9 not confirmed.",
+  "established_year": 1989,
+  "area_acres": 341.3,
+  "total_units": 2853,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": "Plots allotted; about 60% of houses built and occupied (NPF)",
+  "utilities": [
+   "electricity",
+   "security"
+  ],
+  "latitude": 33.5672,
+  "longitude": 73.1325,
+  "website": "https://npf.org.pk/npf-o9-housing-scheme",
+  "description": "NPF scheme launched in 1989 on 2730 kanal about 1 km off the Islamabad Expressway, next to Bahria Town, Pakistan Town and PWD; NPF reports 2853 residential and 119 commercial plots and gas still pending in a small area.",
+  "sources": [
+   {
+    "title": "NPF - O-9 (Eastridge) Housing Scheme",
+    "url": "https://npf.org.pk/npf-o9-housing-scheme"
+   },
+   {
+    "title": "CDA - Private Housing Schemes (approved list, all letters)",
+    "url": "https://cda.gov.pk/housing-schemes?letter=all"
+   },
+   {
+    "title": "CDA - Illegal Housing Schemes list",
+    "url": "https://cda.gov.pk/illegal-housing-schemes"
+   },
+   {
+    "title": "RDA - Approved Housing Societies (rda.gop.pk/ahs; data via official API /backend/api/societies/approved)",
+    "url": "https://rda.gop.pk/ahs"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - Police Foundation",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=Police+Foundation"
+   }
+  ]
+ },
+ {
+  "name": "PWD Housing Scheme",
+  "name_ur": null,
+  "city": "Islamabad",
+  "developer": null,
+  "approval_authority": "CDA",
+  "approval_status": null,
+  "approval_note": "Not found on CDA's current approved list or illegal list (checked Oct 2026). The 'Pak PWD, Chakri Road' entry on RDA's illegal list is a different scheme.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.5714,
+  "longitude": 73.1451,
+  "website": null,
+  "description": "Established residential society directly off the Islamabad Expressway (PWD interchange) in ICT Zone 5, next to Police Foundation O-9, Pakistan Town and Soan Garden.",
+  "sources": [
+   {
+    "title": "CDA - Private Housing Schemes (approved list, all letters)",
+    "url": "https://cda.gov.pk/housing-schemes?letter=all"
+   },
+   {
+    "title": "CDA - Illegal Housing Schemes list",
+    "url": "https://cda.gov.pk/illegal-housing-schemes"
+   },
+   {
+    "title": "RDA - Illegal Housing Societies (rda.gop.pk/ihs; data via official API /backend/api/societies/illegal)",
+    "url": "https://rda.gop.pk/ihs"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - PWD Housing",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=PWD+Housing"
+   }
+  ]
+ },
+ {
+  "name": "Pakistan Town",
+  "name_ur": "پاکستان ٹاؤن",
+  "city": "Islamabad",
+  "developer": null,
+  "approval_authority": "CDA",
+  "approval_status": null,
+  "approval_note": "Not found on CDA's current approved list or illegal list (checked Oct 2026).",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.5752,
+  "longitude": 73.1438,
+  "website": null,
+  "description": "Residential society off the Islamabad Expressway in ICT Zone 5 near Korang Town and PWD Housing Scheme.",
+  "sources": [
+   {
+    "title": "CDA - Private Housing Schemes (approved list, all letters)",
+    "url": "https://cda.gov.pk/housing-schemes?letter=all"
+   },
+   {
+    "title": "CDA - Illegal Housing Schemes list",
+    "url": "https://cda.gov.pk/illegal-housing-schemes"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - Pakistan Town",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=Pakistan+Town"
+   }
+  ]
+ },
+ {
+  "name": "Margalla View Housing Scheme (D-17)",
+  "name_ur": null,
+  "city": "Islamabad",
+  "developer": "Twin City Housing (Pvt) Ltd.",
+  "approval_authority": "CDA",
+  "approval_status": "approved",
+  "approval_note": "CDA list: revised LOP approved 2020/2021 (1912.02 kanal), NOC initially issued 14-06-2002 but revised NOC not yet obtained; extension (292.25 kanal) LOP approved, NOC issued.",
+  "established_year": null,
+  "area_acres": 239.0,
+  "total_units": 1578,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.6578,
+  "longitude": 72.8538,
+  "website": null,
+  "description": "Private scheme in sector D-17, ICT Zone 2, off GT Road near the Margalla foothills.",
+  "sources": [
+   {
+    "title": "CDA - Private Housing Schemes (approved list, all letters)",
+    "url": "https://cda.gov.pk/housing-schemes?letter=all"
+   },
+   {
+    "title": "CDA scheme page - Margalla View Housing Scheme",
+    "url": "https://cda.gov.pk/housing-schemes/margalla-view-housing-scheme"
+   },
+   {
+    "title": "CDA - Status of approved private housing schemes in Zone 2, 5 & E-11 (PDF)",
+    "url": "https://cda.gov.pk/Assets/pdf/status_of_housing_socities.pdf"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - Margalla View",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=Margalla+View"
+   }
+  ]
+ },
+ {
+  "name": "Engineers Co-operative Housing Society (D-18/E-18)",
+  "name_ur": null,
+  "city": "Islamabad",
+  "developer": "Engineers Co-operative Housing Society",
+  "approval_authority": "CDA",
+  "approval_status": "approved",
+  "approval_note": "CDA list: LOP approved 28-05-2005 over 4298 kanal (Sector D-18/E-18 specified area); NOC not issued.",
+  "established_year": null,
+  "area_acres": 537.3,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "Engineers' cooperative scheme in the D-18/E-18 specified area of ICT; CDA separately lists 'Engineers Housing Scheme' by Engineers International (1156.29 kanal, NOC issued 2010).",
+  "sources": [
+   {
+    "title": "CDA - Private Housing Schemes (approved list, all letters)",
+    "url": "https://cda.gov.pk/housing-schemes?letter=all"
+   },
+   {
+    "title": "CDA scheme page - Engineers Co-operative",
+    "url": "https://cda.gov.pk/housing-schemes/engineers-co-opertaive"
+   },
+   {
+    "title": "CDA scheme page - Engineers Housing Scheme",
+    "url": "https://cda.gov.pk/housing-schemes/engineers-housing-scheme"
+   }
+  ]
+ },
+ {
+  "name": "Top City-1",
+  "name_ur": null,
+  "city": "Rawalpindi",
+  "developer": null,
+  "approval_authority": "RDA",
+  "approval_status": "approved",
+  "approval_note": "RDA approved list: 'Top City' (Bijnial, Pind) approved over 9681 kanal.",
+  "established_year": null,
+  "area_acres": 1210.1,
+  "total_units": null,
+  "plot_sizes": [
+   "5 marla",
+   "10 marla",
+   "1 kanal",
+   "2 kanal",
+   "4 kanal (farmhouse)"
+  ],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.5763,
+  "longitude": 72.8693,
+  "website": null,
+  "description": "Scheme in Mouza Bijnial on the Srinagar (Kashmir) Highway about 3 km from Islamabad International Airport, marketed as Islamabad but under RDA; plot sizes are from listing sites (Zameen/ICONS) and unverified with the developer.",
+  "sources": [
+   {
+    "title": "RDA - Approved Housing Societies (rda.gop.pk/ahs; data via official API /backend/api/societies/approved)",
+    "url": "https://rda.gop.pk/ahs"
+   },
+   {
+    "title": "Zameen area guide - Top City-1 (pointer)",
+    "url": "https://www.zameen.com/area-guides/islamabad/top-city-1-1383/"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - Top City",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=Top+City"
+   }
+  ]
+ },
+ {
+  "name": "Faisal Town Phase 1 (F-18)",
+  "name_ur": null,
+  "city": "Rawalpindi",
+  "developer": "Faisal Town Group",
+  "approval_authority": "RDA",
+  "approval_status": "noc_issued",
+  "approval_note": "RDA approved list: 'Faisal Town (Rev & Extension)', Mouza Chahan, Barkat, Pind Nasralla & Noughazi, final NOC issued over 4735.90 kanal. 'Faisal Town Phase II' (Kolian Par/Thalian) is on RDA's illegal list.",
+  "established_year": null,
+  "area_acres": 592.0,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.6082,
+  "longitude": 72.8738,
+  "website": "https://faisaltowngroup.com",
+  "description": "Scheme branded as sector F-18 Islamabad on Fateh Jang Road near the M-1 Fateh Jang/Tarnol interchange, falling under RDA in Rawalpindi district.",
+  "sources": [
+   {
+    "title": "RDA - Approved Housing Societies (rda.gop.pk/ahs; data via official API /backend/api/societies/approved)",
+    "url": "https://rda.gop.pk/ahs"
+   },
+   {
+    "title": "RDA - Illegal Housing Societies (rda.gop.pk/ihs; data via official API /backend/api/societies/illegal)",
+    "url": "https://rda.gop.pk/ihs"
+   },
+   {
+    "title": "Faisal Town Group official website",
+    "url": "https://faisaltowngroup.com/"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - Faisal Town",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=Faisal+Town"
+   }
+  ]
+ },
+ {
+  "name": "University Town",
+  "name_ur": "یونیورسٹی ٹاؤن",
+  "city": "Rawalpindi",
+  "developer": null,
+  "approval_authority": "RDA",
+  "approval_status": "approved",
+  "approval_note": "RDA approved list: Mouza Bajnial, town planning approved over 3454 kanal (transfer & mortgage deed under process). In Nov 2025 RDA warned buyers, banned land transfers linked to the developer and moved against its sponsors over alleged irregularities (APP).",
+  "established_year": null,
+  "area_acres": 431.8,
+  "total_units": null,
+  "plot_sizes": [
+   "5 marla",
+   "10 marla",
+   "1 kanal"
+  ],
+  "development_status": "under development",
+  "possession_status": "Developer advertises immediate possession",
+  "utilities": [],
+  "latitude": 33.5852,
+  "longitude": 72.8829,
+  "website": "https://universitytown.com.pk",
+  "description": "Scheme in Mouza Bajnial on the main Kashmir (Srinagar) Highway near the airport, under RDA; developer describes it as about 70% developed.",
+  "sources": [
+   {
+    "title": "RDA - Approved Housing Societies (rda.gop.pk/ahs; data via official API /backend/api/societies/approved)",
+    "url": "https://rda.gop.pk/ahs"
+   },
+   {
+    "title": "APP - RDA warns citizens against illegal sale/purchase of plots in University Town (Nov 2025)",
+    "url": "https://www.app.com.pk/?p=1103880"
+   },
+   {
+    "title": "University Town official website",
+    "url": "https://universitytown.com.pk/"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - University Town",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=University+Town"
+   }
+  ]
+ },
+ {
+  "name": "Eighteen (Elite Reverie Housing)",
+  "name_ur": null,
+  "city": "Rawalpindi",
+  "developer": "Ora Developers (Egypt) with Saif Group and Kohistan Builders",
+  "approval_authority": "RDA",
+  "approval_status": "approved",
+  "approval_note": "RDA approved list: 'Elite Reverie Housing (Eighteen)', Bajnial/Bhamra, town planning approved over 4839 kanal (transfer & mortgage deed under process).",
+  "established_year": 2018,
+  "area_acres": 604.9,
+  "total_units": null,
+  "plot_sizes": [
+   "0.5 kanal (villa)",
+   "1 kanal (villa)",
+   "2 kanal (villa)",
+   "4 kanal (villa)",
+   "8 kanal (villa)"
+  ],
+  "development_status": "under development",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.5944,
+  "longitude": 72.8894,
+  "website": null,
+  "description": "Golf-centred villa community on the Srinagar Highway next to University Town, launched with a groundbreaking on 25 March 2018; ProPakistani put progress at about 40%.",
+  "sources": [
+   {
+    "title": "RDA - Approved Housing Societies (rda.gop.pk/ahs; data via official API /backend/api/societies/approved)",
+    "url": "https://rda.gop.pk/ahs"
+   },
+   {
+    "title": "Zameen News - Eighteen Islamabad launched, ground breaking held (Mar 2018)",
+    "url": "https://www.zameen.com/news/eighteen-islamabad-launched-ground-breaking-held.html"
+   },
+   {
+    "title": "ProPakistani ProProperty - Eighteen (Elite Reverie)",
+    "url": "https://propakistani.pk/proproperty/projects/elite-reverie-housing-society-eighteen/"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - Eighteen",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=Eighteen"
+   }
+  ]
+ },
+ {
+  "name": "Capital Smart City",
+  "name_ur": null,
+  "city": "Rawalpindi",
+  "developer": "Future Development Holdings (Pvt) Ltd. and Habib Rafiq (Pvt) Ltd.",
+  "approval_authority": "RDA",
+  "approval_status": "partially_approved",
+  "approval_note": "RDA approved list: Mouza Chahan, approved over 7376 kanal. 'Capital Smart City Phase II' and 'Capital Smart City Extension' (Mouza Mandwaal Rajar, Chakri Road) added to RDA's illegal list in Mar 2026. Project is marketed at about 80,000 kanal.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [
+   "5 marla to 2 kanal (residential)",
+   "5 to 20 kanal (farmhouse)"
+  ],
+  "development_status": "under development",
+  "possession_status": null,
+  "utilities": [
+   "underground electricity",
+   "security"
+  ],
+  "latitude": 33.4408,
+  "longitude": 72.8588,
+  "website": "https://www.smartcitypk.com",
+  "description": "Large scheme beside the M-2 Lahore-Islamabad motorway near the Thallian interchange (a dedicated M-2 interchange was approved by NHA), master-planned by Surbana Jurong; ProPakistani put progress at about 25%.",
+  "sources": [
+   {
+    "title": "RDA - Approved Housing Societies (rda.gop.pk/ahs; data via official API /backend/api/societies/approved)",
+    "url": "https://rda.gop.pk/ahs"
+   },
+   {
+    "title": "RDA - Illegal Housing Societies (rda.gop.pk/ihs; data via official API /backend/api/societies/illegal)",
+    "url": "https://rda.gop.pk/ihs"
+   },
+   {
+    "title": "ProPakistani ProProperty - Capital Smart City",
+    "url": "https://propakistani.pk/proproperty/projects/capital-smart-city/"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - Capital Smart City",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=Capital+Smart+City"
+   }
+  ]
+ },
+ {
+  "name": "Blue World City",
+  "name_ur": null,
+  "city": "Rawalpindi",
+  "developer": "Blue Group of Companies",
+  "approval_authority": "RDA",
+  "approval_status": "illegal",
+  "approval_note": "On RDA's illegal list (Mouza Habtaal, Sehal, Thallian, Katarian, Chakri Road). RDA had withdrawn its planning permission and in Jul 2021 called it an illegal scheme and asked IESCO/SNGPL/PTCL not to serve it (The News).",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [
+   "5 marla",
+   "8 marla",
+   "10 marla",
+   "1 kanal",
+   "2 kanal",
+   "4-14 kanal (farmhouse)"
+  ],
+  "development_status": "under development",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.3675,
+  "longitude": 72.8669,
+  "website": "https://blueworldcity.com.pk",
+  "description": "Scheme on main Chakri Road near the Chakri interchange of the M-2; RDA mounted an operation against it in Oct 2023. Plot sizes are the developer's advertised blocks (via ProPakistani).",
+  "sources": [
+   {
+    "title": "RDA - Illegal Housing Societies (rda.gop.pk/ihs; data via official API /backend/api/societies/illegal)",
+    "url": "https://rda.gop.pk/ihs"
+   },
+   {
+    "title": "The News - RDA issues notice to owner of illegal housing scheme (Jul 2021)",
+    "url": "https://www.thenews.com.pk/print/859454-rda-issues-notice-to-owner-of-illegal-housing-scheme"
+   },
+   {
+    "title": "ProPakistani ProProperty - Blue World City",
+    "url": "https://propakistani.pk/proproperty/projects/blue-world-city/"
+   },
+   {
+    "title": "ProPakistani - RDA launches major crackdown on three unauthorized housing projects (Oct 2023)",
+    "url": "https://propakistani.pk/proproperty/rawalpindi-development-authority-launches-major-crackdown-on-three-unauthorized-housing-projects/"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - Blue World City",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=Blue+World+City"
+   }
+  ]
+ },
+ {
+  "name": "Kingdom Valley",
+  "name_ur": null,
+  "city": "Rawalpindi",
+  "developer": "Kingdom Group / Ghulam Hussain Shahid Real Estate Engineers",
+  "approval_authority": "PHATA (recorded on RDA list)",
+  "approval_status": "partially_approved",
+  "approval_note": "RDA approved list: 'Kingdom valley', Mouza Choora, 'approved by PHATA over 103 kanal 15 marlas', whereas the project is marketed at about 15,000 kanal; RDA illegal list has 'Moon Galaxy Housing / Moon Enclave' in 'new Kingdom Valley'.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [
+   "3.5 marla to 1 kanal (residential)",
+   "2, 4 and 8 kanal (farmhouse)"
+  ],
+  "development_status": "under development",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.3235,
+  "longitude": 72.7495,
+  "website": null,
+  "description": "Scheme tied to the Naya Pakistan Housing Programme, about 3 km from the Chakri interchange of the M-2 in Mouza Choora, Rawalpindi Saddar tehsil.",
+  "sources": [
+   {
+    "title": "RDA - Approved Housing Societies (rda.gop.pk/ahs; data via official API /backend/api/societies/approved)",
+    "url": "https://rda.gop.pk/ahs"
+   },
+   {
+    "title": "RDA - Illegal Housing Societies (rda.gop.pk/ihs; data via official API /backend/api/societies/illegal)",
+    "url": "https://rda.gop.pk/ihs"
+   },
+   {
+    "title": "ProPakistani ProProperty - Kingdom Valley",
+    "url": "https://propakistani.pk/proproperty/projects/kingdom-valley/"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - Kingdom Valley",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=Kingdom+Valley"
+   }
+  ]
+ },
+ {
+  "name": "Rudn Enclave",
+  "name_ur": null,
+  "city": "Rawalpindi",
+  "developer": "RMRSCO (Pvt) Ltd.",
+  "approval_authority": "RDA",
+  "approval_status": "illegal",
+  "approval_note": "On RDA's illegal list ('RUDN Enclave', Mouza Budhiyal, Adyala Road; and 'Ruden Enclave', Dhala Khasala, Adyala Road). RDA filed an FIR against its owners in Sep 2023 (ProPakistani). Developer claims PHATA approval.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": "https://rudnenclave.com",
+  "description": "Scheme on Adyala Road near Khasala village, Rawalpindi, marketed with access to the planned Rawalpindi Ring Road.",
+  "sources": [
+   {
+    "title": "RDA - Illegal Housing Societies (rda.gop.pk/ihs; data via official API /backend/api/societies/illegal)",
+    "url": "https://rda.gop.pk/ihs"
+   },
+   {
+    "title": "ProPakistani - RDA initiates legal action against Rudn Enclave owners (Sep 2023)",
+    "url": "https://propakistani.pk/proproperty/?p=19164"
+   },
+   {
+    "title": "Rudn Enclave official website",
+    "url": "https://rudnenclave.com/"
+   }
+  ]
+ },
+ {
+  "name": "Gulshan-e-Abad",
+  "name_ur": null,
+  "city": "Rawalpindi",
+  "developer": "Abad Cooperative Housing Society",
+  "approval_authority": "RDA",
+  "approval_status": "partially_approved",
+  "approval_note": "RDA approved list: 'Abad Cooperative Housing Society (Gulshan-a-Abad)', Mouza Kaliyal, town planning approved over 2500 kanal (transfer & mortgage deed pending); 'extension & sector 4 is illegal'. 'Abad Pearl Villas' is on RDA's illegal list.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "Cooperative society on Adyala Road, Rawalpindi (not a DHA scheme), developed from the mid-1990s in four sectors; sector 4 is the part RDA treats as illegal.",
+  "sources": [
+   {
+    "title": "RDA - Approved Housing Societies (rda.gop.pk/ahs; data via official API /backend/api/societies/approved)",
+    "url": "https://rda.gop.pk/ahs"
+   },
+   {
+    "title": "RDA - Illegal Housing Societies (rda.gop.pk/ihs; data via official API /backend/api/societies/illegal)",
+    "url": "https://rda.gop.pk/ihs"
+   },
+   {
+    "title": "Zameen area guide - Gulshan Abad (pointer)",
+    "url": "https://www.zameen.com/area-guides/rawalpindi/gulshan-abad-1058"
+   }
+  ]
+ },
+ {
+  "name": "Taj Residencia",
+  "name_ur": "تاج ریزیڈنسیا",
+  "city": "Rawalpindi",
+  "developer": null,
+  "approval_authority": "RDA",
+  "approval_status": "partially_approved",
+  "approval_note": "RDA approved list: final NOC over 224 kanal (Mouza Kaak); extension of 2200 kanal (Sheikhpur) 'revised & extension is under process'. Blue Bell, Cosmos and Lotus blocks (Mouza Kaak and Sheikhpur) added to RDA's illegal list in May 2026.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.5898,
+  "longitude": 72.9679,
+  "website": null,
+  "description": "Private scheme in Mouzas Kaak and Sheikhpur, Rawalpindi district; only a small core has a final NOC.",
+  "sources": [
+   {
+    "title": "RDA - Approved Housing Societies (rda.gop.pk/ahs; data via official API /backend/api/societies/approved)",
+    "url": "https://rda.gop.pk/ahs"
+   },
+   {
+    "title": "RDA - Illegal Housing Societies (rda.gop.pk/ihs; data via official API /backend/api/societies/illegal)",
+    "url": "https://rda.gop.pk/ihs"
+   },
+   {
+    "title": "OpenStreetMap Nominatim - Taj Residencia",
+    "url": "https://nominatim.openstreetmap.org/ui/search.html?q=Taj+Residencia"
+   }
+  ]
+ },
+ {
+  "name": "DHA Lahore Phase 1–5",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": "Defence Housing Authority (DHA) Lahore",
+  "approval_authority": "DHA Lahore (own statute)",
+  "approval_status": "approved",
+  "approval_note": "Developed by DHA Lahore, a statutory authority (converted from LCCHS by 1999 Punjab ordinance; federalised 2002, validated 2004) — outside LDA private-scheme approval.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": "Possession given; DHA possession notices still issued for remaining plots (e.g. Sec M, Ph-V, Mar 2026)",
+  "utilities": [],
+  "latitude": 31.4735,
+  "longitude": 74.3967,
+  "website": "https://dhalahore.org/",
+  "description": "The oldest DHA Lahore phases, east of Lahore Cantonment. DHA started in 1973 as the Civil and Defence Housing Society, was renamed LCCHS in 1975 and grew from 34,000 to about 312,000 kanals overall.",
+  "sources": [
+   {
+    "title": "DHA Lahore – About Us",
+    "url": "https://dhalahore.org/about-us/"
+   },
+   {
+    "title": "DHA Lahore – Phases Maps",
+    "url": "https://dhalahore.org/dha-phases-maps/"
+   },
+   {
+    "title": "DHA Lahore – Possession notice Sec M Ph-V (Mar 2026)",
+    "url": "https://dhalahore.org/wp-content/uploads/2026/04/Sec-M-Ph-V-300326.pdf"
+   },
+   {
+    "title": "OpenStreetMap – DHA Phase 1/2/3/5 boundaries (centroid averaged)",
+    "url": "https://www.openstreetmap.org/relation/17405125"
+   }
+  ]
+ },
+ {
+  "name": "DHA Phase 6",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": "Defence Housing Authority (DHA) Lahore",
+  "approval_authority": "DHA Lahore (own statute)",
+  "approval_status": "approved",
+  "approval_note": "DHA Lahore's own phase; DHA is the statutory authority (1999 ordinance, federalised 2002/2004). DHA's main office is in Sector A, Phase VI.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.4716,
+  "longitude": 74.4511,
+  "website": "https://dhalahore.org/",
+  "description": "DHA Lahore phase east of Phase 5 in Lahore Cantonment tehsil; houses DHA Lahore's head office (Sector A, Phase VI).",
+  "sources": [
+   {
+    "title": "DHA Lahore – About Us",
+    "url": "https://dhalahore.org/about-us/"
+   },
+   {
+    "title": "DHA Lahore – Phases Maps",
+    "url": "https://dhalahore.org/dha-phases-maps/"
+   },
+   {
+    "title": "OpenStreetMap – DHA Phase 6",
+    "url": "https://www.openstreetmap.org/node/7297733033"
+   }
+  ]
+ },
+ {
+  "name": "DHA Phase 7–9",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": "Defence Housing Authority (DHA) Lahore",
+  "approval_authority": "DHA Lahore (own statute)",
+  "approval_status": "approved",
+  "approval_note": "DHA Lahore's own phases (Phase VII incl. Sector Y; Phase VIII incl. Ivy Green, CBW, Air Avenue, Ex Park View; Phase IX Town and Prism), per DHA maps.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "under development",
+  "possession_status": "Possession being opened in stages (e.g. Phase IX Prism possession ceremony, May 2026)",
+  "utilities": [],
+  "latitude": 31.4658,
+  "longitude": 74.4592,
+  "website": "https://dhalahore.org/",
+  "description": "Newer eastern DHA Lahore phases toward Allama Iqbal Airport and the Ring Road. Phase VIII includes the former Park View sector and Air Avenue; Phase IX has Town and Prism.",
+  "sources": [
+   {
+    "title": "DHA Lahore – Phases Maps",
+    "url": "https://dhalahore.org/dha-phases-maps/"
+   },
+   {
+    "title": "DHA Lahore – home page (Phase VIII, Prism IX updates)",
+    "url": "https://dhalahore.org/"
+   },
+   {
+    "title": "OpenStreetMap – DHA Phase 7",
+    "url": "https://www.openstreetmap.org/way/628500912"
+   },
+   {
+    "title": "OpenStreetMap – DHA Phase 8",
+    "url": "https://www.openstreetmap.org/way/628502289"
+   },
+   {
+    "title": "OpenStreetMap – DHA Phase 9 Town",
+    "url": "https://www.openstreetmap.org/way/1268210219"
+   }
+  ]
+ },
+ {
+  "name": "DHA Rahbar (Phase 11)",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": "Defence Housing Authority (DHA) Lahore",
+  "approval_authority": "DHA Lahore (own statute)",
+  "approval_status": "approved",
+  "approval_note": "DHA Lahore's own phase (Phase XI Rahbar, sectors I–V); per DHA, the merger of Sector V into Phase XI is still in progress.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "under development",
+  "possession_status": "Sectors I–II largely developed and populated; III–IV developing (per DHA)",
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": "https://dhalahore.org/dha-rahbar/",
+  "description": "DHA Phase XI with five sectors, reached from Defence Road, Raiwind Road, the Ring Road and Ferozepur Road. Has parks, a sports complex, a mosque, a club, a medical complex and a school.",
+  "sources": [
+   {
+    "title": "DHA Lahore – DHA Rahbar",
+    "url": "https://dhalahore.org/dha-rahbar/"
+   },
+   {
+    "title": "DHA Lahore – Phases Maps",
+    "url": "https://dhalahore.org/dha-phases-maps/"
+   }
+  ]
+ },
+ {
+  "name": "DHA EME Sector (Phase 12)",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": "Defence Housing Authority (DHA) Lahore",
+  "approval_authority": "DHA Lahore (own statute)",
+  "approval_status": "approved",
+  "approval_note": "Listed by DHA Lahore as 'Phase XII EME' in its official phase maps (former EME Society).",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.4476,
+  "longitude": 74.2142,
+  "website": "https://dhalahore.org/",
+  "description": "Former EME Society, now DHA Phase XII, in Khanpur on Lahore's western side, next to Park View Villas.",
+  "sources": [
+   {
+    "title": "DHA Lahore – Phases Maps (Phase XII EME)",
+    "url": "https://dhalahore.org/dha-phases-maps/"
+   },
+   {
+    "title": "OpenStreetMap – DHA EME Sector",
+    "url": "https://www.openstreetmap.org/node/304962662"
+   }
+  ]
+ },
+ {
+  "name": "Bahria Town Lahore",
+  "name_ur": "بحریہ ٹاؤن",
+  "city": "Lahore",
+  "developer": "Bahria Town (Pvt) Ltd",
+  "approval_authority": "LDA",
+  "approval_status": "partially_approved",
+  "approval_note": "LDA approved list: Sectors A, B, C (14,243.2 kanals) finally approved; Sector D (2,009.22 kanals) finally approved 07-02-2023. 'Golf View Residencia (Bahria Town)' (Mouza Tukra Alam Shah) is on LDA's illegal list. In 2013 LDA said Sectors D–F had no approval at that time (Dawn).",
+  "established_year": null,
+  "area_acres": 2031.6,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.3814,
+  "longitude": 74.1863,
+  "website": "https://bahriatown.com/lahore/",
+  "description": "Large gated community in UC Maraka, Iqbal Town, off Canal Road/Multan Road (mouzas Maraka, Jaliana, Bhalai Gill, Muqadam Singh, Rakh Sultankey, Tarogil). Known for its Eiffel Tower replica and Grand Jamia Masjid.",
+  "sources": [
+   {
+    "title": "LDA – Approved Private Housing Schemes",
+    "url": "https://lda.gop.pk/approved-schemes"
+   },
+   {
+    "title": "LDA – Illegal Housing Schemes",
+    "url": "https://lda.gop.pk/illegal-schemes"
+   },
+   {
+    "title": "Dawn – LDA locks horns with real estate group (Feb 2013)",
+    "url": "https://www.dawn.com/news/788075/lda-locks-horns-with-real-estate-group"
+   },
+   {
+    "title": "Wikipedia – Bahria Town Lahore",
+    "url": "https://en.wikipedia.org/wiki/Bahria_Town_Lahore"
+   },
+   {
+    "title": "OpenStreetMap – Bahria Town",
+    "url": "https://www.openstreetmap.org/way/643411217"
+   }
+  ]
+ },
+ {
+  "name": "Bahria Orchard",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": "Bahria Town (Pvt) Ltd",
+  "approval_authority": "LDA (Phase I originally TMA-approved)",
+  "approval_status": "partially_approved",
+  "approval_note": "LDA approved list: Phase-I (3,737.55 kanals, mouzas Paji & Raiwind) 'Approved by TMA in 2009' (28-07-2009). LDA illegal list: Phase-II, Phase-II Extension (aka Ph-V), Sector G, Sector H and Phase-IV.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.3048,
+  "longitude": 74.2035,
+  "website": "https://www.bahriaorchard.com/",
+  "description": "Bahria Town project on Raiwind Road and Sharif Medical City Road, Raiwind tehsil. Only Phase I appears on LDA's approved list (3,737.55 kanals, about 467 acres); several later phases are on LDA's illegal list.",
+  "sources": [
+   {
+    "title": "LDA – Approved Private Housing Schemes",
+    "url": "https://lda.gop.pk/approved-schemes"
+   },
+   {
+    "title": "LDA – Illegal Housing Schemes",
+    "url": "https://lda.gop.pk/illegal-schemes"
+   },
+   {
+    "title": "The News – Record of 103 housing schemes seized (Sep 2014)",
+    "url": "https://www.thenews.com.pk/archive/print/525430-record-of-103-housing-schemes-seized"
+   },
+   {
+    "title": "Bahria Orchard official site",
+    "url": "https://www.bahriaorchard.com/"
+   },
+   {
+    "title": "OpenStreetMap – Bahria Orchard",
+    "url": "https://www.openstreetmap.org/way/894138287"
+   }
+  ]
+ },
+ {
+  "name": "Lake City",
+  "name_ur": "لیک سٹی",
+  "city": "Lahore",
+  "developer": null,
+  "approval_authority": "LDA",
+  "approval_status": "approved",
+  "approval_note": "LDA approved list: Lake City Bella Vista (partial revision, 9,126.03 kanals) finally approved 26-04-2022; Lake City Bella Verde (6,746.04 kanals) approved 12-01-2021. A separate 392.51-kanal 'unapproved pockets' entry has no stage shown.",
+  "established_year": null,
+  "area_acres": 1984.0,
+  "total_units": 14627,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.3536,
+  "longitude": 74.2527,
+  "website": null,
+  "description": "Two LDA-approved schemes (Bella Vista and Bella Verde) in mouzas Halloki, Janjaty and Khananepal on Raiwind Road, Raiwind tehsil. Area and unit counts are from LDA's records (residential + commercial plots).",
+  "sources": [
+   {
+    "title": "LDA – Approved Private Housing Schemes",
+    "url": "https://lda.gop.pk/approved-schemes"
+   },
+   {
+    "title": "OpenStreetMap – Lake City",
+    "url": "https://www.openstreetmap.org/node/3279634736"
+   }
+  ]
+ },
+ {
+  "name": "Park View City Lahore",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": "Vision Developers (Pvt) Ltd (Abdul Aleem Khan)",
+  "approval_authority": "LDA (area now under RUDA jurisdiction)",
+  "approval_status": "partially_approved",
+  "approval_note": "Original 'River Edge' scheme (765.05 kanals, Mouza Shahpur Khanpur, Multan Road) is on LDA's approved list as finally approved. Profit (Nov 2022) reports LDA refused extension beyond 765 kanals and issued notices; the name change to Park View was not approved.",
+  "established_year": 2004,
+  "area_acres": 95.6,
+  "total_units": 1117,
+  "plot_sizes": [],
+  "development_status": "under development",
+  "possession_status": "Society said in 2022 that over 4,000 homes were built",
+  "utilities": [],
+  "latitude": 31.4526,
+  "longitude": 74.2024,
+  "website": "https://parkviewcity.com.pk/",
+  "description": "Started as River Edge in 2004 (LDA-approved 2006) and was bought and renamed by Vision Developers in 2010. Lies on Multan Road near Thokar Niaz Baig; area and units shown are only the 765-kanal LDA-approved River Edge layout, and the built footprint is larger.",
+  "sources": [
+   {
+    "title": "LDA – Approved Private Housing Schemes (River Edge)",
+    "url": "https://lda.gop.pk/approved-schemes"
+   },
+   {
+    "title": "Profit – Up a river without a paddle (Oct 2022)",
+    "url": "https://profit.pakistantoday.com.pk/2022/10/23/up-a-river-without-a-paddle"
+   },
+   {
+    "title": "Profit – Punjab minister castigates Aleem Khan's Park View society (Nov 2022)",
+    "url": "https://profit.pakistantoday.com.pk/2022/11/19/punjab-minister-castigates-aleem-khans-park-view-society"
+   },
+   {
+    "title": "OpenStreetMap – Park View Villas",
+    "url": "https://www.openstreetmap.org/node/3283269424"
+   }
+  ]
+ },
+ {
+  "name": "Lahore Smart City",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": "Future Development Holdings",
+  "approval_authority": "LDA",
+  "approval_status": "approved",
+  "approval_note": "LDA approved list: 'Lahore Smart City', Mouza/Chak No. 42, 43 & 44 Hardosohal, 2,153 kanals, 'Finally approved' (no date shown). The marketed project is reportedly larger; check which phases the approval covers.",
+  "established_year": null,
+  "area_acres": 269.1,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.711,
+  "longitude": 74.2851,
+  "website": null,
+  "description": "On the Lahore Eastern Bypass near Kala Shah Kaku, in Ferozewala tehsil (Sheikhupura District), just outside Lahore district. The area shown is the 2,153 kanals on LDA's approved list.",
+  "sources": [
+   {
+    "title": "LDA – Approved Private Housing Schemes",
+    "url": "https://lda.gop.pk/approved-schemes"
+   },
+   {
+    "title": "OpenStreetMap – Lahore Smart City",
+    "url": "https://www.openstreetmap.org/way/1238830952"
+   }
+  ]
+ },
+ {
+  "name": "Etihad Town",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": null,
+  "approval_authority": "LDA",
+  "approval_status": "partially_approved",
+  "approval_note": "LDA approved list: Etihad Town (Phase I, 2,200.38 kanals) finally approved 03-12-2024; Phase-II (2,478.53 kanals, Mouza Jedu), Premier Enclave (401.84 kanals) and Phase IV (261.15 kanals) technically approved only.",
+  "established_year": null,
+  "area_acres": 667.7,
+  "total_units": 7561,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "Phase I is in mouzas Rakh Khamba and Ameerpura; Phase II is in Mouza Jedu and Phase IV in Asal Suleman. Area and units are totals of the four LDA records (residential + commercial plots).",
+  "sources": [
+   {
+    "title": "LDA – Approved Private Housing Schemes",
+    "url": "https://lda.gop.pk/approved-schemes"
+   }
+  ]
+ },
+ {
+  "name": "Al-Kabir Town",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": null,
+  "approval_authority": "LDA",
+  "approval_status": "partially_approved",
+  "approval_note": "LDA approved list: 'Al-Kabir Town' (Mouza Janjaty, 239.85 kanals, blocks A & B) finally approved. LDA illegal list: 'Al-Kabir Down Town' (Raiwind Road), 'Al-Kabir Apartment Homes' (Mouza Tarogil) and 'Alkabir Town (Umar Block project)'.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "Raiwind Road scheme. Only a 239.85-kanal section (blocks A and B, 573 plots) is LDA-approved, and several related Al-Kabir projects are on LDA's illegal list, so check the exact block before buying.",
+  "sources": [
+   {
+    "title": "LDA – Approved Private Housing Schemes",
+    "url": "https://lda.gop.pk/approved-schemes"
+   },
+   {
+    "title": "LDA – Illegal Housing Schemes",
+    "url": "https://lda.gop.pk/illegal-schemes"
+   }
+  ]
+ },
+ {
+  "name": "Central Park Housing Scheme",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": null,
+  "approval_authority": "LDA",
+  "approval_status": "approved",
+  "approval_note": "LDA approved list: Central Park Phase-II (revised, 971.5 kanals) approved 16-10-2024 (final approval first granted 24-09-2021); Phase-III (294.70 kanals) approved 07-03-2023.",
+  "established_year": null,
+  "area_acres": 158.3,
+  "total_units": 1933,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "Scheme in mouzas Baddoki, Asal Suleman, Atto Asal and Ladhekey Bhullar. Area and units are the Phase II (revised) and Phase III LDA records combined.",
+  "sources": [
+   {
+    "title": "LDA – Approved Private Housing Schemes",
+    "url": "https://lda.gop.pk/approved-schemes"
+   }
+  ]
+ },
+ {
+  "name": "Valencia Town",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": null,
+  "approval_authority": "LDA",
+  "approval_status": "approved",
+  "approval_note": "LDA approved list: Valencia Town Ph-I–IV (7,322.55 kanals, blocks A–P) approved 22-05-1999; Ph-V (1,121.50 kanals) approved 10-08-2004. 'Valencia Valley' (Pine Avenue Road) is a different scheme on LDA's illegal list.",
+  "established_year": null,
+  "area_acres": 1055.5,
+  "total_units": 4569,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.4131,
+  "longitude": 74.2564,
+  "website": null,
+  "description": "Established scheme in mouzas Sadhoki and Dharam Chand near Wapda Town and NFC, Model Town tehsil. Don't confuse it with 'Valencia Valley', which is on LDA's illegal list.",
+  "sources": [
+   {
+    "title": "LDA – Approved Private Housing Schemes",
+    "url": "https://lda.gop.pk/approved-schemes"
+   },
+   {
+    "title": "LDA – Illegal Housing Schemes",
+    "url": "https://lda.gop.pk/illegal-schemes"
+   },
+   {
+    "title": "OpenStreetMap – Valencia Town Main Boulevard",
+    "url": "https://www.openstreetmap.org/way/500271777"
+   }
+  ]
+ },
+ {
+  "name": "Wapda Town (WAPDA Employees Cooperative Housing Society)",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": "WAPDA Employees Cooperative Housing Society",
+  "approval_authority": "LDA",
+  "approval_status": "approved",
+  "approval_note": "LDA approved list: WAPDA ECHS Ph-I (9,280.55 kanals), Ph-I Extension (388 kanals) and Ph-II (1,817.55 kanals) all marked 'Approved' (no dates shown).",
+  "established_year": null,
+  "area_acres": 1435.8,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.4369,
+  "longitude": 74.27,
+  "website": null,
+  "description": "Large established cooperative society in mouzas Sattokatla and Rakh Khamba, Model Town tehsil, near Johar Town and Valencia.",
+  "sources": [
+   {
+    "title": "LDA – Approved Private Housing Schemes",
+    "url": "https://lda.gop.pk/approved-schemes"
+   },
+   {
+    "title": "OpenStreetMap – Wapda Town",
+    "url": "https://www.openstreetmap.org/node/304242090"
+   }
+  ]
+ },
+ {
+  "name": "Johar Town (LDA)",
+  "name_ur": "جوہر ٹاؤن",
+  "city": "Lahore",
+  "developer": "Lahore Development Authority (LDA)",
+  "approval_authority": "LDA",
+  "approval_status": "approved",
+  "approval_note": "LDA's own public-sector scheme (described by Dawn, Jun 2024, as LDA's biggest housing scheme). The private Gulshan-e-Mustafa scheme (LDA-approved 1980) was later absorbed into it.",
+  "established_year": null,
+  "area_acres": 3250.0,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.4632,
+  "longitude": 74.2939,
+  "website": "https://lda.gop.pk/",
+  "description": "LDA's largest housing scheme at over 26,000 kanals (area_acres is that figure divided by 8), in two phases (blocks A–G and G2–R). It is in Lahore's Iqbal zone in the south-west of the city.",
+  "sources": [
+   {
+    "title": "Dawn – Digitisation helps LDA identify 3,200 plots in Johar Town (Jun 2024)",
+    "url": "https://www.dawn.com/news/1841330"
+   },
+   {
+    "title": "Wikipedia – Johar Town",
+    "url": "https://en.wikipedia.org/wiki/Johar_Town"
+   },
+   {
+    "title": "OpenStreetMap – Johar Town",
+    "url": "https://www.openstreetmap.org/relation/21073631"
+   }
+  ]
+ },
+ {
+  "name": "Model Town",
+  "name_ur": "ماڈل ٹاون",
+  "city": "Lahore",
+  "developer": "Cooperative Model Town Society",
+  "approval_authority": "Registrar Cooperative Societies Punjab (Model Town Society); extension blocks under LDA",
+  "approval_status": null,
+  "approval_note": "Pre-partition cooperative society (registered 1924); not on LDA's private-scheme lists, so no LDA approval status applies.",
+  "established_year": 1922,
+  "area_acres": 1463.0,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": "Fully settled",
+  "utilities": [],
+  "latitude": 31.4836,
+  "longitude": 74.326,
+  "website": null,
+  "description": "Garden-city cooperative founded in the early 1920s on Diwan Khem Chand's plan, with ten blocks (A–K) around a central park. The outer blocks (L–S) form Model Town Extension under LDA.",
+  "sources": [
+   {
+    "title": "Wikipedia – Model Town, Lahore",
+    "url": "https://en.wikipedia.org/wiki/Model_Town,_Lahore"
+   },
+   {
+    "title": "OpenStreetMap – Model Town",
+    "url": "https://www.openstreetmap.org/way/627246938"
+   }
+  ]
+ },
+ {
+  "name": "Askari X (Askari 10)",
+  "name_ur": "عسکری ۱۰",
+  "city": "Lahore",
+  "developer": null,
+  "approval_authority": null,
+  "approval_status": null,
+  "approval_note": "Army-sponsored scheme in Lahore Cantonment tehsil; not on LDA's lists and no official approval record found.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.5354,
+  "longitude": 74.4171,
+  "website": null,
+  "description": "Askari sector in Lahore Cantonment near Allama Iqbal International Airport.",
+  "sources": [
+   {
+    "title": "OpenStreetMap – Askari X",
+    "url": "https://www.openstreetmap.org/node/9313233693"
+   }
+  ]
+ },
+ {
+  "name": "Askari XI (Askari 11)",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": null,
+  "approval_authority": null,
+  "approval_status": null,
+  "approval_note": "Army-sponsored scheme; not on LDA's lists and no official approval record found.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.4412,
+  "longitude": 74.4306,
+  "website": null,
+  "description": "Askari sector on Bedian Road next to DHA Phase V, with Sectors A, B and C (Sector C also called Shuhada Town). Coordinates are an OSM point in Sector C.",
+  "sources": [
+   {
+    "title": "OpenStreetMap – Askari XI (Sector C)",
+    "url": "https://www.openstreetmap.org/node/4723034830"
+   },
+   {
+    "title": "Zameen area guide – Askari 11 (pointer only)",
+    "url": "https://www.zameen.com/area-guides/lahore/askari/askari-11-1503"
+   }
+  ]
+ },
+ {
+  "name": "Paragon City",
+  "name_ur": "پیراگون سٹی",
+  "city": "Lahore",
+  "developer": "Paragon City (Pvt) Ltd",
+  "approval_authority": "LDA (claimed earlier TMA Aziz Bhatti Town approval)",
+  "approval_status": "unapproved",
+  "approval_note": "Dawn (27 Nov 2018) reported NAB's statement that the society 'has not yet been approved by the LDA' and that its claimed TMA approval was disputed. Not on LDA's current approved or illegal lists; current status unverified.",
+  "established_year": 2005,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.5305,
+  "longitude": 74.4532,
+  "website": null,
+  "description": "Scheme in Lahore Cantonment tehsil bounded by Barki Road and the Ring Road, near the airport. The developer claims 7,000+ kanals and 8,000+ families. Its official site currently carries injected spam content.",
+  "sources": [
+   {
+    "title": "Dawn – Paragon director becomes approver against Saad Rafique (Nov 2018)",
+    "url": "https://www.dawn.com/news/1447933/paragon-director-becomes-approver-against-saad-rafique"
+   },
+   {
+    "title": "OpenStreetMap – Paragon City",
+    "url": "https://www.openstreetmap.org/node/9313233692"
+   }
+  ]
+ },
+ {
+  "name": "Lahore Motorway City",
+  "name_ur": "لاہور موٹر وے سٹی",
+  "city": "Lahore",
+  "developer": null,
+  "approval_authority": null,
+  "approval_status": null,
+  "approval_note": "Not on LDA's approved or illegal lists; no official or reputable-news approval record found (portals claim TMA approval — unverified).",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.6441,
+  "longitude": 74.2151,
+  "website": null,
+  "description": "Scheme north-west of Lahore in Jhugian Sialan, Ferozewala tehsil (Sheikhupura District), near the M-2 motorway.",
+  "sources": [
+   {
+    "title": "OpenStreetMap – Lahore Motorway City",
+    "url": "https://www.openstreetmap.org/way/568503992"
+   },
+   {
+    "title": "LDA – Approved Private Housing Schemes (not listed)",
+    "url": "https://lda.gop.pk/approved-schemes"
+   }
+  ]
+ },
+ {
+  "name": "Al Rehman Garden",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": null,
+  "approval_authority": "LDA (TMA-approved land sub-divisions)",
+  "approval_status": "partially_approved",
+  "approval_note": "LDA approved list shows only Al-Rehman Garden Ph-III LSD (49.25 kanals, 03-10-2013) and Ph-VI LSD (72.7 kanals, 26-03-2013), both 'TMA Approved', in Kot Dhoni Chand. Other phases, including the large Phase 2, were not found on LDA's approved or illegal lists.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "Multi-phase scheme in north-east Lahore (GT Road / Sharaqpur Road side). Approval is only verified for two small LDA-listed land sub-divisions, so check the specific phase.",
+  "sources": [
+   {
+    "title": "LDA – Approved Private Housing Schemes",
+    "url": "https://lda.gop.pk/approved-schemes"
+   },
+   {
+    "title": "Zameen area guide – Al Rehman Garden (pointer only)",
+    "url": "https://www.zameen.com/area-guides/lahore/al-rehman-garden-4504/"
+   }
+  ]
+ },
+ {
+  "name": "Formanites Housing Scheme",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": null,
+  "approval_authority": "LDA",
+  "approval_status": "under_process",
+  "approval_note": "LDA approved list: Formanites Housing Phase-I & II (1,191.30 kanals) — 'Technical approval' dated 30-09-2006; final approval not shown.",
+  "established_year": null,
+  "area_acres": 148.9,
+  "total_units": 930,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.4433,
+  "longitude": 74.413,
+  "website": null,
+  "description": "Scheme in mouzas Kamahan, Jathol, Leil and Wadhwah, next to DHA Phase V and Sector FF Phase 4.",
+  "sources": [
+   {
+    "title": "LDA – Approved Private Housing Schemes",
+    "url": "https://lda.gop.pk/approved-schemes"
+   },
+   {
+    "title": "OpenStreetMap – Formanites Housing Scheme",
+    "url": "https://www.openstreetmap.org/way/1444682740"
+   }
+  ]
+ },
+ {
+  "name": "Izmir Town",
+  "name_ur": "ازمیر ٹاؤن",
+  "city": "Lahore",
+  "developer": null,
+  "approval_authority": "LDA",
+  "approval_status": "approved",
+  "approval_note": "LDA approved list: Izmir Town Ph-I (4,241.17 kanals) approved 27-11-2002; Ph-II (459.08 kanals) approved 15-08-2005.",
+  "established_year": null,
+  "area_acres": 587.5,
+  "total_units": 2479,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.4111,
+  "longitude": 74.177,
+  "website": null,
+  "description": "Scheme in Mouza Mohlanwal near Chung, Jubilee Town and NESPAK Society Phase II, Raiwind tehsil.",
+  "sources": [
+   {
+    "title": "LDA – Approved Private Housing Schemes",
+    "url": "https://lda.gop.pk/approved-schemes"
+   },
+   {
+    "title": "OpenStreetMap – Izmir Town",
+    "url": "https://www.openstreetmap.org/node/304962748"
+   }
+  ]
+ },
+ {
+  "name": "LDA City",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": "Lahore Development Authority (LDA)",
+  "approval_authority": "LDA",
+  "approval_status": "approved",
+  "approval_note": "LDA's own public-sector scheme. Plot numbers for 9,712 file holders were balloted on 30 Nov 2019 (Dawn).",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [
+   "5 Marla",
+   "10 Marla",
+   "1 Kanal",
+   "2 Kanal"
+  ],
+  "development_status": "under development",
+  "possession_status": "Possession handed over in stages in Jinnah Sector (Block C from Dec 2023; Blocks K, B, D, E in 2024)",
+  "utilities": [],
+  "latitude": 31.3497,
+  "longitude": 74.3452,
+  "website": "https://lda.gop.pk/",
+  "description": "LDA-run scheme off Ferozepur Road (Mouza Jedu/Kahna area); Phase 1 is the Jinnah Sector. Possession has been handed over block by block since late 2023.",
+  "sources": [
+   {
+    "title": "Dawn – LDA City: land arranged to allot plots to 9,700 file holders (Dec 2019)",
+    "url": "https://www.dawn.com/news/1525339"
+   },
+   {
+    "title": "The News – LDA City allottees to get possession of plots",
+    "url": "https://www.thenews.com.pk/print/1142747-lda-city-allottees-to-get-possession-of-plots-tomorrow"
+   },
+   {
+    "title": "Business Recorder – LDA achieves record revenue generation from auctions",
+    "url": "https://www.brecorder.com/news/40340513/lda-achieves-record-revenue-generation-from-auctions"
+   },
+   {
+    "title": "OpenStreetMap – LDA City",
+    "url": "https://www.openstreetmap.org/way/1552245250"
+   }
+  ]
+ },
+ {
+  "name": "Sukh Chayn Gardens",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": null,
+  "approval_authority": "LDA",
+  "approval_status": "approved",
+  "approval_note": "LDA approved list: Sukh Chayn Gardens Housing Scheme (2,132.45 kanals, blocks A–H) approved 25-04-2013.",
+  "established_year": null,
+  "area_acres": 266.6,
+  "total_units": 1364,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.3915,
+  "longitude": 74.1598,
+  "website": null,
+  "description": "Scheme in mouzas Maraka and Mohlanwal, next to Bahria Town off Multan Road, Raiwind tehsil.",
+  "sources": [
+   {
+    "title": "LDA – Approved Private Housing Schemes",
+    "url": "https://lda.gop.pk/approved-schemes"
+   },
+   {
+    "title": "OpenStreetMap – Sukh Chayn Gardens",
+    "url": "https://www.openstreetmap.org/node/3279593624"
+   }
+  ]
+ },
+ {
+  "name": "Nasheman-e-Iqbal Cooperative Housing Society",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": "Nasheman-e-Iqbal Cooperative Housing Society",
+  "approval_authority": "LDA",
+  "approval_status": "approved",
+  "approval_note": "LDA approved list: Phase-I (1,135 kanals) finally approved (revised plan 21-11-1988); Ph-II Extension (1,195.10 kanals) approved 10-11-2003; Ph-II land sub-division (103.18 kanals, 24-04-1994).",
+  "established_year": null,
+  "area_acres": 304.2,
+  "total_units": 1981,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.4336,
+  "longitude": 74.2512,
+  "website": null,
+  "description": "Cooperative society off Khayaban-e-Jinnah Road (mouzas Khamba, Bagrian, Sadhoki), next to Wapda Town and near the UET society.",
+  "sources": [
+   {
+    "title": "LDA – Approved Private Housing Schemes",
+    "url": "https://lda.gop.pk/approved-schemes"
+   },
+   {
+    "title": "OpenStreetMap – Nasheman Iqbal CHS",
+    "url": "https://www.openstreetmap.org/way/27703048"
+   }
+  ]
+ },
+ {
+  "name": "Eden City",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": null,
+  "approval_authority": null,
+  "approval_status": null,
+  "approval_note": "Not on LDA's approved or illegal lists by this name; portals claim LDA approval — unverified.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.5076,
+  "longitude": 74.4343,
+  "website": null,
+  "description": "Eden-branded scheme in Lahore Cantonment tehsil next to DHA Phase 8 (Air Avenue), near the airport; not a DHA sector. Coordinates are OSM 'Eden City Park'.",
+  "sources": [
+   {
+    "title": "OpenStreetMap – Eden City Park",
+    "url": "https://www.openstreetmap.org/way/690113078"
+   },
+   {
+    "title": "Zameen area guide – DHA Phase 8 (pointer only)",
+    "url": "https://www.zameen.com/area-guides/phase-8-dha-lahore"
+   }
+  ]
+ },
+ {
+  "name": "NFC Employees Cooperative Housing Society (Phase I & II)",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": "NFC Employees Cooperative Housing Society",
+  "approval_authority": "LDA",
+  "approval_status": "approved",
+  "approval_note": "LDA approved list: NFC Ph-I (2,565.55 kanals, Mouza Sattokatla) approved 12-04-2007; NFC ECHS Phase-II (7,058.69 kanals, mouzas Maraka, Sultankey & Khudpur) approved 09-08-2007.",
+  "established_year": null,
+  "area_acres": 1203.0,
+  "total_units": 8222,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.4193,
+  "longitude": 74.2711,
+  "website": null,
+  "description": "Phase I is near Wapda Town in Mouza Sattokatla. Phase II is a separate, larger site toward Multan Road (Maraka/Sultankey). Coordinates are for Phase I.",
+  "sources": [
+   {
+    "title": "LDA – Approved Private Housing Schemes",
+    "url": "https://lda.gop.pk/approved-schemes"
+   },
+   {
+    "title": "OpenStreetMap – NFC (Phase I road)",
+    "url": "https://www.openstreetmap.org/way/11120589"
+   }
+  ]
+ },
+ {
+  "name": "Fazaia Housing Scheme Lahore",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": null,
+  "approval_authority": "LDA",
+  "approval_status": "partially_approved",
+  "approval_note": "LDA approved list: Phase-II (1,444.11 kanals, mouzas Mal & Bhai Kot) approved 14-06-2013; Phase-I (3,940.88 kanals) technically approved 06-02-2024.",
+  "established_year": null,
+  "area_acres": 673.1,
+  "total_units": 5164,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.3763,
+  "longitude": 74.2414,
+  "website": null,
+  "description": "Scheme on Raiwind Road in mouzas Janjaty, Kot Jewan Mal, Bhalai Gill, Mal and Bhai Kot, near Lake City.",
+  "sources": [
+   {
+    "title": "LDA – Approved Private Housing Schemes",
+    "url": "https://lda.gop.pk/approved-schemes"
+   },
+   {
+    "title": "OpenStreetMap – Fazaia Housing Scheme",
+    "url": "https://www.openstreetmap.org/node/3279634735"
+   }
+  ]
+ },
+ {
+  "name": "Army Welfare Trust (AWT) Housing Scheme",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": "Army Welfare Trust",
+  "approval_authority": "LDA",
+  "approval_status": "partially_approved",
+  "approval_note": "LDA approved list: AWT Ph-I (650 kanals, Mouza Rakhpura) approved 07-01-1992; AWT Ph-II (6,151.96 kanals) — 2nd revised layout technically approved 11-03-2024.",
+  "established_year": null,
+  "area_acres": 850.2,
+  "total_units": 5990,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.4033,
+  "longitude": 74.2029,
+  "website": null,
+  "description": "Phase I is in Mouza Rakhpura (Khizrabad area, Raiwind tehsil); Phase II is in mouzas Asal Lakhowal, Ramkot and Janjaty. Coordinates are for Phase I.",
+  "sources": [
+   {
+    "title": "LDA – Approved Private Housing Schemes",
+    "url": "https://lda.gop.pk/approved-schemes"
+   },
+   {
+    "title": "OpenStreetMap – AWT Housing Scheme Phase 1",
+    "url": "https://www.openstreetmap.org/way/900427609"
+   }
+  ]
+ },
+ {
+  "name": "New Lahore City",
+  "name_ur": null,
+  "city": "Lahore",
+  "developer": null,
+  "approval_authority": "LDA",
+  "approval_status": "partially_approved",
+  "approval_note": "LDA approved list: Phase-I (346.9 kanals) approved 03-01-2023; Phase-II (2,054.28 kanals) technical approval 24-07-2018, final pending. LDA illegal list: Phase-III (UBD Canal Road) and Phase-IV (aka Ext / Ph-I Ext, Sundar-Raiwind Road).",
+  "established_year": null,
+  "area_acres": 300.1,
+  "total_units": 2978,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "Scheme in mouzas Maraka, Sultankey and Khudpur toward Sundar-Raiwind Road and UBD Canal. Phases III and IV are on LDA's illegal list; area and units cover only Phases I–II.",
+  "sources": [
+   {
+    "title": "LDA – Approved Private Housing Schemes",
+    "url": "https://lda.gop.pk/approved-schemes"
+   },
+   {
+    "title": "LDA – Illegal Housing Schemes",
+    "url": "https://lda.gop.pk/illegal-schemes"
+   }
+  ]
+ },
+ {
+  "name": "DHA Karachi (Defence Housing Authority, Phases 1-8)",
+  "name_ur": "ڈیفنس ہاؤسنگ اتھارٹی کراچی",
+  "city": "Karachi",
+  "developer": "Pakistan Defence Officers Housing Authority (DHA Karachi)",
+  "approval_authority": "Statutory authority (Presidential Order No. 7 of 1980); municipal functions with Clifton Cantonment Board",
+  "approval_status": "approved",
+  "approval_note": "Statutory housing authority created by Presidential Order No. 7 of 1980, later validated by the National Assembly; not subject to SBCA/KDA scheme approval lists.",
+  "established_year": 1980,
+  "area_acres": 8852,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": "Phases 1-7 largely built; Phase 8 still partly vacant",
+  "utilities": [],
+  "latitude": 24.8,
+  "longitude": 67.065,
+  "website": "https://www.dhakarachi.org",
+  "description": "Defence Housing Authority's original Karachi estate along the coast, organised in eight phases that grew east and south from Phase 1. The authority traces back to a 1950s cooperative society of retired servicemen.",
+  "sources": [
+   {
+    "title": "Defence Housing Authority, Karachi - Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Defence_Housing_Authority,_Karachi"
+   },
+   {
+    "title": "Defence Housing Authority - Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Defence_Housing_Authority"
+   }
+  ],
+  "aliases": [
+   "DHA Karachi"
+  ]
+ },
+ {
+  "name": "DHA City Karachi (DCK)",
+  "name_ur": "ڈی ایچ اے سٹی کراچی",
+  "city": "Karachi",
+  "developer": "Defence Housing Authority Karachi",
+  "approval_authority": "DHA Karachi (statutory authority)",
+  "approval_status": "approved",
+  "approval_note": "Developed by DHA Karachi under its statutory powers (Presidential Order No. 7 of 1980); master plan unveiled by the DHA Executive Board in 2011.",
+  "established_year": null,
+  "area_acres": 11640,
+  "total_units": null,
+  "plot_sizes": [
+   "125 sq yd",
+   "200 sq yd",
+   "250 sq yd",
+   "300 sq yd",
+   "500 sq yd",
+   "600 sq yd",
+   "1000 sq yd"
+  ],
+  "development_status": "under development",
+  "possession_status": "Under development; DHA balloting and plot sales ongoing in sectors",
+  "utilities": [],
+  "latitude": 25.038,
+  "longitude": 67.4488,
+  "website": "https://www.dhakarachi.org",
+  "description": "DHA's satellite city on the M-9 Karachi-Hyderabad motorway in Gadap Town, Malir district. The master plan was prepared by a consortium including Doxiadis, RMJM and Osmani & Co.",
+  "sources": [
+   {
+    "title": "DHA City - Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/DHA_City"
+   },
+   {
+    "title": "Final master plan of DHA City unveiled (Zameen News)",
+    "url": "https://www.zameen.com/news/final-master-plan-of-dha-city-unveiled.html"
+   },
+   {
+    "title": "New plots in DCK (Zameen News, plot sizes)",
+    "url": "https://www.zameen.com/news/new-plots-in-dck-a-deal-you-shouldnt-miss.html"
+   }
+  ]
+ },
+ {
+  "name": "Bahria Town Karachi",
+  "name_ur": "بحریہ ٹاؤن کراچی",
+  "city": "Karachi",
+  "developer": "Bahria Town (Pvt) Ltd",
+  "approval_authority": "Supreme Court of Pakistan (land settlement); Malir Development Authority land",
+  "approval_status": "partially_approved",
+  "approval_note": "SC (4 May 2018) held the MDA land grant/exchange to Bahria illegal and void; on 21 Mar 2019 SC accepted a Rs460bn settlement recognising only the site plan of 16,896 acres; in Nov 2023 SC declared the developer in default of instalments.",
+  "established_year": 2014,
+  "area_acres": 16896,
+  "total_units": null,
+  "plot_sizes": [
+   "125 sq yd",
+   "250 sq yd",
+   "500 sq yd",
+   "1000 sq yd"
+  ],
+  "development_status": "under development",
+  "possession_status": "Many precincts handed over and inhabited; other precincts under development",
+  "utilities": [],
+  "latitude": 25.0,
+  "longitude": 67.3167,
+  "website": "https://www.bahriatown.com",
+  "description": "Large private gated town off the M-9 motorway in Malir district, built by Bahria Town from 2014. Its land was the subject of a landmark Supreme Court case ending in a Rs460bn settlement.",
+  "sources": [
+   {
+    "title": "SC accepts Bahria Town Karachi's Rs460bn offer, halts NAB references (Dawn, 21 Mar 2019)",
+    "url": "https://www.dawn.com/news/1471002"
+   },
+   {
+    "title": "A landmark verdict? (Dawn editorial, 6 May 2018)",
+    "url": "https://www.dawn.com/news/1405967"
+   },
+   {
+    "title": "Bahria Town to pay billions as SC declares it defaulted on installments (Aaj News)",
+    "url": "https://english.aaj.tv/news/30342180/bahria-town-to-pay-billions-as-sc-declares-it-defaulted-on-installments"
+   },
+   {
+    "title": "Bahria Town Karachi - Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Bahria_Town_Karachi"
+   }
+  ]
+ },
+ {
+  "name": "Gulshan-e-Iqbal (KDA Scheme 24)",
+  "name_ur": "گلشنِ اقبال",
+  "city": "Karachi",
+  "developer": "Karachi Development Authority (KDA)",
+  "approval_authority": "Karachi Development Authority",
+  "approval_status": "approved",
+  "approval_note": "Public-sector KDA Scheme 24, developed by KDA from 1966.",
+  "established_year": 1966,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": "Fully settled residential and commercial area (Blocks 1-20)",
+  "utilities": [],
+  "latitude": 24.917,
+  "longitude": 67.083,
+  "website": null,
+  "description": "KDA Scheme 24, a large planned neighbourhood of Karachi East divided into Blocks 1-20 and named after Allama Iqbal.",
+  "sources": [
+   {
+    "title": "Gulshan-e-Iqbal - Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Gulshan-e-Iqbal"
+   },
+   {
+    "title": "Karachi Development Authority - Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Karachi_Development_Authority"
+   }
+  ]
+ },
+ {
+  "name": "Gulistan-e-Jauhar (KDA Scheme 36)",
+  "name_ur": "گلستانِ جوہر",
+  "city": "Karachi",
+  "developer": "Karachi Development Authority (KDA)",
+  "approval_authority": "Karachi Development Authority",
+  "approval_status": "approved",
+  "approval_note": "KDA Scheme 36 (Gulistan-e-Jouhar); gazette notification dated 8 Apr 1985 listed by Shehri.",
+  "established_year": 1985,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": "Settled; mostly apartments and houses across numbered blocks",
+  "utilities": [],
+  "latitude": 24.933,
+  "longitude": 67.133,
+  "website": null,
+  "description": "KDA residential scheme east of Gulshan-e-Iqbal, made up of numbered blocks with many apartment complexes.",
+  "sources": [
+   {
+    "title": "KDA Schemes (Shehri - gazette notifications)",
+    "url": "https://www.shehri.org/kdaschemes.html"
+   },
+   {
+    "title": "Gulistan-e-Johar - Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Gulistan-e-Johar"
+   }
+  ]
+ },
+ {
+  "name": "KDA Scheme 33 (incl. cooperative housing societies)",
+  "name_ur": "اسکیم 33",
+  "city": "Karachi",
+  "developer": "KDA / Board of Revenue Sindh, with numerous cooperative housing societies",
+  "approval_authority": "Karachi Development Authority",
+  "approval_status": "approved",
+  "approval_note": "KDA scheme launched 1980 (Dawn 2002). Individual societies within Scheme 33 have varying layout approvals; check each society separately.",
+  "established_year": 1980,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "under development",
+  "possession_status": "Mixed: older sectors settled, many societies still developing",
+  "utilities": [],
+  "latitude": 24.945,
+  "longitude": 67.14,
+  "website": null,
+  "description": "KDA scheme along the Super Highway hosting many cooperative housing societies; development stalled for about 22 years before restarting in 2002.",
+  "sources": [
+   {
+    "title": "Nazim kicks off Rs30m project in Scheme-33: 22-year dilemma ends (Dawn, 16 Nov 2002)",
+    "url": "https://www.dawn.com/news/66968"
+   },
+   {
+    "title": "Scheme 33 - some societies you should know about (Zameen blog, pointer)",
+    "url": "https://www.zameen.com/blog/scheme-33-some-societies-you-should-know-about.html"
+   }
+  ]
+ },
+ {
+  "name": "North Nazimabad (KDA Scheme 2 / Timuria)",
+  "name_ur": "نارتھ ناظم آباد",
+  "city": "Karachi",
+  "developer": "Karachi Improvement Trust / Karachi Development Authority",
+  "approval_authority": "Karachi Development Authority",
+  "approval_status": "approved",
+  "approval_note": "KDA Scheme 2 (Taimooria, North Nazimabad); gazette dated 7 Aug 1964 listed by Shehri; scheme started by KIT in 1958.",
+  "established_year": 1958,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [
+   "120 sq yd",
+   "3000 sq yd"
+  ],
+  "development_status": "developed",
+  "possession_status": "Fully settled (Blocks A-U)",
+  "utilities": [],
+  "latitude": 24.933,
+  "longitude": 67.033,
+  "website": null,
+  "description": "Planned neighbourhood begun in 1958 as KDA Scheme 2, originally to house federal employees. Plot sizes range from 120 sq yd to 3,000 sq yd.",
+  "sources": [
+   {
+    "title": "North Nazimabad - Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/North_Nazimabad"
+   },
+   {
+    "title": "KDA Schemes (Shehri - gazette notifications)",
+    "url": "https://www.shehri.org/kdaschemes.html"
+   }
+  ]
+ },
+ {
+  "name": "Clifton (KDA Scheme 5 / Kehkashan)",
+  "name_ur": "کلفٹن",
+  "city": "Karachi",
+  "developer": "Karachi Development Authority (KDA)",
+  "approval_authority": "Karachi Development Authority (Blocks 8-9 under Clifton Cantonment)",
+  "approval_status": "approved",
+  "approval_note": "KDA Scheme 5 gazette notification of 30 Oct 1964, revised maps 1972 and 1985; SC in 2021 ordered a report on how commercial plots in Kehkashan were created.",
+  "established_year": 1964,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": "Fully settled; disputes over amenity/commercial plot conversions",
+  "utilities": [],
+  "latitude": 24.815,
+  "longitude": 67.03,
+  "website": null,
+  "description": "KDA Scheme 5 (Kehkashan) covering most of Clifton's numbered blocks; Blocks 8 and 9 fall under Clifton Cantonment.",
+  "sources": [
+   {
+    "title": "KDA Schemes (Shehri - gazette notifications)",
+    "url": "https://www.shehri.org/kdaschemes.html"
+   },
+   {
+    "title": "Paper Book (Sch-5 Clifton) - Shehri, for SC order",
+    "url": "https://shehri.org/publications_html/Paper Book (Sch-5 Clifton).pdf"
+   }
+  ]
+ },
+ {
+  "name": "PECHS (Pakistan Employees Cooperative Housing Society)",
+  "name_ur": "پی ای سی ایچ ایس",
+  "city": "Karachi",
+  "developer": "Pakistan Employees Cooperative Housing Society Ltd",
+  "approval_authority": "Federal Ministry of Works (land licence); cooperative society",
+  "approval_status": "approved",
+  "approval_note": "Society registered 23 Dec 1947; federal land allotted under 1949 terms and 1958 licence agreement with the Ministry of Works (per Shehri document archive). Licence ended in 1974.",
+  "established_year": 1947,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": "Fully settled; heavy commercialisation along main roads",
+  "utilities": [],
+  "latitude": 24.868,
+  "longitude": 67.064,
+  "website": null,
+  "description": "One of Karachi's oldest cooperative housing societies, built on federal land in central Karachi. Several main roads were declared commercial in 2004.",
+  "sources": [
+   {
+    "title": "P.E.C.H.S. Cooperative Housing Society (Shehri)",
+    "url": "https://shehri.org/pechs.html"
+   },
+   {
+    "title": "P.E.C.H.S Block 2 - Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/P.E.C.H.S_Block_2"
+   }
+  ]
+ },
+ {
+  "name": "Naya Nazimabad",
+  "name_ur": "نیا ناظم آباد",
+  "city": "Karachi",
+  "developer": "Javedan Corporation Ltd (Arif Habib Group)",
+  "approval_authority": "Sindh Building Control Authority",
+  "approval_status": null,
+  "approval_note": "No official SBCA layout-approval record found. Hospital phase reported to have SBCA architectural approval; Sindh High Court petition (2014) over waste dumping on the site.",
+  "established_year": 2011,
+  "area_acres": 1367,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "under development",
+  "possession_status": "Partly inhabited; about 6,000 units owned by the public (reported)",
+  "utilities": [],
+  "latitude": 24.9753,
+  "longitude": 67.0258,
+  "website": null,
+  "description": "Private gated scheme near Manghopir built on the former Javedan Cement land. Javedan's 2023 investor briefing gives 1,367 acres of landholding.",
+  "sources": [
+   {
+    "title": "Naya Nazimabad - Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Naya_Nazimabad"
+   },
+   {
+    "title": "Javedan Corporation - Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Javedan"
+   },
+   {
+    "title": "Javedan Corporation corporate briefing (PSX)",
+    "url": "https://dps.psx.com.pk:443/download/document/221562.pdf"
+   }
+  ]
+ },
+ {
+  "name": "Navy Housing Scheme Karsaz",
+  "name_ur": "نیوی ہاؤسنگ اسکیم کارساز",
+  "city": "Karachi",
+  "developer": "Naval Housing Scheme (Pakistan Navy)",
+  "approval_authority": null,
+  "approval_status": null,
+  "approval_note": "No public approval record found; scheme on Pakistan Navy land at PNS Karsaz.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": "Settled; NHS Phase-IV high-rise towers designed (NESPAK, 2015)",
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "Pakistan Navy residential scheme at Karsaz off Shahrah-e-Faisal. NESPAK designed five high-rise towers on 30 acres of NHS Phase-IV for retired naval officers.",
+  "sources": [
+   {
+    "title": "Navy Housing Scheme Karachi (NESPAK project page)",
+    "url": "https://nespak.com.pk/ajax/projects/Navy.html"
+   }
+  ]
+ },
+ {
+  "name": "Taiser Town (MDA Scheme 45)",
+  "name_ur": "تیسر ٹاؤن",
+  "city": "Karachi",
+  "developer": "Malir Development Authority (MDA)",
+  "approval_authority": "Malir Development Authority",
+  "approval_status": "approved",
+  "approval_note": "Public-sector MDA scheme; plot balloting held 19 Jul 2019 (about 20,000 successful applicants).",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [
+   "80 sq yd",
+   "120 sq yd",
+   "240 sq yd",
+   "400 sq yd"
+  ],
+  "development_status": "under development",
+  "possession_status": "Balloted 2019; development pending",
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": "https://www.mda.gos.pk/scheme/taiser-town-scheme-45",
+  "description": "Malir Development Authority's large public housing scheme in Karachi, with 80-400 sq yd residential plots. Sources disagree on its area (14,466 vs 20,570 acres).",
+  "sources": [
+   {
+    "title": "Taiser Town Scheme 45 (MDA)",
+    "url": "https://www.mda.gos.pk/scheme/taiser-town-scheme-45"
+   },
+   {
+    "title": "Taiser Town Scheme 45 Karachi (Zameen blog, pointer)",
+    "url": "https://www.zameen.com/blog/taiser-town-scheme-45-karachi.html"
+   }
+  ]
+ },
+ {
+  "name": "Citi Housing Faisalabad",
+  "name_ur": "سٹی ہاؤسنگ فیصل آباد",
+  "city": "Faisalabad",
+  "developer": "Citi Housing (Pvt) Ltd",
+  "approval_authority": "Faisalabad Development Authority (FDA)",
+  "approval_status": "approved",
+  "approval_note": "FDA private-schemes register: 'CITI Housing Scheme Chak No. 234/RB' and 'Chak No. 4&5/JB' Approved; 'Citi Housing Phase-II Chak No. 4/JB' Under Process (checked Oct 2026).",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": "Phase I developed; Phase II approval under process",
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "Citi Housing's Faisalabad scheme, with FDA-approved sections at Chak 234/RB (Samundri Road side) and Chak 4&5/JB (Sargodha Road side).",
+  "sources": [
+   {
+    "title": "FDA - Private Schemes register",
+    "url": "https://fda.gov.pk/schemes_private"
+   },
+   {
+    "title": "FDA private schemes data feed",
+    "url": "https://fda.gov.pk/ajax/ajax.society_private.php?stype=datatable&cid=2"
+   }
+  ]
+ },
+ {
+  "name": "Eden Valley Faisalabad",
+  "name_ur": "ایڈن ویلی فیصل آباد",
+  "city": "Faisalabad",
+  "developer": null,
+  "approval_authority": "Faisalabad Development Authority (FDA)",
+  "approval_status": "under_process",
+  "approval_note": "FDA private-schemes register lists 'Eden Valley, Chak No. 208/RB, 8 Chak Road' as Under Process (checked Oct 2026). Sister schemes Eden Garden, Eden Orchard and Eden Villas are listed Approved.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "under development",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "Residential scheme at Chak 208/RB, Faisalabad. FDA warns that utilities are not provided in schemes still under process.",
+  "sources": [
+   {
+    "title": "FDA - Private Schemes register",
+    "url": "https://fda.gov.pk/schemes_private"
+   }
+  ]
+ },
+ {
+  "name": "WAPDA City Faisalabad",
+  "name_ur": "واپڈا سٹی فیصل آباد",
+  "city": "Faisalabad",
+  "developer": null,
+  "approval_authority": "Faisalabad Development Authority (FDA)",
+  "approval_status": "approved",
+  "approval_note": "FDA register: 'WAPDA City Chak No.192/RB' Approved; 'WAPDA City-II Chak No. 192/RB' Under Process (checked Oct 2026).",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": "Phase I developed; WAPDA City-II approval under process",
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "Housing scheme at Chak 192/RB off the Canal Road expressway towards the motorway. Phase I is FDA-approved; its extension is still under process.",
+  "sources": [
+   {
+    "title": "FDA - Private Schemes register",
+    "url": "https://fda.gov.pk/schemes_private"
+   },
+   {
+    "title": "Wapda City Faisalabad area guide (Zameen, pointer)",
+    "url": "https://www.zameen.com/area-guides/faisalabad/wapda-city-501/"
+   }
+  ]
+ },
+ {
+  "name": "DHA Multan",
+  "name_ur": "ڈی ایچ اے ملتان",
+  "city": "Multan",
+  "developer": "Defence Housing Authority Multan",
+  "approval_authority": "DHA (chapter of DHA Lahore, under Chief Executive Order No. 26 of 2002)",
+  "approval_status": "approved",
+  "approval_note": "DHA Multan's construction regulations state it is a chapter of DHA Lahore, which is constituted under CEO Order 26 of 2002; outside MDA's private-scheme list.",
+  "established_year": 2017,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [
+   "10 marla",
+   "1 kanal",
+   "2 kanal"
+  ],
+  "development_status": "under development",
+  "possession_status": "Possession given in Sectors A, H, M, N, Q, R, U, Rumanza and Villas (Jan 2023)",
+  "utilities": [
+   "electricity"
+  ],
+  "latitude": null,
+  "longitude": null,
+  "website": "https://www.dhamultan.org",
+  "description": "Defence Housing Authority's Multan project, including the Rumanza golf community. Sector A (236 acres) was energised from an integrated grid station in 2023.",
+  "sources": [
+   {
+    "title": "DHA Multan construction by-laws (DHAM)",
+    "url": "https://www.dhamultan.org/wp-content/uploads/2021/06/ByLaws DHAM.pdf"
+   },
+   {
+    "title": "DHA Multan announces possession and electric energization of Sector A (ProPakistani, 18 Jan 2023)",
+    "url": "https://propakistani.pk/proproperty/dha-multan-announces-possession-and-electric-energization-of-sector-a/"
+   },
+   {
+    "title": "DHA Multan location ballot (Zameen blog, pointer)",
+    "url": "https://zameen.com/blog/dha-multan-location-ballot-31-july-2019.html"
+   }
+  ]
+ },
+ {
+  "name": "Buch Executive Villas / Buch Villas",
+  "name_ur": "بُچ ایگزیکٹو ولاز",
+  "city": "Multan",
+  "developer": null,
+  "approval_authority": "Multan Development Authority (MDA)",
+  "approval_status": "approved",
+  "approval_note": "MDA approved list (Sep 2025): Buch Villas HS 1330 K (24-06-2019), Buch Villas Extension-I 1829 K (19-01-2017), Buch Executive Villas Extension 2191 K (11-12-2020), Buch Executive Villas Phase-II 576.74 K (03-12-2022), Mouza Buch Khusro Abad, Bosan Road. Area below is the sum of these sanctions.",
+  "established_year": null,
+  "area_acres": 740.84,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "under development",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "Group of MDA-sanctioned schemes on Bosan Road, Multan, sanctioned in stages between 2017 and 2022 (about 5,927 kanal in total).",
+  "sources": [
+   {
+    "title": "MDA Multan - List of Approved Private Housing Schemes / LSDs (PDF, Sep 2025)",
+    "url": "https://mda.punjab.gov.pk/system/files/approved.pdf"
+   },
+   {
+    "title": "MDA Multan - Private Housing Schemes / Land Sub Divisions",
+    "url": "https://mda.punjab.gov.pk/private-housing-and-land-sub-division"
+   }
+  ]
+ },
+ {
+  "name": "Citi Housing Multan",
+  "name_ur": "سٹی ہاؤسنگ ملتان",
+  "city": "Multan",
+  "developer": "Citi Housing (Pvt) Ltd",
+  "approval_authority": "Multan Development Authority (MDA)",
+  "approval_status": "approved",
+  "approval_note": "MDA approved list (Sep 2025): Citi Housing HS 997.15 K (01-09-2018) and Citi Housing Private Ltd 1898.63 K (24-01-2020), Mouza Lutf Abad, Bosan Road. Area below is the sum.",
+  "established_year": null,
+  "area_acres": 361.97,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "Citi Housing's Multan scheme on Bosan Road in Lutfabad. Bookings opened in June 2020.",
+  "sources": [
+   {
+    "title": "MDA Multan - List of Approved Private Housing Schemes / LSDs (PDF, Sep 2025)",
+    "url": "https://mda.punjab.gov.pk/system/files/approved.pdf"
+   },
+   {
+    "title": "Citi Housing Multan project officially launched (Zameen News, 3 Jun 2020)",
+    "url": "https://www.zameen.com/news/citi-housing-multan-project-officially-launched.html"
+   }
+  ]
+ },
+ {
+  "name": "Royal Orchard Multan",
+  "name_ur": "رائل آرچرڈ ملتان",
+  "city": "Multan",
+  "developer": "Habib Rafiq (Pvt) Ltd",
+  "approval_authority": "Multan Development Authority (MDA)",
+  "approval_status": "approved",
+  "approval_note": "MDA approved list (Sep 2025): Royal Orchard HS 1200 K (13-08-2020) and Royal Orchard (Extension) 3190.25 K (24-05-2018), Mouza Durana Langana, Multan Public School Road. Area below is the sum.",
+  "established_year": null,
+  "area_acres": 548.78,
+  "total_units": null,
+  "plot_sizes": [
+   "5 marla",
+   "10 marla",
+   "1 kanal",
+   "2 kanal"
+  ],
+  "development_status": "under development",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "Gated scheme on Multan Public School Road about 9 km from Multan airport, developed by Habib Rafiq (Pvt) Ltd.",
+  "sources": [
+   {
+    "title": "MDA Multan - List of Approved Private Housing Schemes / LSDs (PDF, Sep 2025)",
+    "url": "https://mda.punjab.gov.pk/system/files/approved.pdf"
+   },
+   {
+    "title": "Royal Orchard Multan - a guide for genuine buyers (Zameen News, pointer)",
+    "url": "https://www.zameen.com/news/royal-orchard-multan-a-guide-for-genuine-buyers.html"
+   }
+  ]
+ },
+ {
+  "name": "DHA Peshawar",
+  "name_ur": "ڈی ایچ اے پشاور",
+  "city": "Peshawar",
+  "developer": "Defence Housing Authority Peshawar",
+  "approval_authority": "Statutory authority (DHA Peshawar Act 2009, KP)",
+  "approval_status": "approved",
+  "approval_note": "Created by the Defence Housing Authority Peshawar Act 2009 (Act X of 2009, passed Jan 2009); KP housing department notifies its areas. CM approved DHA schemes at Wodpaga and opposite Regi Lalma (Dawn, Jul 2014).",
+  "established_year": 2009,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "under development",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "DHA's Peshawar project on suburban land at Wodpaga and on Nasir Bagh Road opposite Regi Lalma. Farmers objected to the acquisition of farmland in 2014.",
+  "sources": [
+   {
+    "title": "The Defence Housing Authority Peshawar Act 2009 (KP Assembly)",
+    "url": "https://www.pakp.gov.pk/wp-content/uploads/2024/06/The-Defence-Housing-Authority-Peshawar-Act-2009-Act-No.-X-2009-1.pdf"
+   },
+   {
+    "title": "DHA plans housing projects on farmland (Dawn, 5 Jul 2014)",
+    "url": "https://www.dawn.com/news/1117227"
+   }
+  ]
+ },
+ {
+  "name": "Hayatabad Township",
+  "name_ur": "حیات آباد",
+  "city": "Peshawar",
+  "developer": "Peshawar Development Authority (PDA)",
+  "approval_authority": "Peshawar Development Authority",
+  "approval_status": "approved",
+  "approval_note": "Public-sector PDA township; Commissioner Peshawar approved expansion into Phases 8 and 9 on about 1,000 acres (The News, 20 Dec 2024).",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": "Phases 1-7 settled; Phases 8-9 planned",
+  "utilities": [],
+  "latitude": 33.9748,
+  "longitude": 71.4354,
+  "website": null,
+  "description": "Planned PDA township in western Peshawar, developed from the late 1970s. It has seven phases, each split into sectors A-H.",
+  "sources": [
+   {
+    "title": "Hayatabad - Wikipedia",
+    "url": "https://en.wikipedia.org/wiki/Hayatabad"
+   },
+   {
+    "title": "Hayatabad's expansion approved (The News, 20 Dec 2024)",
+    "url": "https://www.thenews.com.pk/print/1263416-hayatabad-s-expansion-approved"
+   }
+  ]
+ },
+ {
+  "name": "Regi Model Town",
+  "name_ur": "ریگی ماڈل ٹاؤن",
+  "city": "Peshawar",
+  "developer": "Peshawar Development Authority (PDA)",
+  "approval_authority": "Peshawar Development Authority",
+  "approval_status": "approved",
+  "approval_note": "Public-sector PDA scheme from the early 1990s. Land dispute with the Kukikhel tribe; Peshawar High Court (Apr 2026) directed the DC Peshawar to resolve non-allotment.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [
+   "5 marla",
+   "10 marla",
+   "1 kanal"
+  ],
+  "development_status": "under development",
+  "possession_status": "Only Zones 3 and 4 partly developed; about 17,000 allottees without possession (2023)",
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "PDA housing scheme for government employees with five zones. Zones 1, 2 and 5 remain undeveloped because of a long-running tribal land dispute.",
+  "sources": [
+   {
+    "title": "17,000 KP govt employees haven't received possession of plots for nearly 30 years (ProPakistani, 13 Sep 2023)",
+    "url": "https://propakistani.pk/2023/09/13/17000-kp-govt-employees-havent-received-possession-of-plots-for-nearly-30-years/amp/"
+   },
+   {
+    "title": "PHC orders official to resolve Regi Model Town plots issue (The News)",
+    "url": "https://www.thenews.pk/print/1411783-phc-orders-official-to-resolve-regi-model-town-plots-issue"
+   }
+  ]
+ },
+ {
+  "name": "DHA Gujranwala",
+  "name_ur": "ڈی ایچ اے گوجرانوالہ",
+  "city": "Gujranwala",
+  "developer": "Defence Housing Authority Gujranwala",
+  "approval_authority": "Defence Housing Authority",
+  "approval_status": null,
+  "approval_note": "Not in the GDA private-scheme register (DHA project). No enabling statute or notification was found.",
+  "established_year": 2014,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [
+   "10 marla",
+   "1 kanal",
+   "2 kanal"
+  ],
+  "development_status": "under development",
+  "possession_status": "Balloted Feb 2019; development work began Apr 2019",
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "DHA project launched in 2014 near Rahwali Cantt, with 1,500 acres acquired for Phase I. A 2020 MoU gave ARY Laguna 400 acres inside the society.",
+  "sources": [
+   {
+    "title": "Development work begins in DHA Gujranwala (Zameen News, pointer)",
+    "url": "https://www.zameen.com/news/development-work-begins-in-dha-gujranwala.html"
+   },
+   {
+    "title": "DHA Gujranwala to get ARY Laguna after Karachi (ARY News)",
+    "url": "https://arynews.tv/dha-gujranwala-ary-laguna-karachi/"
+   }
+  ]
+ },
+ {
+  "name": "Citi Housing Gujranwala",
+  "name_ur": "سٹی ہاؤسنگ گوجرانوالہ",
+  "city": "Gujranwala",
+  "developer": "Citi Housing (Pvt) Ltd",
+  "approval_authority": "Gujranwala Development Authority (GDA)",
+  "approval_status": "partially_approved",
+  "approval_note": "GDA approved register: 'Citi Housing (Phase-I, Ext-I & II) & Illegal Extension' 5760.09 K (approved LOP, Ex. TMA Khiyali Shahpur & GDA) and 'Citi Housing Phase-II' 1042.24 K approved; register itself flags an illegal extension. Area below is the approved total.",
+  "established_year": null,
+  "area_acres": 850.29,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "Citi Housing's flagship scheme on the Upper Chenab Canal Bank Road (Phase I) and G.T. Road (Phase II), Gujranwala.",
+  "sources": [
+   {
+    "title": "GDA - Approved Private Housing Schemes (page 1)",
+    "url": "https://gda.punjab.gov.pk/approved-private-housing-scheme"
+   },
+   {
+    "title": "GDA - Approved Private Housing Schemes (page 3)",
+    "url": "https://gda.punjab.gov.pk/approved-private-housing-scheme?page=2"
+   }
+  ]
+ },
+ {
+  "name": "Master City Gujranwala",
+  "name_ur": "ماسٹر سٹی گوجرانوالہ",
+  "city": "Gujranwala",
+  "developer": "Master City (Pvt) Ltd",
+  "approval_authority": "Gujranwala Development Authority (GDA)",
+  "approval_status": "partially_approved",
+  "approval_note": "GDA register: 'Master City & Illegal Extension' approved area 2382.87 K (Mouza Kotli Mughlan & Muslim Chak). GDA notice of 19 Nov 2024 says only the approved area is legal and the other extensions are not approved by GDA. Phase I was approved in May 2015.",
+  "established_year": 2015,
+  "area_acres": 297.86,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "under development",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "Gated scheme on the Upper Chenab Canal Road. Only about 2,383 kanal are GDA-approved; the Phase II extension of about 4,000 kanal is being sold without approval.",
+  "sources": [
+   {
+    "title": "GDA - Approved Private Housing Schemes (page 3)",
+    "url": "https://gda.punjab.gov.pk/approved-private-housing-scheme?page=2"
+   },
+   {
+    "title": "GDA - Important Notice Regarding Master City Approved Area (19 Nov 2024)",
+    "url": "https://gda.punjab.gov.pk/node/84"
+   },
+   {
+    "title": "The Master City Housing Scheme scam (Lok Sujag)",
+    "url": "https://loksujag.com/story/illegal-housing-societies-gujranwala-eng"
+   }
+  ]
+ },
+ {
+  "name": "Citi Housing Sialkot",
+  "name_ur": "سٹی ہاؤسنگ سیالکوٹ",
+  "city": "Sialkot",
+  "developer": "Citi Housing (Pvt) Ltd",
+  "approval_authority": null,
+  "approval_status": null,
+  "approval_note": "No official approval record found. Developer marketing claims an NOC but names no approving body or number.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "Citi Housing scheme in the Daska Road area of Sialkot. Its approval status could not be confirmed from official sources.",
+  "sources": [
+   {
+    "title": "City Housing Society Sialkot overview (Zameen, pointer)",
+    "url": "https://www.zameen.com/area-guides/sialkot/citi-housing-society-8221"
+   }
+  ]
+ },
+ {
+  "name": "DHA Quetta",
+  "name_ur": "ڈی ایچ اے کوئٹہ",
+  "city": "Quetta",
+  "developer": "Defence Housing Authority Quetta",
+  "approval_authority": "Statutory authority (DHA Quetta Act 2015, Balochistan)",
+  "approval_status": "approved",
+  "approval_note": "Created by the Defence Housing Authority Quetta Act 2015 (passed 1 Oct 2015) and amended 2024. BHC struck down some clauses; the Supreme Court later overturned that verdict.",
+  "established_year": 2015,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [
+   "1 kanal"
+  ],
+  "development_status": "under development",
+  "possession_status": "Early Bird 1-kanal residential and 5-marla commercial plots handed over (Mar 2023)",
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "Defence Housing Authority project in Quetta under a provincial act. Early Bird plots were balloted on 30 Mar 2022 and handed over in 2023.",
+  "sources": [
+   {
+    "title": "The Defence Housing Authority Quetta Act 2015 Amendment 2024 (Govt of Balochistan)",
+    "url": "https://balochistan.gov.pk/wp-content/uploads/2024/10/The-Defence-Housing-Authority-Quetta-Act-2015-Amendment-2024.pdf"
+   },
+   {
+    "title": "DHA Quetta hands over possession of Early Bird plots (ProPakistani, 10 Mar 2023)",
+    "url": "https://propakistani.pk/proproperty/?p=12969"
+   }
+  ]
+ },
+ {
+  "name": "Gulistan-e-Sarmast (HDA scheme)",
+  "name_ur": "گلستانِ سرمست",
+  "city": "Hyderabad",
+  "developer": "Hyderabad Development Authority (HDA)",
+  "approval_authority": "Hyderabad Development Authority",
+  "approval_status": "approved",
+  "approval_note": "Public-sector HDA scheme announced Dec 2008 on 2,000 acres of the 1992 Kohisar scheme land; SHC case (filed Dec 2018) over possession and use of development funds.",
+  "established_year": 2008,
+  "area_acres": 2000,
+  "total_units": null,
+  "plot_sizes": [
+   "100 sq yd",
+   "120 sq yd",
+   "240 sq yd",
+   "400 sq yd"
+  ],
+  "development_status": "under development",
+  "possession_status": "Allottees litigating over delayed possession (2019)",
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "HDA low-cost scheme in Hyderabad's Kohisar area. About 90 percent of the plots are 100 sq yd and 40 percent of the land is reserved for amenities.",
+  "sources": [
+   {
+    "title": "HDA launches housing scheme after decade (Dawn, 16 Dec 2008)",
+    "url": "https://dawn.com/news/433708"
+   },
+   {
+    "title": "Gulistan-e-Sarmast case: SHC issues notices (Zameen News, 10 Mar 2019, pointer)",
+    "url": "https://www.zameen.com/news/gulistan-e-sarmast-case-shc-issues-important-notices.html"
+   }
+  ]
+ },
+ {
+  "name": "DHA Bahawalpur",
+  "name_ur": "ڈی ایچ اے بہاولپور",
+  "city": "Bahawalpur",
+  "developer": "Defence Housing Authority Bahawalpur",
+  "approval_authority": "Defence Housing Authority",
+  "approval_status": null,
+  "approval_note": "DHA project. No enabling statute or development-authority approval record was found.",
+  "established_year": 2015,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [
+   "10 marla"
+  ],
+  "development_status": "under development",
+  "possession_status": "Possession of 10-marla plots in Sector C announced Oct 2021; location ballots continuing (2023)",
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": "https://dhabahawalpur.com",
+  "description": "DHA project in Bahawalpur set up in 2015. Phase I (about 3,000 acres, Blocks A-N) was to be developed at a cost of PKR 85bn.",
+  "sources": [
+   {
+    "title": "DHA Bahawalpur schedules 2023 location ballot (ProPakistani, 28 Apr 2023)",
+    "url": "https://propakistani.pk/proproperty/?p=15562"
+   },
+   {
+    "title": "DHA Bahawalpur balloted Phase I to cost PKR 85bn (Zameen News, pointer)",
+    "url": "https://www.zameen.com/news/dha-bahawalpur-balloted-phase-i-to-cost-pkr-85-bn.html"
+   }
+  ]
+ },
+ {
+  "name": "Abbottabad Smart City",
+  "name_ur": "ایبٹ آباد سمارٹ سٹی",
+  "city": "Abbottabad",
+  "developer": null,
+  "approval_authority": "Tehsil Municipal Administration (TMA) Abbottabad",
+  "approval_status": "illegal",
+  "approval_note": "Named among housing societies declared illegal by TMA Abbottabad in a public notice (reported 11 Apr 2025) for lacking mandatory approval/NOC.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": null,
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "Private society at Dhamtoor, Abbottabad, declared illegal by TMA Abbottabad. TMA says buyers without a valid NOC will not get utility connections.",
+  "sources": [
+   {
+    "title": "12 Housing Societies Declared Illegal in Abbottabad (ProPakistani, 11 Apr 2025)",
+    "url": "https://propakistani.pk/2025/04/11/12-housing-societies-declared-illegal-in-abbottabad/"
+   }
+  ]
+ },
+ {
+  "name": "Singhar (Sangar) Housing Scheme",
+  "name_ur": "سنگھار ہاؤسنگ اسکیم",
+  "city": "Gwadar",
+  "developer": "Government of Balochistan",
+  "approval_authority": "Government of Balochistan / Gwadar Development Authority",
+  "approval_status": null,
+  "approval_note": "Provincial government scheme: plots allotted in four phases from 1991, with Phase 5 pricing set by the CM (Dawn). GDA (Feb 2017) said development work had begun. No GDA approval/NOC record found.",
+  "established_year": 1991,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [
+   "400 sq yd",
+   "600 sq yd",
+   "1000 sq yd"
+  ],
+  "development_status": "under development",
+  "possession_status": "Phase I allottees invited to apply for construction NOCs (Apr 2019)",
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": "http://www.sangargwadar.com",
+  "description": "Government-run housing scheme on Koh-e-Batil, Gwadar, in four or more phases. Some allotments were cancelled in the 2000s.",
+  "sources": [
+   {
+    "title": "Balochistan govt defends Gwadar land allotment (Dawn, 24 Oct 2006)",
+    "url": "https://dawn.com/news/216178"
+   },
+   {
+    "title": "GDA rubbishes Sangar Housing Scheme rumours (Zameen News, 15 Feb 2017, pointer)",
+    "url": "https://www.zameen.com/news/gda-rubbishes-sangar-housing-scheme-rumours.html"
+   },
+   {
+    "title": "Sangar Housing Scheme invites applications for NOC (Zameen News, 29 Apr 2019, pointer)",
+    "url": "https://www.zameen.com/news/sangar-housing-scheme-invites-applications-for-noc.html"
+   },
+   {
+    "title": "Committee to assess losses of Singhar allottees whose allotments were cancelled (Dawn)",
+    "url": "https://dawn.com/news/128215"
+   }
+  ]
+ },
+ {
+  "name": "Model Town Sargodha (SDA)",
+  "name_ur": "ماڈل ٹاؤن سرگودھا",
+  "city": "Sargodha",
+  "developer": "Sargodha Development Authority (formerly Sargodha Improvement Trust)",
+  "approval_authority": "Sargodha Development Authority",
+  "approval_status": "approved",
+  "approval_note": "Public-sector scheme launched by Sargodha Improvement Trust in 1990-91 (Dawn, Nov 2004), now run by SDA.",
+  "established_year": 1990,
+  "area_acres": 1600,
+  "total_units": 3200,
+  "plot_sizes": [
+   "5 marla",
+   "7 marla",
+   "10 marla",
+   "1 kanal"
+  ],
+  "development_status": "under development",
+  "possession_status": "Long-delayed; SDA said in Jan 2020 that development would begin within two months",
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "Government scheme about 7 km from Sargodha city, troubled for years by irregular allotments and stalled development. SDA cited 3,200 plots on 1,600 acres in 2020.",
+  "sources": [
+   {
+    "title": "SARGODHA: Auction of plots in Model Town scheme stopped (Dawn, 8 Nov 2004)",
+    "url": "https://dawn.com/news/399447"
+   },
+   {
+    "title": "Development of Model Town Sargodha to begin in two months (Zameen News, 22 Jan 2020, pointer)",
+    "url": "https://zameen.com/news/development-model-town-sargodha-begin-two-months.html"
+   }
+  ]
+ },
+ {
+  "name": "Royal Orchard Sargodha",
+  "name_ur": "رائل آرچرڈ سرگودھا",
+  "city": "Sargodha",
+  "developer": null,
+  "approval_authority": "Divisional Commissioner Sargodha / Metropolitan Corporation Sargodha",
+  "approval_status": "illegal",
+  "approval_note": "'Royal Orchard' is among the 38 schemes declared illegal within Sargodha metropolitan corporation limits by the Divisional Commissioner, with sale and transfer of plots banned (Dawn, 30 Aug 2023).",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": null,
+  "possession_status": "Plot sale/transfer banned (Aug 2023)",
+  "utilities": [],
+  "latitude": null,
+  "longitude": null,
+  "website": null,
+  "description": "Housing scheme in Sargodha listed as illegal in 2023. Dawn does not name its developer, so it should not be assumed to be linked to Royal Orchard Multan.",
+  "sources": [
+   {
+    "title": "38 housing schemes declared illegal (Dawn, 30 Aug 2023)",
+    "url": "https://www.dawn.com/news/1773038/38-housing-schemes-declared-illegal"
+   }
+  ]
+ }
+]

@@ -1,0 +1,1254 @@
+[
+ {
+  "name": "Karachi",
+  "name_ur": "کراچی",
+  "province": "Sindh",
+  "district": "Karachi Division (Central, East, South, West, Keamari, Korangi, Malir)",
+  "latitude": 24.86,
+  "longitude": 67.01,
+  "population_2023": 18868021,
+  "population_note": "City (urban) population, 2023 Census, PBS: sum of all urban localities in Karachi Division (7 District Municipal Corporations + Faisal, Malir, Karachi, Clifton, Korangi Creek and Manora cantonments), PBS Table 2. Karachi Division total (7 districts, urban + rural) is 20,382,881 (PBS Table 1). area_km2 is the combined area of the 7 Karachi districts (PBS Table 1).",
+  "area_km2": 3527,
+  "development_authority": "Karachi Development Authority (KDA) / Sindh Building Control Authority (SBCA)",
+  "description": "Capital of Sindh, Pakistan's largest city and main seaport (Karachi Port, Port Qasim), and the country's principal commercial and financial centre. Major residential areas include DHA Karachi, Clifton, Gulshan-e-Iqbal, North Nazimabad and Bahria Town Karachi.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Sindh",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/sindh/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Sindh",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/sindh/dcr/table_1.pdf"
+   },
+   {
+    "title": "Karachi Development Authority (official site)",
+    "url": "https://kda.gos.pk/"
+   },
+   {
+    "title": "Sindh Building Control Authority (official site)",
+    "url": "https://www.sbca.gos.pk/"
+   },
+   {
+    "title": "Wikipedia: Karachi (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Karachi"
+   }
+  ]
+ },
+ {
+  "name": "Lahore",
+  "name_ur": "لاہور",
+  "province": "Punjab",
+  "district": "Lahore",
+  "latitude": 31.5497,
+  "longitude": 74.3436,
+  "population_2023": 13004135,
+  "population_note": "City (urban) population, 2023 Census, PBS: Lahore Metropolitan Corporation (all five tehsil parts) + Walton Cantonment + Lahore Cantonment, PBS Table 2. Lahore District is 100% urban, so this equals the district total (PBS Table 1). area_km2 is Lahore District area (PBS Table 1).",
+  "area_km2": 1772,
+  "development_authority": "Lahore Development Authority (LDA)",
+  "description": "Capital of Punjab and Pakistan's second-largest city; a major commercial, cultural and education centre. Prominent residential areas include DHA Lahore, Gulberg, Model Town, Johar Town and Bahria Town Lahore.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Lahore Division (Govt of Punjab): Lahore Development Authority",
+    "url": "https://lahoredivision.punjab.gov.pk/node/54"
+   },
+   {
+    "title": "Wikipedia: Lahore (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Lahore"
+   }
+  ]
+ },
+ {
+  "name": "Faisalabad",
+  "name_ur": "فیصل آباد",
+  "province": "Punjab",
+  "district": "Faisalabad",
+  "latitude": 31.4167,
+  "longitude": 73.0911,
+  "population_2023": 3691999,
+  "population_note": "City (urban) population, 2023 Census, PBS: Faisalabad Municipal Corporation, PBS Table 2. Faisalabad District total is 9,075,819. area_km2 is Faisalabad District area (PBS Table 1).",
+  "area_km2": 5857,
+  "development_authority": "Faisalabad Development Authority (FDA)",
+  "description": "Pakistan's third-largest city and a leading textile manufacturing centre. The FDA regulates housing schemes and runs its own scheme, FDA City.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Faisalabad Development Authority: About FDA",
+    "url": "https://fda.gov.pk/about-fda"
+   },
+   {
+    "title": "Wikipedia: Faisalabad (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Faisalabad"
+   }
+  ]
+ },
+ {
+  "name": "Rawalpindi",
+  "name_ur": "راولپنڈی",
+  "province": "Punjab",
+  "district": "Rawalpindi",
+  "latitude": 33.6,
+  "longitude": 73.0333,
+  "population_2023": 3357612,
+  "population_note": "City (urban) population, 2023 Census, PBS: Rawalpindi Metropolitan Corporation + Rawalpindi Cantonment + Chaklala Cantonment, PBS Table 2. Rawalpindi District total is 6,118,911. area_km2 is Rawalpindi District area (PBS Table 1).",
+  "area_km2": 5285,
+  "development_authority": "Rawalpindi Development Authority (RDA)",
+  "description": "Twin city of Islamabad and headquarters of the Pakistan Army (GHQ); a large commercial and transport hub. Residential areas include Bahria Town, Satellite Town and Saddar/Cantonment areas.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Rawalpindi Development Authority (official site)",
+    "url": "https://rda.gop.pk/"
+   },
+   {
+    "title": "Wikipedia: Rawalpindi (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Rawalpindi"
+   }
+  ]
+ },
+ {
+  "name": "Gujranwala",
+  "name_ur": "گوجرانوالہ",
+  "province": "Punjab",
+  "district": "Gujranwala",
+  "latitude": 32.1567,
+  "longitude": 74.19,
+  "population_2023": 2511118,
+  "population_note": "City (urban) population, 2023 Census, PBS: Gujranwala Metropolitan Corporation only, PBS Table 2 (Gujranwala Cantonment, listed separately, adds 156,929). Gujranwala District total is 5,959,750. area_km2 is Gujranwala District area (PBS Table 1).",
+  "area_km2": 3622,
+  "development_authority": "Gujranwala Development Authority (GDA)",
+  "description": "Industrial city on the GT Road between Lahore and the north, known for metalworking, ceramics and electrical goods manufacturing; divisional headquarters.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Gujranwala Development Authority (official site)",
+    "url": "https://gda.punjab.gov.pk/"
+   },
+   {
+    "title": "Wikipedia: Gujranwala (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Gujranwala"
+   }
+  ]
+ },
+ {
+  "name": "Multan",
+  "name_ur": "ملتان",
+  "province": "Punjab",
+  "district": "Multan",
+  "latitude": 30.1978,
+  "longitude": 71.4697,
+  "population_2023": 2215381,
+  "population_note": "City (urban) population, 2023 Census, PBS: Multan Municipal Corporation + Multan Cantonment, PBS Table 2. Multan District total is 5,362,305. area_km2 is Multan District area (PBS Table 1).",
+  "area_km2": 3720,
+  "development_authority": "Multan Development Authority (MDA)",
+  "description": "Largest city of southern Punjab and a divisional headquarters, known for its Sufi shrines and as a trading centre for cotton and mangoes. Residential areas include DHA Multan and Gulgasht Colony.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Multan Development Authority (official site)",
+    "url": "https://mda.punjab.gov.pk/"
+   },
+   {
+    "title": "Wikipedia: Multan (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Multan"
+   }
+  ]
+ },
+ {
+  "name": "Hyderabad",
+  "name_ur": "حیدرآباد",
+  "province": "Sindh",
+  "district": "Hyderabad",
+  "latitude": 25.3792,
+  "longitude": 68.3683,
+  "population_2023": 1921275,
+  "population_note": "City (urban) population, 2023 Census, PBS: Hyderabad Municipal Corporation (City + Latifabad parts) + Qasimabad MC + Hyderabad Cantonment (3 parts), PBS Table 2. Hyderabad District total is 2,432,540. area_km2 is Hyderabad District area (PBS Table 1).",
+  "area_km2": 993,
+  "development_authority": "Hyderabad Development Authority (HDA)",
+  "description": "Sindh's second-largest city, on the Indus and linked to Karachi by the M-9 motorway; a trading and industrial centre. Main urban areas include Latifabad, Qasimabad and Hyderabad Cantonment.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Sindh",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/sindh/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Sindh",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/sindh/dcr/table_1.pdf"
+   },
+   {
+    "title": "APP: HDA, Telconet discuss digitization of records",
+    "url": "https://www.app.com.pk/?p=1292318"
+   },
+   {
+    "title": "Wikipedia: Hyderabad, Pakistan (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Hyderabad,_Pakistan"
+   }
+  ]
+ },
+ {
+  "name": "Peshawar",
+  "name_ur": "پشاور",
+  "province": "Khyber Pakhtunkhwa",
+  "district": "Peshawar",
+  "latitude": 34.0144,
+  "longitude": 71.5675,
+  "population_2023": 1905975,
+  "population_note": "City (urban) population, 2023 Census, PBS: Peshawar Municipal Corporation + Peshawar Cantonment + Peshawar University TC, PBS Table 2. Peshawar District total is 4,758,762. area_km2 is Peshawar District area (PBS Table 1).",
+  "area_km2": 1518,
+  "development_authority": "Peshawar Development Authority (PDA)",
+  "description": "Capital of Khyber Pakhtunkhwa near the Khyber Pass and a major trading centre for the north-west. Planned residential areas include Hayatabad, University Town and Peshawar Cantonment.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Khyber Pakhtunkhwa",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/kp/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Khyber Pakhtunkhwa",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/kp/dcr/table_1.pdf"
+   },
+   {
+    "title": "The Peshawar Development Authority Act 2017 (Provincial Assembly KP)",
+    "url": "https://www.pakp.gov.pk/wp-content/uploads/2024/05/The-Peshawar-Development-Authority-Act-2017-Act-No.-XXXI-2017.pdf"
+   },
+   {
+    "title": "Wikipedia: Peshawar (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Peshawar"
+   }
+  ]
+ },
+ {
+  "name": "Islamabad",
+  "name_ur": "اسلام آباد",
+  "province": "Islamabad Capital Territory",
+  "district": "Islamabad",
+  "latitude": 33.6931,
+  "longitude": 73.0639,
+  "population_2023": 1108872,
+  "population_note": "City (urban) population, 2023 Census, PBS: Islamabad Metropolitan Corporation (urban ICT), PBS Table 2. Islamabad Capital Territory total (urban + rural) is 2,363,863. area_km2 is ICT district area (PBS Table 1).",
+  "area_km2": 906,
+  "development_authority": "Capital Development Authority (CDA)",
+  "description": "Federal capital, a planned city laid out in lettered CDA sectors (E, F, G, H, I series) at the foot of the Margalla Hills. Housing is split between CDA sectors and private housing schemes along the Islamabad Expressway and GT Road.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Islamabad",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/islamabad/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Islamabad",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/islamabad/dcr/table_1.pdf"
+   },
+   {
+    "title": "Capital Development Authority (official site)",
+    "url": "https://www.cda.gov.pk/"
+   },
+   {
+    "title": "Wikipedia: Islamabad (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Islamabad"
+   }
+  ]
+ },
+ {
+  "name": "Quetta",
+  "name_ur": "کوئٹہ",
+  "province": "Balochistan",
+  "district": "Quetta",
+  "latitude": 30.1958,
+  "longitude": 67.0172,
+  "population_2023": 1565546,
+  "population_note": "City (urban) population, 2023 Census, PBS: Quetta Metropolitan Corporation (City, Saddar, Kuchlak and Sariab sub-division parts) + Quetta Cantonment, PBS Table 2. Quetta District total is 2,595,492. area_km2 is Quetta District area (PBS Table 1).",
+  "area_km2": 3447,
+  "development_authority": "Quetta Development Authority (QDA)",
+  "description": "Capital and largest city of Balochistan, a trading centre near the Afghan border and site of a major military cantonment.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Balochistan",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/balochistan/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Balochistan",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/balochistan/dcr/table_1.pdf"
+   },
+   {
+    "title": "Quetta Development Authority (official site)",
+    "url": "https://qda.gob.pk/"
+   },
+   {
+    "title": "Wikipedia: Quetta (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Quetta"
+   }
+  ]
+ },
+ {
+  "name": "Sargodha",
+  "name_ur": "سرگودھا",
+  "province": "Punjab",
+  "district": "Sargodha",
+  "latitude": 32.0836,
+  "longitude": 72.6711,
+  "population_2023": 975886,
+  "population_note": "City (urban) population, 2023 Census, PBS: Sargodha Municipal Corporation + Sargodha Cantonment, PBS Table 2. Sargodha District total is 4,334,448. area_km2 is Sargodha District area (PBS Table 1).",
+  "area_km2": 5856,
+  "development_authority": "Sargodha Development Authority (SDA)",
+  "description": "Divisional headquarters in a major citrus (kinnow) growing region and home to PAF Base Mushaf. The SDA approves building plans and issues NOCs for private housing schemes in its jurisdiction.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Zameen News: Jurisdiction of Sargodha Development Authority redefined (30 Dec 2018)",
+    "url": "https://www.zameen.com/news/jurisdiction-of-sargodha-development-authority-redefined.html"
+   },
+   {
+    "title": "Wikipedia: Sargodha (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Sargodha"
+   }
+  ]
+ },
+ {
+  "name": "Sialkot",
+  "name_ur": "سیالکوٹ",
+  "province": "Punjab",
+  "district": "Sialkot",
+  "latitude": 32.4925,
+  "longitude": 74.5311,
+  "population_2023": 911817,
+  "population_note": "City (urban) population, 2023 Census, PBS: Sialkot Municipal Corporation + Sialkot Cantonment, PBS Table 2. Sialkot District total is 4,499,394. area_km2 is Sialkot District area (PBS Table 1).",
+  "area_km2": 3016,
+  "development_authority": null,
+  "description": "Export-oriented industrial city known for sports goods, surgical instruments and leather products, served by Sialkot International Airport.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Sialkot (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Sialkot"
+   }
+  ]
+ },
+ {
+  "name": "Bahawalpur",
+  "name_ur": "بہاولپور",
+  "province": "Punjab",
+  "district": "Bahawalpur",
+  "latitude": 29.3956,
+  "longitude": 71.6836,
+  "population_2023": 903795,
+  "population_note": "City (urban) population, 2023 Census, PBS: Bahawalpur Metropolitan Corporation + Bahawalpur Cantonment, PBS Table 2. Bahawalpur District total is 4,284,964. area_km2 is Bahawalpur District area (PBS Table 1).",
+  "area_km2": 24830,
+  "development_authority": "Bahawalpur Development Authority (BDA)",
+  "description": "Former princely-state capital and divisional headquarters in south Punjab; an agricultural and education centre (Islamia University of Bahawalpur) and gateway to the Cholistan Desert.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "The Bahawalpur Development Authority Act 1991 (FAOLEX)",
+    "url": "https://faolex.fao.org/docs/pdf/pak87760.pdf"
+   },
+   {
+    "title": "Wikipedia: Bahawalpur (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Bahawalpur"
+   }
+  ]
+ },
+ {
+  "name": "Sukkur",
+  "name_ur": "سکھر",
+  "province": "Sindh",
+  "district": "Sukkur",
+  "latitude": 27.7061,
+  "longitude": 68.8483,
+  "population_2023": 563851,
+  "population_note": "City (urban) population, 2023 Census, PBS: Sukkur Municipal Corporation (New Sukkur + Sukkur City taluka parts), PBS Table 2. Sukkur District total is 1,639,897. area_km2 is Sukkur District area (PBS Table 1).",
+  "area_km2": 5165,
+  "development_authority": null,
+  "description": "Divisional headquarters on the Indus in upper Sindh and site of the Sukkur Barrage; a trading and transport hub facing Rohri across the river.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Sindh",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/sindh/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Sindh",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/sindh/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Sukkur (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Sukkur"
+   }
+  ]
+ },
+ {
+  "name": "Larkana",
+  "name_ur": "لاڑکانہ",
+  "province": "Sindh",
+  "district": "Larkana",
+  "latitude": 27.5583,
+  "longitude": 68.2111,
+  "population_2023": 551716,
+  "population_note": "City (urban) population, 2023 Census, PBS: Larkana Municipal Corporation, PBS Table 2. Larkana District total is 1,784,453. area_km2 is Larkana District area (PBS Table 1).",
+  "area_km2": 1948,
+  "development_authority": null,
+  "description": "Divisional headquarters in upper Sindh and an agricultural trading centre, near the Mohenjo-daro archaeological site.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Sindh",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/sindh/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Sindh",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/sindh/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Larkana (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Larkana"
+   }
+  ]
+ },
+ {
+  "name": "Sheikhupura",
+  "name_ur": "شیخوپورہ",
+  "province": "Punjab",
+  "district": "Sheikhupura",
+  "latitude": 31.7111,
+  "longitude": 73.9878,
+  "population_2023": 591424,
+  "population_note": "City (urban) population, 2023 Census, PBS: Sheikhupura MC, PBS Table 2. Sheikhupura District total is 4,049,418. area_km2 is Sheikhupura District area (PBS Table 1).",
+  "area_km2": 3744,
+  "development_authority": null,
+  "description": "Industrial district headquarters north-west of Lahore, with factories along the Lahore–Sheikhupura road; known for the Mughal-era Hiran Minar.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Sheikhupura (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Sheikhupura"
+   }
+  ]
+ },
+ {
+  "name": "Rahim Yar Khan",
+  "name_ur": "رحیم یار خان",
+  "province": "Punjab",
+  "district": "Rahim Yar Khan",
+  "latitude": 28.42,
+  "longitude": 70.3,
+  "population_2023": 519261,
+  "population_note": "City (urban) population, 2023 Census, PBS: Rahim Yar Khan Municipal Corporation, PBS Table 2. Rahim Yar Khan District total is 5,564,703. area_km2 is Rahim Yar Khan District area (PBS Table 1).",
+  "area_km2": 11880,
+  "development_authority": null,
+  "description": "District headquarters in southern Punjab with an agriculture-based economy (cotton, sugarcane) and agro-industry; served by Shaikh Zayed International Airport.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Rahim Yar Khan (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Rahim_Yar_Khan"
+   }
+  ]
+ },
+ {
+  "name": "Jhang",
+  "name_ur": "جھنگ",
+  "province": "Punjab",
+  "district": "Jhang",
+  "latitude": 31.2694,
+  "longitude": 72.3161,
+  "population_2023": 606533,
+  "population_note": "City (urban) population, 2023 Census, PBS: Jhang MC, PBS Table 2. Jhang District total is 3,065,639. area_km2 is Jhang District area (PBS Table 1).",
+  "area_km2": 6166,
+  "development_authority": null,
+  "description": "District headquarters in central Punjab near the Chenab river; an agricultural market city.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Jhang (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Jhang"
+   }
+  ]
+ },
+ {
+  "name": "Dera Ghazi Khan",
+  "name_ur": "ڈیرہ غازی خان",
+  "province": "Punjab",
+  "district": "Dera Ghazi Khan",
+  "latitude": 30.0331,
+  "longitude": 70.64,
+  "population_2023": 494464,
+  "population_note": "City (urban) population, 2023 Census, PBS: Dera Ghazi Khan Municipal Corporation, PBS Table 2. Dera Ghazi Khan District total is 3,393,705. area_km2 is Dera Ghazi Khan District area (PBS Table 1).",
+  "area_km2": 11922,
+  "development_authority": null,
+  "description": "Divisional headquarters on the west side of the Indus in south-west Punjab; the regional commercial centre for areas bordering Balochistan and Khyber Pakhtunkhwa.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Dera Ghazi Khan (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Dera_Ghazi_Khan"
+   }
+  ]
+ },
+ {
+  "name": "Gujrat",
+  "name_ur": "گجرات",
+  "province": "Punjab",
+  "district": "Gujrat",
+  "latitude": 32.5739,
+  "longitude": 74.0789,
+  "population_2023": 574240,
+  "population_note": "City (urban) population, 2023 Census, PBS: Gujrat Metropolitan Corporation, PBS Table 2. Gujrat District total is 3,219,375. area_km2 is Gujrat District area (PBS Table 1).",
+  "area_km2": 3192,
+  "development_authority": null,
+  "description": "Industrial city between the Jhelum and Chenab rivers, known for manufacturing electric fans, furniture and ceramics.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Gujrat, Pakistan (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Gujrat,_Pakistan"
+   }
+  ]
+ },
+ {
+  "name": "Sahiwal",
+  "name_ur": "ساہیوال",
+  "province": "Punjab",
+  "district": "Sahiwal",
+  "latitude": 30.6611,
+  "longitude": 73.1083,
+  "population_2023": 538344,
+  "population_note": "City (urban) population, 2023 Census, PBS: Sahiwal Metropolitan Corporation, PBS Table 2. Sahiwal District total is 2,881,811. area_km2 is Sahiwal District area (PBS Table 1).",
+  "area_km2": 3201,
+  "development_authority": null,
+  "description": "Divisional headquarters between Lahore and Multan; an agricultural and dairy centre that gives its name to the Sahiwal cattle breed.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Sahiwal (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Sahiwal"
+   }
+  ]
+ },
+ {
+  "name": "Wah Cantonment",
+  "name_ur": "واہ کینٹ",
+  "province": "Punjab",
+  "district": "Rawalpindi",
+  "latitude": 33.7714,
+  "longitude": 72.7518,
+  "population_2023": 400733,
+  "population_note": "City (urban) population, 2023 Census, PBS: Wah Cantonment, PBS Table 2. area_km2 is Taxila Tehsil area (PBS Table 1), which contains Wah Cantonment.",
+  "area_km2": 312,
+  "development_authority": null,
+  "description": "Cantonment city in Taxila tehsil, home of the Pakistan Ordnance Factories and administered by the Wah Cantonment Board; adjacent to the Taxila archaeological sites.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Wah Cantonment (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Wah_Cantonment"
+   }
+  ]
+ },
+ {
+  "name": "Mardan",
+  "name_ur": "مردان",
+  "province": "Khyber Pakhtunkhwa",
+  "district": "Mardan",
+  "latitude": 34.2012,
+  "longitude": 72.0258,
+  "population_2023": 368302,
+  "population_note": "City (urban) population, 2023 Census, PBS: Mardan MC + Mardan Cantonment, PBS Table 2. Mardan District total is 2,744,898. area_km2 is Mardan District area (PBS Table 1).",
+  "area_km2": 1632,
+  "development_authority": null,
+  "description": "Divisional headquarters and the second-largest city of Khyber Pakhtunkhwa by 2023 urban population; an agricultural centre (sugarcane, tobacco) on the Peshawar valley plain.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Khyber Pakhtunkhwa",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/kp/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Khyber Pakhtunkhwa",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/kp/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Mardan (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Mardan"
+   }
+  ]
+ },
+ {
+  "name": "Kasur",
+  "name_ur": "قصور",
+  "province": "Punjab",
+  "district": "Kasur",
+  "latitude": 31.1167,
+  "longitude": 74.45,
+  "population_2023": 510875,
+  "population_note": "City (urban) population, 2023 Census, PBS: Kasur MC, PBS Table 2. Kasur District total is 4,084,286. area_km2 is Kasur District area (PBS Table 1).",
+  "area_km2": 3995,
+  "development_authority": null,
+  "description": "District headquarters south-east of Lahore near the Indian border, known for leather tanning and the shrine of Baba Bulleh Shah.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Kasur (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Kasur"
+   }
+  ]
+ },
+ {
+  "name": "Okara",
+  "name_ur": "اوکاڑہ",
+  "province": "Punjab",
+  "district": "Okara",
+  "latitude": 30.8092,
+  "longitude": 73.4536,
+  "population_2023": 533693,
+  "population_note": "City (urban) population, 2023 Census, PBS: Okara Municipal Corporation only, PBS Table 2 (Okara Cantonment, listed separately, adds 65,590). Okara District total is 3,515,490. area_km2 is Okara District area (PBS Table 1).",
+  "area_km2": 4377,
+  "development_authority": null,
+  "description": "District headquarters on the Lahore–Multan route in central Punjab; an agricultural and dairy market city.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Okara, Pakistan (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Okara,_Pakistan"
+   }
+  ]
+ },
+ {
+  "name": "Mingora",
+  "name_ur": "مینگورہ",
+  "province": "Khyber Pakhtunkhwa",
+  "district": "Swat",
+  "latitude": 34.7717,
+  "longitude": 72.36,
+  "population_2023": 361112,
+  "population_note": "City (urban) population, 2023 Census, PBS: Mingora MC (Babuzai Tehsil), PBS Table 2. Swat District total is 2,687,384. area_km2 is Babuzai Tehsil area (PBS Table 1).",
+  "area_km2": 297,
+  "development_authority": null,
+  "description": "Largest city and commercial centre of the Swat valley, adjoining the district headquarters Saidu Sharif; the main base for tourism to upper Swat.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Khyber Pakhtunkhwa",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/kp/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Khyber Pakhtunkhwa",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/kp/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Mingora (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Mingora"
+   }
+  ]
+ },
+ {
+  "name": "Nawabshah",
+  "name_ur": "نوابشاہ",
+  "province": "Sindh",
+  "district": "Shaheed Benazirabad",
+  "latitude": 26.2442,
+  "longitude": 68.41,
+  "population_2023": 363138,
+  "population_note": "City (urban) population, 2023 Census, PBS: Nawabshah MC, PBS Table 2. Shaheed Benazirabad District total is 1,845,102. area_km2 is Shaheed Benazirabad District area (PBS Table 1).",
+  "area_km2": 4502,
+  "development_authority": null,
+  "description": "Headquarters of Shaheed Benazirabad district and division in central Sindh; an agricultural trading centre.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Sindh",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/sindh/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Sindh",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/sindh/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Nawabshah (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Nawabshah"
+   }
+  ]
+ },
+ {
+  "name": "Chiniot",
+  "name_ur": "چنیوٹ",
+  "province": "Punjab",
+  "district": "Chiniot",
+  "latitude": 31.7194,
+  "longitude": 72.9842,
+  "population_2023": 318165,
+  "population_note": "City (urban) population, 2023 Census, PBS: Chiniot MC, PBS Table 2. Chiniot District total is 1,563,024. area_km2 is Chiniot District area (PBS Table 1).",
+  "area_km2": 2643,
+  "development_authority": null,
+  "description": "District headquarters on the Chenab river, known for its carved wooden furniture industry.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Chiniot (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Chiniot"
+   }
+  ]
+ },
+ {
+  "name": "Kotri",
+  "name_ur": "کوٹری",
+  "province": "Sindh",
+  "district": "Jamshoro",
+  "latitude": 25.374,
+  "longitude": 68.3013,
+  "population_2023": 106615,
+  "population_note": "City (urban) population, 2023 Census, PBS: Kotri MC only, PBS Table 2 (the adjoining Bolhari MC in Kotri Taluka is listed separately at 169,613). Jamshoro District total is 1,117,308. area_km2 is Kotri Taluka area (PBS Table 1).",
+  "area_km2": 1051,
+  "development_authority": null,
+  "description": "Industrial town on the right bank of the Indus opposite Hyderabad, site of the Kotri Barrage and an industrial estate.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Sindh",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/sindh/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Sindh",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/sindh/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Kotri (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Kotri"
+   }
+  ]
+ },
+ {
+  "name": "Kamoke",
+  "name_ur": "کامونکے",
+  "province": "Punjab",
+  "district": "Gujranwala",
+  "latitude": 31.9736,
+  "longitude": 74.2228,
+  "population_2023": 292023,
+  "population_note": "City (urban) population, 2023 Census, PBS: Kamoke Municipal Corporation, PBS Table 2. area_km2 is Kamoke Tehsil area (PBS Table 1).",
+  "area_km2": 834,
+  "development_authority": null,
+  "description": "Tehsil headquarters on the GT Road between Lahore and Gujranwala and a major rice market.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Kamoke (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Kamoke"
+   }
+  ]
+ },
+ {
+  "name": "Hafizabad",
+  "name_ur": "حافظ آباد",
+  "province": "Punjab",
+  "district": "Hafizabad",
+  "latitude": 32.0714,
+  "longitude": 73.6878,
+  "population_2023": 318621,
+  "population_note": "City (urban) population, 2023 Census, PBS: Hafizabad MC, PBS Table 2. Hafizabad District total is 1,319,909. area_km2 is Hafizabad District area (PBS Table 1).",
+  "area_km2": 2367,
+  "development_authority": null,
+  "description": "District headquarters in Gujranwala division and a market town for the surrounding rice-growing area.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Hafizabad (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Hafizabad"
+   }
+  ]
+ },
+ {
+  "name": "Sadiqabad",
+  "name_ur": "صادق آباد",
+  "province": "Punjab",
+  "district": "Rahim Yar Khan",
+  "latitude": 28.3,
+  "longitude": 70.1167,
+  "population_2023": 274210,
+  "population_note": "City (urban) population, 2023 Census, PBS: Sadiqabad Municipal Corporation, PBS Table 2. area_km2 is Sadiqabad Tehsil area (PBS Table 1).",
+  "area_km2": 2964,
+  "development_authority": null,
+  "description": "Tehsil headquarters in Rahim Yar Khan district near the Sindh border; an agricultural market and industrial town.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Sadiqabad, Punjab (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Sadiqabad,_Punjab"
+   }
+  ]
+ },
+ {
+  "name": "Mirpur Khas",
+  "name_ur": "میرپور خاص",
+  "province": "Sindh",
+  "district": "Mirpur Khas",
+  "latitude": 25.525,
+  "longitude": 69.0158,
+  "population_2023": 267833,
+  "population_note": "City (urban) population, 2023 Census, PBS: Mirpur Khas MC, PBS Table 2. Mirpur Khas District total is 1,681,386. area_km2 is Mirpur Khas District area (PBS Table 1).",
+  "area_km2": 2925,
+  "development_authority": null,
+  "description": "Divisional headquarters in lower Sindh, known for mango production and as a gateway to Tharparkar.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Sindh",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/sindh/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Sindh",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/sindh/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Mirpur Khas (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Mirpur_Khas"
+   }
+  ]
+ },
+ {
+  "name": "Burewala",
+  "name_ur": "بورے والا",
+  "province": "Punjab",
+  "district": "Vehari",
+  "latitude": 30.1592,
+  "longitude": 72.6817,
+  "population_2023": 361664,
+  "population_note": "City (urban) population, 2023 Census, PBS: Burewala MC, PBS Table 2. area_km2 is Burewala Tehsil area (PBS Table 1).",
+  "area_km2": 1295,
+  "development_authority": null,
+  "description": "Tehsil headquarters in Vehari district in a cotton-growing area, with cotton ginning and textile industry.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Burewala (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Burewala"
+   }
+  ]
+ },
+ {
+  "name": "Kohat",
+  "name_ur": "کوہاٹ",
+  "province": "Khyber Pakhtunkhwa",
+  "district": "Kohat",
+  "latitude": 33.59,
+  "longitude": 71.4397,
+  "population_2023": 235880,
+  "population_note": "City (urban) population, 2023 Census, PBS: Kohat MC + Kohat Cantonment, PBS Table 2. Kohat District total is 1,234,661. area_km2 is Kohat District area (PBS Table 1).",
+  "area_km2": 2991,
+  "development_authority": "Kohat Development Authority (KDA)",
+  "description": "Divisional headquarters south of Peshawar, connected to it through the Kohat Tunnel, with a large military cantonment.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Khyber Pakhtunkhwa",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/kp/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Khyber Pakhtunkhwa",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/kp/dcr/table_1.pdf"
+   },
+   {
+    "title": "APP: DC presides over meeting on KDA's ongoing development projects",
+    "url": "https://www.app.com.pk/?p=1033946"
+   },
+   {
+    "title": "Wikipedia: Kohat (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Kohat"
+   }
+  ]
+ },
+ {
+  "name": "Khanewal",
+  "name_ur": "خانیوال",
+  "province": "Punjab",
+  "district": "Khanewal",
+  "latitude": 30.3,
+  "longitude": 71.9333,
+  "population_2023": 281890,
+  "population_note": "City (urban) population, 2023 Census, PBS: Khanewal MC, PBS Table 2. Khanewal District total is 3,364,077. area_km2 is Khanewal District area (PBS Table 1).",
+  "area_km2": 4349,
+  "development_authority": null,
+  "description": "District headquarters near Multan in southern Punjab; a railway junction and agricultural market town.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Khanewal (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Khanewal"
+   }
+  ]
+ },
+ {
+  "name": "Dera Ismail Khan",
+  "name_ur": "ڈیرہ اسماعیل خان",
+  "province": "Khyber Pakhtunkhwa",
+  "district": "Dera Ismail Khan",
+  "latitude": 31.8314,
+  "longitude": 70.9019,
+  "population_2023": 220575,
+  "population_note": "City (urban) population, 2023 Census, PBS: Dera Ismail Khan MC + Dera Ismail Khan Cantonment, PBS Table 2. Dera Ismail Khan District total is 1,829,811. area_km2 is Dera Ismail Khan District area (PBS Table 1).",
+  "area_km2": 9334,
+  "development_authority": null,
+  "description": "Divisional headquarters on the west bank of the Indus in southern Khyber Pakhtunkhwa; a trading centre linking KP with Punjab and Balochistan.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Khyber Pakhtunkhwa",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/kp/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Khyber Pakhtunkhwa",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/kp/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Dera Ismail Khan (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Dera_Ismail_Khan"
+   }
+  ]
+ },
+ {
+  "name": "Abbottabad",
+  "name_ur": "ایبٹ آباد",
+  "province": "Khyber Pakhtunkhwa",
+  "district": "Abbottabad",
+  "latitude": 34.1558,
+  "longitude": 73.2194,
+  "population_2023": 234395,
+  "population_note": "City (urban) population, 2023 Census, PBS: Abbottabad MC (74,712) + Abbottabad Cantonment (159,683), PBS Table 2. Abbottabad District total is 1,419,072. area_km2 is Abbottabad District area (PBS Table 1).",
+  "area_km2": 1967,
+  "development_authority": null,
+  "description": "Hill city and divisional headquarters of Hazara, home to the Pakistan Military Academy (Kakul) and many educational institutions; a base for travel to the Galiyat, which are under the separate Galiyat Development Authority.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Khyber Pakhtunkhwa",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/kp/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Khyber Pakhtunkhwa",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/kp/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Abbottabad (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Abbottabad"
+   }
+  ]
+ },
+ {
+  "name": "Gwadar",
+  "name_ur": "گوادر",
+  "province": "Balochistan",
+  "district": "Gwadar",
+  "latitude": 25.1264,
+  "longitude": 62.3225,
+  "population_2023": 70852,
+  "population_note": "City (urban) population, 2023 Census, PBS: Gwadar MC, PBS Table 2 (2017 figure in the same table: 90,201). Gwadar District total is 305,160. area_km2 is Gwadar District area (PBS Table 1).",
+  "area_km2": 12637,
+  "development_authority": "Gwadar Development Authority (GDA)",
+  "description": "Deep-sea port city on the Makran coast and a focus of CPEC investment; land-use planning and NOCs for housing schemes are handled by the Gwadar Development Authority.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Balochistan",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/balochistan/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Balochistan",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/balochistan/dcr/table_1.pdf"
+   },
+   {
+    "title": "Gwadar Development Authority (official site)",
+    "url": "https://www.gda.gov.pk/"
+   },
+   {
+    "title": "Wikipedia: Gwadar (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Gwadar"
+   }
+  ]
+ },
+ {
+  "name": "Muzaffarabad",
+  "name_ur": "مظفر آباد",
+  "province": "Azad Kashmir",
+  "district": "Muzaffarabad",
+  "latitude": 34.3583,
+  "longitude": 73.4722,
+  "population_2023": null,
+  "population_note": "Not available: the PBS 2023 Census results (241.49 million) cover the four provinces and ICT only and exclude Azad Jammu & Kashmir. No 2023 city figure found. area_km2 not verified.",
+  "area_km2": null,
+  "development_authority": "Muzaffarabad Development Authority (MDA)",
+  "description": "Capital of Azad Jammu and Kashmir at the confluence of the Jhelum and Neelum rivers. The Development Authority Muzaffarabad prepares master plans for Muzaffarabad Tehsil.",
+  "sources": [
+   {
+    "title": "The Development Authority Muzaffarabad Act 1989 (AJK law)",
+    "url": "https://law.gok.pk/wp-content/uploads/2023/05/The-Development-Authority-Muzaffarabad-Act-1989-ACT-II-OF-1989.pdf"
+   },
+   {
+    "title": "PBS: Census 2023 press release (coverage: provinces and ICT)",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/Press%20Release.pdf"
+   },
+   {
+    "title": "Wikipedia: Muzaffarabad (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Muzaffarabad"
+   }
+  ]
+ },
+ {
+  "name": "Gilgit",
+  "name_ur": "گلگت",
+  "province": "Gilgit-Baltistan",
+  "district": "Gilgit",
+  "latitude": 35.9208,
+  "longitude": 74.3083,
+  "population_2023": null,
+  "population_note": "Not available: the PBS 2023 Census results (241.49 million) cover the four provinces and ICT only and exclude Gilgit-Baltistan. No 2023 city figure found. area_km2 not verified.",
+  "area_km2": null,
+  "development_authority": "Gilgit Development Authority (GDA)",
+  "description": "Capital of Gilgit-Baltistan on the Karakoram Highway; the administrative and trading centre of the region and a base for northern tourism.",
+  "sources": [
+   {
+    "title": "APP: Gilgit Development Authority delegation visits FDA",
+    "url": "https://www.app.com.pk/?p=1143716"
+   },
+   {
+    "title": "PBS: Census 2023 press release (coverage: provinces and ICT)",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/Press%20Release.pdf"
+   },
+   {
+    "title": "Wikipedia: Gilgit (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Gilgit"
+   }
+  ]
+ },
+ {
+  "name": "Mirpur",
+  "name_ur": "میرپور",
+  "province": "Azad Kashmir",
+  "district": "Mirpur",
+  "latitude": 33.15,
+  "longitude": 73.7333,
+  "population_2023": null,
+  "population_note": "Not available: the PBS 2023 Census results (241.49 million) cover the four provinces and ICT only and exclude Azad Jammu & Kashmir. No 2023 city figure found. area_km2 not verified.",
+  "area_km2": null,
+  "development_authority": "Mirpur Development Authority (MDA)",
+  "description": "City in Azad Kashmir beside the Mangla Dam reservoir, rebuilt as New Mirpur after the old town was submerged; known for its large diaspora in the United Kingdom.",
+  "sources": [
+   {
+    "title": "The Mirpur Development Authority Ordinance 1974 (AJK law)",
+    "url": "https://law.gok.pk/wp-content/uploads/2023/06/The-Mirpur-Development-Authority-Ordinance-1974.-ORDINANCE-IV-OF-1974.pdf"
+   },
+   {
+    "title": "PBS: Census 2023 press release (coverage: provinces and ICT)",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/Press%20Release.pdf"
+   },
+   {
+    "title": "Wikipedia: Mirpur, Azad Kashmir (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Mirpur,_Azad_Kashmir"
+   }
+  ]
+ },
+ {
+  "name": "Murree",
+  "name_ur": "مری",
+  "province": "Punjab",
+  "district": "Rawalpindi",
+  "latitude": 33.9042,
+  "longitude": 73.3903,
+  "population_2023": 25186,
+  "population_note": "City (urban) population, 2023 Census, PBS: Murree MC (16,317) + Murree Hills Cantonment (8,869), PBS Table 2. Murree is tabulated as a tehsil of Rawalpindi District in the 2023 Census; Murree Tehsil total is 252,526 (PBS Table 1). The MC's 2017 figure in the same table (148,304) indicates a boundary change. area_km2 is Murree Tehsil area (PBS Table 1).",
+  "area_km2": 434,
+  "development_authority": "Murree-Kahuta Development Authority (MKDA)",
+  "description": "Hill station in the Murree Hills north-east of Islamabad and a major summer tourist destination.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Govt of Punjab: CS orders restoration of Murree-Kahuta Development Authority (21 May 2019)",
+    "url": "https://punjab.gov.pk/node/3138"
+   },
+   {
+    "title": "Wikipedia: Murree (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Murree"
+   }
+  ]
+ },
+ {
+  "name": "Jhelum",
+  "name_ur": "جہلم",
+  "province": "Punjab",
+  "district": "Jhelum",
+  "latitude": 32.9425,
+  "longitude": 73.7256,
+  "population_2023": 312426,
+  "population_note": "City (urban) population, 2023 Census, PBS: Jhelum Municipal Corporation + Jhelum Cantonment, PBS Table 2. Jhelum District total is 1,382,308. area_km2 is Jhelum District area (PBS Table 1).",
+  "area_km2": 3587,
+  "development_authority": null,
+  "description": "District headquarters on the Jhelum river and the GT Road, with a large military cantonment; near Rohtas Fort and Mangla Dam.",
+  "sources": [
+   {
+    "title": "PBS Census-2023 Table 2: Urban localities by population size, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_2.pdf"
+   },
+   {
+    "title": "PBS Census-2023 Table 1: Area, population by sex, density, urban population, Punjab",
+    "url": "https://www.pbs.gov.pk/sites/default/files/population/2023/tables/punjab/dcr/table_1.pdf"
+   },
+   {
+    "title": "Wikipedia: Jhelum (coordinates, Urdu name)",
+    "url": "https://en.wikipedia.org/wiki/Jhelum"
+   }
+  ]
+ }
+]

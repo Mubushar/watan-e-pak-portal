@@ -210,6 +210,10 @@ def load_seed() -> Dict[str, int]:
                 data.pop("approval_status", None)
             names = {_norm(row["name"])} | {_norm(a) for a in row.get("aliases", [])}
             existing = next((s for s in core.housing_schemes_db if s.city_id == city.id and _norm(s.name) in names), None)
+            if existing is None and row.get("aliases"):
+                # An alias may name a record filed under the twin city (e.g. DHA phases: Islamabad / Rawalpindi).
+                aliases = {_norm(a) for a in row["aliases"]}
+                existing = next((s for s in core.housing_schemes_db if _norm(s.name) in aliases), None)
             if existing:
                 for k, v in data.items():
                     if k not in ("name", "city_id"):

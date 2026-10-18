@@ -233,6 +233,26 @@ To turn real sending on:
 - **WhatsApp:** `WHATSAPP_TOKEN` and `WHATSAPP_PHONE_ID`. Free text only reaches people who messaged you in the last 24 hours; outside that window set `PORTAL_WHATSAPP_CRM_TEMPLATE` to an approved template with one body parameter.
 - **Voice notes and spoken answers:** `OPENAI_API_KEY`.
 
+## Base data: cities and housing schemes
+
+The base data was researched in October 2026 and is loaded at start-up by `basedata.load_seed()`:
+
+- **`geodata/pk_cities_basedata.json`:** 44 cities with English and Urdu names, province,
+  district, coordinates and development authority. 41 have their 2023 Census urban population
+  (Pakistan Bureau of Statistics tables). Gilgit-Baltistan and Azad Kashmir aren't covered by the
+  2023 Census, so those figures are empty. Area is the district or tehsil area, as noted.
+- **`geodata/pk_housing_schemes.json`:** 102 housing schemes in Islamabad, Rawalpindi, Lahore,
+  Karachi and 11 other cities, with developer, approval authority and **approval status**
+  (`approved`, `noc_issued`, `partially_approved`, `under_process`, `unapproved`, `illegal`,
+  `cancelled`), plus approved area, plot counts, coordinates and website where available. Status
+  comes from official lists (CDA, RDA, LDA, FDA, MDA, GDA, QDA, KDA), DHA laws, Supreme Court
+  reporting and reputable news.
+
+Every record carries the sources it came from. Fields that couldn't be verified are left empty.
+Records with the same name are enriched rather than duplicated. Approval statuses change, so
+check with the authority before relying on one. Admins edit everything under **Administration ›
+Base data** (`/admin/basedata/{cities|schemes|blocks}`, permission `basedata.manage`).
+
 ## Infrastructure mega projects and area case studies
 
 | Endpoint | What it returns |
