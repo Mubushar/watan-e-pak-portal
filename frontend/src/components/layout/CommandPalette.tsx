@@ -17,6 +17,7 @@ const NAV: Hit[] = [
   { group: "Go to", label: "Map explorer (GIS)", to: "/map", icon: <MapPin className="h-4 w-4" /> },
   { group: "Go to", label: "Infrastructure mega projects", to: "/infrastructure", icon: <MapPin className="h-4 w-4" /> },
   { group: "Go to", label: "CRM dashboard", to: "/app/crm-dashboard", icon: <MapPin className="h-4 w-4" /> },
+  { group: "Go to", label: "Base data — cities, housing schemes, blocks (admin)", to: "/app/admin/base-data", icon: <MapPin className="h-4 w-4" /> },
   { group: "Go to", label: "AI Hub & agents", to: "/ai", icon: <Sparkles className="h-4 w-4" /> },
   { group: "Go to", label: "Tools & calculators", to: "/tools", icon: <Wrench className="h-4 w-4" /> },
   { group: "Go to", label: "Market insights", to: "/insights", icon: <Landmark className="h-4 w-4" /> },

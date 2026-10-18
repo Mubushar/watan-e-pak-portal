@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { CloudOff, LayoutDashboard, LogOut, Moon, Sun, UserRound } from "lucide-react";
+import { CloudOff, Database, LayoutDashboard, LogOut, Moon, Sun, UserRound } from "lucide-react";
 import { connectivity, post } from "@/lib/api";
 import { BRAND } from "@/lib/images";
 import { cn } from "@/lib/utils";
@@ -136,6 +136,11 @@ export function UserMenu() {
             <Link to="/app/profile" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-brand-50 dark:hover:bg-white/5">
               <UserRound className="h-4 w-4" /> Profile & notifications
             </Link>
+            {useAuth.getState().can("basedata.manage") && (
+              <Link to="/app/admin/base-data" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-brand-50 dark:hover:bg-white/5">
+                <Database className="h-4 w-4" /> Base data (cities, schemes)
+              </Link>
+            )}
             <button
               onClick={() => {
                 post("/auth/logout").catch(() => {});

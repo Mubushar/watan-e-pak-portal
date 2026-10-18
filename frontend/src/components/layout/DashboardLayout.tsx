@@ -28,6 +28,7 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
+import { get } from "@/lib/api";
 import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/store/auth";
@@ -211,6 +212,14 @@ export function DashboardLayout() {
   useEffect(() => {
     window.scrollTo({ top: 0 });
   }, [loc.pathname]);
+  // Roles and permissions can change on the server (new permissions, role edits): sync them.
+  const setUser = useAuth((s) => s.setUser);
+  useEffect(() => {
+    if (!token) return;
+    get<{ user: typeof user }>("/auth/me", undefined, { noFallback: true })
+      .then((r) => r?.user && setUser(r.user))
+      .catch(() => undefined);
+  }, [token, setUser]);
 
   if (!token || !user) return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />;
 

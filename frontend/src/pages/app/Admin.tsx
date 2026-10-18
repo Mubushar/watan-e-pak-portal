@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import {
@@ -81,7 +82,16 @@ export default function Admin() {
         title="Administration"
         subtitle="Users, roles & permissions, the audit trail, runtime settings and system health."
         crumbs={[{ label: "Dashboard", to: "/app" }, { label: "Administration" }]}
-        actions={me && <Badge tone={canManage ? "gold" : "gray"} icon={<ShieldCheck className="h-3 w-3" />}>{titleCase(me.role)}</Badge>}
+        actions={
+          <>
+            {useAuth.getState().can("basedata.manage") && (
+              <Link to="/app/admin/base-data" className="btn btn-outline btn-sm">
+                <Database className="h-4 w-4" /> Base data
+              </Link>
+            )}
+            {me && <Badge tone={canManage ? "gold" : "gray"} icon={<ShieldCheck className="h-3 w-3" />}>{titleCase(me.role)}</Badge>}
+          </>
+        }
       />
       {!canManage && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
