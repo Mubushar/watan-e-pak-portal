@@ -453,7 +453,9 @@ def outline_geojson(meta: Dict[str, Any]) -> Dict[str, Any]:
 
 
 LABEL_GROUPS = [
-    ("names & facilities", sorted(NAMED_CATEGORIES), True),
+    # Off by default: each group is thousands of points (the plan tiles already show the
+    # text), and visible layers are embedded in every scheme's HTML map.
+    ("names & facilities", sorted(NAMED_CATEGORIES), False),
     ("plot numbers & sizes", ["plot_number", "plot_size"], False),
     ("engineering marks & dimensions", ["infrastructure", "dimension"], False),
 ]
