@@ -8,8 +8,9 @@ This module makes the portal answer on those routes.
 Two modes
 ---------
 1. **OpenAI mode** (real LLM answers): with `OPENAI_API_KEY` set, every request is
-   forwarded to OpenAI (model `gpt-5.6-luna` unless `OPENAI_MODEL` says otherwise).
-   Streaming is passed through.
+   forwarded to OpenAI (model `gpt-6-luna` — the low-cost tier — unless `OPENAI_MODEL`
+   says otherwise). Streaming is passed through. Replies are capped at
+   `OPENAI_MAX_OUTPUT_TOKENS` (default 800) unless the client asks for a limit.
 
 2. **Local fallback mode** (default, no config): `/v1/chat/completions` answers
    directly from the portal's own data using `rag_search`, so the endpoint still
@@ -19,7 +20,8 @@ Two modes
 Environment variables (or backend/.env)
 ---------------------------------------
     OPENAI_API_KEY        enables OpenAI for chat (and voice — see openai_voice.py)
-    OPENAI_MODEL          chat model, default gpt-5.6-luna
+    OPENAI_MODEL          chat model, default gpt-6-luna
+    OPENAI_MAX_OUTPUT_TOKENS  reply cap for chat (default 800; keeps costs predictable)
     OPENAI_BASE_URL       optional, e.g. an Azure OpenAI / proxy URL (default https://api.openai.com/v1)
 
 Testing with a free / local model (chat only — voice is unaffected)::
@@ -68,8 +70,11 @@ if LLM_BASE_URL:
 else:
     UPSTREAM_BASE_URL = OPENAI_BASE_URL if OPENAI_API_KEY else ""
     UPSTREAM_API_KEY = OPENAI_API_KEY
-    UPSTREAM_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna")
+    UPSTREAM_MODEL = os.getenv("OPENAI_MODEL", "gpt-6-luna")
     UPSTREAM_PROVIDER = "openai" if OPENAI_API_KEY else None
+
+# Default reply cap for OpenAI chat (a client can still ask for less or more).
+MAX_OUTPUT_TOKENS = int(os.getenv("OPENAI_MAX_OUTPUT_TOKENS", "800") or 0)
 
 # OpenAI-only request fields that other servers may reject.
 _OPENAI_ONLY_FIELDS = ("reasoning_effort", "verbosity", "store", "safety_identifier", "prompt_cache_key")
@@ -272,6 +277,8 @@ async def chat_completions(request: Request) -> Any:
         if LLM_BASE_URL:
             for field in _OPENAI_ONLY_FIELDS:
                 body.pop(field, None)
+        elif MAX_OUTPUT_TOKENS > 0 and "max_tokens" not in body and "max_completion_tokens" not in body:
+            body["max_completion_tokens"] = MAX_OUTPUT_TOKENS
         url = f"{UPSTREAM_BASE_URL}/chat/completions"
         if stream:
             return StreamingResponse(

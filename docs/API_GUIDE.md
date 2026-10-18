@@ -319,7 +319,7 @@ OpenAI-style API.
 | `POST /ai/speak` | `{"text", "language"}` returns `{"audio_base64", "mime_type": "audio/mpeg"}` from OpenAI text-to-speech. |
 
 **Chat:** with `OPENAI_API_KEY` set, `/v1/chat/completions` forwards to OpenAI (model
-`gpt-5.6-luna`, or `OPENAI_MODEL`). A request that names the local model id is sent to
+`gpt-6-luna`, or `OPENAI_MODEL`). A request that names the local model id is sent to
 that model instead.
 
 ### CORS

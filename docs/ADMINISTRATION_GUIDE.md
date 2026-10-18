@@ -216,8 +216,8 @@ from listing search and voice is off; the app shows a notice.
 
 | Feature | OpenAI API | Setting (default) |
 | --- | --- | --- |
-| Typed chat and voice-note replies | Chat completions | `OPENAI_MODEL` (`gpt-5.6-luna`) |
-| **Live voice agent** | Realtime API (speech-to-speech, WebRTC) | `OPENAI_REALTIME_MODEL` (`gpt-realtime-2.1`) |
+| Typed chat, voice-note replies and web look-ups | Chat completions / Responses (web search) | `OPENAI_MODEL` (`gpt-6-luna`), `OPENAI_WEB_MODEL` |
+| **Live voice agent** | Realtime API (speech-to-speech, WebRTC) | `OPENAI_REALTIME_MODEL` (`gpt-realtime-2.1-mini`) |
 | Voice notes and live captions | Speech-to-text, with `languages: ["ur","en"]` so Urdu comes back in Urdu script and not Hindi | `OPENAI_TRANSCRIBE_MODEL` (`gpt-transcribe`) |
 | Voice-note replies | Text-to-speech | `OPENAI_TTS_MODEL` (`gpt-4o-mini-tts`) |
 | Voice | Built-in voice, or your own custom voice | `OPENAI_VOICE` (`marin`), `OPENAI_VOICE_ID` (`voice_…`) |
@@ -248,8 +248,15 @@ customers; you request access through OpenAI sales. You record a fixed consent p
 the resulting `voice_…` id in `OPENAI_VOICE_ID`. OpenAI requires telling listeners that
 the voice is AI-generated.
 
-**Cost.** Realtime is billed per audio token, speech-to-text per minute and text-to-speech
-per character. Set usage limits on the OpenAI project as well.
+**Cost.** The defaults are OpenAI's low-cost models: `gpt-6-luna` for text (the cheapest
+current model with function calling) and `gpt-realtime-2.1-mini` for live voice (about a
+third of `gpt-realtime-2.1`'s audio price). `gpt-transcribe` is kept because it accepts
+`languages: ["ur","en"]`; `gpt-4o-mini-tts` is the cheapest text-to-speech model.
+Realtime is billed per audio token, speech-to-text per minute and text-to-speech per
+token. Chat replies are capped at `OPENAI_MAX_OUTPUT_TOKENS` (800) and web look-ups at
+1,200 output tokens; the app hangs up a live call after `AI_LIVE_MAX_MINUTES` (8). Set a
+monthly budget on the OpenAI project as well. For a quality upgrade, set
+`OPENAI_REALTIME_MODEL=gpt-realtime-2.1` (and optionally a larger `OPENAI_MODEL`).
 
 **Cost protection.** Every endpoint that spends OpenAI credit is rate-limited per caller.
 These are `/v1/chat/completions` and `/v1/completions` (when proxying), `/ai/transcribe`,
@@ -261,7 +268,9 @@ are kept in memory and reset on restart.
 | --- | --- | --- |
 | `AI_CHAT_PER_MINUTE` | 30 | Chat requests (typed messages, voice-note replies). `0` = no limit. |
 | `AI_VOICE_PER_MINUTE` | 30 | Speech-to-text and text-to-speech calls. |
-| `AI_LIVE_PER_HOUR` | 20 | Live voice-agent calls started. |
+| `AI_LIVE_PER_HOUR` | 6 | Live voice-agent calls started. |
+| `AI_LIVE_MAX_MINUTES` | 8 | The app ends a live call after this many minutes. `0` = no limit. |
+| `OPENAI_MAX_OUTPUT_TOKENS` | 800 | Reply cap for chat when the client sets none. `0` = no cap. |
 | `AI_REQUIRE_SIGNIN` | 0 | `1` = guests get `401` and must sign in to use the AI. |
 | `AI_TRUST_PROXY` | 0 | `1` only behind your own reverse proxy: guests are told apart by `X-Forwarded-For`. Otherwise anyone could fake that header to dodge the limits. |
 

@@ -140,9 +140,9 @@ never ships in the app.
 
 | Mode | How it works |
 | --- | --- |
-| **Live conversation** (🎧) | OpenAI **Realtime API** (`gpt-realtime-2.1`), speech-to-speech over WebRTC (`src/lib/realtime.ts`). Natural, low-latency talk that you can interrupt. Captions of both sides appear in the chat. The agent calls tools: it searches listings, opens details, reads your listings and drafts a new listing, and the results appear as cards and buttons. Mute and hang-up controls are on screen. |
+| **Live conversation** (🎧) | OpenAI **Realtime API** (`gpt-realtime-2.1-mini`), speech-to-speech over WebRTC (`src/lib/realtime.ts`). Natural, low-latency talk that you can interrupt. Captions of both sides appear in the chat. The agent calls tools: it searches listings, opens details, reads your listings and drafts a new listing, and the results appear as cards and buttons. Mute and hang-up controls are on screen. |
 | **Voice note** (🎤) | Your recording goes to OpenAI speech-to-text (`gpt-transcribe`; Urdu in Urdu script). The reply comes from the chat model and is returned as a voice note (`gpt-4o-mini-tts`). |
-| **Typed message** | The OpenAI chat model (`gpt-5.6-luna`) replies in text. 🔊 Listen reads it aloud with the OpenAI voice. |
+| **Typed message** | The OpenAI chat model (`gpt-6-luna`) replies in text. 🔊 Listen reads it aloud with the OpenAI voice. |
 
 The voice is the same everywhere: `OPENAI_VOICE` (default `marin`), or your own
 `OPENAI_VOICE_ID`. Microphone access works in Chrome, Edge and Safari, in the desktop

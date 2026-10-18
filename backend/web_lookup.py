@@ -15,7 +15,7 @@ import httpx
 import envfile  # noqa: F401  (loads backend/.env)
 import openai_voice
 
-MODEL = os.getenv("OPENAI_WEB_MODEL") or os.getenv("OPENAI_MODEL") or "gpt-5.6-luna"
+MODEL = os.getenv("OPENAI_WEB_MODEL") or os.getenv("OPENAI_MODEL") or "gpt-6-luna"
 INSTRUCTIONS = (
     "You look up facts for a Pakistani real-estate assistant. Search the web, then answer in at most "
     "5 short sentences or bullet points, in English, with concrete facts: names, numbers, dates, the "
@@ -51,6 +51,7 @@ def lookup(question: str) -> Dict[str, Any]:
                 "input": question.strip()[:1000],
                 "tools": [{"type": "web_search", "user_location": {"type": "approximate", "country": "PK"}}],
                 "reasoning": {"effort": "low"},
+                "max_output_tokens": 1200,  # a short sourced answer; also bounds the cost
             },
         )
     except httpx.HTTPError as exc:

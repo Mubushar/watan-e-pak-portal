@@ -13,7 +13,8 @@ Everything audio goes through OpenAI, with the API key kept on this server:
 Configuration (environment variables, or ``backend/.env``)::
 
     OPENAI_API_KEY=sk-...                     # required
-    OPENAI_REALTIME_MODEL=gpt-realtime-2.1    # live agent
+    OPENAI_REALTIME_MODEL=gpt-realtime-2.1-mini   # live agent (about a third of gpt-realtime-2.1's price)
+    AI_LIVE_MAX_MINUTES=8                     # the app hangs up a live call after this many minutes
     OPENAI_TRANSCRIBE_MODEL=gpt-transcribe    # voice notes + live captions
     OPENAI_TTS_MODEL=gpt-4o-mini-tts          # voice-note replies
     OPENAI_VOICE=marin                        # built-in voice (marin, cedar, ...)
@@ -33,7 +34,9 @@ import envfile  # noqa: F401  (loads backend/.env)
 
 API_KEY = os.getenv("OPENAI_API_KEY", "")
 BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
-REALTIME_MODEL = os.getenv("OPENAI_REALTIME_MODEL", "gpt-realtime-2.1")
+REALTIME_MODEL = os.getenv("OPENAI_REALTIME_MODEL", "gpt-realtime-2.1-mini")
+# Live calls are billed per audio token; the app ends a call after this long (0 = no limit).
+LIVE_MAX_MINUTES = int(os.getenv("AI_LIVE_MAX_MINUTES", "8") or 0)
 TRANSCRIBE_MODEL = os.getenv("OPENAI_TRANSCRIBE_MODEL", "gpt-transcribe")
 TTS_MODEL = os.getenv("OPENAI_TTS_MODEL", "gpt-4o-mini-tts")
 VOICE = os.getenv("OPENAI_VOICE", "marin")
@@ -102,11 +105,17 @@ def _headers() -> Dict[str, str]:
 
 def _error(resp: httpx.Response) -> VoiceError:
     """Turn an OpenAI error response into a VoiceError with a readable message."""
+    code = ""
     try:
         err = resp.json().get("error") or {}
         msg = err.get("message") if isinstance(err, dict) else err
+        if isinstance(err, dict):
+            code = f"{err.get('code') or ''} {err.get('type') or ''}"
     except Exception:
         msg = resp.text[:200]
+    if resp.status_code == 429 and ("insufficient_quota" in code or "credit_balance" in code):
+        return VoiceError("The OpenAI account has run out of credit — add credit at platform.openai.com → "
+                          "Settings → Billing, then try again.", 402)
     if resp.status_code == 429:
         return VoiceError(f"OpenAI rate limit or quota reached — try again shortly. ({msg})", 429)
     if resp.status_code == 401:
@@ -493,7 +502,9 @@ def realtime_session(user: Optional[Dict[str, Any]] = None, reply_lang: str = "a
         "tools": REALTIME_TOOLS,
         "tool_choice": "auto",
     }
-    if REALTIME_MODEL.startswith("gpt-realtime-2"):
+    # Full gpt-realtime-2.x models take a reasoning effort; the -mini model is a distilled
+    # reasoning model whose docs don't list the setting, so it is left at its default.
+    if REALTIME_MODEL.startswith("gpt-realtime-2") and "mini" not in REALTIME_MODEL:
         session["reasoning"] = {"effort": "low"}
     headers = {**_headers(), "Content-Type": "application/json"}
     if user and user.get("id"):
@@ -513,4 +524,5 @@ def realtime_session(user: Optional[Dict[str, Any]] = None, reply_lang: str = "a
         "model": REALTIME_MODEL,
         "calls_url": f"{BASE_URL}/realtime/calls",
         "voice": VOICE_ID or VOICE,
+        "max_minutes": LIVE_MAX_MINUTES or None,
     }

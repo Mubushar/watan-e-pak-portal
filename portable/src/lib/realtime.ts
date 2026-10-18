@@ -31,6 +31,8 @@ interface SessionGrant {
   client_secret: string;
   calls_url: string;
   model: string;
+  /** The server's cap on call length (AI_LIVE_MAX_MINUTES), to keep audio costs down. */
+  max_minutes?: number | null;
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -45,6 +47,7 @@ export class RealtimeAgent {
   private userText = new Map<string, string>();
   private agentText = new Map<string, string>();
   private ended = false;
+  private limitTimer: ReturnType<typeof setTimeout> | null = null;
   muted = false;
 
   constructor(private h: AgentHandlers) {}
@@ -89,6 +92,13 @@ export class RealtimeAgent {
     });
     if (!res.ok) throw new Error(`OpenAI rejected the voice call (${res.status}).`);
     await pc.setRemoteDescription({ type: "answer", sdp: await res.text() });
+    const max = grant.max_minutes ?? 0;
+    if (max > 0) {
+      this.limitTimer = setTimeout(() => {
+        this.h.onError(`Live calls end after ${max} minutes to keep AI costs down — tap the headphones to start a new one.`);
+        this.finish();
+      }, max * 60_000);
+    }
   }
 
   /** Mute / unmute the microphone (the agent keeps the conversation). */
@@ -115,6 +125,7 @@ export class RealtimeAgent {
   private finish() {
     if (this.ended) return;
     this.ended = true;
+    if (this.limitTimer) clearTimeout(this.limitTimer);
     this.mic?.getTracks().forEach((t) => t.stop());
     try {
       this.dc?.close();

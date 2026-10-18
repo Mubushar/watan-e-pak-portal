@@ -10,7 +10,7 @@ Settings (environment variables, or ``backend/.env``)::
     AI_REQUIRE_SIGNIN=0          # 1 = only signed-in users may use the AI
     AI_CHAT_PER_MINUTE=30        # chat completions (typed messages, voice notes)
     AI_VOICE_PER_MINUTE=30       # speech-to-text + text-to-speech calls
-    AI_LIVE_PER_HOUR=20          # live voice-agent sessions started
+    AI_LIVE_PER_HOUR=6           # live voice-agent sessions started (the most expensive call)
     AI_TRUST_PROXY=0             # 1 = behind a reverse proxy: identify guests by X-Forwarded-For
 """
 
@@ -30,7 +30,7 @@ import envfile  # noqa: F401  (loads backend/.env)
 LIMITS: Dict[str, Tuple[int, int]] = {
     "chat": (int(os.getenv("AI_CHAT_PER_MINUTE", "30")), 60),
     "voice": (int(os.getenv("AI_VOICE_PER_MINUTE", "30")), 60),
-    "live": (int(os.getenv("AI_LIVE_PER_HOUR", "20")), 3600),
+    "live": (int(os.getenv("AI_LIVE_PER_HOUR", "6")), 3600),
 }
 
 
