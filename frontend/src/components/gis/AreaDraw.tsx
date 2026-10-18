@@ -115,6 +115,7 @@ export function AreaDraw({ mode, shape, onShape, onCancel }: { mode: DrawMode | 
       e.preventDefault();
     };
     const onDbl = (e: MouseEvent) => {
+      if ((e.target as HTMLElement).closest(".leaflet-control")) return;
       e.preventDefault();
       e.stopPropagation();
       if (mode === "polygon") finishPolygon(ptsRef.current);

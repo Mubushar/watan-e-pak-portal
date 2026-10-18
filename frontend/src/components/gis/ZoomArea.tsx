@@ -46,6 +46,8 @@ export function ZoomArea({
     // The release also produces a click; don't let it reach map layers (clicking a plan
     // outline zooms to the whole plan, which would undo the box zoom).
     const swallowClick = (e: MouseEvent) => {
+      // Map controls (the + / − buttons, attribution links) keep working while the tool is on.
+      if ((e.target as HTMLElement).closest(".leaflet-control")) return;
       e.stopPropagation();
       e.preventDefault();
     };
