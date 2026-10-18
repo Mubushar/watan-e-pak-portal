@@ -9,10 +9,9 @@
  *   - GET  /rag/search            (structured matches rendered as listing cards)
  * Either way it offers a one-click hand-off to the Conversational Homebuying agent.
  */
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { CircleMarker, Marker, Tooltip } from "react-leaflet";
 import { Bot, Calculator, Map as MapIcon, Send, Sparkles, User as UserIcon, Wand2 } from "lucide-react";
 import type { Property } from "@/types";
 import { agentReply, capabilities, type AgentEffect } from "@/lib/agent";
@@ -20,7 +19,8 @@ import { get, post } from "@/lib/api";
 import { pkrShort, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { PropertyRow } from "@/components/property/PropertyCard";
-import { PortalMap, pin } from "@/components/map/PortalMap";
+// Leaflet (~150 kB) loads only when a reply actually contains a map.
+const ChatMap = lazy(() => import("./ChatMap"));
 import { Markdown } from "./Markdown";
 
 interface RagHit {
@@ -150,17 +150,9 @@ export function ChatPanel({ compact, className, initial }: { compact?: boolean; 
                 )}
                 {m.map && (
                   <div className="mt-2 overflow-hidden rounded-xl">
-                    <PortalMap center={[m.map.focus.latitude, m.map.focus.longitude]} zoom={14} height={compact ? 180 : 240} switcher={false}>
-                      <Marker position={[m.map.focus.latitude, m.map.focus.longitude]} icon={pin("featured", { size: 32 })} />
-                      {m.map.markers.map((mk, k) => (
-                        <CircleMarker key={k} center={[mk.latitude, mk.longitude]} radius={6} pathOptions={{ color: "#146f45", weight: 2, fillColor: "#f2dd8f", fillOpacity: 0.9 }}>
-                          <Tooltip>
-                            {mk.name} · {mk.kind}
-                            {mk.distance_km !== undefined ? ` · ${mk.distance_km} km` : ""}
-                          </Tooltip>
-                        </CircleMarker>
-                      ))}
-                    </PortalMap>
+                    <Suspense fallback={<div className="animate-pulse bg-black/5 dark:bg-white/5" style={{ height: compact ? 180 : 240 }} />}>
+                      <ChatMap map={m.map} height={compact ? 180 : 240} />
+                    </Suspense>
                   </div>
                 )}
                 {!!m.links?.length && (

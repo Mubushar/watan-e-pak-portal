@@ -21,31 +21,8 @@ import { useApi, useMutate } from "@/hooks/useApi";
 import { apiUrl, post } from "@/lib/api";
 import { date, num, pct, pkrShort, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import {
-  Badge,
-  Bars,
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  type Column,
-  DataTable,
-  Donut,
-  EmptyState,
-  Field,
-  Input,
-  Legendish,
-  Modal,
-  PageHeader,
-  Progress,
-  QueryState,
-  Select,
-  Skeleton,
-  StatCard,
-  StatusBadge,
-  Textarea,
-  Toggle,
-} from "@/components/ui";
+import { Badge, Button, Card, CardBody, CardHeader, type Column, DataTable, EmptyState, Field, Input, Modal, PageHeader, Progress, QueryState, Select, Skeleton, StatCard, StatusBadge, Textarea, Toggle } from "@/components/ui";
+import { Bars, Donut, Legendish } from "@/components/ui/charts";
 import { ok, RAG_HEX, RagPill, Ring, stagger } from "@/components/collab/kit";
 
 // ---------------------------------------------------------------- types

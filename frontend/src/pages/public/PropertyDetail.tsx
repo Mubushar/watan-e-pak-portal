@@ -40,29 +40,8 @@ import { gallery, resolveImage } from "@/lib/images";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/store/auth";
 import { usePrefs } from "@/store/prefs";
-import {
-  AreaTrend,
-  Avatar,
-  Badge,
-  Bars,
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Carousel,
-  CopyButton,
-  EmptyState,
-  ErrorState,
-  Field,
-  Input,
-  KeyValue,
-  Modal,
-  ScoreRing,
-  Skeleton,
-  Slider,
-  Tabs,
-  Textarea,
-} from "@/components/ui";
+import { Avatar, Badge, Button, Card, CardBody, CardHeader, Carousel, CopyButton, EmptyState, ErrorState, Field, Input, KeyValue, Modal, ScoreRing, Skeleton, Slider, Tabs, Textarea } from "@/components/ui";
+import { AreaTrend, Bars } from "@/components/ui/charts";
 import { CompareButton, FavoriteButton, PropertyCard } from "@/components/property/PropertyCard";
 import { PortalMap, pin } from "@/components/map/PortalMap";
 import { AdSlot } from "@/components/ads/AdSlot";

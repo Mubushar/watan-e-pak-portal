@@ -29,32 +29,8 @@ import { useApi, useMutate } from "@/hooks/useApi";
 import { post } from "@/lib/api";
 import { date, num, pkr, pkrShort, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import {
-  Badge,
-  Bars,
-  BarList,
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  DataTable,
-  Donut,
-  EmptyState,
-  Field,
-  Input,
-  Legendish,
-  Modal,
-  PageHeader,
-  PALETTE,
-  QueryState,
-  Segmented,
-  Select,
-  Skeleton,
-  Slider,
-  Tabs,
-  Textarea,
-  type Column,
-} from "@/components/ui";
+import { Badge, BarList, Button, Card, CardBody, CardHeader, DataTable, EmptyState, Field, Input, Modal, PageHeader, QueryState, Segmented, Select, Skeleton, Slider, Tabs, Textarea, type Column } from "@/components/ui";
+import { Bars, Donut, Legendish, PALETTE } from "@/components/ui/charts";
 import { Accordion, GlowPanel, ok, today } from "@/components/collab/kit";
 
 // ---------------------------------------------------------------- types

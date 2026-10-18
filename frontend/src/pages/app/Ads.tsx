@@ -7,30 +7,8 @@ import { apiUrl, del, post, put } from "@/lib/api";
 import { compact, date, num, pct, pkrShort, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { AdCreative } from "@/components/ads/AdSlot";
-import {
-  Badge,
-  Bars,
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  DataTable,
-  Donut,
-  Field,
-  Input,
-  Legendish,
-  Modal,
-  PageHeader,
-  Progress,
-  QueryState,
-  Segmented,
-  Select,
-  Skeleton,
-  StatCard,
-  StatusBadge,
-  Textarea,
-  type Column,
-} from "@/components/ui";
+import { Badge, Button, Card, CardBody, CardHeader, DataTable, Field, Input, Modal, PageHeader, Progress, QueryState, Segmented, Select, Skeleton, StatCard, StatusBadge, Textarea, type Column } from "@/components/ui";
+import { Bars, Donut, Legendish } from "@/components/ui/charts";
 import { ok } from "@/components/collab/kit";
 
 interface AdRow extends Ad {

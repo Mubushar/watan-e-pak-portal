@@ -30,33 +30,8 @@ import { apiUrl, post, put } from "@/lib/api";
 import { date, num, pct, pkr, pkrShort, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/store/auth";
-import {
-  AreaTrend,
-  Badge,
-  Bars,
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  DataTable,
-  EmptyState,
-  ErrorState,
-  Field,
-  Input,
-  KeyValue,
-  Modal,
-  PageHeader,
-  Progress,
-  QueryState,
-  Select,
-  Skeleton,
-  Slider,
-  StatCard,
-  StatusBadge,
-  Tabs,
-  Textarea,
-  type Column,
-} from "@/components/ui";
+import { Badge, Button, Card, CardBody, CardHeader, DataTable, EmptyState, ErrorState, Field, Input, KeyValue, Modal, PageHeader, Progress, QueryState, Select, Skeleton, Slider, StatCard, StatusBadge, Tabs, Textarea, type Column } from "@/components/ui";
+import { AreaTrend, Bars } from "@/components/ui/charts";
 import { apiErr, ok, RAG_HEX, RagPill, Ring, today } from "@/components/collab/kit";
 import { Gantt, type GanttRow } from "@/components/collab/Gantt";
 

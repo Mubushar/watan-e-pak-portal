@@ -5,7 +5,8 @@ import { AlertTriangle, CalendarDays, CheckCircle2, Hammer, RefreshCcw, Search, 
 import { useApi } from "@/hooks/useApi";
 import { num, pkr, pkrShort, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Badge, Bars, Donut, EmptyState, Field, Input, Legendish, QueryState, Select, Skeleton, Slider } from "@/components/ui";
+import { Badge, EmptyState, Field, Input, QueryState, Select, Skeleton, Slider } from "@/components/ui";
+import { Bars, Donut, Legendish } from "@/components/ui/charts";
 import { MiniStat, Panel, bandTone, crShort, numOr, useDebounced } from "./ops-kit";
 
 export const PROPERTY_TYPES = ["house", "apartment", "building", "floor", "office", "shop", "space", "warehouse", "shed"];

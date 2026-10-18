@@ -6,7 +6,8 @@
 import { useMemo, useState } from "react";
 import { Banknote, CalendarClock, Coins, Home, Landmark, Percent, PiggyBank, Repeat, Scale, TrendingUp, Wallet } from "lucide-react";
 import { num, pkr, pkrShort } from "@/lib/format";
-import { AreaTrend, Bars, Card, CardBody, CardHeader, Donut, Legendish, PALETTE, ScoreRing, StatCard } from "@/components/ui";
+import { Card, CardBody, CardHeader, ScoreRing, StatCard } from "@/components/ui";
+import { AreaTrend, Bars, Donut, Legendish, PALETTE } from "@/components/ui/charts";
 import { CalcShell, ChoiceChips, NumField, StatGrid, useCalc } from "./CalcKit";
 
 const money = (v: number) => pkrShort(v, false);

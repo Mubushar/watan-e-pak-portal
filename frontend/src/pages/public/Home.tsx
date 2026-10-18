@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AnimatePresence, animate, motion, useInView } from "framer-motion";
-import { Marker, Popup } from "react-leaflet";
 import {
   ArrowRight,
   BadgeCheck,
@@ -37,13 +36,18 @@ import type { City, NewsItem, Property, PropertyList, Story } from "@/types";
 import { useApi } from "@/hooks/useApi";
 import { get } from "@/lib/api";
 import { compact, pkrShort, timeAgo, titleCase } from "@/lib/format";
-import { cityImage, coverImage, HERO, themedImage } from "@/lib/images";
+import { cityImage, HERO, themedImage } from "@/lib/images";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { usePrefs } from "@/store/prefs";
-import { AreaTrend, Badge, Carousel, Section, Segmented, Skeleton } from "@/components/ui";
+import { Badge, Carousel, Section, Segmented, Skeleton } from "@/components/ui";
+import { Deferred } from "@/components/ui/Deferred";
 import { PropertyCard, PropertyRow } from "@/components/property/PropertyCard";
-import { PortalMap, pin } from "@/components/map/PortalMap";
+import type { HomePoi } from "./home/HomeMap";
+
+// Below-the-fold widgets load their libraries (Leaflet ~150 kB, recharts ~400 kB) on scroll.
+const HomeMap = lazy(() => import("./home/HomeMap"));
+const AreaTrend = lazy(() => import("@/components/ui/charts").then((m) => ({ default: m.AreaTrend })));
 import { AdSlot } from "@/components/ads/AdSlot";
 
 // ---------------------------------------------------------------- helpers
@@ -414,7 +418,7 @@ const POI_LEGEND = [
 ] as const;
 
 function MapAndAssistant({ props }: { props: Property[] }) {
-  const pois = useApi<{ pois: { id: string; name: string; category: string; latitude: number; longitude: number }[] }>("/poi", { limit: 200 });
+  const pois = useApi<{ pois: HomePoi[] }>("/poi", { limit: 200 });
   const [layers, setLayers] = useState<string[]>(["property", "education", "health", "park"]);
   const pts = props.filter((p) => p.latitude && p.longitude);
   const fit = useMemo(() => pts.map((p) => [p.latitude!, p.longitude!] as [number, number]), [pts]);
@@ -444,35 +448,11 @@ function MapAndAssistant({ props }: { props: Property[] }) {
               </button>
             ))}
           </div>
-          <PortalMap height={420} fit={fit} className="rounded-none" scrollWheelZoom={false}>
-            {layers.includes("property") &&
-              pts.map((p) => (
-                <Marker key={p.id} position={[p.latitude!, p.longitude!]} icon={pin(p.featured ? "featured" : p.use_type === "commercial" ? "commercial" : "property")}>
-                  <Popup>
-                    <Link to={`/properties/${p.id}`} className="block">
-                      <img src={coverImage(p)} alt="" className="h-28 w-full object-cover" />
-                      <div className="p-3">
-                        <p className="font-semibold text-ink">{p.title}</p>
-                        <p className="text-xs text-ink-mute">{[p.scheme_name, p.city_name].filter(Boolean).join(", ")}</p>
-                        <p className="mt-1 font-bold text-brand-700">{pkrShort(p.price)}</p>
-                      </div>
-                    </Link>
-                  </Popup>
-                </Marker>
-              ))}
-            {(pois.data?.pois ?? [])
-              .filter((x) => layers.includes(x.category))
-              .map((x) => (
-                <Marker key={x.id} position={[x.latitude, x.longitude]} icon={pin(x.category, { size: 26 })}>
-                  <Popup>
-                    <div className="p-3">
-                      <p className="font-semibold">{x.name}</p>
-                      <p className="text-xs capitalize text-ink-mute">{x.category}</p>
-                    </div>
-                  </Popup>
-                </Marker>
-              ))}
-          </PortalMap>
+          <Deferred height={420} className="bg-brand-50/40 dark:bg-white/5">
+            <Suspense fallback={<Skeleton className="h-[420px] rounded-none" />}>
+              <HomeMap pts={pts} pois={pois.data?.pois ?? []} layers={layers} fit={fit} />
+            </Suspense>
+          </Deferred>
         </div>
       </div>
       <div className="card flex flex-col overflow-hidden">
@@ -527,17 +507,21 @@ function MarketPulse() {
               </div>
             </div>
             <div className="mt-4">
-              <AreaTrend
-                data={series}
-                x="year"
-                height={210}
-                format={(v) => pkrShort(v, false)}
-                series={[
-                  { key: "optimistic", label: "Optimistic", color: "#c99a22" },
-                  { key: "base", label: "Base", color: "#146f45" },
-                  { key: "pessimistic", label: "Pessimistic", color: "#94a3b8" },
-                ]}
-              />
+              <Deferred height={210}>
+                <Suspense fallback={<Skeleton className="h-[210px]" />}>
+                  <AreaTrend
+                    data={series}
+                    x="year"
+                    height={210}
+                    format={(v: number) => pkrShort(v, false)}
+                    series={[
+                      { key: "optimistic", label: "Optimistic", color: "#c99a22" },
+                      { key: "base", label: "Base", color: "#146f45" },
+                      { key: "pessimistic", label: "Pessimistic", color: "#94a3b8" },
+                    ]}
+                  />
+                </Suspense>
+              </Deferred>
             </div>
             <p className="mt-2 text-xs text-ink-mute">
               5-year price-per-marla forecast · news sentiment <b className="capitalize text-ink dark:text-white">{t.data?.news.net_sentiment}</b> · band <b className="capitalize text-ink dark:text-white">{t.data?.forecast.index_band}</b>

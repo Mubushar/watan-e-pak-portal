@@ -10,7 +10,8 @@ import { ExternalLink, FileText } from "lucide-react";
 import { apiUrl, type Query } from "@/lib/api";
 import { pct, pkrShort, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { AreaTrend, Modal, PALETTE, Spinner, type Tone } from "@/components/ui";
+import { Modal, Spinner, type Tone } from "@/components/ui";
+import { AreaTrend, PALETTE } from "@/components/ui/charts";
 import { usePrefs } from "@/store/prefs";
 import type { Scenarios } from "./types";
 

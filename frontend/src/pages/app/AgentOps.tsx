@@ -9,29 +9,8 @@ import { get, post } from "@/lib/api";
 import { pkrShort, timeAgo, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/store/auth";
-import {
-  Badge,
-  Bars,
-  Button,
-  ButtonLink,
-  Card,
-  CardBody,
-  CardHeader,
-  DataTable,
-  Donut,
-  Drawer,
-  EmptyState,
-  Legendish,
-  PageHeader,
-  PALETTE,
-  Progress,
-  QueryState,
-  ScoreRing,
-  Skeleton,
-  StatCard,
-  StatusBadge,
-  type Column,
-} from "@/components/ui";
+import { Badge, Button, ButtonLink, Card, CardBody, CardHeader, DataTable, Drawer, EmptyState, PageHeader, Progress, QueryState, ScoreRing, Skeleton, StatCard, StatusBadge, type Column } from "@/components/ui";
+import { Bars, Donut, Legendish, PALETTE } from "@/components/ui/charts";
 import { AUTONOMY, runProgress } from "@/components/agents/AgentBits";
 import { RunView } from "@/components/agents/RunPanel";
 

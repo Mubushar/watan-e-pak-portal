@@ -36,11 +36,19 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 1200,
       rollupOptions: {
         output: {
-          manualChunks: {
-            react: ["react", "react-dom", "react-router-dom"],
-            charts: ["recharts"],
-            map: ["leaflet", "react-leaflet"],
-            motion: ["framer-motion"],
+          // Only the libraries themselves go into these chunks. (The object form also pulled in
+          // their shared dependencies such as clsx, which made every page load the 400 kB
+          // charts chunk and the map chunk.)
+          manualChunks(id) {
+            if (!id.includes("node_modules")) return undefined;
+            // Small helpers shared by the app and the libraries below get their own chunk, so the
+            // app doesn't import them from (and preload) the charts chunk.
+            if (/node_modules[\/](clsx|tailwind-merge|tiny-invariant|eventemitter3|react-is)[\/]/.test(id)) return "vendor";
+            if (/node_modules[\/](react|react-dom|react-router|react-router-dom|scheduler)[\/]/.test(id)) return "react";
+            if (/node_modules[\/](recharts|recharts-scale|victory-vendor|d3-[a-z-]+)[\/]/.test(id)) return "charts";
+            if (/node_modules[\/](leaflet|react-leaflet|@react-leaflet[\/][a-z-]+)[\/]/.test(id)) return "map";
+            if (/node_modules[\/](framer-motion|motion-dom|motion-utils)[\/]/.test(id)) return "motion";
+            return undefined;
           },
         },
       },

@@ -22,31 +22,8 @@ import { post, put } from "@/lib/api";
 import { useApi, useMutate } from "@/hooks/useApi";
 import { date, num, pct, pkrShort, timeAgo, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import {
-  Avatar,
-  Badge,
-  BarList,
-  Bars,
-  Button,
-  Card,
-  DataTable,
-  EmptyState,
-  Field,
-  Input,
-  Modal,
-  PageHeader,
-  Progress,
-  QueryState,
-  ScoreRing,
-  Segmented,
-  Select,
-  Skeleton,
-  StatCard,
-  StatusBadge,
-  Tabs,
-  Textarea,
-  type Column,
-} from "@/components/ui";
+import { Avatar, Badge, BarList, Button, Card, DataTable, EmptyState, Field, Input, Modal, PageHeader, Progress, QueryState, ScoreRing, Segmented, Select, Skeleton, StatCard, StatusBadge, Tabs, Textarea, type Column } from "@/components/ui";
+import { Bars } from "@/components/ui/charts";
 import { FormGrid, MiniStat, Panel, ScoreBar, SkeletonGrid, Stars, bandTone, crShort, sentence, ensure, isoDay, numOr, stagger, useFormState, rs } from "@/components/biz/ops-kit";
 import { CrmLeadDrawer } from "@/components/biz/CrmLeadDrawer";
 import { CrmPipelineBoard } from "@/components/biz/CrmPipelineBoard";

@@ -4,7 +4,8 @@ import { motion } from "framer-motion";
 import { Banknote, Building2, CalendarRange, HandCoins, HardHat, Hourglass, Percent, Plus, Receipt, Stamp, Trash2, Users, Wallet } from "lucide-react";
 import { num, pkr, pkrShort, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Bars, Button, Card, CardBody, CardHeader, Donut, Field, Input, Legendish, PALETTE, Progress, Select, StatCard, Toggle } from "@/components/ui";
+import { Button, Card, CardBody, CardHeader, Field, Input, Progress, Select, StatCard, Toggle } from "@/components/ui";
+import { Bars, Donut, Legendish, PALETTE } from "@/components/ui/charts";
 import { CalcShell, ChoiceChips, NumField, StatGrid, useCalc } from "./CalcKit";
 
 const money = (v: number) => pkrShort(v, false);

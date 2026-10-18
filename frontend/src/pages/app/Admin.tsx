@@ -27,29 +27,8 @@ import { put } from "@/lib/api";
 import { compact, date, num, timeAgo, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/store/auth";
-import {
-  Avatar,
-  Badge,
-  BarList,
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  DataTable,
-  Donut,
-  EmptyState,
-  JsonView,
-  Legendish,
-  Modal,
-  PageHeader,
-  QueryState,
-  Segmented,
-  Skeleton,
-  StatCard,
-  StatusBadge,
-  Tabs,
-  type Column,
-} from "@/components/ui";
+import { Avatar, Badge, BarList, Button, Card, CardBody, CardHeader, DataTable, EmptyState, JsonView, Modal, PageHeader, QueryState, Segmented, Skeleton, StatCard, StatusBadge, Tabs, type Column } from "@/components/ui";
+import { Donut, Legendish } from "@/components/ui/charts";
 import { ok } from "@/components/collab/kit";
 import { IntegrationsCard } from "@/components/collab/Integrations";
 

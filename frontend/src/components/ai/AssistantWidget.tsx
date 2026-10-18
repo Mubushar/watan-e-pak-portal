@@ -1,8 +1,12 @@
+import { lazy, Suspense } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bot, Maximize2, X } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { usePrefs } from "@/store/prefs";
-import { ChatPanel } from "./ChatPanel";
+import { Spinner } from "@/components/ui";
+
+// The chat (and its agent / map code) loads the first time the widget is opened.
+const ChatPanel = lazy(() => import("./ChatPanel").then((m) => ({ default: m.ChatPanel })));
 
 /** Floating AI assistant available on every public page. */
 export function AssistantWidget() {
@@ -37,7 +41,15 @@ export function AssistantWidget() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <ChatPanel compact className="min-h-0 flex-1" />
+            <Suspense
+              fallback={
+                <div className="flex flex-1 items-center justify-center">
+                  <Spinner />
+                </div>
+              }
+            >
+              <ChatPanel compact className="min-h-0 flex-1" />
+            </Suspense>
           </motion.div>
         )}
       </AnimatePresence>

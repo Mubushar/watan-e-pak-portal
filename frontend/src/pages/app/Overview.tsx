@@ -32,7 +32,8 @@ import { useApi } from "@/hooks/useApi";
 import { useAuth } from "@/store/auth";
 import { num, pct, pkrShort, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Badge, Bars, ButtonLink, Donut, EmptyState, Legendish, PageHeader, Progress, QueryState, Skeleton, StatCard, StatusBadge } from "@/components/ui";
+import { Badge, ButtonLink, EmptyState, PageHeader, Progress, QueryState, Skeleton, StatCard, StatusBadge } from "@/components/ui";
+import { Bars, Donut, Legendish } from "@/components/ui/charts";
 import { MiniStat, Panel, SkeletonGrid, bandTone, crShort, stagger, rs } from "@/components/biz/ops-kit";
 import type { SmartAction } from "@/types";
 
