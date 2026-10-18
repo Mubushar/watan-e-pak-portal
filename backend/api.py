@@ -39,6 +39,8 @@ import masterplan
 import web_lookup
 import ai_guard
 import directions as routing
+import megaprojects
+import study_area
 import openai_voice
 import gemini_live
 import openai_facade
@@ -542,6 +544,59 @@ def geo_directions(from_lat: float, from_lon: float, to_lat: float, to_lon: floa
     alternatives. Driving times include typical city traffic. Falls back to the portal's own
     router when the online routing service is off or unreachable."""
     return routing.directions((from_lat, from_lon), (to_lat, to_lon), mode=mode, alternatives=alternatives)
+
+
+class StudyAreaRequest(BaseModel):
+    kind: str  # circle | rectangle | polygon
+    name: Optional[str] = None
+    center: Optional[List[float]] = None  # [lat, lon] (circle)
+    radius_m: Optional[float] = None  # circle
+    bounds: Optional[Dict[str, float]] = None  # {south, west, north, east} (rectangle)
+    coordinates: Optional[List[List[float]]] = None  # [[lat, lon], ...] (polygon)
+    save: bool = False  # also keep it as an area of interest
+
+
+@app.post("/geo/study-area", tags=["aoi"])
+def geo_study_area(payload: StudyAreaRequest) -> Any:
+    """Case-study report for an area drawn on the map: scores & grade, strengths / concerns /
+    recommendation, population & development, every facility inside and the nearest of each
+    kind, neighbourhoods, listings & price per marla, schemes, DHA master plan, valuation,
+    development cost, economic impact, 5-year forecast and news."""
+    result = study_area.study(
+        payload.kind, name=payload.name, center=tuple(payload.center) if payload.center else None,  # type: ignore[arg-type]
+        radius_m=payload.radius_m, bounds=payload.bounds, coordinates=payload.coordinates, save=payload.save)
+    if "error" in result:
+        raise HTTPException(status_code=422, detail=result["error"])
+    return result
+
+
+@app.get("/geo/megaprojects", tags=["places"])
+def geo_megaprojects(type: Optional[str] = None, status: Optional[str] = None, province: Optional[str] = None,
+                     city: Optional[str] = None, q: Optional[str] = None, format: str = "json") -> Any:
+    """Infrastructure & development mega projects that affect real estate — ring roads, motorways,
+    expressways, mass transit, rail, new sectors, industrial / economic zones, airports, business
+    districts. Filter by ``type`` / ``status`` (comma lists), ``province``, ``city`` or text ``q``;
+    ``format=geojson`` returns a FeatureCollection for maps."""
+    rows = megaprojects.search(type=type, status=status, province=province, city=city, q=q)
+    if format == "geojson":
+        return megaprojects.geojson(rows)
+    return {"count": len(rows), "note": megaprojects.note(), "types": megaprojects.TYPE_LABELS,
+            "statuses": megaprojects.STATUS_LABELS, "projects": rows}
+
+
+@app.get("/geo/megaprojects/near", tags=["places"])
+def geo_megaprojects_near(lat: float, lon: float, radius_km: float = 0.0) -> Any:
+    """Mega projects whose price effect reaches a point (or an area ``radius_km`` around it), strongest first."""
+    rows = megaprojects.near(lat, lon, area_radius_km=radius_km)
+    return {"count": len(rows), "projects": rows}
+
+
+@app.get("/geo/megaprojects/{project_id}", tags=["places"])
+def geo_megaproject(project_id: str) -> Any:
+    p = megaprojects.get(project_id)
+    if not p:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return megaprojects.summary(p)
 
 
 @app.get("/geo/cities", tags=["places"])

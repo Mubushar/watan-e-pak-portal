@@ -153,6 +153,30 @@ Data files in `geodata/`: `pk_provinces.geojson` (geoBoundaries gbOpen PAK ADM1,
 domain) and `pk_cities.json` (Natural Earth populated places, public domain; Urdu names
 added).
 
+## Infrastructure mega projects and area case studies
+
+| Endpoint | What it returns |
+| --- | --- |
+| `GET /geo/megaprojects?type=&status=&province=&city=&q=&format=json\|geojson` | Ring roads, motorways, expressways, mass transit, rail, new sectors, industrial / economic zones, airports and business districts, with status, dates, summary, expected price effect and how far it reaches |
+| `GET /geo/megaprojects/near?lat=&lon=&radius_km=` | Projects whose effect reaches a point or area, strongest first |
+| `GET /geo/megaprojects/{id}` | One project |
+| `POST /geo/study-area` | Case-study report for a circle, rectangle or polygon drawn on the map (see below) |
+
+`megaprojects.py` reads `geodata/pk_megaprojects.json`. The list is compiled from public
+announcements up to mid-2026, and routes and boundaries are approximate. Add or update a project
+by editing the JSON (geometry is a `line` path, a `polygon` ring or a `point` with
+`radius_km`, all in `[lat, lon]`), then restart.
+
+`study_area.py` builds the report: scores (amenities, facilities per resident, development,
+portal market activity, 5-year outlook, mega-project pipeline) and a grade from A to E;
+strengths, concerns and a recommendation; population and neighbourhoods; facilities inside and
+the nearest of each kind; listings, price per marla and nearby comparables; housing schemes;
+the DHA master plan; mega projects; valuation and economics; forecast; and news. It is
+rule-based and uses no AI credit. Body: `{"kind": "circle", "center": [lat, lon],
+"radius_m": 1500}`, `{"kind": "rectangle", "bounds": {south, west, north, east}}` or
+`{"kind": "polygon", "coordinates": [[lat, lon], ...]}`. Add `"save": true` to keep the area
+as an area of interest.
+
 ## MCP HTTP mode
 
 `/mcp` runs in **stateless** mode by default (`PORTAL_MCP_STATELESS=1`). This

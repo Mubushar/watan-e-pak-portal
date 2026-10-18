@@ -928,6 +928,30 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
             "coordinates": json.dumps([[31.4460, 74.2740], [31.4460, 74.2870], [31.4560, 74.2870], [31.4560, 74.2740]])})
         check("GET /gis/area", r.status_code == 200 and r.json().get("area_sqm", 0) > 0, str(r.status_code))
 
+        # --- infrastructure mega projects & drawn study areas ---
+        r = client.get("/geo/megaprojects")
+        check("GET /geo/megaprojects", r.status_code == 200 and r.json().get("count", 0) >= 10, str(r.status_code))
+        r = client.get("/geo/megaprojects", params={"type": "ring_road", "format": "geojson"})
+        feats = r.json().get("features", []) if r.status_code == 200 else []
+        check("GET /geo/megaprojects?format=geojson", bool(feats) and all(f["properties"]["type"] == "ring_road" for f in feats), str(r.status_code))
+        r = client.get("/geo/megaprojects/near", params={"lat": 33.428, "lon": 72.995})
+        check("GET /geo/megaprojects/near (Rawalpindi Ring Road)",
+              r.status_code == 200 and any(p["id"] == "rawalpindi-ring-road" for p in r.json().get("projects", [])), str(r.status_code))
+        r = client.get("/geo/megaprojects/no-such-project")
+        check("GET /geo/megaprojects/{id} (404)", r.status_code == 404, str(r.status_code))
+
+        aois_before = len(core.aois_db)
+        r = client.post("/geo/study-area", json={"kind": "circle", "center": [33.428, 72.995], "radius_m": 1500})
+        body = r.json() if r.status_code == 200 else {}
+        check("POST /geo/study-area (circle)",
+              r.status_code == 200 and body.get("grade") in "ABCDE" and "infrastructure" in body.get("scores", {})
+              and any(p["id"] == "rawalpindi-ring-road" for p in body.get("mega_projects", {}).get("projects", [])), str(r.status_code))
+        check("POST /geo/study-area leaves no AOI behind", len(core.aois_db) == aois_before, str(len(core.aois_db)))
+        r = client.post("/geo/study-area", json={"kind": "rectangle", "bounds": {"south": 31.44, "west": 74.27, "north": 31.46, "east": 74.29}})
+        check("POST /geo/study-area (rectangle)", r.status_code == 200 and r.json().get("shape", {}).get("area_km2", 0) > 0, str(r.status_code))
+        r = client.post("/geo/study-area", json={"kind": "polygon", "coordinates": [[31.44, 74.27], [31.46, 74.28]]})
+        check("POST /geo/study-area (bad polygon -> 422)", r.status_code == 422, str(r.status_code))
+
         r = client.get("/gis/bearing", params={"lat1": 31.5204, "lon1": 74.3587, "lat2": 31.4504, "lon2": 74.2800})
         check("GET /gis/bearing", r.status_code == 200 and r.json().get("distance_km", 0) > 0, str(r.status_code))
 
