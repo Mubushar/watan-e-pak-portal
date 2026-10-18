@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Bot,
   CalendarCheck,
   Inbox,
-  LayoutDashboard,
+  Gauge,
   RadioTower,
   CalendarClock,
   CheckCircle2,
@@ -32,7 +32,6 @@ import { Bars } from "@/components/ui/charts";
 import { FormGrid, MiniStat, Panel, ScoreBar, SkeletonGrid, Stars, bandTone, crShort, sentence, ensure, isoDay, numOr, stagger, useFormState, rs } from "@/components/biz/ops-kit";
 import { CrmLeadDrawer } from "@/components/biz/CrmLeadDrawer";
 import { CrmPipelineBoard } from "@/components/biz/CrmPipelineBoard";
-import { CrmDashboardTab } from "@/components/crm/CrmDashboardTab";
 import { CrmInboxTab } from "@/components/crm/CrmInboxTab";
 import { CrmChannelsTab } from "@/components/crm/CrmChannelsTab";
 import { CrmCopilot } from "@/components/crm/CrmCopilot";
@@ -52,8 +51,8 @@ import {
 } from "@/components/biz/crm-types";
 import type { City } from "@/types";
 
-type TabKey = "dashboard" | "leads" | "pipeline" | "deals" | "customers" | "agents" | "tasks" | "appointments" | "inbox" | "channels" | "broker";
-const TAB_KEYS: TabKey[] = ["dashboard", "leads", "pipeline", "deals", "customers", "agents", "tasks", "appointments", "inbox", "channels", "broker"];
+type TabKey = "leads" | "pipeline" | "deals" | "customers" | "agents" | "tasks" | "appointments" | "inbox" | "channels" | "broker";
+const TAB_KEYS: TabKey[] = ["leads", "pipeline", "deals", "customers", "agents", "tasks", "appointments", "inbox", "channels", "broker"];
 
 interface CrmDashboard {
   agents: number;
@@ -69,10 +68,10 @@ const INVALIDATE = ["/crm", "/broker", "/portal", "/agents", "/marketing"];
 export default function Crm() {
   const [params, setParams] = useSearchParams();
   const tabParam = params.get("tab") as TabKey | null;
-  const tab: TabKey = tabParam && TAB_KEYS.includes(tabParam) ? tabParam : "dashboard";
+  const tab: TabKey = tabParam && TAB_KEYS.includes(tabParam) ? tabParam : "leads";
   const setTab = (t: TabKey) => setParams((p) => {
     const n = new URLSearchParams(p);
-    if (t === "dashboard") n.delete("tab");
+    if (t === "leads") n.delete("tab");
     else n.set("tab", t);
     return n;
   }, { replace: true });
@@ -93,6 +92,9 @@ export default function Crm() {
         subtitle="Smart sales hub — leads, pipeline, follow-ups, WhatsApp / e-mail / SMS and your AI copilot"
         actions={
           <>
+            <Link to="/app/crm-dashboard" className="btn btn-outline btn-sm">
+              <Gauge className="h-4 w-4" /> Dashboard
+            </Link>
             <Button
               variant="gold"
               size="sm"
@@ -114,7 +116,6 @@ export default function Crm() {
         }
       />
 
-      {tab !== "dashboard" && (
       <QueryState q={dash} skeleton={<SkeletonGrid n={4} />}>
         {(d) => (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -125,7 +126,6 @@ export default function Crm() {
           </div>
         )}
       </QueryState>
-      )}
 
       <Card className="overflow-hidden">
         <Tabs<TabKey>
@@ -133,7 +133,6 @@ export default function Crm() {
           value={tab}
           onChange={setTab}
           tabs={[
-            { value: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
             { value: "leads", label: "Leads", icon: <Users className="h-4 w-4" />, count: dash.data?.leads.total },
             { value: "pipeline", label: "Pipeline", icon: <KanbanSquare className="h-4 w-4" /> },
             { value: "deals", label: "Deals", icon: <Handshake className="h-4 w-4" />, count: dash.data?.deals.total },
@@ -147,16 +146,6 @@ export default function Crm() {
           ]}
         />
         <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-          {tab === "dashboard" && (
-            <CrmDashboardTab
-              agents={agents}
-              onOpenLead={setLeadId}
-              onAsk={(question) => {
-                setCopilotQ(question || undefined);
-                setCopilot(true);
-              }}
-            />
-          )}
           {tab === "inbox" && <CrmInboxTab onOpenLead={setLeadId} />}
           {tab === "channels" && <CrmChannelsTab />}
           {tab === "leads" && <LeadsTab agents={agents} onOpen={setLeadId} />}

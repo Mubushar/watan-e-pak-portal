@@ -12,6 +12,7 @@ import {
   Globe,
   HardHat,
   KeyRound,
+  Gauge,
   LayoutDashboard,
   Megaphone,
   Menu,
@@ -59,6 +60,7 @@ export function useDashboardNav(unread: number): { title: string; items: NavItem
     {
       title: "Sales & Leasing",
       items: [
+        { to: "/app/crm-dashboard", label: "CRM dashboard", icon: Gauge, perm: "crm.view" },
         { to: "/app/crm", label: "CRM", icon: Users, perm: "crm.view" },
         { to: "/app/listings", label: "My listings", icon: Building2, end: true },
         { to: "/app/listings/new", label: "List a property", icon: PlusSquare },
