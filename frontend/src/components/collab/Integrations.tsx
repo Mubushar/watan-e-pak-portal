@@ -15,9 +15,13 @@ import { Badge, Card, CardBody, CardHeader, Skeleton } from "@/components/ui";
 
 interface AiCaps {
   chat_mode: "local" | "upstream";
+  /** openai | lmstudio | openai-compatible (LLM_BASE_URL) */
+  chat_provider: string | null;
   chat_model: string;
-  voice: { provider: string | null; stt_model: string | null; tts_model: string | null; realtime_model: string | null; voice: string | null };
+  voice: { provider: string | null; stt_model: string | null; tts_model: string | null; realtime_model: string | null; voice: string | null; live_provider?: string | null };
 }
+
+const PROVIDER_LABEL: Record<string, string> = { openai: "OpenAI", lmstudio: "LM Studio", "openai-compatible": "custom server", gemini: "Gemini Live" };
 
 function Row({ icon, title, ok, children }: { icon: ReactNode; title: string; ok: boolean | undefined; children: ReactNode }) {
   return (
@@ -53,12 +57,18 @@ export function IntegrationsCard() {
           <Skeleton className="h-40 md:col-span-2" />
         ) : (
           <>
-            <Row icon={<Bot className="h-4 w-4" />} title="AI assistant (OpenAI)" ok={ai.data ? ai.data.chat_mode === "upstream" : undefined}>
+            <Row icon={<Bot className="h-4 w-4" />} title="AI assistant" ok={ai.data ? ai.data.chat_mode === "upstream" : undefined}>
               {ai.data?.chat_mode === "upstream" ? (
                 <>
-                  Chat: <b>{ai.data.chat_model}</b>
+                  Chat: <b>{ai.data.chat_model}</b> ({PROVIDER_LABEL[ai.data.chat_provider ?? ""] ?? ai.data.chat_provider})
                   {ai.data.voice.stt_model && <> · speech-to-text {ai.data.voice.stt_model}</>}
-                  {ai.data.voice.realtime_model && <> · live voice {ai.data.voice.realtime_model}</>}
+                  {ai.data.voice.realtime_model && (
+                    <>
+                      {" "}
+                      · live voice {ai.data.voice.realtime_model}
+                      {ai.data.voice.live_provider && ai.data.voice.live_provider !== "openai" && <> ({PROVIDER_LABEL[ai.data.voice.live_provider] ?? ai.data.voice.live_provider})</>}
+                    </>
+                  )}
                 </>
               ) : (
                 "Local answers from portal data. Set OPENAI_API_KEY in backend/.env for the tool-using assistant and voice."
