@@ -19,6 +19,7 @@ the result. That keeps MCP and REST perfectly in sync — no duplicated logic.
 
 import asyncio
 import base64
+import gzip
 import json
 import os
 import re
@@ -40,6 +41,7 @@ import web_lookup
 import ai_guard
 import directions as routing
 import megaprojects
+import roads
 import study_area
 import openai_voice
 import gemini_live
@@ -568,6 +570,30 @@ def geo_study_area(payload: StudyAreaRequest) -> Any:
     if "error" in result:
         raise HTTPException(status_code=422, detail=result["error"])
     return result
+
+
+@app.get("/geo/roads", tags=["places"])
+def geo_roads(request: Request, south: float, west: float, north: float, east: float, zoom: int = 8,
+              classes: Optional[str] = None) -> Any:
+    """Pakistan's main roads in a map view, from OpenStreetMap: motorways, trunk roads / national
+    highways, primary and secondary roads (and those under construction), with number, English /
+    Urdu name, lanes, speed limit and surface. Detail and classes follow the zoom. Compact rows:
+    ``c`` class, ``s`` status, ``r`` number, ``n`` / ``u`` name, ``l`` lanes, ``v`` max speed,
+    ``f`` surface, ``p`` [[lat, lon], ...]."""
+    data = roads.in_view(south, west, north, east, zoom, classes.split(",") if classes else None)
+    body = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    # Country views run to ~1 MB of coordinates; gzip cuts that by about 4x.
+    if "gzip" in request.headers.get("accept-encoding", "") and len(body) > 4096:
+        return Response(gzip.compress(body, compresslevel=5), media_type="application/json",
+                        headers={"Content-Encoding": "gzip", "Vary": "Accept-Encoding", "Cache-Control": "public, max-age=3600"})
+    return Response(body, media_type="application/json")
+
+
+@app.get("/geo/roads/search", tags=["places"])
+def geo_roads_search(q: str, limit: int = 20) -> Any:
+    """Find a road by number or name (e.g. ``M-2``, ``N-5``, ``GT Road``) with its extent."""
+    rows = roads.search(q, limit)
+    return {"count": len(rows), "roads": rows}
 
 
 @app.get("/geo/megaprojects", tags=["places"])

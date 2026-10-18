@@ -14,3 +14,7 @@ media/uploads/
 
 # DHA master-plan layers built from the source PDFs (masterplans/build_masterplans.py)
 media/masterplans/
+
+# Pakistan road network built from OpenStreetMap (build_roads.py) and its source extract
+media/roads/
+media/osm/

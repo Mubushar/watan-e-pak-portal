@@ -153,6 +153,25 @@ Data files in `geodata/`: `pk_provinces.geojson` (geoBoundaries gbOpen PAK ADM1,
 domain) and `pk_cities.json` (Natural Earth populated places, public domain; Urdu names
 added).
 
+## Road network (OpenStreetMap)
+
+`GET /geo/roads?south=&west=&north=&east=&zoom=` returns Pakistan's motorways, trunk roads and
+national highways, primary and secondary roads in a map view, including roads under
+construction. Each road has its number, English and Urdu name, lanes, speed limit and surface.
+Detail follows the zoom level, and responses are gzipped. `GET /geo/roads/search?q=M-2` finds a
+road by number or name.
+
+The data comes from Geofabrik's daily OpenStreetMap extract (© OpenStreetMap contributors,
+ODbL). It is built locally and is git-ignored (`media/osm/`, `media/roads/`):
+
+```bash
+curl -L -o media/osm/pakistan-latest.osm.pbf https://download.geofabrik.de/asia/pakistan-latest.osm.pbf
+uv run --no-project --python 3.12 --with osmium python build_roads.py
+```
+
+Re-run both commands to pick up new roads, then restart the backend. Without the file, the
+endpoint returns no roads and a hint on how to build it.
+
 ## Infrastructure mega projects and area case studies
 
 | Endpoint | What it returns |

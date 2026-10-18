@@ -940,6 +940,12 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         r = client.get("/geo/megaprojects/no-such-project")
         check("GET /geo/megaprojects/{id} (404)", r.status_code == 404, str(r.status_code))
 
+        # Road network: works with or without the built OpenStreetMap data file.
+        r = client.get("/geo/roads", params={"south": 33.6, "west": 73.0, "north": 33.7, "east": 73.1, "zoom": 13})
+        check("GET /geo/roads", r.status_code == 200 and "roads" in r.json(), str(r.status_code))
+        r = client.get("/geo/roads/search", params={"q": "M-2"})
+        check("GET /geo/roads/search", r.status_code == 200 and "roads" in r.json(), str(r.status_code))
+
         aois_before = len(core.aois_db)
         r = client.post("/geo/study-area", json={"kind": "circle", "center": [33.428, 72.995], "radius_m": 1500})
         body = r.json() if r.status_code == 200 else {}

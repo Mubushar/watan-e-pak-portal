@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bot, Maximize2, X } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { usePrefs } from "@/store/prefs";
 import { Spinner } from "@/components/ui";
 
@@ -14,6 +15,7 @@ export function AssistantWidget() {
   const setOpen = usePrefs((s) => s.setAssistantOpen);
   const { pathname } = useLocation();
   if (pathname.startsWith("/ai")) return null;
+  const onMap = pathname === "/map";
   return (
     <>
       <AnimatePresence>
@@ -55,7 +57,11 @@ export function AssistantWidget() {
       </AnimatePresence>
       <button
         onClick={() => setOpen(!open)}
-        className="fixed bottom-6 end-4 z-[90] flex h-14 items-center gap-2 rounded-full bg-gold-gradient pe-5 ps-4 font-semibold text-brand-950 shadow-glow transition hover:scale-105 sm:end-6"
+        className={cn(
+          "fixed z-[90] flex items-center gap-2 rounded-full bg-gold-gradient pe-5 ps-4 font-semibold text-brand-950 shadow-glow transition hover:scale-105",
+          // On the map, sit left of the map's zoom buttons (bottom corner) instead of over them.
+          onMap ? "bottom-4 end-16 h-12" : "bottom-6 end-4 h-14 sm:end-6",
+        )}
         aria-label="Ask AI"
       >
         <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-brand-800 text-white">

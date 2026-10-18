@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
@@ -16,6 +16,7 @@ import {
   Eye,
   FileBarChart,
   FileText,
+  Hash,
   Footprints,
   Globe2,
   Home,
@@ -44,6 +45,7 @@ import type { City, Property, PropertyList, Scheme } from "@/types";
 import { toast } from "sonner";
 import { get } from "@/lib/api";
 import { useApi } from "@/hooks/useApi";
+import { useSavedState } from "@/hooks/useSavedState";
 import { compact, num, pkrShort, titleCase } from "@/lib/format";
 import { coverImage } from "@/lib/images";
 import { cn } from "@/lib/utils";
@@ -58,6 +60,7 @@ import { POI_CATEGORIES, POI_MIN_ZOOM, PoiLayer } from "@/components/gis/PoiLaye
 import { AreaDraw, shapeAreaKm2, type DrawMode, type StudyShape } from "@/components/gis/AreaDraw";
 import { StudyReport, useStudyReport } from "@/components/gis/StudyReport";
 import { ANNOTATION_MIN_ZOOM, MEGA_TYPES, MegaProjectLayer, useMegaProjects } from "@/components/gis/MegaProjects";
+import { LiveRoadOverlay, ROAD_CLASSES, RoadLayer, type RoadStatus } from "@/components/gis/RoadLayer";
 import { usePrefs } from "@/store/prefs";
 import { LABEL_MIN_ZOOM, MasterPlanLayers, MasterPlanPanel, PlanLabels, useMasterPlans, type PlanLabel } from "@/components/gis/MasterPlans";
 import type { Aoi, AoiStats, GisLayer, GisLayerDetail, Poi, PoiCategory, RingResult, RouteResult } from "@/components/gis/types";
@@ -112,7 +115,8 @@ export default function MapExplorer() {
   const [map, setMap] = useState<L.Map | null>(null);
   const [tab, setTab] = useState<TabKey>("properties");
   const [open, setOpen] = useState(true);
-  const [vis, setVis] = useState<Vis>({ props: true, pois: false, layers: true, aois: false, provinces: true, cities: true });
+  // Layer choices are saved per user and come back on the next visit.
+  const [vis, setVis] = useSavedState<Vis>("map.vis", { props: true, pois: false, layers: true, aois: false, provinces: true, cities: true });
   const [report, setReport] = useState<ReportRef | null>(null);
   const markerRefs = useRef(new Map<string, L.Marker>());
   const zoomMoved = useRef(false);
@@ -167,8 +171,12 @@ export default function MapExplorer() {
     });
 
   // -------------------------------------------------------------- layers
-  const [hidden, setHidden] = useState<Set<string>>(new Set());
-  const [labelsOn, setLabelsOn] = useState<Set<string>>(new Set());
+  const [labelsOn, setLabelsOn] = useSavedState<Set<string>>("map.planLabels", () => new Set());
+  // GIS layers follow their own default visibility until the user chooses.
+  const [hiddenChoice, setHiddenChoice] = useSavedState<Set<string> | null>("map.hiddenLayers", null);
+  const defaultHidden = useMemo(() => new Set(gisLayers.filter((l) => !l.visible).map((l) => l.id)), [gisLayers]);
+  const hidden = hiddenChoice ?? defaultHidden;
+  const setHidden = (u: SetStateAction<Set<string>>) => setHiddenChoice((prev) => (typeof u === "function" ? u(prev ?? defaultHidden) : u));
   // Only layers that are actually drawn are downloaded (each can be several MB).
   const activeLayers = useMemo(
     () => (vis.layers ? [...gisLayers.filter((l) => !hidden.has(l.id)), ...labelLayers.filter((l) => labelsOn.has(l.id))] : []),
@@ -193,22 +201,13 @@ export default function MapExplorer() {
     };
   }, [map]);
   const plansQ = useMasterPlans();
-  const [planShown, setPlanShown] = useState<Set<string>>(new Set());
-  // Every loaded master plan starts switched on (they can be hidden from the Layers tab).
-  const plansInit = useRef(false);
-  useEffect(() => {
-    const plans = plansQ.data?.plans;
-    if (plans?.length && !plansInit.current) {
-      plansInit.current = true;
-      setPlanShown(new Set(plans.map((p) => p.key)));
-    }
-  }, [plansQ.data]);
+  // Master plans start switched on until the user chooses (null = no saved choice yet).
+  const [planChoice, setPlanChoice] = useSavedState<Set<string> | null>("map.plans", null);
+  const allPlans = useMemo(() => new Set((plansQ.data?.plans ?? []).map((p) => p.key)), [plansQ.data]);
+  const planShown = planChoice ?? allPlans;
+  const setPlanShown = (u: SetStateAction<Set<string>>) => setPlanChoice((prev) => (typeof u === "function" ? u(prev ?? allPlans) : u));
   const [planHit, setPlanHit] = useState<PlanLabel | null>(null);
-  const [layerOpacity, setLayerOpacity] = useState(70);
-  useEffect(() => {
-    if (!gisLayers.length) return;
-    setHidden(new Set(gisLayers.filter((l) => !l.visible).map((l) => l.id)));
-  }, [layersQ.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [layerOpacity, setLayerOpacity] = useSavedState("map.layerOpacity", 70);
 
   // -------------------------------------------------------------- AOIs
   const [aoiId, setAoiId] = useState<string | null>(null);
@@ -225,11 +224,11 @@ export default function MapExplorer() {
   const dRadii = useDebounced(radii, 600);
   const analysing = tab === "analyse";
   const [zoomDraw, setZoomDraw] = useState(false);
-  const [baseMap, setBaseMap] = useState<BaseMapKey>("streets");
+  const [baseMap, setBaseMap] = useSavedState<BaseMapKey>("map.base", "streets");
   const appLang = usePrefs((s) => s.lang);
-  const [mapLang, setMapLang] = useState<MapLang>(appLang === "ur" ? "both" : "en");
+  const [mapLang, setMapLang] = useSavedState<MapLang>("map.lang", appLang === "ur" ? "both" : "en");
   const nav = useNavigator();
-  const [osmCats, setOsmCats] = useState<Set<string>>(new Set());
+  const [osmCats, setOsmCats] = useSavedState<Set<string>>("map.poi", () => new Set());
   const [poiStatus, setPoiStatus] = useState<{ count: number; total: number; zoomIn: boolean } | null>(null);
   const togglePoiCat = (k: string, on: boolean) =>
     setOsmCats((s) => {
@@ -269,8 +268,22 @@ export default function MapExplorer() {
 
   // ---- infrastructure mega projects
   const megaQ = useMegaProjects();
-  const [megaTypes, setMegaTypes] = useState<Set<string>>(() => new Set(MEGA_TYPES.map((t) => t.key)));
-  const [megaAnnot, setMegaAnnot] = useState(true);
+  const [megaTypes, setMegaTypes] = useSavedState<Set<string>>("map.mega", () => new Set(MEGA_TYPES.map((t) => t.key)));
+  const [megaAnnot, setMegaAnnot] = useSavedState("map.megaAnnotations", true);
+
+  // ---- road network (OpenStreetMap) and the live road overlay
+  const [roadClasses, setRoadClasses] = useSavedState<Set<string>>("map.roads", () => new Set(["motorway", "trunk"]));
+  const [roadBuilding, setRoadBuilding] = useSavedState("map.roadsConstruction", true);
+  const [roadShields, setRoadShields] = useSavedState("map.roadShields", true);
+  const [roadLive, setRoadLive] = useSavedState("map.roadsLive", false);
+  const [roadStatus, setRoadStatus] = useState<RoadStatus | null>(null);
+  const toggleRoad = (k: string, on: boolean) =>
+    setRoadClasses((s) => {
+      const n = new Set(s);
+      if (on) n.add(k);
+      else n.delete(k);
+      return n;
+    });
   const toggleMega = (k: string, on: boolean) =>
     setMegaTypes((s) => {
       const n = new Set(s);
@@ -398,6 +411,8 @@ export default function MapExplorer() {
       <PortalMap height="100%" className="rounded-none" scrollWheelZoom onReady={onReady} zoom={5} switcher={false} baseKey={baseMap}>
         {/* ----------------------------------------------------- Pakistan reference layers */}
         {vis.provinces && <ProvinceLayer map={map} lang={mapLang} zoom={zoom} />}
+        {roadLive && <LiveRoadOverlay />}
+        {roadClasses.size > 0 && <RoadLayer classes={roadClasses} construction={roadBuilding} shields={roadShields} lang={mapLang} onStatus={setRoadStatus} />}
         {megaTypes.size > 0 && <MegaProjectLayer projects={megaQ.data?.projects ?? []} types={megaTypes} lang={mapLang} zoom={zoom} labelZoom={11} annotate={megaAnnot} />}
         {vis.cities && <CityLabels zoom={zoom} lang={mapLang} />}
         {osmCats.size > 0 && <PoiLayer categories={osmCats} lang={mapLang} onStatus={setPoiStatus} />}
@@ -625,6 +640,27 @@ export default function MapExplorer() {
               { key: "provinces", label: "Province boundaries", hint: "Provinces & territories, with listing counts", icon: MapIcon, on: vis.provinces, onChange: (v) => setVis((x) => ({ ...x, provinces: v })) },
               { key: "cities", label: "City names", hint: "Main cities; gold dots have a city page", icon: Building2, on: vis.cities, onChange: (v) => setVis((x) => ({ ...x, cities: v })) },
             ],
+          },
+          {
+            key: "roads",
+            title: "Road network",
+            icon: Route,
+            items: [
+              ...ROAD_CLASSES.map((c) => ({
+                key: `road-${c.key}`,
+                label: c.label,
+                hint: c.minZoom ? `From zoom ${c.minZoom}` : "All zoom levels",
+                color: c.color,
+                on: roadClasses.has(c.key),
+                onChange: (v: boolean) => toggleRoad(c.key, v),
+              })),
+              { key: "road-construction", label: "Roads under construction", hint: "Dashed, in the road's colour class", icon: Construction, on: roadBuilding, onChange: setRoadBuilding },
+              { key: "road-shields", label: "Route numbers", hint: "M-2, N-5 … shields from zoom 7", icon: Hash, on: roadShields, onChange: setRoadShields },
+              { key: "road-live", label: "Live road overlay", hint: "Esri World Transportation; best on satellite", icon: Layers3, on: roadLive, onChange: setRoadLive },
+            ],
+            note: roadStatus?.missing
+              ? roadStatus.hint
+              : `OpenStreetMap${roadStatus?.date ? `, extract of ${roadStatus.date}` : ""}${roadStatus && roadClasses.size ? ` · ${roadStatus.count.toLocaleString()} road sections in view` : ""}. Click a road for details.`,
           },
           {
             key: "mega",
