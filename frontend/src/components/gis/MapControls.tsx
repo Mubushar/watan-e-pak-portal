@@ -1,8 +1,8 @@
 /**
  * The map explorer's control column, grouped like a GIS toolbar:
  *   Map    base map · layers (one panel with an on/off switch for every layer) · label language
- *   View   fit to listings
- *   Tools  zoom to area (drag a box) · draw a case-study area (circle / rectangle / polygon)
+ *   Full   fit to listings (the whole picture)
+ *   Zoom   zoom to area (drag a box) · draw a case-study area (circle / rectangle / polygon)
  *
  * The layers panel: a filter box, "All on / All off", then collapsible sections (Portal data,
  * Points of interest, Reference, DHA master plans, GIS layers). Each section has a master switch
@@ -57,7 +57,25 @@ function Switch({ on, onChange, label, small }: { on: boolean; onChange: (v: boo
   );
 }
 
-function Btn({ icon: Icon, title, active, onClick, badge }: { icon: LucideIcon; title: string; active?: boolean; onClick: () => void; badge?: number }) {
+function Btn({
+  icon: Icon,
+  title,
+  active,
+  onClick,
+  badge,
+  text,
+  iconClass,
+}: {
+  icon: LucideIcon;
+  title: string;
+  active?: boolean;
+  onClick: () => void;
+  badge?: number;
+  /** A short caption under the icon. */
+  text?: string;
+  /** Icon colour / fill when the button is not active. */
+  iconClass?: string;
+}) {
   return (
     <button
       type="button"
@@ -66,11 +84,13 @@ function Btn({ icon: Icon, title, active, onClick, badge }: { icon: LucideIcon; 
       aria-label={title}
       aria-pressed={active}
       className={cn(
-        "relative flex h-10 w-10 items-center justify-center transition first:rounded-t-xl last:rounded-b-xl",
+        "relative flex w-10 flex-col items-center justify-center transition first:rounded-t-xl last:rounded-b-xl",
+        text ? "h-12 gap-0.5" : "h-10",
         active ? "bg-brand-700 text-white" : "text-brand-800 hover:bg-brand-50 dark:text-white dark:hover:bg-white/10",
       )}
     >
-      <Icon className="h-[18px] w-[18px]" />
+      <Icon className={cn("h-[18px] w-[18px]", !active && iconClass)} />
+      {text && <span className="text-[9px] font-bold leading-none">{text}</span>}
       {!!badge && <span className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-gold-500 px-1 text-[10px] font-bold text-brand-950">{badge}</span>}
     </button>
   );
@@ -247,19 +267,28 @@ export function MapControls({
     <div ref={ref} className="absolute end-3 top-3 z-[400] flex flex-col items-end gap-2">
       <ToolGroup label="Map">
         <Btn icon={Layers} title="Base map" active={open === "base"} onClick={() => setOpen(open === "base" ? null : "base")} />
-        <Btn icon={Layers3} title="Layers — turn any layer on or off" active={open === "layers"} badge={activeCount} onClick={() => setOpen(open === "layers" ? null : "layers")} />
-        <Btn icon={Languages} title="Map label language — English / اردو" active={open === "lang"} onClick={() => setOpen(open === "lang" ? null : "lang")} />
+        <Btn
+          icon={Layers3}
+          text="Portal"
+          iconClass="text-emerald-600 fill-emerald-400/40 dark:text-emerald-400"
+          title="Layers — turn any layer on or off"
+          active={open === "layers"}
+          badge={activeCount}
+          onClick={() => setOpen(open === "layers" ? null : "layers")}
+        />
+        <Btn icon={Languages} text="Lang" title="Map label language — English / اردو" active={open === "lang"} onClick={() => setOpen(open === "lang" ? null : "lang")} />
       </ToolGroup>
       {onFit && (
-        <ToolGroup label="View">
+        <ToolGroup label="Full">
           <Btn icon={Globe} title="Fit to listings" onClick={onFit} />
         </ToolGroup>
       )}
-      <ToolGroup label="Tools">
+      <ToolGroup label="Zoom">
         <Btn icon={SquareDashedMousePointer} title={zoomDraw ? "Cancel zoom to area" : "Zoom to area: drag a box on the map"} active={zoomDraw} onClick={() => onZoomDraw(!zoomDraw)} />
         {onDraw && (
           <Btn
             icon={PencilRuler}
+            text="Study"
             title={drawMode ? "Cancel drawing" : "Draw a study area — circle, rectangle or polygon — for a case-study report"}
             active={!!drawMode || open === "draw"}
             onClick={() => (drawMode ? onDraw(null) : setOpen(open === "draw" ? null : "draw"))}
