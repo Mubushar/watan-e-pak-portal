@@ -292,7 +292,7 @@ export function MapControls({
         <ToolGroup label="Study">
           <Btn
             icon={PencilRuler}
-            text="Study"
+            text="Select"
             title={drawMode ? "Cancel drawing" : "Draw a study area — circle, rectangle or polygon — for a case-study report"}
             active={!!drawMode || open === "draw"}
             onClick={() => (drawMode ? onDraw(null) : setOpen(open === "draw" ? null : "draw"))}
