@@ -14,6 +14,7 @@ import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 import { pin } from "@/components/map/PortalMap";
 import { PlaceSearch, type PlaceHit } from "./PlaceSearch";
+import { MapContextMenu } from "./MapContextMenu";
 
 type Mode = "drive" | "bike" | "walk";
 interface Step {
@@ -71,7 +72,6 @@ export function NavigatorLayer({ nav }: { nav: NavigatorState }) {
   const map = useMap();
   const fly = useFly();
   const { hit, routing, from, to, picking, q, selected } = nav;
-  const [ctx, setCtx] = useState<{ lat: number; lon: number } | null>(null);
   const point = (lat: number, lon: number, label?: string): PlaceHit => ({ type: "picked", label: label ?? `Point ${lat.toFixed(5)}, ${lon.toFixed(5)}`, lat, lon });
 
   // Fly to a new search result.
@@ -94,10 +94,6 @@ export function NavigatorLayer({ nav }: { nav: NavigatorState }) {
       if (picking === "from") nav.setFrom(h);
       else nav.setTo(h);
       nav.setPicking(null);
-    },
-    // Right-click (long-press on touch): "Directions from here / to here".
-    contextmenu(e) {
-      setCtx({ lat: e.latlng.lat, lon: e.latlng.lng });
     },
   });
   useEffect(() => {
@@ -158,35 +154,27 @@ export function NavigatorLayer({ nav }: { nav: NavigatorState }) {
           <Polyline positions={routes[selected]!.geometry} pathOptions={{ color: "#1a73e8", weight: 6, opacity: 1 }} interactive={false} />
         </>
       )}
-      {ctx && (
-        <Popup position={[ctx.lat, ctx.lon]} eventHandlers={{ remove: () => setCtx(null) }}>
-          <div className="w-52 p-2">
-            <p className="px-1 pb-1 text-[11px] text-ink-mute">
-              {ctx.lat.toFixed(5)}, {ctx.lon.toFixed(5)}
-            </p>
-            {(
-              [
-                ["Directions from here", (h: PlaceHit) => nav.setFrom(h)],
-                ["Directions to here", (h: PlaceHit) => nav.setTo(h)],
-              ] as [string, (h: PlaceHit) => void][]
-            ).map(([label, set]) => (
-              <button
-                key={label}
-                type="button"
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-start text-sm font-semibold text-ink hover:bg-brand-50"
-                onClick={() => {
-                  set(point(ctx.lat, ctx.lon));
-                  nav.setRouting(true);
-                  setCtx(null);
-                  map.closePopup();
-                }}
-              >
-                <Navigation className="h-4 w-4 text-brand-600" /> {label}
-              </button>
-            ))}
-          </div>
-        </Popup>
-      )}
+      {/* Right-click (long-press on touch): "Directions from here / to here". */}
+      <MapContextMenu
+        items={[
+          {
+            label: "Directions from here",
+            icon: <Navigation className="h-4 w-4 text-brand-600" />,
+            onSelect: (lat, lon) => {
+              nav.setFrom(point(lat, lon));
+              nav.setRouting(true);
+            },
+          },
+          {
+            label: "Directions to here",
+            icon: <MapPin className="h-4 w-4 text-red-600" />,
+            onSelect: (lat, lon) => {
+              nav.setTo(point(lat, lon));
+              nav.setRouting(true);
+            },
+          },
+        ]}
+      />
       {/* A and B can be dragged to adjust the route. */}
       {routing && from && (
         <Marker
