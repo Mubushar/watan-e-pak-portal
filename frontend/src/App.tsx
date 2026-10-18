@@ -21,6 +21,7 @@ const P: Record<string, ComponentType> = {
   Schemes: lazy(() => import("@/pages/gis/Schemes")),
   CityPage: lazy(() => import("@/pages/gis/CityPage")),
   Projects: lazy(() => import("@/pages/gis/Projects")),
+  Infrastructure: lazy(() => import("@/pages/gis/Infrastructure")),
   ContentPage: lazy(() => import("@/pages/content/ContentPage")),
   Stories: lazy(() => import("@/pages/content/Stories")),
   Pricing: lazy(() => import("@/pages/content/Pricing")),
@@ -82,6 +83,7 @@ export default function App() {
             <Route path="schemes" element={<P.Schemes />} />
             <Route path="cities/:city" element={<P.CityPage />} />
             <Route path="projects" element={<P.Projects />} />
+            <Route path="infrastructure" element={<P.Infrastructure />} />
             <Route path="pages/:key" element={<P.ContentPage />} />
             <Route path="stories" element={<P.Stories />} />
             <Route path="pricing" element={<P.Pricing />} />

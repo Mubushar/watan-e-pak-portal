@@ -2,14 +2,15 @@
  * The map explorer's control column, grouped like a GIS toolbar:
  *   Map    base map · layers (one panel with an on/off switch for every layer) · label language
  *   View   fit to listings
- *   Tools  zoom to area (drag a box)
+ *   Tools  zoom to area (drag a box) · draw a case-study area (circle / rectangle / polygon)
  *
  * The layers panel: a filter box, "All on / All off", then collapsible sections (Portal data,
  * Points of interest, Reference, DHA master plans, GIS layers). Each section has a master switch
  * and shows how many of its layers are on; items can have sub-layers (e.g. a plan's labels).
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Check, ChevronDown, Globe, Languages, Layers, Layers3, Search, SquareDashedMousePointer, X, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, Circle, Globe, Hexagon, Languages, Layers, Layers3, PencilRuler, RectangleHorizontal, Search, SquareDashedMousePointer, X, type LucideIcon } from "lucide-react";
+import type { DrawMode } from "./AreaDraw";
 import type { MapLang } from "./PakistanLayers";
 import { BASE_MAPS, type BaseMapKey } from "@/components/map/PortalMap";
 import { cn } from "@/lib/utils";
@@ -204,7 +205,11 @@ export function MapControls({
   onZoomDraw,
   lang,
   onLang,
+  drawMode,
+  onDraw,
 }: {
+  drawMode?: DrawMode | null;
+  onDraw?: (m: DrawMode | null) => void;
   lang: MapLang;
   onLang: (l: MapLang) => void;
   groups: LayerGroup[];
@@ -214,7 +219,7 @@ export function MapControls({
   zoomDraw: boolean;
   onZoomDraw: (on: boolean) => void;
 }) {
-  const [open, setOpen] = useState<"base" | "layers" | "lang" | null>(null);
+  const [open, setOpen] = useState<"base" | "layers" | "lang" | "draw" | null>(null);
   const [filter, setFilter] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(readCollapsed);
   const ref = useRef<HTMLDivElement>(null);
@@ -252,7 +257,50 @@ export function MapControls({
       )}
       <ToolGroup label="Tools">
         <Btn icon={SquareDashedMousePointer} title={zoomDraw ? "Cancel zoom to area" : "Zoom to area: drag a box on the map"} active={zoomDraw} onClick={() => onZoomDraw(!zoomDraw)} />
+        {onDraw && (
+          <Btn
+            icon={PencilRuler}
+            title={drawMode ? "Cancel drawing" : "Draw a study area — circle, rectangle or polygon — for a case-study report"}
+            active={!!drawMode || open === "draw"}
+            onClick={() => (drawMode ? onDraw(null) : setOpen(open === "draw" ? null : "draw"))}
+          />
+        )}
       </ToolGroup>
+
+      {open === "draw" && onDraw && (
+        <Popover title="Draw a study area" onClose={() => setOpen(null)} wide>
+          <div className="p-2">
+            {(
+              [
+                ["circle", Circle, "Circle", "Press at the centre and drag out the radius"],
+                ["rectangle", RectangleHorizontal, "Rectangle", "Drag from one corner to the other"],
+                ["polygon", Hexagon, "Polygon", "Click each corner; double-click or Enter to finish"],
+              ] as [DrawMode, LucideIcon, string, string][]
+            ).map(([k, Icon, l, hint]) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => {
+                  onDraw(k);
+                  setOpen(null);
+                }}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-start hover:bg-brand-50 dark:hover:bg-white/10"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-600/10 text-violet-700 dark:text-violet-300">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold">{l}</span>
+                  <span className="block text-[11px] text-ink-mute">{hint}</span>
+                </span>
+              </button>
+            ))}
+            <p className="px-3 pt-1 text-[10px] text-ink-mute">
+              The portal then prepares a real-estate case study of the area: amenities, people, market, master plan, mega projects, outlook.
+            </p>
+          </div>
+        </Popover>
+      )}
 
       {open === "base" && (
         <Popover title="Base map" onClose={() => setOpen(null)}>

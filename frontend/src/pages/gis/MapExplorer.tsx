@@ -11,9 +11,11 @@ import {
   ChevronDown,
   Circle as CircleIcon,
   Compass,
+  Construction,
   Crosshair,
   Eye,
   FileBarChart,
+  FileText,
   Footprints,
   Globe2,
   Home,
@@ -22,6 +24,7 @@ import {
   Map as MapIcon,
   MapPin,
   Navigation,
+  PencilRuler,
   PanelLeftClose,
   PanelLeftOpen,
   Radar,
@@ -33,9 +36,11 @@ import {
   Square,
   Star,
   Target,
+  Trash2,
   SquareDashedMousePointer,
 } from "lucide-react";
 import type { City, Property, PropertyList, Scheme } from "@/types";
+import { toast } from "sonner";
 import { get } from "@/lib/api";
 import { useApi } from "@/hooks/useApi";
 import { compact, num, pkrShort, titleCase } from "@/lib/format";
@@ -49,6 +54,9 @@ import { MapControls } from "@/components/gis/MapControls";
 import { CityLabels, ProvinceLayer, type MapLang } from "@/components/gis/PakistanLayers";
 import { NavigatorLayer, NavigatorPanel, useNavigator } from "@/components/gis/Navigator";
 import { POI_CATEGORIES, POI_MIN_ZOOM, PoiLayer } from "@/components/gis/PoiLayer";
+import { AreaDraw, shapeAreaKm2, type DrawMode, type StudyShape } from "@/components/gis/AreaDraw";
+import { StudyReport, useStudyReport } from "@/components/gis/StudyReport";
+import { MEGA_TYPES, MegaProjectLayer, useMegaProjects } from "@/components/gis/MegaProjects";
 import { usePrefs } from "@/store/prefs";
 import { LABEL_MIN_ZOOM, MasterPlanLayers, MasterPlanPanel, PlanLabels, useMasterPlans, type PlanLabel } from "@/components/gis/MasterPlans";
 import type { Aoi, AoiStats, GisLayer, GisLayerDetail, Poi, PoiCategory, RingResult, RouteResult } from "@/components/gis/types";
@@ -258,6 +266,48 @@ export default function MapExplorer() {
   };
   const endZoomDraw = useCallback(() => setZoomDraw(false), []);
 
+  // ---- infrastructure mega projects
+  const megaQ = useMegaProjects();
+  const [megaTypes, setMegaTypes] = useState<Set<string>>(() => new Set(MEGA_TYPES.map((t) => t.key)));
+  const toggleMega = (k: string, on: boolean) =>
+    setMegaTypes((s) => {
+      const n = new Set(s);
+      if (on) n.add(k);
+      else n.delete(k);
+      return n;
+    });
+
+  // ---- case-study area: draw a circle / rectangle / polygon -> report
+  const [drawMode, setDrawMode] = useState<DrawMode | null>(null);
+  const [studyShape, setStudyShape] = useState<StudyShape | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const study = useStudyReport();
+  const runStudy = study.run;
+  const startDraw = (m: DrawMode | null) => {
+    setZoomDraw(false);
+    nav.setPicking(null);
+    setDrawMode(m);
+  };
+  const onStudyShape = useCallback(
+    (s: StudyShape) => {
+      setDrawMode(null);
+      setStudyShape(s);
+      if (shapeAreaKm2(s) > 500) {
+        toast.error("That area is too large for a case study. Draw up to about 25 km across.");
+        return;
+      }
+      setReportOpen(true);
+      void runStudy(s, "Study area");
+    },
+    [runStudy],
+  );
+  const cancelDraw = useCallback(() => setDrawMode(null), []);
+  const clearStudy = () => {
+    setStudyShape(null);
+    setReportOpen(false);
+    study.setData(null);
+  };
+
   const nearPoiQ = useApi<{ pois: Poi[]; count: number }>(
     analysing && mode === "radius" && pt ? "/poi/nearby" : null,
     pt ? { latitude: pt[0], longitude: pt[1], radius_km: dRadius, limit: 100 } : undefined,
@@ -346,6 +396,7 @@ export default function MapExplorer() {
       <PortalMap height="100%" className="rounded-none" scrollWheelZoom onReady={onReady} zoom={5} switcher={false} baseKey={baseMap}>
         {/* ----------------------------------------------------- Pakistan reference layers */}
         {vis.provinces && <ProvinceLayer map={map} lang={mapLang} zoom={zoom} />}
+        {megaTypes.size > 0 && <MegaProjectLayer projects={megaQ.data?.projects ?? []} types={megaTypes} lang={mapLang} zoom={zoom} labelZoom={11} />}
         {vis.cities && <CityLabels zoom={zoom} lang={mapLang} />}
         {osmCats.size > 0 && <PoiLayer categories={osmCats} lang={mapLang} onStatus={setPoiStatus} />}
         <NavigatorLayer nav={nav} />
@@ -520,8 +571,9 @@ export default function MapExplorer() {
           </>
         )}
 
-        <MapClick enabled={analysing && !zoomDraw && !nav.picking} onClick={onMapClick} />
+        <MapClick enabled={analysing && !zoomDraw && !drawMode && !nav.picking} onClick={onMapClick} />
         <ZoomArea active={zoomDraw} onDone={endZoomDraw} padding={sidePad()} />
+        <AreaDraw mode={drawMode} shape={studyShape} onShape={onStudyShape} onCancel={cancelDraw} />
       </PortalMap>
 
       {/* ------------------------------------------------------- map controls (grouped) */}
@@ -529,7 +581,12 @@ export default function MapExplorer() {
         base={baseMap}
         onBase={setBaseMap}
         zoomDraw={zoomDraw}
-        onZoomDraw={setZoomDraw}
+        onZoomDraw={(v) => {
+          if (v) setDrawMode(null);
+          setZoomDraw(v);
+        }}
+        drawMode={drawMode}
+        onDraw={startDraw}
         onFit={properties.length ? () => fitTo(map, filtered.map((p) => [p.latitude!, p.longitude!]), 13, sidePad()) : undefined}
         lang={mapLang}
         onLang={setMapLang}
@@ -566,6 +623,27 @@ export default function MapExplorer() {
               { key: "provinces", label: "Province boundaries", hint: "Provinces & territories, with listing counts", icon: MapIcon, on: vis.provinces, onChange: (v) => setVis((x) => ({ ...x, provinces: v })) },
               { key: "cities", label: "City names", hint: "Main cities; gold dots have a city page", icon: Building2, on: vis.cities, onChange: (v) => setVis((x) => ({ ...x, cities: v })) },
             ],
+          },
+          {
+            key: "mega",
+            title: "Infrastructure projects",
+            icon: Construction,
+            items: MEGA_TYPES.filter((t) => (megaQ.data?.projects ?? []).some((p) => p.type === t.key)).map((t) => ({
+              key: `mega-${t.key}`,
+              label: t.label,
+              hint: `${(megaQ.data?.projects ?? []).filter((p) => p.type === t.key).length} projects`,
+              color: t.color,
+              on: megaTypes.has(t.key),
+              onChange: (v: boolean) => toggleMega(t.key, v),
+            })),
+            note: (
+              <>
+                Ring roads, motorways, new sectors and economic zones that move land prices.{" "}
+                <Link to="/infrastructure" className="link">
+                  Details
+                </Link>
+              </>
+            ),
           },
           {
             key: "plans",
@@ -620,7 +698,47 @@ export default function MapExplorer() {
             </div>
           </motion.div>
         )}
-        {analysing && !zoomDraw && (
+        {drawMode && (
+          <motion.div key="draw" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+            <div className="glass-dark flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold shadow-soft">
+              <PencilRuler className="h-4 w-4 text-gold-300" />
+              {drawMode === "circle"
+                ? "Press at the centre and drag out the radius"
+                : drawMode === "rectangle"
+                  ? "Drag from one corner to the opposite corner"
+                  : "Click each corner · double-click or Enter to finish · Backspace undoes"}{" "}
+              · Esc cancels
+            </div>
+          </motion.div>
+        )}
+        {studyShape && !drawMode && !zoomDraw && (
+          <motion.div key="study" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="pointer-events-auto">
+            <div className="flex items-center gap-1 whitespace-nowrap rounded-2xl bg-white p-1.5 shadow-2xl ring-1 ring-black/5 dark:bg-brand-950">
+              <span className="px-2 text-xs font-semibold">
+                <span className="me-1.5 inline-block h-2.5 w-2.5 rounded-full bg-violet-600" />
+                Study area · {shapeAreaKm2(studyShape).toFixed(2)} km²
+              </span>
+              <Button
+                size="sm"
+                icon={<FileText className="h-4 w-4" />}
+                loading={study.loading}
+                onClick={() => {
+                  setReportOpen(true);
+                  if (!study.data) void study.run(studyShape, "Study area");
+                }}
+              >
+                Report
+              </Button>
+              <button type="button" onClick={() => startDraw(studyShape.kind)} className="btn btn-ghost btn-sm" title="Draw again">
+                <PencilRuler className="h-4 w-4" /> Redraw
+              </button>
+              <button type="button" onClick={clearStudy} className="btn btn-ghost btn-icon h-8 w-8" title="Clear the study area" aria-label="Clear the study area">
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+        {analysing && !zoomDraw && !drawMode && !studyShape && (
           <motion.div key="analyse" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
             <div className="glass-dark flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold shadow-soft">
               <Crosshair className="h-4 w-4 text-gold-300" />
@@ -630,6 +748,23 @@ export default function MapExplorer() {
         )}
       </AnimatePresence>
       </div>
+
+      {reportOpen && (
+        <StudyReport
+          data={study.data}
+          loading={study.loading}
+          shape={studyShape}
+          onClose={() => setReportOpen(false)}
+          onSave={async (name) => {
+            if (!studyShape) return;
+            const r = await study.run(studyShape, name, true);
+            if (r) {
+              toast.success(`Saved "${name}" to your areas of interest`);
+              void qc.invalidateQueries({ queryKey: ["/aoi"] });
+            }
+          }}
+        />
+      )}
 
       {/* ------------------------------------------------------- side panel / bottom sheet */}
       <motion.aside

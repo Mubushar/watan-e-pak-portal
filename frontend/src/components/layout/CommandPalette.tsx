@@ -15,6 +15,7 @@ type Hit = { group: string; label: string; sub?: string; to: string; icon: React
 const NAV: Hit[] = [
   { group: "Go to", label: "Browse properties", to: "/properties", icon: <Home className="h-4 w-4" /> },
   { group: "Go to", label: "Map explorer (GIS)", to: "/map", icon: <MapPin className="h-4 w-4" /> },
+  { group: "Go to", label: "Infrastructure mega projects", to: "/infrastructure", icon: <MapPin className="h-4 w-4" /> },
   { group: "Go to", label: "AI Hub & agents", to: "/ai", icon: <Sparkles className="h-4 w-4" /> },
   { group: "Go to", label: "Tools & calculators", to: "/tools", icon: <Wrench className="h-4 w-4" /> },
   { group: "Go to", label: "Market insights", to: "/insights", icon: <Landmark className="h-4 w-4" /> },
