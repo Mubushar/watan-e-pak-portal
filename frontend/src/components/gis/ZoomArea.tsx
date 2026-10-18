@@ -1,7 +1,8 @@
 /**
- * "Zoom to area": drag a rectangle over the map and zoom to it.
+ * Box zoom: drag a rectangle over the map to zoom in to it — or, with `mode="out"`, to zoom out
+ * so that the whole current view fits into the box you drew (smaller box, bigger zoom-out).
  *   press + drag     draw the box (mouse, pen or touch)
- *   release          zoom to the box
+ *   release          zoom
  *   Esc              cancel
  * Render inside the map; `active` turns it on, `onDone` is called when it zooms or is cancelled.
  * With `sticky` the tool stays on after each zoom (draw box after box) until it is switched off
@@ -12,15 +13,21 @@ import { useEffect, useRef, useState } from "react";
 import { Rectangle, useMap } from "react-leaflet";
 import L from "leaflet";
 
-const STYLE = { color: "#c99a22", weight: 2.5, dashArray: "6 5", fillColor: "#f2dd8f", fillOpacity: 0.18 };
+const STYLE = {
+  in: { color: "#c99a22", weight: 2.5, dashArray: "6 5", fillColor: "#f2dd8f", fillOpacity: 0.18 },
+  out: { color: "#2563eb", weight: 2.5, dashArray: "6 5", fillColor: "#93c5fd", fillOpacity: 0.18 },
+};
 
 export function ZoomArea({
   active,
   onDone,
   padding,
   sticky = false,
+  mode = "in",
 }: {
   active: boolean;
+  /** "in": zoom to the box; "out": fit the current view into the box. */
+  mode?: "in" | "out";
   onDone: () => void;
   padding?: { start?: number; bottom?: number };
   sticky?: boolean;
@@ -39,7 +46,7 @@ export function ZoomArea({
     // While the tool is on, a drag draws the box instead of panning the map.
     map.dragging.disable();
     map.boxZoom.disable();
-    el.style.cursor = "crosshair";
+    el.style.cursor = mode === "out" ? "zoom-out" : "zoom-in";
     el.style.touchAction = "none";
 
     const at = (e: PointerEvent) => map.mouseEventToLatLng(e as unknown as MouseEvent);
@@ -69,10 +76,18 @@ export function ZoomArea({
       start.current = null;
       setBox(null);
       if (Math.abs(a.x - b.x) < 8 || Math.abs(a.y - b.y) < 8) return; // a click, not a box
-      const rtl = document.documentElement.dir === "rtl";
-      const s = 24 + (padding?.start ?? 0);
-      const bottom = 24 + (padding?.bottom ?? 0);
-      map.flyToBounds(bounds, { paddingTopLeft: [rtl ? 24 : s, 24], paddingBottomRight: [rtl ? s : 24, bottom], maxZoom: 19, duration: 0.8 });
+      if (mode === "out") {
+        // The whole view shrinks into the box: zoom out by log2(view / box), centred on the box.
+        const size = map.getSize();
+        const scale = Math.min(Math.abs(a.x - b.x) / size.x, Math.abs(a.y - b.y) / size.y);
+        const zoom = Math.max(map.getMinZoom(), map.getZoom() + Math.log2(Math.max(scale, 0.01)));
+        map.flyTo(bounds.getCenter(), Math.floor(zoom), { duration: 0.8 });
+      } else {
+        const rtl = document.documentElement.dir === "rtl";
+        const s = 24 + (padding?.start ?? 0);
+        const bottom = 24 + (padding?.bottom ?? 0);
+        map.flyToBounds(bounds, { paddingTopLeft: [rtl ? 24 : s, 24], paddingBottomRight: [rtl ? s : 24, bottom], maxZoom: 19, duration: 0.8 });
+      }
       // One-shot mode: turn the tool off after this gesture's click has been swallowed.
       if (!sticky) setTimeout(onDone, 0);
     };
@@ -96,7 +111,7 @@ export function ZoomArea({
       el.style.cursor = "";
       el.style.touchAction = "";
     };
-  }, [active, map, onDone, sticky, padding?.start, padding?.bottom]);
+  }, [active, map, onDone, sticky, mode, padding?.start, padding?.bottom]);
 
-  return active && box ? <Rectangle bounds={box} pathOptions={STYLE} interactive={false} /> : null;
+  return active && box ? <Rectangle bounds={box} pathOptions={STYLE[mode]} interactive={false} /> : null;
 }

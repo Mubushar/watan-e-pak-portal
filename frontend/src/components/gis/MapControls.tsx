@@ -1,7 +1,8 @@
 /**
  * The map explorer's control column, grouped like a GIS toolbar:
  *   Map    base map · layers (one panel with an on/off switch for every layer) · label language
- *   View   fit to listings (full) · zoom to area (drag a box)
+ *   View   pan (hand: normal map dragging) · fit to listings (full) · box zoom in / out
+ *          (each box tool stays on until clicked again or another tool is picked)
  *   Study  draw a case-study area (circle / rectangle / polygon)
  *
  * The layers panel: a filter box, "All on / All off", then collapsible sections (Portal data,
@@ -9,7 +10,7 @@
  * and shows how many of its layers are on; items can have sub-layers (e.g. a plan's labels).
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Check, ChevronDown, Circle, Globe, Hexagon, Languages, Layers, Layers3, PencilRuler, RectangleHorizontal, Search, SquareDashedMousePointer, X, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, Circle, Globe, Hand, Hexagon, Languages, Layers, Layers3, PencilRuler, RectangleHorizontal, Search, X, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
 import type { DrawMode } from "./AreaDraw";
 import type { MapLang } from "./PakistanLayers";
 import { BASE_MAPS, type BaseMapKey } from "@/components/map/PortalMap";
@@ -221,8 +222,10 @@ export function MapControls({
   base,
   onBase,
   onFit,
-  zoomDraw,
-  onZoomDraw,
+  zoomMode,
+  onZoomMode,
+  panActive,
+  onPan,
   lang,
   onLang,
   drawMode,
@@ -236,8 +239,13 @@ export function MapControls({
   base: BaseMapKey;
   onBase: (b: BaseMapKey) => void;
   onFit?: () => void;
-  zoomDraw: boolean;
-  onZoomDraw: (on: boolean) => void;
+  /** Box zoom tool: "in", "out", or off (null). */
+  zoomMode: "in" | "out" | null;
+  onZoomMode: (m: "in" | "out" | null) => void;
+  /** True when no tool is on and the map drags normally. */
+  panActive: boolean;
+  /** Switch every tool off: back to dragging the map. */
+  onPan: () => void;
 }) {
   const [open, setOpen] = useState<"base" | "layers" | "lang" | "draw" | null>(null);
   const [filter, setFilter] = useState("");
@@ -264,7 +272,7 @@ export function MapControls({
   const setAll = (v: boolean) => groups.forEach((g) => g.items.forEach((i) => i.on !== v && i.onChange(v)));
   // Using any other tool switches the zoom tool off.
   const other = (fn: () => void) => () => {
-    if (zoomDraw) onZoomDraw(false);
+    if (zoomMode) onZoomMode(null);
     fn();
   };
 
@@ -284,13 +292,21 @@ export function MapControls({
         <Btn icon={Languages} text="Lang" title="Map label language — English / اردو" active={open === "lang"} onClick={other(() => setOpen(open === "lang" ? null : "lang"))} />
       </ToolGroup>
       <ToolGroup label="View">
+        <Btn icon={Hand} text="Pan" title="Pan: drag the map (turns every tool off)" active={panActive} onClick={onPan} />
         {onFit && <Btn icon={Globe} text="Full" title="Fit to listings" onClick={other(onFit)} />}
         <Btn
-          icon={SquareDashedMousePointer}
-          text="Zoom"
-          title={zoomDraw ? "Zoom tool is on — click to turn it off" : "Zoom tool: drag boxes on the map to zoom in (stays on until you click again)"}
-          active={zoomDraw}
-          onClick={() => onZoomDraw(!zoomDraw)}
+          icon={ZoomIn}
+          text="Zoom +"
+          title={zoomMode === "in" ? "Box zoom-in is on — click to turn it off" : "Box zoom-in: drag a box to zoom in to it (stays on until you click again)"}
+          active={zoomMode === "in"}
+          onClick={() => onZoomMode(zoomMode === "in" ? null : "in")}
+        />
+        <Btn
+          icon={ZoomOut}
+          text="Zoom −"
+          title={zoomMode === "out" ? "Box zoom-out is on — click to turn it off" : "Box zoom-out: drag a box — the current view shrinks into it (stays on until you click again)"}
+          active={zoomMode === "out"}
+          onClick={() => onZoomMode(zoomMode === "out" ? null : "out")}
         />
       </ToolGroup>
       {onDraw && (

@@ -44,7 +44,8 @@ import {
   Trash2,
   Type,
   Waves,
-  SquareDashedMousePointer,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import type { City, Property, PropertyList, Scheme } from "@/types";
 import { toast } from "sonner";
@@ -231,7 +232,9 @@ export default function MapExplorer() {
   const [radii, setRadii] = useState("1,3,5");
   const dRadii = useDebounced(radii, 600);
   const analysing = tab === "analyse";
-  const [zoomDraw, setZoomDraw] = useState(false);
+  const [zoomMode, setZoomMode] = useState<"in" | "out" | null>(null);
+  const zoomDraw = zoomMode !== null;
+  const setZoomDraw = (on: boolean) => setZoomMode(on ? "in" : null);
   const [baseMap, setBaseMap] = useSavedState<BaseMapKey>("map.base", "streets");
   const appLang = usePrefs((s) => s.lang);
   const [mapLang, setMapLang] = useSavedState<MapLang>("map.lang", appLang === "ur" ? "both" : "en");
@@ -272,7 +275,7 @@ export default function MapExplorer() {
       return n;
     });
   };
-  const endZoomDraw = useCallback(() => setZoomDraw(false), []);
+  const endZoomDraw = useCallback(() => setZoomMode(null), []);
   // Starting another map tool (directions, picking a point, a side-panel tab) switches the zoom tool off.
   useEffect(() => {
     setZoomDraw(false);
@@ -621,7 +624,7 @@ export default function MapExplorer() {
         )}
 
         <MapClick enabled={analysing && !zoomDraw && !drawMode && !nav.picking} onClick={onMapClick} />
-        <ZoomArea active={zoomDraw} onDone={endZoomDraw} padding={sidePad()} sticky />
+        <ZoomArea active={zoomDraw} mode={zoomMode ?? "in"} onDone={endZoomDraw} padding={sidePad()} sticky />
         <AreaDraw mode={drawMode} shape={studyShape} onShape={onStudyShape} onCancel={cancelDraw} />
       </PortalMap>
 
@@ -629,10 +632,19 @@ export default function MapExplorer() {
       <MapControls
         base={baseMap}
         onBase={setBaseMap}
-        zoomDraw={zoomDraw}
-        onZoomDraw={(v) => {
-          if (v) setDrawMode(null);
-          setZoomDraw(v);
+        zoomMode={zoomMode}
+        onZoomMode={(m) => {
+          if (m) {
+            setDrawMode(null);
+            nav.setPicking(null);
+          }
+          setZoomMode(m);
+        }}
+        panActive={!zoomMode && !drawMode && !nav.picking}
+        onPan={() => {
+          setZoomMode(null);
+          setDrawMode(null);
+          nav.setPicking(null);
         }}
         drawMode={drawMode}
         onDraw={startDraw}
@@ -829,8 +841,8 @@ export default function MapExplorer() {
         {zoomDraw && (
           <motion.div key="zoom" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
             <div className="glass-dark flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold shadow-soft">
-              <SquareDashedMousePointer className="h-4 w-4 text-gold-300" />
-              Zoom tool on: drag boxes to zoom in · click Zoom again (or Esc) to turn it off
+              {zoomMode === "out" ? <ZoomOut className="h-4 w-4 text-sky-300" /> : <ZoomIn className="h-4 w-4 text-gold-300" />}
+              {zoomMode === "out" ? "Zoom-out tool on: drag a box — the current view shrinks into it" : "Zoom-in tool on: drag boxes to zoom in"} · Pan (or Esc) turns it off
             </div>
           </motion.div>
         )}
