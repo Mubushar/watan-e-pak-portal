@@ -41,6 +41,7 @@ const P: Record<string, ComponentType> = {
   AgentOps: lazy(() => import("@/pages/app/AgentOps")),
   Crm: lazy(() => import("@/pages/app/Crm")),
   CrmDashboard: lazy(() => import("@/pages/app/CrmDashboard")),
+  BaseData: lazy(() => import("@/pages/app/BaseData")),
   Accounting: lazy(() => import("@/pages/app/Accounting")),
   Transactions: lazy(() => import("@/pages/app/Transactions")),
   Leasing: lazy(() => import("@/pages/app/Leasing")),
@@ -115,6 +116,7 @@ export default function App() {
             <Route path="ads" element={<P.Ads />} />
             <Route path="construction" element={<P.Construction />} />
             <Route path="admin" element={<P.Admin />} />
+            <Route path="admin/base-data" element={<RequirePermission perm="basedata.manage" area="base data"><P.BaseData /></RequirePermission>} />
             <Route path="profile" element={<P.Profile />} />
             <Route path="listings" element={<P.MyListings />} />
             <Route path="listings/new" element={<P.ListingNew />} />

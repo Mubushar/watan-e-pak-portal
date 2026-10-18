@@ -876,7 +876,7 @@ async def run_wing_checks() -> None:
 # ============================================================
 
 
-_GUARDED = ("/crm", "/marketing", "/broker", "/agents", "/messaging")
+_GUARDED = ("/crm", "/marketing", "/broker", "/agents", "/messaging", "/cities", "/schemes", "/blocks", "/admin/basedata")
 
 
 def _sign_in_guarded(client: TestClient) -> str:
@@ -931,6 +931,34 @@ def run_access_checks(client: TestClient) -> None:
     check("access: agent can't brief another agent's lead", other is not None and client.post(f"/crm/ai/lead-brief/{other.id}", headers=agent).status_code == 403)
     ins = client.get("/crm/insights", headers=agent).json()
     check("access: agent insights cover own book", ins["kpis"]["leads_total"] == len(leads), str(ins["kpis"]["leads_total"]))
+    # --- base data admin (basedata.manage)
+    admin = login("admin@portal.pk", "Admin@12345")
+    check("basedata: signed out -> 401", client.get("/admin/basedata", headers=anon).status_code == 401)
+    check("basedata: agent -> 403", client.get("/admin/basedata", headers=agent).status_code == 403)
+    ov = client.get("/admin/basedata", headers=admin).json()
+    check("basedata: overview lists cities / schemes / blocks", [t["table"] for t in ov["tables"]] == ["cities", "schemes", "blocks"], str(ov)[:120])
+    r = client.post("/admin/basedata/cities", headers=admin, json={"name": "Basedata Test City", "state": "Punjab", "population": 1000,
+                                                                   "sources": [{"title": "t", "url": "https://example.com"}]})
+    city_id = r.json().get("id")
+    check("basedata: create city", r.status_code == 201 and bool(city_id), r.text[:120])
+    check("basedata: duplicate name -> 422", client.post("/admin/basedata/cities", headers=admin, json={"name": "basedata test city"}).status_code == 422)
+    check("basedata: bad type -> 422", client.put(f"/admin/basedata/cities/{city_id}", headers=admin, json={"population": "many"}).status_code == 422)
+    r = client.put(f"/admin/basedata/cities/{city_id}", headers=admin, json={"population": 2000, "district": "Test"})
+    check("basedata: update city", r.status_code == 200 and r.json().get("population") == 2000, r.text[:120])
+    r = client.post("/admin/basedata/schemes", headers=admin, json={"name": "Basedata Test Scheme", "city_id": city_id, "approval_status": "approved", "plot_sizes": ["5 marla"]})
+    scheme_id = r.json().get("id")
+    check("basedata: create scheme", r.status_code == 201 and r.json().get("city") == "Basedata Test City", r.text[:120])
+    check("basedata: bad approval status -> 422", client.post("/admin/basedata/schemes", headers=admin, json={"name": "X", "city_id": city_id, "approval_status": "maybe"}).status_code == 422)
+    r = client.post("/admin/basedata/blocks", headers=admin, json={"name": "Block A", "scheme_id": scheme_id})
+    check("basedata: create block", r.status_code == 201, r.text[:120])
+    check("basedata: city in use -> 409", client.delete(f"/admin/basedata/cities/{city_id}", headers=admin).status_code == 409)
+    check("basedata: scheme in use -> 409", client.delete(f"/admin/basedata/schemes/{scheme_id}", headers=admin).status_code == 409)
+    check("basedata: delete block", client.delete(f"/admin/basedata/blocks/{r.json()['id']}", headers=admin).status_code == 200)
+    check("basedata: delete scheme then city", client.delete(f"/admin/basedata/schemes/{scheme_id}", headers=admin).status_code == 200
+          and client.delete(f"/admin/basedata/cities/{city_id}", headers=admin).status_code == 200)
+    check("basedata: old write routes need the permission", client.put("/schemes/x", headers=agent, json={}).status_code == 403)
+    check("basedata: public city list stays open", client.get("/cities", headers=anon).status_code == 200)
+
     support = login("support@portal.pk", "Support@12345")
     check("access: customer support sees the whole CRM", client.get("/crm/leads", headers=support).json()["count"] >= len(leads))
 

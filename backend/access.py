@@ -98,6 +98,10 @@ def rule_for(method: str, path: str) -> Rule:
         if method == "GET" and _PUBLIC_AGENT_READS.match(path):
             return "public"
         return "user"
+    if path.startswith("/admin/basedata"):
+        return "basedata.manage"
+    if path.split("/")[1:2] in (["cities"], ["schemes"], ["blocks"]) and method in ("POST", "PUT", "PATCH", "DELETE"):
+        return "basedata.manage"
     if path.startswith(("/crm/", "/marketing/", "/broker/")) or path in ("/crm", "/marketing", "/broker"):
         return "crm.view" if method in ("GET", "HEAD") else "crm.manage"
     if path.startswith("/messaging/") or path == "/messaging":
@@ -171,7 +175,7 @@ class AccessGuard:
             if not user:
                 await _deny(send, 401, "Please sign in to use this feature", {"WWW-Authenticate": "Bearer"})
                 return
-            if rule.startswith("crm.") and not can(user, rule):
+            if rule.endswith((".view", ".manage")) and not can(user, rule):
                 await _deny(send, 403, f"Your role doesn't include {rule.replace('.', ' ')} access")
                 return
             mine = agent_scope(user)

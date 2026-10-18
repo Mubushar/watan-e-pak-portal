@@ -31,7 +31,7 @@ from fastapi import (Depends, FastAPI, Header, HTTPException, Query, Request, We
                      WebSocketDisconnect)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
-from pydantic import BaseModel, Field
+from pydantic import ValidationError, BaseModel, Field
 
 import server as core
 import ads_network
@@ -43,6 +43,7 @@ import directions as routing
 import megaprojects
 import roads
 import access
+import basedata
 import crm_ai
 import crm_channels
 import water
@@ -114,6 +115,74 @@ def _link_demo_agent() -> None:
 
 
 _link_demo_agent()
+basedata.load_seed()  # researched cities & housing schemes (geodata/pk_*_basedata / housing_schemes)
+
+
+# ------------------------------------------------------------------ base data admin (basedata.manage)
+
+_BASEDATA_TABLES = ("cities", "schemes", "blocks")
+
+
+def _basedata_table(table: str) -> str:
+    if table not in _BASEDATA_TABLES:
+        raise HTTPException(status_code=404, detail=f"Unknown table — one of {', '.join(_BASEDATA_TABLES)}")
+    return table
+
+
+@app.get("/admin/basedata", tags=["admin"])
+def basedata_overview() -> Any:
+    """The base-data tables with their row counts and editable fields."""
+    return {"tables": [{"table": t, "count": len(basedata.rows(t)), "fields": basedata.fields(t)} for t in _BASEDATA_TABLES],
+            "approval_statuses": basedata.APPROVAL_STATUSES, "development_statuses": basedata.DEVELOPMENT_STATUSES}
+
+
+@app.get("/admin/basedata/{table}", tags=["admin"])
+def basedata_list(table: str, q: Optional[str] = None, city_id: Optional[str] = None, scheme_id: Optional[str] = None) -> Any:
+    rows = basedata.rows(_basedata_table(table), q=q, city_id=city_id, scheme_id=scheme_id)
+    return {"table": table, "count": len(rows), "rows": rows}
+
+
+@app.get("/admin/basedata/{table}/{record_id}", tags=["admin"])
+def basedata_get(table: str, record_id: str) -> Any:
+    row = basedata.get(_basedata_table(table), record_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    return row
+
+
+@app.post("/admin/basedata/{table}", tags=["admin"], status_code=201)
+def basedata_create(table: str, payload: Dict[str, Any]) -> Any:
+    try:
+        return basedata.create(_basedata_table(table), payload)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors()[0].get("msg", "Invalid value"))
+
+
+@app.put("/admin/basedata/{table}/{record_id}", tags=["admin"])
+def basedata_update(table: str, record_id: str, payload: Dict[str, Any]) -> Any:
+    try:
+        row = basedata.update(_basedata_table(table), record_id, payload)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors()[0].get("msg", "Invalid value"))
+    if row is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    return row
+
+
+@app.delete("/admin/basedata/{table}/{record_id}", tags=["admin"])
+def basedata_delete(table: str, record_id: str) -> Any:
+    """Delete a city, scheme or block — refused (409) while schemes, blocks or listings use it."""
+    res = basedata.delete(_basedata_table(table), record_id)
+    if res.get("error") == "not_found":
+        raise HTTPException(status_code=404, detail="Not found")
+    if res.get("error") == "blocked":
+        parts = ", ".join(f"{v} {k}" for k, v in res["dependents"].items())
+        raise HTTPException(status_code=409, detail=f"Still in use by {parts} — move or delete those first")
+    return res
 
 _cors_origins = [o.strip() for o in os.getenv("PORTAL_CORS_ORIGINS", "*").split(",") if o.strip()]
 app.add_middleware(

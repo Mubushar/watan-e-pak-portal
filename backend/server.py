@@ -110,11 +110,18 @@ class MediaMixin(BaseModel):
 class City(MediaMixin):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
-    state: Optional[str] = None
+    name_ur: Optional[str] = None
+    state: Optional[str] = None  # province / territory
+    district: Optional[str] = None
     country: str = "Pakistan"
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     description: Optional[str] = None
+    population: Optional[int] = None  # 2023 Census
+    population_note: Optional[str] = None
+    area_km2: Optional[float] = None
+    development_authority: Optional[str] = None
+    sources: List[Dict[str, str]] = Field(default_factory=list)  # [{title, url}]
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
@@ -135,6 +142,14 @@ class HousingScheme(MediaMixin):
     possession_status: Optional[str] = None    # e.g. possession given, partial, not yet
     utilities: List[str] = Field(default_factory=list)  # electricity, gas, water, sewerage …
     population: Optional[int] = None           # residents, if the society publishes it
+    name_ur: Optional[str] = None
+    # approved | noc_issued | partially_approved | under_process | unapproved | illegal | cancelled
+    approval_status: Optional[str] = None
+    approval_note: Optional[str] = None        # which list / ruling / when
+    area_acres: Optional[float] = None
+    plot_sizes: List[str] = Field(default_factory=list)  # "5 marla", "1 kanal", "250 sq yd" …
+    website: Optional[str] = None
+    sources: List[Dict[str, str]] = Field(default_factory=list)  # [{title, url}]
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
@@ -644,9 +659,13 @@ def list_cities() -> str:
             {
                 "id": c.id,
                 "name": c.name,
+                "name_ur": c.name_ur,
                 "state": c.state,
+                "district": c.district,
                 "latitude": c.latitude,
                 "longitude": c.longitude,
+                "population": c.population,
+                "development_authority": c.development_authority,
                 "schemes": len(schemes),
                 "properties": len(props),
             }
@@ -671,6 +690,10 @@ def list_schemes(city: Optional[str] = None) -> str:
                 "established_year": s.established_year,
                 "development_status": s.development_status,
                 "approval_authority": s.approval_authority,
+                "approval_status": s.approval_status,
+                "developer": s.developer,
+                "latitude": s.latitude,
+                "longitude": s.longitude,
                 "blocks": len([b for b in block_zone_areas_db if b.scheme_id == s.id]),
             }
         )

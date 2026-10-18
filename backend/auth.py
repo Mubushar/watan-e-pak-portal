@@ -96,6 +96,7 @@ PERMISSIONS: Dict[str, str] = {
     "listings.manage": "Create / edit / withdraw listings",
     "properties.view": "View the property catalogue",
     "properties.manage": "Edit the property catalogue and GIS coordinates",
+    "basedata.manage": "Manage base data: cities, housing schemes / societies, blocks and zones",
     "projects.view": "View big projects",
     "projects.manage": "Create / edit big projects and their media",
     "gis.view": "Use maps, layers and spatial analysis",

@@ -12,6 +12,7 @@ import {
   Globe,
   HardHat,
   KeyRound,
+  Database,
   Gauge,
   LayoutDashboard,
   Megaphone,
@@ -87,7 +88,8 @@ export function useDashboardNav(unread: number): { title: string; items: NavItem
     {
       title: "Administration",
       items: [
-        { to: "/app/admin", label: "Users & roles", icon: ShieldCheck },
+        { to: "/app/admin", label: "Users & roles", icon: ShieldCheck, end: true },
+        { to: "/app/admin/base-data", label: "Base data", icon: Database, perm: "basedata.manage" },
         { to: "/app/profile", label: "Profile", icon: UserRound },
       ],
     },
