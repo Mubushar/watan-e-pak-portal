@@ -946,6 +946,12 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         r = client.get("/geo/roads/search", params={"q": "M-2"})
         check("GET /geo/roads/search", r.status_code == 200 and "roads" in r.json(), str(r.status_code))
 
+        # Water bodies and districts: also work without the built OpenStreetMap files.
+        r = client.get("/geo/water", params={"south": 33.9, "west": 72.5, "north": 34.2, "east": 72.9, "zoom": 11})
+        check("GET /geo/water", r.status_code == 200 and "water" in r.json(), str(r.status_code))
+        r = client.get("/geo/districts")
+        check("GET /geo/districts", r.status_code == 200 and r.json().get("type") == "FeatureCollection", str(r.status_code))
+
         aois_before = len(core.aois_db)
         r = client.post("/geo/study-area", json={"kind": "circle", "center": [33.428, 72.995], "radius_m": 1500})
         body = r.json() if r.status_code == 200 else {}

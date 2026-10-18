@@ -42,6 +42,7 @@ import ai_guard
 import directions as routing
 import megaprojects
 import roads
+import water
 import study_area
 import openai_voice
 import gemini_live
@@ -479,6 +480,34 @@ def geo_provinces() -> Any:
     return {"type": "FeatureCollection", "attribution": data.get("attribution"), "features": features}
 
 
+_DISTRICTS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "media", "boundaries", "pk_districts.geojson")
+_DISTRICTS: Dict[str, Any] = {}
+
+
+@app.get("/geo/districts", tags=["places"])
+def geo_districts(request: Request) -> Any:
+    """Pakistan's districts as GeoJSON (OpenStreetMap admin_level 6, built by ``build_districts.py``)
+    with English / Urdu name, province, area, a label point and the number of portal listings in each.
+    Islamabad Capital Territory, which has no districts, is included as one."""
+    if not os.path.exists(_DISTRICTS_FILE):
+        return {"type": "FeatureCollection", "features": [], "missing": True,
+                "hint": "District data not built yet: run build_districts.py (see backend/README.md)."}
+    if "data" not in _DISTRICTS:
+        with open(_DISTRICTS_FILE, encoding="utf-8") as fh:
+            data = json.load(fh)
+        for f in _pk_file("pk_provinces.geojson")["features"]:
+            if f["properties"]["name"] == "Islamabad Capital Territory":
+                data["features"].append({"type": "Feature", "geometry": f["geometry"], "properties": {
+                    "name": "Islamabad", "name_ur": f["properties"].get("name_ur") or "اسلام آباد",
+                    "province": "Islamabad Capital Territory", "area_km2": 906.5, "label": [33.69, 73.04]}})
+        _DISTRICTS["data"] = data
+    data = _DISTRICTS["data"]
+    points = [(p.latitude, p.longitude) for p in core.properties_db if p.latitude is not None and p.longitude is not None]
+    features = [{**f, "properties": {**f["properties"], "listings": sum(1 for la, lo in points if _in_geometry(la, lo, f["geometry"]))}}
+                for f in data["features"]]
+    return _json_maybe_gzip(request, {"type": "FeatureCollection", "meta": data.get("meta"), "count": len(features), "features": features})
+
+
 @app.get("/geo/places", tags=["places"])
 def geo_places(south: float, west: float, north: float, east: float, categories: Optional[str] = None,
                limit: int = 1500) -> Any:
@@ -572,6 +601,15 @@ def geo_study_area(payload: StudyAreaRequest) -> Any:
     return result
 
 
+def _json_maybe_gzip(request: Request, data: Any) -> Response:
+    """JSON, gzipped when the client accepts it (map layers run to ~1 MB of coordinates; gzip cuts ~4-7x)."""
+    body = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    if "gzip" in request.headers.get("accept-encoding", "") and len(body) > 4096:
+        return Response(gzip.compress(body, compresslevel=5), media_type="application/json",
+                        headers={"Content-Encoding": "gzip", "Vary": "Accept-Encoding", "Cache-Control": "public, max-age=3600"})
+    return Response(body, media_type="application/json")
+
+
 @app.get("/geo/roads", tags=["places"])
 def geo_roads(request: Request, south: float, west: float, north: float, east: float, zoom: int = 8,
               classes: Optional[str] = None) -> Any:
@@ -581,12 +619,17 @@ def geo_roads(request: Request, south: float, west: float, north: float, east: f
     ``c`` class, ``s`` status, ``r`` number, ``n`` / ``u`` name, ``l`` lanes, ``v`` max speed,
     ``f`` surface, ``p`` [[lat, lon], ...]."""
     data = roads.in_view(south, west, north, east, zoom, classes.split(",") if classes else None)
-    body = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-    # Country views run to ~1 MB of coordinates; gzip cuts that by about 4x.
-    if "gzip" in request.headers.get("accept-encoding", "") and len(body) > 4096:
-        return Response(gzip.compress(body, compresslevel=5), media_type="application/json",
-                        headers={"Content-Encoding": "gzip", "Vary": "Accept-Encoding", "Cache-Control": "public, max-age=3600"})
-    return Response(body, media_type="application/json")
+    return _json_maybe_gzip(request, data)
+
+
+@app.get("/geo/water", tags=["places"])
+def geo_water(request: Request, south: float, west: float, north: float, east: float, zoom: int = 8,
+              classes: Optional[str] = None) -> Any:
+    """Pakistan's water bodies in a map view, from OpenStreetMap: rivers, canals (lines) and lakes,
+    reservoirs, river beds, ponds (areas, with ``a`` = km²), thinned by zoom. Compact rows: ``c``
+    class, ``n`` / ``u`` name, ``p`` [[lat, lon], ...]."""
+    data = water.in_view(south, west, north, east, zoom, classes.split(",") if classes else None)
+    return _json_maybe_gzip(request, data)
 
 
 @app.get("/geo/roads/search", tags=["places"])

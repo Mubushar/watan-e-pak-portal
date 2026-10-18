@@ -172,6 +172,22 @@ uv run --no-project --python 3.12 --with osmium python build_roads.py
 Re-run both commands to pick up new roads, then restart the backend. Without the file, the
 endpoint returns no roads and a hint on how to build it.
 
+The same extract also gives:
+
+| Endpoint | Build | What it returns |
+| --- | --- | --- |
+| `GET /geo/water?south=&west=&north=&east=&zoom=` | `build_water.py` → `media/water/` | Rivers and canals (lines); lakes, dams / reservoirs, river beds and ponds (areas with km²). Thinned by zoom and gzipped |
+| `GET /geo/districts` | `build_districts.py` → `media/boundaries/` | District boundaries (OSM `admin_level=6`, plus Islamabad Capital Territory) with English / Urdu name, province, area and listing count |
+
+```bash
+uv run --no-project --python 3.12 --with osmium python build_water.py
+uv run --no-project --python 3.12 --with osmium python build_districts.py
+```
+
+The map's terrain layer (DTM elevation colours, hillshade and the elevation under the mouse)
+needs no backend data. The browser decodes the open AWS Terrain Tiles directly (Terrarium
+PNGs: SRTM 30 m over Pakistan).
+
 ## Infrastructure mega projects and area case studies
 
 | Endpoint | What it returns |

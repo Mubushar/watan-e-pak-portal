@@ -19,12 +19,15 @@ import {
   Hash,
   Footprints,
   Globe2,
+  Grid2x2,
   Home,
   LandPlot,
   Layers3,
   Map as MapIcon,
   MapPin,
   MessageSquareText,
+  Mountain,
+  MountainSnow,
   Navigation,
   PencilRuler,
   PanelLeftClose,
@@ -39,6 +42,8 @@ import {
   Star,
   Target,
   Trash2,
+  Type,
+  Waves,
   SquareDashedMousePointer,
 } from "lucide-react";
 import type { City, Property, PropertyList, Scheme } from "@/types";
@@ -61,12 +66,15 @@ import { AreaDraw, shapeAreaKm2, type DrawMode, type StudyShape } from "@/compon
 import { StudyReport, useStudyReport } from "@/components/gis/StudyReport";
 import { ANNOTATION_MIN_ZOOM, MEGA_TYPES, MegaProjectLayer, useMegaProjects } from "@/components/gis/MegaProjects";
 import { LiveRoadOverlay, ROAD_CLASSES, RoadLayer, type RoadStatus } from "@/components/gis/RoadLayer";
+import { WATER_CLASSES, WaterLayer, type WaterStatus } from "@/components/gis/WaterLayer";
+import { DISTRICT_LABEL_ZOOM, DistrictLayer } from "@/components/gis/DistrictLayer";
+import { ELEVATION_GRADIENT, TerrainLayer } from "@/components/gis/TerrainLayer";
 import { usePrefs } from "@/store/prefs";
 import { LABEL_MIN_ZOOM, MasterPlanLayers, MasterPlanPanel, PlanLabels, useMasterPlans, type PlanLabel } from "@/components/gis/MasterPlans";
 import type { Aoi, AoiStats, GisLayer, GisLayerDetail, Poi, PoiCategory, RingResult, RouteResult } from "@/components/gis/types";
 
 type TabKey = "properties" | "places" | "layers" | "areas" | "analyse";
-type Vis = { props: boolean; pois: boolean; layers: boolean; aois: boolean; provinces: boolean; cities: boolean };
+type Vis = { props: boolean; pois: boolean; layers: boolean; aois: boolean; provinces: boolean; cities: boolean; districts: boolean; districtNames: boolean };
 type AnalyseMode = "radius" | "route" | "rings";
 type LatLon = [number, number];
 
@@ -116,7 +124,7 @@ export default function MapExplorer() {
   const [tab, setTab] = useState<TabKey>("properties");
   const [open, setOpen] = useState(true);
   // Layer choices are saved per user and come back on the next visit.
-  const [vis, setVis] = useSavedState<Vis>("map.vis", { props: true, pois: false, layers: true, aois: false, provinces: true, cities: true });
+  const [vis, setVis] = useSavedState<Vis>("map.vis", { props: true, pois: false, layers: true, aois: false, provinces: true, cities: true, districts: false, districtNames: true });
   const [report, setReport] = useState<ReportRef | null>(null);
   const markerRefs = useRef(new Map<string, L.Marker>());
   const zoomMoved = useRef(false);
@@ -277,6 +285,23 @@ export default function MapExplorer() {
   const [roadShields, setRoadShields] = useSavedState("map.roadShields", true);
   const [roadLive, setRoadLive] = useSavedState("map.roadsLive", false);
   const [roadStatus, setRoadStatus] = useState<RoadStatus | null>(null);
+
+  // ---- water bodies (OpenStreetMap)
+  const [waterClasses, setWaterClasses] = useSavedState<Set<string>>("map.water", () => new Set(["river", "reservoir", "lake", "riverbed"]));
+  const [waterLabels, setWaterLabels] = useSavedState("map.waterLabels", true);
+  const [waterStatus, setWaterStatus] = useState<WaterStatus | null>(null);
+
+  // ---- terrain (DTM): elevation colours, hillshade, elevation under the mouse
+  const [terrainColour, setTerrainColour] = useSavedState("map.terrainColour", false);
+  const [terrainShade, setTerrainShade] = useSavedState("map.terrainShade", false);
+  const [elevation, setElevation] = useState<number | null>(null);
+  const toggleWater = (k: string, on: boolean) =>
+    setWaterClasses((s) => {
+      const n = new Set(s);
+      if (on) n.add(k);
+      else n.delete(k);
+      return n;
+    });
   const toggleRoad = (k: string, on: boolean) =>
     setRoadClasses((s) => {
       const n = new Set(s);
@@ -411,9 +436,12 @@ export default function MapExplorer() {
       <PortalMap height="100%" className="rounded-none" scrollWheelZoom onReady={onReady} zoom={5} switcher={false} baseKey={baseMap}>
         {/* ----------------------------------------------------- Pakistan reference layers */}
         {vis.provinces && <ProvinceLayer map={map} lang={mapLang} zoom={zoom} />}
+        <TerrainLayer colour={terrainColour} shade={terrainShade} opacity={terrainColour ? 0.6 : 0.8} onElevation={(m) => setElevation(m)} />
+        {waterClasses.size > 0 && <WaterLayer classes={waterClasses} labels={waterLabels} lang={mapLang} onStatus={setWaterStatus} />}
         {roadLive && <LiveRoadOverlay />}
         {roadClasses.size > 0 && <RoadLayer classes={roadClasses} construction={roadBuilding} shields={roadShields} lang={mapLang} onStatus={setRoadStatus} />}
         {megaTypes.size > 0 && <MegaProjectLayer projects={megaQ.data?.projects ?? []} types={megaTypes} lang={mapLang} zoom={zoom} labelZoom={11} annotate={megaAnnot} />}
+        {vis.districts && <DistrictLayer lang={mapLang} zoom={zoom} labels={vis.districtNames} />}
         {vis.cities && <CityLabels zoom={zoom} lang={mapLang} />}
         {osmCats.size > 0 && <PoiLayer categories={osmCats} lang={mapLang} onStatus={setPoiStatus} />}
         <NavigatorLayer nav={nav} />
@@ -638,8 +666,57 @@ export default function MapExplorer() {
             icon: Globe2,
             items: [
               { key: "provinces", label: "Province boundaries", hint: "Provinces & territories, with listing counts", icon: MapIcon, on: vis.provinces, onChange: (v) => setVis((x) => ({ ...x, provinces: v })) },
+              {
+                key: "districts",
+                label: "District boundaries",
+                hint: "All districts (OpenStreetMap); hover for listings",
+                icon: Grid2x2,
+                on: vis.districts,
+                onChange: (v) => setVis((x) => ({ ...x, districts: v })),
+                children: [{ key: "district-names", label: `District names (from zoom ${DISTRICT_LABEL_ZOOM})`, on: vis.districtNames, onChange: (v: boolean) => setVis((x) => ({ ...x, districtNames: v })) }],
+              },
               { key: "cities", label: "City names", hint: "Main cities; gold dots have a city page", icon: Building2, on: vis.cities, onChange: (v) => setVis((x) => ({ ...x, cities: v })) },
             ],
+          },
+          {
+            key: "terrain",
+            title: "Terrain (DTM)",
+            icon: Mountain,
+            items: [
+              { key: "terrain-colour", label: "Elevation colours", hint: "Height above sea level, 30 m model", icon: Mountain, on: terrainColour, onChange: setTerrainColour },
+              { key: "terrain-shade", label: "Hillshade", hint: "Relief shading of hills and slopes", icon: MountainSnow, on: terrainShade, onChange: setTerrainShade },
+            ],
+            note: (
+              <span className="block space-y-1">
+                <span className="block h-2 rounded-full" style={{ background: ELEVATION_GRADIENT }} />
+                <span className="flex justify-between text-[10px]">
+                  <span>0 m</span>
+                  <span>1,500</span>
+                  <span>3,500</span>
+                  <span>7,000+ m</span>
+                </span>
+                <span className="block">AWS Terrain Tiles (SRTM 30 m). Move the mouse over the map to read the elevation.</span>
+              </span>
+            ),
+          },
+          {
+            key: "water",
+            title: "Water bodies",
+            icon: Waves,
+            items: [
+              ...WATER_CLASSES.map((c) => ({
+                key: `water-${c.key}`,
+                label: c.label,
+                hint: c.hint,
+                color: c.color,
+                on: waterClasses.has(c.key),
+                onChange: (v: boolean) => toggleWater(c.key, v),
+              })),
+              { key: "water-labels", label: "Lake & dam names", hint: "From zoom 9", icon: Type, on: waterLabels, onChange: setWaterLabels },
+            ],
+            note: waterStatus?.missing
+              ? waterStatus.hint
+              : `OpenStreetMap${waterStatus?.date ? `, extract of ${waterStatus.date}` : ""}${waterStatus && waterClasses.size ? ` · ${waterStatus.count.toLocaleString()} features in view` : ""}. Click water for details.`,
           },
           {
             key: "roads",
@@ -734,6 +811,13 @@ export default function MapExplorer() {
           open ? "md:start-[404px]" : "md:start-3",
         )}
       />
+
+      {(terrainColour || terrainShade) && elevation != null && (
+        <div className="pointer-events-none absolute bottom-[6.75rem] end-3 z-[420] flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1 text-xs font-bold shadow-soft ring-1 ring-black/5 dark:bg-brand-950/95">
+          <Mountain className="h-3.5 w-3.5 text-brand-700 dark:text-brand-300" />
+          {elevation.toLocaleString()} m
+        </div>
+      )}
 
       {/* ------------------------------------------------------- tool hints */}
       <div className="pointer-events-none absolute bottom-6 start-1/2 z-[380] -translate-x-1/2 rtl:translate-x-1/2 md:start-[calc(50%+190px)]">

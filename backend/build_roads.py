@@ -41,6 +41,10 @@ def _dp(pts: list, tol: float) -> list:
     """Douglas-Peucker simplification of [[lat, lon], ...] (iterative)."""
     if len(pts) < 3:
         return pts
+    if len(pts) > 3 and pts[0] == pts[-1]:
+        # Closed ring: split at the point farthest from the start and simplify each half.
+        k = max(range(1, len(pts) - 1), key=lambda i: (pts[i][0] - pts[0][0]) ** 2 + (pts[i][1] - pts[0][1]) ** 2)
+        return _dp(pts[: k + 1], tol)[:-1] + _dp(pts[k:], tol)
     keep = [False] * len(pts)
     keep[0] = keep[-1] = True
     stack = [(0, len(pts) - 1)]

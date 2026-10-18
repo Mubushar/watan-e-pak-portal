@@ -330,3 +330,34 @@
   border-radius: 9999px;
   flex-shrink: 0;
 }
+
+/* ---- map: water body names */
+.water-label span {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  font: italic 600 11px/1.1 system-ui, sans-serif;
+  color: #1864ab;
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 2px #fff;
+  pointer-events: none;
+}
+
+/* ---- map: district names */
+.district-label span {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  white-space: nowrap;
+  font: 700 10px/1.15 system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5f3dc4;
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 2px #fff;
+  pointer-events: none;
+}
+.district-label .map-ur {
+  text-transform: none;
+  letter-spacing: 0;
+}
