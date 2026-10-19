@@ -14,8 +14,9 @@ runbook. For feature walk-throughs aimed at end users, see the
 
 * Python 3.11+ (the project is developed against the current CPython and run through `uv`).
 * Runtime dependencies: `fastapi`, `uvicorn[standard]`, `httpx`, `mcp[cli]`.
-* No external database or object store is required to run (data is seeded in memory) —
-  see [§5](#5-data-storage--backups) for the production plan.
+* No external database is required: data is saved to a local SQLite file
+  (`backend/data/portal.sqlite3`). For PostgreSQL set `DATABASE_URL` and install the
+  optional driver (`uv sync --extra postgres`) — see [§5](#5-data-storage--backups).
 
 ### 1.2 Install
 
@@ -30,7 +31,7 @@ uv sync                 # or: uv add fastapi "uvicorn[standard]" httpx mcp[cli]
 | --- | --- | --- |
 | **REST + MCP together** (recommended) | `uv run python main.py` | REST on `:8000/docs`, MCP on `:8000/mcp`, OpenAI facade on `:8000/v1`. |
 | **MCP only (stdio)** | `uv run mcp dev server.py` | Opens MCP Inspector on `:6274`. For desktop MCP clients. |
-| **Production** | `uvicorn api:app --host 0.0.0.0 --port 8000` | Put a reverse proxy/TLS terminator in front. |
+| **Production** | `uvicorn api:app --host 0.0.0.0 --port 8000` | Set `PORTAL_ENV=production`, run **one** worker process, and put an HTTPS reverse proxy in front ([Security & Operations](SECURITY_AND_OPERATIONS.md#4-production-checklist)). |
 
 `main.py` listens on `127.0.0.1:8000` by default, so only this computer can reach it. To
 test the Android or iOS app on a real phone, set `PORTAL_HOST=0.0.0.0` (and optionally
@@ -51,21 +52,28 @@ test the Android or iOS app on a real phone, set `PORTAL_HOST=0.0.0.0` (and opti
 ### 2.1 Environment variables
 
 The portal is configured primarily through the runtime settings surface
-([§2.2](#22-runtime-settings)) and a small number of environment variables for
-deployment-level concerns.
+([§2.2](#22-runtime-settings)) and environment variables (or `backend/.env`, never
+committed; a real environment variable wins) for deployment-level concerns. The full
+table is in [Security & Operations §1](SECURITY_AND_OPERATIONS.md#1-environment-variables);
+the ones you set first:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `PORTAL_MCP_STATELESS` | `1` (true) | `1` runs the MCP HTTP transport **statelessly** (each request independent — safe behind a load balancer). `0` keeps session state. |
-| `PORTAL_AUTH_EXPOSE_OTP` | `1` (true) | **Dev convenience.** When true the plaintext OTP is retained and returned in responses / listed at `/auth/otps`. **Set to `0` in production.** |
-| `PORTAL_LLM_BASE_URL` | *(empty)* | OpenAI-compatible LLM base URL for the `/v1` proxy mode (e.g. `https://api.openai.com/v1`). |
-| `PORTAL_LLM_API_KEY` | *(falls back to `OPENAI_API_KEY`)* | API key for the upstream LLM. |
-| `PORTAL_LLM_MODEL` | `gpt-4o-mini` | Default model advertised/used by the facade. |
+| `PORTAL_ENV` | `development` | `production` switches off demo accounts, exposed OTPs, public API docs, local MCP access and the CORS wildcard, and adds HSTS. |
+| `PORTAL_SEED_DEMO` | on in development | Seed the 13 demo accounts. |
+| `PORTAL_MCP_TOKEN` | *(empty)* | Bearer token for MCP clients on `/mcp` ([§4.9](#49-mcp-access)). |
+| `PORTAL_CORS_ORIGINS` / `PORTAL_ALLOWED_HOSTS` | `*` in development / any | Browser origins and host names the API accepts. List them in production. |
+| `PORTAL_AUTH_EXPOSE_OTP` | on in development | Return OTPs as `dev_otp` ([§4.1](#41-auth-policy-group-auth)). |
+| `DATABASE_URL` / `PORTAL_DB_PATH` | SQLite in `backend/data/` | Where data is saved ([§5](#5-data-storage--backups)). `PORTAL_PERSIST=0` keeps it in memory only. |
+| `PORTAL_MCP_STATELESS` | `1` (true) | `1` runs the MCP HTTP transport **statelessly** (each request independent). `0` keeps session state. |
+| `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | *(empty)* | Send `/v1` chat to another OpenAI-compatible server (LM Studio, Ollama) instead of OpenAI ([§4.5](#45-ai-model-and-voice-for-the-assistant-openai)). |
 
 ```powershell
 # Example: production-style session
-$env:PORTAL_AUTH_EXPOSE_OTP = "0"
-$env:PORTAL_MCP_STATELESS   = "1"
+$env:PORTAL_ENV = "production"
+$env:PORTAL_MCP_TOKEN = "<long random value>"
+$env:PORTAL_CORS_ORIGINS = "https://arzepak.pk"
+$env:PORTAL_ALLOWED_HOSTS = "arzepak.pk,api.arzepak.pk"
 uv run python main.py
 ```
 
@@ -98,7 +106,10 @@ and the current values):
 ## 3. Users, roles & permissions (RBAC)
 
 The portal has a four-tier area model — **public → client → staff → admin** — with **19
-roles** and **30 fine-grained permissions** (`resource.action`).
+roles** and **31 fine-grained permissions** (`resource.action`). The server enforces them on
+every request (deny by default; see
+[Security & Operations §2](SECURITY_AND_OPERATIONS.md#2-security-model)), and the web
+portal hides pages and menu items the user's role can't use.
 
 ### 3.1 Roles
 
@@ -107,19 +118,46 @@ roles** and **30 fine-grained permissions** (`resource.action`).
 `customer_support`, `moderator`, `auditor`, `admin`, `super_admin`.
 
 * Public self-registration may only pick from `SIGNUP_ROLES`: `user`, `buyer`, `tenant`,
-  `seller`, `landlord`, `investor`, `agent`, `developer`. Everything else is granted by
-  an administrator.
+  `seller`, `landlord`, `investor`, `agent`, `developer`. `agent` and `developer` carry CRM
+  and catalogue rights, so those accounts start as a plain `user` with the role
+  *requested* (`requested_role`); grant it under **Users & roles** after checking the
+  person. Everything else is granted by an administrator.
 * A user may hold **several roles**; permissions are the union, plus any directly-granted
-  extra permissions.
+  extra permissions. `super_admin` has every permission; `admin` has all but
+  `roles.manage`.
+* A user whose only CRM role is `agent` sees only their own leads, customers, deals and
+  tasks (the account must be linked to a CRM agent).
 
 ### 3.2 Permissions
 
 `portal.view`, `portal.publish`, `listings.view`, `listings.manage`, `properties.view`,
-`properties.manage`, `projects.view`, `projects.manage`, `gis.view`, `gis.manage`,
-`poi.manage`, `aoi.manage`, `crm.view`, `crm.manage`, `accounting.view`, `accounting.manage`,
-`finance.view`, `finance.manage`, `payments.view`, `payments.manage`, `content.view`,
-`content.manage`, `ads.view`, `ads.manage`, `news.manage`, `users.view`, `users.manage`,
-`roles.manage`, `settings.manage`, `audit.view`.
+`properties.manage`, `basedata.manage`, `projects.view`, `projects.manage`, `gis.view`,
+`gis.manage`, `poi.manage`, `aoi.manage`, `crm.view`, `crm.manage`, `accounting.view`,
+`accounting.manage`, `finance.view`, `finance.manage`, `payments.view`, `payments.manage`,
+`content.view`, `content.manage`, `ads.view`, `ads.manage`, `news.manage`, `users.view`,
+`users.manage`, `roles.manage`, `settings.manage`, `audit.view`.
+
+What each one opens:
+
+| Permission | Opens | Roles that have it (besides super_admin) |
+| --- | --- | --- |
+| `basedata.manage` | Administration › Base data; writes to `/cities`, `/schemes`, `/blocks` | admin |
+| `properties.manage` | Administration › Property database; writes to `/properties` | admin, developer |
+| `gis.manage` | Administration › GIS layers; every GIS write; unpublished layers | admin, valuer |
+| `listings.manage` | images, leasing and maintenance writes | admin, moderator, developer, agency_manager, agent, seller, landlord |
+| `crm.view` / `crm.manage` | CRM, marketing, broker, transactions; agent smart actions / approving agent runs | admin, agency_manager, agent, customer_support (both); moderator (view) |
+| `accounting.view` / `accounting.manage` | Accounting (`payments.manage` for payments and rent invoices) | admin, finance_manager, accountant (both); auditor (view) |
+| `finance.view` / `finance.manage` | Commercial back office | `finance.manage`: admin, finance_manager |
+| `projects.view` / `projects.manage` | PMO, big projects | admin, developer |
+| `ads.view` / `ads.manage` | Advertising | admin, moderator, ad_manager (both); others view |
+| `content.manage` / `news.manage` | Content pages, news | admin, moderator, content_editor |
+| `poi.manage` / `aoi.manage` | Points / areas of interest (saving a study area) | admin, developer (POI), valuer (AOI) |
+| `users.view` / `roles.manage` | Users & roles | `users.view`: admin, agency_manager, customer_support, auditor |
+| `settings.manage` | Portal settings, storage status, OTP outbox, messaging dispatch / purge / moderation | admin |
+| `audit.view` | Audit trails, messaging outbox and statistics | admin, finance_manager, auditor |
+
+The authoritative role → permission map is `ROLE_CATALOG` in `backend/auth.py`
+(`GET /roles`).
 
 ### 3.3 Administering access
 
@@ -144,7 +182,66 @@ remove their messaging memberships — see the dedicated
 [access-revocation](../backend/README.md) flow in the Messaging Guide's
 [Administration section](MESSAGING_GUIDE.md#11-governance). Departing
 staff immediately lose channel access and any outstanding signed attachment links remain
-scoped to their (revoked) identity.
+scoped to their (revoked) identity. Suspending a user also ends all their sessions.
+
+### 3.4 Administration screens (web portal)
+
+The web portal's **Administration** menu (`/app/admin…`) shows each screen only to roles
+with its permission:
+
+| Screen | Route | Permission |
+| --- | --- | --- |
+| Users & roles | `/app/admin` | `users.view` or `settings.manage` (changing roles needs `roles.manage`) |
+| Base data | `/app/admin/base-data` | `basedata.manage` |
+| Property database | `/app/admin/properties` | `properties.manage` |
+| GIS layers | `/app/admin/gis-layers` | `gis.manage` |
+
+**Base data** — cities, housing schemes / societies and blocks / zones
+(`/admin/basedata/{cities|schemes|blocks}`): add, edit and delete with validation (unique
+names, known approval statuses, sources). A city or scheme that is still in use can't be
+deleted (`409`). See `backend/README.md` › *Base data* for where the seed data comes from.
+
+**Property database** — every listing with every field (`/admin/properties*`):
+
+* Search and filter by text, city, scheme, status, category, use type, featured, agent,
+  price range and whether it has a map location; sort by updated, created, price, title or
+  size; page through the results. Status counts at the top double as filters.
+* Add or edit a listing with full validation: the scheme must belong to the city and the
+  block to the scheme, coordinates must be inside Pakistan, and the size you type (sq ft,
+  marla or kanal) updates the other units.
+* **Bulk actions** on the selected rows: feature / unfeature, set status, assign an agent,
+  delete.
+* **Export CSV** downloads the (filtered) catalogue. **Import CSV** takes the same columns:
+  rows with an `id` update that listing, rows without one create a listing; cities,
+  schemes, blocks and agents are matched by name. The import always runs as a **dry run**
+  first and shows what it would create or update and every row error. Nothing is saved
+  while any row is wrong. At most 5,000 rows per file.
+
+**GIS layers** — every map layer except the base maps (`/gis/layers*`):
+
+* **Upload** a GeoJSON, KML (Google Earth), GPX or CSV (latitude / longitude columns) file,
+  up to 25 MB and 50,000 features. The drawer reads the file first (dry run) and shows the
+  feature count, geometry types, bounding box and how much lies inside Pakistan; points
+  given as `[lat, lon]` are flipped to `[lon, lat]` and reported. Shapefiles and KMZ must be
+  converted first (QGIS › Export › GeoJSON).
+* Edit a layer's name, description, type, style and settings; **replace** its geometry with
+  a new file; **download** it as GeoJSON; delete it.
+* **Published** decides whether the layer exists on the public map at all; **On by default**
+  whether it is drawn before a visitor chooses (visitors switch published layers on and off
+  in the map's Layers panel). Unpublished layers are visible only to `gis.manage` users,
+  for previewing.
+* The **built-in overlays** — listings, featured places, areas of interest, points of
+  interest, province and district boundaries, city names, terrain (DTM), water bodies, road
+  network, live road overlay and infrastructure mega projects — are layer records too. They
+  can be unpublished but not deleted. The master-plan layers are marked *Built from the
+  master-plan PDF*; their label geometry is rebuilt from the plan files.
+* **On a fresh install every layer starts unpublished**, so the public map shows only base
+  maps until you click **Publish all** (or publish layers one by one). The choice is saved
+  and survives restarts; overlays added by a later version arrive unpublished.
+
+API equivalents: `POST /gis/layers/upload` (`dry_run`, `replace_layer_id`) and
+`POST /gis/layers/publish` (`{"published": true}` for everything, or `ids`, or
+`scope`: `builtin` | `uploaded` | `master_plans`).
 
 ---
 
@@ -159,33 +256,48 @@ scoped to their (revoked) identity.
 | `otp_max_attempts` | 5 | Wrong-code attempts before the OTP is invalidated. |
 | `otp_resend_cooldown_seconds` | 30 | Minimum wait between resends. |
 | `otp_max_per_hour` | 10 | Hourly per-identifier cap (rate limit). |
-| `session_ttl_hours` | 24 | Bearer-token lifetime; refresh to extend. |
+| `session_ttl_hours` | 24 | Bearer-token lifetime; refresh to extend. Sessions are saved, so a restart doesn't sign anyone out. |
 | `password_min_length` | 8 | Minimum password length. |
-| `pbkdf2_iterations` | 120000 | Password hashing strength (PBKDF2). |
-| `expose_otp` | true *(dev)* | Return codes as `dev_otp`. If `PORTAL_AUTH_EXPOSE_OTP` is unset, this applies only to channels with **no** delivery provider (§4.4). **Set `0` in production.** |
+| `pbkdf2_iterations` | 600000 | PBKDF2-SHA256 rounds for new password hashes (`PORTAL_PBKDF2_ITERATIONS`). The count is stored with each salt, so older 120,000-round hashes still verify. |
+| `expose_otp` | true in development, false in production | Return codes as `dev_otp`. If `PORTAL_AUTH_EXPOSE_OTP` is unset, this applies only to channels with **no** delivery provider (§4.4). |
+| `login_max_failures` | 5 | Failed password sign-ins for one account (`PORTAL_LOGIN_MAX_FAILURES`) … |
+| `login_lock_minutes` | 15 | … within this many minutes lock password sign-in for that account for the window (`PORTAL_LOGIN_LOCK_MINUTES`). |
 | `channels` | `sms`, `email` | Delivery channels for OTP. |
+
+`GET /auth/config` also returns `environment` and, in development only, `demo_accounts`
+(the one-click sign-ins the login pages offer).
 
 ### 4.2 Flows
 
-* **Signup** → OTP verify (purpose `signup`) → token.
+* **Signup** → OTP verify (purpose `signup`) → token. `agent` / `developer` sign-ups start
+  as `user` with the role requested (§3.1).
 * **Passwordless login** → `POST /auth/otp/request` (purpose `login`) → `POST /auth/otp/verify`.
-* **Password login** → `POST /auth/login` (401 bad credentials, 403 unverified).
+* **Password login** → `POST /auth/login` (401 bad credentials, 403 unverified). Repeated
+  failures lock password sign-in for that account (`code: "locked"`, §4.1); OTP login and
+  password reset still work, and the lock is logged as `login_blocked`.
 * **Refresh / logout** → `POST /auth/refresh`, `POST /auth/logout` (revokes the token).
 * **Password reset** → `POST /auth/password/reset-request` → `POST /auth/password/reset`
-  (revokes all sessions); signed-in change via `POST /auth/password/set`.
+  (revokes all sessions); signed-in change via `POST /auth/password/set` (ends the user's
+  other sessions).
+* **Owner account** → `PORTAL_OWNER_USERNAME` / `PORTAL_OWNER_PASSWORD` in `backend/.env`
+  create (and on every start re-apply) your own super-admin, independent of the demo
+  accounts.
 
 ### 4.3 Audit & monitoring
 
 * **Auth audit trail** — `GET /auth/events`.
 * **Portal audit trail** — role/assignment/audit views; messaging keeps its own audit log
   (`messaging://audit`). Grant `audit.view` to auditors.
-* **OTP outbox** — `GET /auth/notifications` (simulated SMS/e-mail outbox for demos).
+* **OTP outbox** — `GET /auth/notifications` and `GET /auth/otps` (simulated SMS/e-mail
+  outbox for demos; need `settings.manage`).
+* **Errors** — an unhandled error returns `500` with an `error_id`; search the server log
+  for that id to find the traceback.
 
 ### 4.4 Delivering OTPs (SMS / WhatsApp / e-mail)
 
-Out of the box **no code is sent anywhere**. Each message goes only to the in-memory
-outbox (`GET /auth/notifications`, status `simulated`), the API returns the code as
-`dev_otp`, and the apps show a *Test mode* hint. To deliver real codes, configure
+Out of the box **no code is sent anywhere**. Each message goes only to the outbox
+(`GET /auth/notifications`, status `simulated`), and in development the API returns the
+code as `dev_otp` and the apps show a *Test mode* hint. To deliver real codes, configure
 `backend/delivery.py` through environment variables or `backend/.env` (template:
 `backend/.env.example`, loaded at startup):
 
@@ -270,7 +382,9 @@ are kept in memory and reset on restart.
 | `AI_VOICE_PER_MINUTE` | 30 | Speech-to-text and text-to-speech calls. |
 | `AI_LIVE_PER_HOUR` | 6 | Live voice-agent calls started. |
 | `AI_LIVE_MAX_MINUTES` | 8 | The app ends a live call after this many minutes. `0` = no limit. |
-| `OPENAI_MAX_OUTPUT_TOKENS` | 800 | Reply cap for chat when the client sets none. `0` = no cap. |
+| `OPENAI_MAX_OUTPUT_TOKENS` | 800 | Reply cap for chat when the client sets none; a client may ask for at most twice this. `0` = no cap. |
+| `AI_ALLOWED_MODELS` | *(empty)* | The server always uses `OPENAI_MODEL`; list extra models here (comma-separated) that callers may name on `/v1`. |
+| `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` | The only model `/v1/embeddings` uses (at most 256 inputs / 200,000 characters per call). |
 | `AI_REQUIRE_SIGNIN` | 0 | `1` = guests get `401` and must sign in to use the AI. |
 | `AI_TRUST_PROXY` | 0 | `1` only behind your own reverse proxy: guests are told apart by `X-Forwarded-For`. Otherwise anyone could fake that header to dodge the limits. |
 
@@ -319,7 +433,12 @@ The agent's tools:
   markers, plus an "Open in Google Maps" link. On the outskirts the radius widens until a
   few places show. Each listing page has the same map.
 - **`web_lookup`** (`POST /ai/web-lookup`): uses OpenAI web search, with sources, for facts
-  the data can't hold, such as approval authority, possession status or news.
+  the data can't hold, such as approval authority, possession status or news. It asks for
+  official sources first (`.gov.pk`, `.gop.pk`, `.gos.pk`, `.gkp.pk`, SBP, DHA), then
+  established news, ranks the returned sources by trust tier (`best_source_tier`), and
+  answers the same question from a cache for 6 hours (`"cached": true`).
+- **`knowledge_search`** (`POST /ai/knowledge/search`): the portal's own knowledge base, with
+  citations (§4.10).
 
 Area names are matched loosely, so "DHA 2", "Phase-VIII" and "G13" work. A city word
 narrows the search. Names the bundled data doesn't know are looked up on Nominatim when
@@ -384,8 +503,9 @@ with these GIS layers:
   - *plot numbers & sizes*, hidden by default;
   - *engineering marks & dimensions*, hidden by default.
 
-They work with all existing `/gis` endpoints and MCP tools. Turn this off with
-`MASTERPLANS_GIS=0`.
+They work with all existing `/gis` endpoints and MCP tools. Like every map layer they
+start unpublished; publish them under Administration › GIS layers (§3.4). Turn this off
+with `MASTERPLANS_GIS=0`.
 
 **The assistant's tools:**
 - **`master_plan`** (`GET /masterplans/{key}`, `/masterplans/search`, `/masterplans/at`):
@@ -486,26 +606,70 @@ Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/ads" -ContentType "ap
 The apps ask for consent where the law needs it, using Google's consent form (EU/UK).
 iOS also asks the tracking question. Never click your own ads: Google bans accounts for it.
 
-> **Before launch:** `POST/PUT/DELETE /ads` need no sign-in yet, like the property
-> routes (§10). Restrict them to staff before real advertisers' money is involved.
+Creating, editing and deleting ads needs `ads.manage`; reading campaigns and reports needs
+`ads.view`. Only the apps' view / click events (`/ads/{id}/event`, `/ads/{id}/track`) and
+the active-ad feed are public.
+
+### 4.9 MCP access
+
+`/mcp` exposes every portal tool, so it is not public. A client needs one of:
+
+* `Authorization: Bearer <PORTAL_MCP_TOKEN>` — set a long random token in `backend/.env`
+  and put it in the MCP client's configuration;
+* the bearer token of a signed-in `super_admin` / `admin` (the web portal's MCP console and
+  tool runner use this, and are shown to administrators only);
+* in development, with no token set, a local client on `127.0.0.1` that sends no browser
+  `Origin` header (`PORTAL_MCP_LOCAL`, on by default outside production).
+
+Other callers get `401`. The [MCP Guide §5](MCP_GUIDE.md#5-identity--auth) shows the client
+configuration.
+
+### 4.10 The assistant's knowledge, memory and prompt
+
+* **Knowledge base** (`backend/knowledge.py`) — fast BM25 search over listings, housing
+  schemes (with approval status and sources), cities, mega projects, big projects, news and
+  the guide pages, rebuilt automatically when the data changes. It understands crore / lakh /
+  arab, marla / kanal / sq ft, bedrooms, Urdu script and Roman Urdu. Every hit carries a
+  `[n]` citation and a **trust tier** (`backend/sources.py`): `official` (government and
+  development authorities), `verified` (checked by the portal), `reference` (established
+  references and news), `listing` (submitted by an owner or agent) and `unverified`
+  (everything else, including the sample news). Keep scheme sources in **Base data**
+  accurate: they decide the tier.
+* **One system prompt** (`backend/prompts.py`, `PROMPT_VERSION`) for the web portal, the
+  app and voice. `POST /ai/context` returns it together with the knowledge hits and what the
+  assistant remembers about the user, in one call.
+* **Memory** (`backend/memory.py`) — per signed-in user and private to them (not visible to
+  other users or to admins): the last turns of each conversation (14 days, at most 200) and
+  long-term facts (budget, cities and schemes, type, size, bedrooms, buying or renting,
+  language, and notes the user asked to keep; at most 150). It never stores CNIC, card or
+  bank numbers or passwords. Users list, delete, clear or switch it off through
+  `/me/memory`. Guests get no memory. Memory is saved with the rest of the data (§5).
 
 ---
 
 ## 5. Data, storage & backups
 
-### 5.1 The storage seam — read this first
+### 5.1 Durable storage — read this first
 
-Data is held **in memory and seeded on startup** so the portal runs with zero external
-infrastructure. This is deliberate, but it means:
+The portal works on in-memory stores for speed, and `backend/storage.py` saves every one of
+them to a database, so **data survives a restart**:
 
-* **All data is lost on restart** unless a persistence layer is added.
-* Every store sits behind a thin seam so a **PostgreSQL + PostGIS** backend (and private
-  object storage for attachments) can be dropped in without touching the domain logic.
-  Messaging in particular documents its intended tables (conversations, memberships,
-  messages, attachments, notification records, outbox items) for exactly this migration.
+* **Where** — PostgreSQL when `DATABASE_URL=postgresql://…` is set and the optional driver
+  is installed (`uv sync --extra postgres`); otherwise a SQLite file,
+  `backend/data/portal.sqlite3` (`PORTAL_DB_PATH`; git-ignored).
+* **First run** — the sample data is seeded and saved. **Every later start** loads the saved
+  data instead of the seed.
+* **When** — a few seconds after any write request (`PORTAL_DB_FLUSH_SECONDS`, default 3),
+  once a minute regardless, and at shutdown. Only changed items are written.
+* **Status** — `GET /portal/storage` (backend, location, last save, last error, rows per
+  store); `POST /portal/storage/flush` saves now. Both need `settings.manage`.
+* **Off** — `PORTAL_PERSIST=0` keeps everything in memory (the test suite does this).
+* Run **one** backend process; several workers would each keep their own copy.
 
-**Do not treat the in-memory lists as permanent storage.** For any real deployment, wire
-the seam to a database before going live.
+How rows are stored, what is skipped, and what happens when a store can't be loaded are in
+[Security & Operations §3](SECURITY_AND_OPERATIONS.md#3-durable-storage). The
+`migrate_to_postgres.py` toolkit ([Data Migration Guide](DATA_MIGRATION_GUIDE.md)) is a
+separate export into a relational schema for reporting; the running portal doesn't read it.
 
 ### 5.2 Object storage for attachments
 
@@ -522,7 +686,7 @@ message body. The portal hands out **HMAC-signed, expiring, permission-checked l
 
 | Concern | Policy |
 | --- | --- |
-| Database backups | Daily full + point-in-time recovery once PostgreSQL is enabled. |
+| Database backups | SQLite: flush, then `sqlite3 backend/data/portal.sqlite3 ".backup <file>"` daily. PostgreSQL: `pg_dump` of `portal_rows` and `portal_kv`, plus daily full + point-in-time recovery. Also back up `backend/media/uploads/` (listing photos). |
 | Object storage | Versioned bucket with lifecycle/expiry rules. |
 | Message retention | `retention_days_default` = **1095 days (3 years)**; configurable per policy. |
 | Deletion | Per-conversation deletion and retention enforcement; deletions are audited. |
@@ -583,7 +747,9 @@ Telegram is a *complementary* alert channel, never the primary workspace.
 Users opt in by sending `/start <link_code>` to the bot; commands are `/stop` (opt out),
 `/mute`, `/unmute`, `/digest`, `/status`. Every alert is sanitised to short text plus an
 authenticated deep link (`/messaging/portal`); **no confidential data is sent via
-Telegram**.
+Telegram**. When you register the bot's webhook with Telegram (`setWebhook`), pass a
+`secret_token` and put the same value in `PORTAL_TELEGRAM_WEBHOOK_SECRET`; updates without
+it are then refused with `401`.
 
 ### 6.5 Moderation, retention & revocation
 
@@ -607,6 +773,8 @@ Telegram**.
 | Messaging statistics | `messaging://statistics`, `/messaging/statistics` |
 | Messaging audit trail | `messaging://audit` |
 | Portal activity (recent events) | `portal_activity` |
+| Durable storage (last save, errors, rows per store) | `GET /portal/storage` |
+| Sign-ins, failures and lockouts | `GET /auth/events` |
 
 `portal_health` reports counts for the messaging stores (`msg_*`) alongside every other
 subsystem, so a single call tells you whether a wing failed to seed.
@@ -640,22 +808,30 @@ plausible-but-wrong data.
 
 ## 10. Security hardening checklist
 
-- [ ] Set `PORTAL_AUTH_EXPOSE_OTP=0` (never expose OTPs in production).
-- [ ] Change **all** seeded demo passwords and remove unused demo accounts.
-- [ ] Terminate TLS at the reverse proxy; never expose `main.py` directly to the internet.
-- [ ] Move storage to PostgreSQL + PostGIS and attachments to a private, encrypted bucket.
-- [ ] Keep the object bucket private; audit signed-link TTLs.
+The full list, with the reasons, is the
+[production checklist](SECURITY_AND_OPERATIONS.md#4-production-checklist). In short:
+
+- [ ] Set `PORTAL_ENV=production` (no demo accounts, no exposed OTPs, API docs hidden,
+      no local MCP access, HSTS).
+- [ ] Set `PORTAL_MCP_TOKEN`, `PORTAL_CORS_ORIGINS` and `PORTAL_ALLOWED_HOSTS`.
+- [ ] Terminate TLS at an HTTPS reverse proxy; never expose `main.py` directly to the
+      internet. Set `PORTAL_TRUST_PROXY=1` only behind it.
+- [ ] **Rotate every API key or password that was ever pasted into `backend/.env` comments,
+      `.env.example`, a ticket or a chat.**
+- [ ] Create your owner account (`PORTAL_OWNER_USERNAME` / `PORTAL_OWNER_PASSWORD`) and
+      remove or suspend any demo accounts carried over from a development database.
+- [ ] Set the webhook secrets (`PORTAL_WHATSAPP_APP_SECRET`,
+      `PORTAL_TELEGRAM_WEBHOOK_SECRET`, `PORTAL_CRM_WEBHOOK_SECRET`).
+- [ ] Use PostgreSQL (`DATABASE_URL`) or back up the SQLite file daily; test a restore.
+      Run one backend process.
+- [ ] Publish the map layers you want public (§3.4).
+- [ ] Keep attachments in a private, encrypted bucket; audit signed-link TTLs.
 - [ ] Run the notification dispatcher as a background worker with provider credentials
       injected via environment/secret store (never committed).
 - [ ] Grant the principle of least privilege using roles + permissions; review `audit.view`
-      holders.
-- [ ] Back up the database and object store; test restores.
+      and `settings.manage` holders; grant requested `agent` / `developer` roles only after
+      checking the person.
 - [ ] Review messaging retention and moderation policy with legal/compliance.
-- [ ] Restrict CORS/host settings at the proxy for the deployment domain.
-- [ ] Put sign-in (staff roles) on the write routes that are still open:
-      `POST/PUT/DELETE /properties` and `POST/PUT/DELETE /ads` (and `/ads/{id}/track`).
-      The apps don't need them: they use `/me/listings` (sign-in required) and
-      `/ads/{id}/event` (counts each viewer once).
 - [ ] Replace AdMob's sample app ids and set `ADS_ADMOB_TESTING=0` only in release builds (§4.8).
 - [ ] Confirm DHA's permission to show its master plans to customers (§4.7).
 
@@ -667,9 +843,16 @@ plausible-but-wrong data.
 | --- | --- | --- |
 | `ModuleNotFoundError` on start | Wrong working directory or deps not installed | Run from `backend/`; `uv sync`. |
 | Port 8000 address in use | Stale process | Stop it or use another port; `smoke_http.py` uses 8011. |
-| Data resets after restart | Expected — in-memory storage | Enable the DB seam ([§5](#5-data-storage--backups)). |
+| Data resets after restart | `PORTAL_PERSIST=0`, or the database couldn't be opened | `GET /portal/storage`; check the startup log line `storage: …` ([§5](#5-data-storage--backups)). |
+| `GET /portal/storage` lists a store under `frozen` | Its saved rows couldn't be loaded (e.g. after a model change); it runs on sample data and is never written | Fix the cause, restart; the saved rows are untouched. |
+| PostgreSQL configured but SQLite used | `psycopg` not installed | `uv sync --extra postgres`, restart. |
 | A wing shows zero items in `portal_health` | Seeding failed for that wing | Check startup logs; the `_seed_*` routine for that wing. |
 | User can't see a page/channel | Missing role/permission or membership | Review [§3](#3-users-roles--permissions-rbac) and [§6](#6-messaging-administration). |
+| `401` / `403` from the API | Not signed in / role lacks the permission | See the rule table in [Security & Operations §2.2](SECURITY_AND_OPERATIONS.md#22-permissions-per-area). |
+| "Too many failed sign-ins" | Login lockout (§4.1) | Wait for the window, or sign in with an OTP / reset the password. |
+| Public map shows only base maps | Layers not published (fresh install) | Administration › GIS layers › **Publish all** (§3.4). |
+| MCP client gets `401` | No / wrong token | Send `Authorization: Bearer <PORTAL_MCP_TOKEN>` (§4.9). |
+| No demo sign-in buttons | `PORTAL_ENV=production` or `PORTAL_SEED_DEMO=0` | Expected; use real accounts. |
 | A capability returns `requires_optional_dependency` | Missing optional package | Install the named package or accept the fallback. |
 | OTP emails not delivered | Outbox is simulated | Connect a real provider in the auth outbox seam. |
 | Attachment link expired | TTL elapsed (by design) | Reopen the message for a fresh signed link. |

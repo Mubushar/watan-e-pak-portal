@@ -25,7 +25,8 @@ Full manuals live in [`../docs/`](../docs/README.md). The documentation set is:
 | [Agentic AI Guide](../docs/AGENTIC_AI_GUIDE.md) | The Agentic OS: products, agents, run engine and approval gates. |
 | [Messaging Guide](../docs/MESSAGING_GUIDE.md) | The messaging + notifications system end to end. |
 | [Testing Guide](../docs/TESTING_GUIDE.md) | Running and extending the test suites. |
-| [Data Migration Guide](../docs/DATA_MIGRATION_GUIDE.md) | Admins migrating the in-memory data to PostgreSQL. |
+| [Data Migration Guide](../docs/DATA_MIGRATION_GUIDE.md) | Exporting the stores into a relational PostgreSQL schema for reporting. |
+| [Security & Operations](../docs/SECURITY_AND_OPERATIONS.md) | Environment variables, the access model, durable storage, backups, production checklist. |
 
 Auto-generated references (regenerate with `uv run python ..\docs\_gen\gen_docs.py`) live in
 `../docs/reference/` — tools, resources, prompts, REST endpoints, agents, messaging
@@ -55,7 +56,17 @@ catalogs and settings — and never drift from the code.
 | `main.py` | Runs the combined server with uvicorn (REST + MCP on one port). |
 | `test_integration.py` | Test app that exercises **both** MCP and FastAPI and checks the store is shared. |
 | `smoke_http.py` | Starts the real uvicorn server and checks REST + the MCP `/mcp` handshake over the network. |
-| `openai_facade.py` | OpenAI-compatible shim: `/v1/models`, `/v1/chat/completions`, `/v1/completions`, `/v1/embeddings`. |
+| `openai_facade.py` | OpenAI-compatible shim: `/v1/models`, `/v1/chat/completions`, `/v1/completions`, `/v1/embeddings`. The server picks the model (`AI_ALLOWED_MODELS` for extras), caps output and embeddings, and keeps one pooled upstream client. |
+| `portal_env.py` | Deployment mode and security switches read once from the environment (`PORTAL_ENV`, `PORTAL_SEED_DEMO`, `PORTAL_EXPOSE_DOCS`, `PORTAL_MCP_TOKEN`, `PORTAL_MCP_LOCAL`, `PORTAL_TRUST_PROXY`, `PORTAL_MAX_BODY_MB`, `PORTAL_ALLOWED_HOSTS`). |
+| `access.py` | The access guard: one ASGI middleware with the rule table (`_RULES`) that decides what every HTTP route and `/mcp` needs. Reads are public unless a rule says otherwise; unnamed writes need an admin. Also the "act as yourself" messaging check and the agent-owns-it CRM check. |
+| `storage.py` | Durable storage: mirrors every in-memory store into PostgreSQL (`DATABASE_URL`) or SQLite (`backend/data/portal.sqlite3`), incrementally, and restores it on start. |
+| `knowledge.py` | The assistant's knowledge base: BM25 retrieval over listings, schemes (with approval status), cities, mega / big projects, news and guides, with `[n]` citations; understands crore / lakh, marla / kanal, Urdu and Roman Urdu. |
+| `sources.py` | Trust tiers for sources: `official`, `verified`, `reference`, `listing`, `unverified`. |
+| `memory.py` | The assistant's per-user memory: recent conversation turns and long-term facts (budget, areas, size …), private, with opt-out. |
+| `prompts.py` | The one system prompt every app and the voice agent use (`POST /ai/context`). |
+| `web_lookup.py` | Web look-ups through OpenAI web search: official sources first, sources ranked by trust, 6-hour cache. |
+| `property_admin.py` | Administration › Property database: query, validated save, bulk actions, CSV export / import with dry run. |
+| `gis_import.py` | Reads uploaded GeoJSON / KML / GPX / CSV files into a clean FeatureCollection with stats (dry run, `[lat, lon]` flip, outside-Pakistan share). |
 
 Because every `@mcp.tool()` function is also a plain Python function, the REST
 layer calls it directly — MCP and REST can never drift apart.
@@ -63,7 +74,8 @@ layer calls it directly — MCP and REST can never drift apart.
 ## Setup
 
 ```powershell
-uv sync            # or: uv add fastapi "uvicorn[standard]" httpx
+uv sync                    # or: uv add fastapi "uvicorn[standard]" httpx
+uv sync --extra postgres   # optional: psycopg, for DATABASE_URL=postgresql://…
 ```
 
 ## Run
@@ -84,6 +96,76 @@ uv run python main.py
 # OpenAI    -> http://127.0.0.1:8000/v1    (models / chat / embeddings)
 ```
 
+## Environment variables
+
+Read from the environment or `backend/.env` (never committed; a real environment variable
+wins). The full list, including OTP delivery, voice, maps and ads, is in
+[Security & Operations §1](../docs/SECURITY_AND_OPERATIONS.md#1-environment-variables).
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PORTAL_ENV` | `development` | `production` turns on the safe defaults: no demo accounts, no OTPs in responses, docs hidden, HSTS, no CORS wildcard. |
+| `PORTAL_SEED_DEMO` | dev on / prod off | Seed the 13 demo accounts (public passwords). |
+| `PORTAL_EXPOSE_DOCS` | dev on / prod off | Serve `/docs`, `/redoc`, `/openapi.json`. |
+| `PORTAL_MCP_TOKEN` | — | Static bearer token for MCP clients on `/mcp`. |
+| `PORTAL_MCP_LOCAL` | dev on / prod off | Let local MCP clients (loopback, no browser `Origin`) in without a token while no token is set. |
+| `PORTAL_MCP_STATELESS` | `1` | Stateless MCP HTTP transport. |
+| `PORTAL_TRUST_PROXY` | `0` | Trust `X-Forwarded-For` (only behind your own reverse proxy). |
+| `PORTAL_MAX_BODY_MB` | `30` | Largest request body (`413` above). |
+| `PORTAL_ALLOWED_HOSTS` | — | Host names the API answers for (comma-separated). |
+| `PORTAL_CORS_ORIGINS` | `*` dev / none prod | Allowed browser origins; `*` is ignored in production. |
+| `PORTAL_AUTH_EXPOSE_OTP` | dev on / prod off | Return OTPs as `dev_otp` (by default only for channels with no provider). |
+| `PORTAL_PBKDF2_ITERATIONS` | `600000` | PBKDF2-SHA256 rounds for new password hashes. |
+| `PORTAL_LOGIN_MAX_FAILURES` / `PORTAL_LOGIN_LOCK_MINUTES` | `5` / `15` | Login lockout. |
+| `PORTAL_OWNER_USERNAME` / `PORTAL_OWNER_PASSWORD` | — | Your own super-admin, re-applied on each start. |
+| `PORTAL_PERSIST` | `1` | `0` = in memory only (the test suite). |
+| `DATABASE_URL` | — | `postgresql://…` for PostgreSQL storage (needs `psycopg[binary]`). |
+| `PORTAL_DB_PATH` | `backend/data/portal.sqlite3` | SQLite file when `DATABASE_URL` is unset. |
+| `PORTAL_DB_FLUSH_SECONDS` | `3` | Delay between a write request and the save. |
+| `PORTAL_WHATSAPP_APP_SECRET` | — | Checks `X-Hub-Signature-256` on the WhatsApp webhook. |
+| `PORTAL_TELEGRAM_WEBHOOK_SECRET` | — | Checks `X-Telegram-Bot-Api-Secret-Token` on the Telegram webhook. |
+| `PORTAL_CRM_WEBHOOK_SECRET` | — | Checks `X-Webhook-Secret` on the lead webhook. |
+| `OPENAI_API_KEY`, `OPENAI_MODEL` | —, `gpt-6-luna` | Chat (the server always uses this model). |
+| `AI_ALLOWED_MODELS` | — | Extra models a `/v1` caller may name. |
+| `OPENAI_MAX_OUTPUT_TOKENS` | `800` | Reply cap (a client may ask for up to twice this). |
+| `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` | The only `/v1/embeddings` model. |
+| `OPENAI_WEB_MODEL` | `OPENAI_MODEL` | Web look-up model. |
+| `PORTAL_HOST` / `PORTAL_PORT` | `127.0.0.1` / `8000` | Where `main.py` listens. |
+
+## Access control
+
+`access.py` checks every HTTP request before the route runs (deny by default): reads are
+public unless a rule names them, any write no rule names needs an admin, `401` means sign
+in and `403` means the role lacks the permission. MCP over HTTP (`/mcp`) needs
+`PORTAL_MCP_TOKEN`, a super_admin / admin session token, or — in development only, with no
+token set — a local client. Other protections: login lockout, versioned PBKDF2, security
+headers (HSTS in production), trusted hosts, strict CORS in production, signed webhooks,
+error ids instead of tracebacks, and escaped server-rendered HTML. The rule table per area
+is in [Security & Operations §2](../docs/SECURITY_AND_OPERATIONS.md#2-security-model).
+
+## Durable storage
+
+`storage.py` saves every store (about 80 of them: listings, CRM, accounting, messaging, users and
+sessions, GIS layers, assistant memory …) one row per item in `portal_rows(store, key, ord,
+data)`:
+
+* **PostgreSQL** when `DATABASE_URL=postgresql://…` is set and `psycopg` is installed (`JSONB`
+  rows); otherwise **SQLite** at `PORTAL_DB_PATH` (default `backend/data/portal.sqlite3`,
+  git-ignored).
+* The first start seeds the sample data and saves it; every later start loads the saved rows
+  over the seed.
+* Saves run a few seconds after any write request, once a minute and at shutdown, and only
+  write what changed. One-time codes and rate counters are skipped; master-plan label
+  geometry is rebuilt from the plan files instead of stored.
+* A store whose rows can't be loaded keeps its seed, is listed as `frozen`, and is never
+  overwritten.
+* `GET /portal/storage` shows the backend, last save, last error and rows per store;
+  `POST /portal/storage/flush` saves now (both `settings.manage`). `PORTAL_PERSIST=0` turns
+  it off.
+
+Run a single process (each worker would keep its own copy). Backups:
+[Security & Operations §3.3](../docs/SECURITY_AND_OPERATIONS.md#33-backups-and-restore).
+
 ## OpenAI-compatible facade
 
 If a client expects an OpenAI-style API (it probes `/v1/models`), point it at
@@ -94,7 +176,11 @@ If a client expects an OpenAI-style API (it probes `/v1/models`), point it at
   returns a deterministic hash embedding.
 * **OpenAI mode** — with `OPENAI_API_KEY` in `backend/.env`, requests are forwarded
   to OpenAI (`OPENAI_MODEL`, optional `OPENAI_BASE_URL`). Streaming is passed through.
-  The same key powers voice (`openai_voice.py`).
+  The same key powers voice (`openai_voice.py`). The server always uses its configured
+  model (plus any in `AI_ALLOWED_MODELS`), returns one choice, caps the reply at
+  `OPENAI_MAX_OUTPUT_TOKENS` (a client may ask for up to twice that), and sends embeddings
+  to `OPENAI_EMBEDDING_MODEL`. Legacy `/v1/completions` is answered through chat
+  completions.
 
 The portal's **tool** interface is still MCP at `/mcp`; the `/v1` facade is only
 an LLM-compatible shim.
@@ -130,6 +216,23 @@ GEMINI_VOICE=Kore
 
 **Back to OpenAI:** delete (or comment out) the `LLM_*` and `VOICE_PROVIDER` lines and
 restart the backend. No code changes.
+
+## Assistant: knowledge base, memory and prompt
+
+The web chat, the portable app and the voice agent share one server-side brain:
+
+| Endpoint | What it does |
+| --- | --- |
+| `POST /ai/context` | One call per question: the shared system prompt (`prompts.py`) with MEMORY and KNOWLEDGE blocks, the knowledge hits, what the assistant remembers about the signed-in user, and the conversation's last turns. Guests get knowledge only. |
+| `POST /ai/turn` | Save the assistant's reply in the user's conversation memory (signed in). |
+| `POST /ai/knowledge/search` | BM25 search with `[n]` citations, trust tiers and the parsed filters (price, size, bedrooms, type). Public. |
+| `GET /me/memory`, `POST /me/memory`, `DELETE /me/memory/{id}`, `DELETE /me/memory`, `PUT /me/memory/settings` | See, add, forget one, forget all, or switch memory off — only for yourself. CNIC / card numbers and passwords are refused. |
+| `POST /ai/web-lookup` | Web search with sources: official sources first, ranked by trust tier, cached 6 hours. |
+
+MCP: `knowledge_search`, `rag_search` (same index), `my_memory_recall`, `my_memory_remember`,
+`my_memory_forget`, and the prompts `scheme_legality_check`, `property_due_diligence`,
+`comparative_market_analysis`, `mega_project_impact`, `urdu_assistant_reply`. Every MCP tool
+carries read-only / destructive / open-world hints (`_annotate_tools` in `server.py`).
 
 ## Map search, places and directions
 
@@ -206,16 +309,19 @@ answers instead, and responses say `source: "ai"`.
 | `POST /crm/messages/send` | WhatsApp, e-mail or SMS to a lead or customer, logged on their timeline. Simulated when the channel isn't configured |
 | `GET /crm/channels` | Which channels are live, and the inbound webhook URLs |
 | `POST /crm/webhooks/lead?source=` | Inbound leads from website forms, Facebook / Instagram lead ads (via Zapier / Make; `field_data` understood) and portals. De-duplicated by phone or e-mail and routed to an agent by region and load. Optional `PORTAL_CRM_WEBHOOK_SECRET` (header `X-Webhook-Secret`) |
-| `GET/POST /crm/webhooks/whatsapp` | Meta WhatsApp Cloud webhook: verification (`PORTAL_WHATSAPP_VERIFY_TOKEN`) and incoming messages, which land on the sender's lead |
+| `GET/POST /crm/webhooks/whatsapp` | Meta WhatsApp Cloud webhook: verification (`PORTAL_WHATSAPP_VERIFY_TOKEN`) and incoming messages, which land on the sender's lead. With `PORTAL_WHATSAPP_APP_SECRET` set, the `X-Hub-Signature-256` signature must match (`401` otherwise) |
 
 **Who can use it** (`access.py`, one middleware over /crm, /marketing, /broker, /agents and
 /messaging):
 
 | Rule | Routes |
 | --- | --- |
-| Public | Enquiry and viewing requests from a property page (`POST /crm/leads`, `POST /crm/appointments`, 20 per IP per minute); the agent contact card (`GET /crm/agents`, public fields only); the listing marketing kit; the AI Hub catalogue; inbound webhooks |
+| Public | Enquiry and viewing requests from a property page (`POST /crm/leads`, `POST /crm/appointments`, 20 per IP per minute); the agent contact card (`GET /crm/agents`, public fields only); the listing marketing kit; the AI Hub catalogue; inbound webhooks (signature-checked when their secret is set) |
 | Signed in | Running Agentic-OS agents. Team messaging, where the ids a request acts as (`author_id`, `actor_id`, `created_by`, `uploaded_by`, `user_id`) must be the signed-in user's unless they're an admin; the live WebSocket needs `?token=` |
-| `crm.view` / `crm.manage` | Reading / changing the CRM, marketing and broker data (agent, agency manager, customer support, admins; moderator and auditor read only) |
+| `crm.view` / `crm.manage` | Reading / changing the CRM, marketing and broker data (agent, agency manager, customer support, admins; moderator reads only). Approving an agent run needs `crm.manage` |
+
+The same middleware covers every other area (accounting, PMO, admin, GIS writes, settings …);
+see the full table in [Security & Operations §2.2](../docs/SECURITY_AND_OPERATIONS.md#22-permissions-per-area).
 
 A user whose CRM role is only **agent** works their own book: lists, the dashboard, insights,
 the timeline and the copilot cover their leads, deals and tasks, and other agents' records
@@ -301,9 +407,14 @@ either mode.
 ### 3. Tests
 
 ```powershell
-uv run python test_integration.py   # in-process MCP client + FastAPI TestClient
-uv run python smoke_http.py         # live uvicorn server + real HTTP
+uv run python test_integration.py   # in-process MCP client + FastAPI TestClient (1243 checks)
+$env:PORTAL_PERSIST = "0"; uv run python smoke_http.py   # live uvicorn server + real HTTP
 ```
+
+`test_integration.py` sets `PORTAL_PERSIST=0` itself, so it never touches your database;
+`smoke_http.py` doesn't, hence the variable. See the
+[Testing Guide](../docs/TESTING_GUIDE.md) (the smoke test currently needs updating for the
+access guard).
 
 ## Capabilities
 
@@ -440,6 +551,20 @@ A **layer** is a styled GeoJSON `FeatureCollection` attached to any entity
 | `gis_add_master_plan` | `POST /gis/master-plans` |
 | `gis_add_boundary` / `gis_add_zone` | `POST /gis/layers` |
 | `gis_list_master_plans` | `GET /gis/master-plans` |
+| — | `POST /gis/layers/upload` (GeoJSON / KML / GPX / CSV file; `dry_run`, `replace_layer_id`) |
+| — | `POST /gis/layers/publish` (`published`, `ids` or `scope`: `all` / `builtin` / `uploaded` / `master_plans`) |
+
+**Publishing.** Every map layer except the base maps is a layer record with `published`
+(on the public map at all) and `visible` (drawn by default). That includes the built-in
+overlays in `BUILTIN_LAYERS` (`server.py`): listings, featured places, areas of interest,
+OpenStreetMap POIs, provinces, districts, city names, terrain, water, roads, live roads and
+mega projects. On a fresh database **every layer starts unpublished**; publish them in
+Administration › GIS layers (`/app/admin/gis-layers`) or with `POST /gis/layers/publish`.
+Guests only see published layers, and the overlay endpoints (`/geo/provinces`,
+`/geo/districts`, `/geo/places`, `/geo/roads`, `/geo/water`, `/geo/cities`,
+`/geo/megaprojects`) return an empty result with `"unpublished": true` until then; users with
+`gis.manage` always see everything. Built-in overlays can't be deleted (`409`). All layer
+writes need `gis.manage`.
 
 `gis_add_master_plan` anchors a housing-society/scheme/zone **master plan
 raster** (and its source PDF) to a geographic rectangle (`north/south/east/west`),
@@ -719,11 +844,14 @@ MCP prompts: `aoi_due_diligence_prompt`, `site_selection_prompt`.
 | `portal_statistics` | `GET /portal/statistics` |
 | `property_availability` | `GET /portal/availability` |
 | `market_trends` | `GET /portal/market-trends` |
+| — | `GET /portal/storage`, `POST /portal/storage/flush` (`settings.manage`) |
 
 `portal_catalog` enumerates every registered MCP tool (grouped), resource, template and prompt —
 the live inventory of the whole surface. `portal_settings` reads and edits the runtime assumptions
 (`GIS_ASSUMPTIONS`), the forecast constants, and the accounting/auth configs. `global_search` fans a
-query across cities, schemes, blocks, properties, big projects, POIs, AOIs, news and the CRM.
+query across cities, schemes, blocks, properties, big projects, POIs, AOIs, news and the CRM;
+over REST the CRM, project and team-message groups are left out for callers without
+`crm.view`, `projects.view` or `audit.view`.
 
 MCP resources: `portal://health`, `portal://catalog`, `portal://settings`, `portal://statistics`.
 MCP prompts: `market_briefing_prompt`, `data_onboarding_prompt`.
@@ -732,7 +860,8 @@ MCP prompts: `market_briefing_prompt`, `data_onboarding_prompt`.
 
 Accounts live in `auth.py` (dependency-free: PBKDF2 password hashing, random OTPs and
 opaque bearer sessions — no SMS/e-mail provider is needed because messages are written
-to an in-memory **outbox** that the tests read back).
+to an **outbox** that the tests read back; `delivery.py` sends real e-mail / SMS /
+WhatsApp when configured).
 
 **Signup is OTP-gated.** A new account is created in `pending` status and only becomes
 `active` — and only then able to log in — once a code from the signup challenge is
@@ -756,16 +885,27 @@ verified.
   (`0321 9998877` → `+923219998877`); emails are lower-cased.
 * **OTP policy** — 6 digits, 5-minute TTL, 5 attempts, a 30-second resend cooldown and a
   cap of 10 codes per identifier per hour. Codes are stored salted-hashed; the plaintext
-  is kept only while `PORTAL_AUTH_EXPOSE_OTP` is on (default, for local dev) and is
-  returned as `dev_otp` so the flow can be driven without a real gateway.
-* **Sessions** — opaque `secrets.token_urlsafe` tokens, 24-hour expiry, revocable;
-  a password reset revokes every existing session.
-* **Guarded routes** — `/auth/me`, `/auth/logout`, `/auth/refresh`, `/auth/users` and
-  `/auth/password/set` require `Authorization: Bearer <token>` (HTTP `401` otherwise).
-  `require_user` in `api.py` is the ready-made FastAPI dependency for protecting more.
+  is kept only while `PORTAL_AUTH_EXPOSE_OTP` is on (default in development, off in
+  production) and is returned as `dev_otp` so the flow can be driven without a real gateway.
+* **Passwords** — PBKDF2-SHA256, **600,000** rounds for new hashes
+  (`PORTAL_PBKDF2_ITERATIONS`). The salt records its round count (`i600000$…`), so older
+  120,000-round hashes still verify.
+* **Lockout** — 5 failed password sign-ins for one account within 15 minutes lock password
+  sign-in for it (`code: "locked"`; `PORTAL_LOGIN_MAX_FAILURES`, `PORTAL_LOGIN_LOCK_MINUTES`).
+  Unknown accounts cost the same time, so timing reveals nothing.
+* **Sessions** — opaque `secrets.token_urlsafe` tokens, 24-hour expiry, revocable, saved
+  with the rest of the data (a restart doesn't sign anyone out); a password reset or a
+  suspension revokes every session, a password change ends the user's other sessions.
+* **Guarded routes** — `/auth/me`, `/auth/logout`, `/auth/refresh` and `/auth/password/set`
+  require `Authorization: Bearer <token>` (HTTP `401` otherwise); `/auth/users` needs
+  `users.view`, `/auth/events` `audit.view`, `/auth/otps` and `/auth/notifications`
+  `settings.manage`. Every other route is covered by `access.py`.
 * **CRM link** — a successful signup also creates a CRM customer and stores
   `customer_id` on the account.
-* **Seeded demo accounts** — 13 accounts covering every tier (all `active`, password shown):
+* **Seeded demo accounts** — only with `PORTAL_SEED_DEMO` (on in development, off in
+  production), because the passwords are public. `/auth/config` lists the login page's
+  one-click accounts in `demo_accounts` only then. 13 accounts covering every tier (all
+  `active`, password shown):
   `admin@portal.pk`/`Admin@12345` (super_admin), `auditor@portal.pk`/`Auditor@12345`,
   `agent@portal.pk`/`Agent@12345`, `developer@portal.pk`/`Developer@12345`,
   `finance@portal.pk`/`Finance@12345` (finance_manager + accountant),
@@ -788,8 +928,9 @@ curl http://127.0.0.1:8000/auth/me -H "Authorization: Bearer <token>"
 ## Users, roles & permissions (RBAC)
 
 `auth.py` carries a full role-based access-control layer. There are **19 system roles**
-grouped into four portal areas, and a catalogue of **30 permissions** written as
-`resource.action` (for example `listings.manage`, `accounting.manage`, `ads.manage`).
+grouped into four portal areas, and a catalogue of **31 permissions** written as
+`resource.action` (for example `listings.manage`, `accounting.manage`, `ads.manage`,
+`basedata.manage`).
 
 | Portal area | Roles |
 | --- | --- |
@@ -815,7 +956,9 @@ granted directly, on top of the roles. The highest-level role is the user's *pri
 
 System roles are protected from deletion and from permission edits; create a **custom role**
 with `auth_create_role` for bespoke access. When signing up, `role` must be one of the
-self-service `SIGNUP_ROLES` (`buyer`, `tenant`, `seller`, `landlord`, `investor`, `user`).
+self-service `SIGNUP_ROLES` (`buyer`, `tenant`, `seller`, `landlord`, `investor`, `user`,
+`agent`, `developer`). `agent` and `developer` (`REQUEST_ONLY_ROLES`) start as `user` with
+`requested_role` set until an administrator grants the role.
 
 MCP resources: `roles://all`, `roles://role/{name}`, `roles://permissions`, `roles://summary`,
 `roles://user/{user_id}`. Prompts: `role_assignment_prompt`.
@@ -1102,8 +1245,11 @@ start "http://127.0.0.1:8000/commercial/portal"
 ### Agentic OS — agents, runs & smart actions
 
 The run engine executes **plan → execute → review → deliver** steps, bound to real portal
-tools. Set `approve=false` to pause at the human-approval gate and finish with
-`agent_approve`. Every run, step and approval is recorded.
+tools. Tools that only read run before the human review; tools that create, send or change
+something (`agents.WRITE_TOOL`) run after it. Runs start with `approve=false`, so a gated run
+pauses at `awaiting_approval` until `agent_approve` (REST needs `crm.manage`), which records
+the signed-in user as the approver and runs the approved step. Running agents needs sign-in.
+Every run, step and approval is recorded.
 
 **MCP tools:** `agents_overview`, `agents_catalog`, `agent_get`, `agent_products`,
 `agent_plan`, `agent_run`, `agent_runs`, `agent_run_get`, `agent_approve`,
@@ -1127,8 +1273,9 @@ curl "http://127.0.0.1:8000/agents/smart-actions"
 # run the conversational buyer agent against the live catalogue
 curl -X POST "http://127.0.0.1:8000/agents/run" -H "Content-Type: application/json" -d '{"agent_key":"conversational_buyer_agent","objective":"find a 3-bed house","text":"3 crore, 3 bed, Lahore, 35 min commute"}'
 
-# pause at the approval gate, then approve
-curl -X POST "http://127.0.0.1:8000/agents/run" -H "Content-Type: application/json" -d '{"agent_key":"transaction_agent","objective":"review a deal","approve":false}'
+# runs pause at the approval gate by default; approve to run the write steps
+curl -X POST "http://127.0.0.1:8000/agents/run" -H "Authorization: Bearer $token" -H "Content-Type: application/json" -d '{"agent_key":"transaction_agent","objective":"review a deal"}'
+curl -X POST "http://127.0.0.1:8000/agents/runs/<run id>/approve" -H "Authorization: Bearer $token"
 ```
 
 ### Transactions — the deal-to-close lifecycle
@@ -1632,18 +1779,16 @@ start "http://127.0.0.1:8000/messaging/portal"
 
 ## Notes
 
-* Storage is **in-memory** for now (seeded on startup); a PostgreSQL + PostGIS
-  backend is the planned next step (`DatabaseConfig` is the seam). The messaging
-  wing follows the same rule and is explicit about it: in-memory lists are **not**
-  the permanent message store, so every store sits behind a thin seam for a PostgreSQL
-  *messaging* schema (conversations, memberships, messages, attachments, notifications,
-  audit) plus private object storage for the files themselves.
+* Data lives in in-memory stores and is **saved by `storage.py`** to PostgreSQL or SQLite
+  (see *Durable storage* above). `migrate_to_postgres.py` is a separate export into a typed
+  relational schema for reporting ([Data Migration Guide](../docs/DATA_MIGRATION_GUIDE.md)).
+  Attachment files themselves belong in private object storage.
 * The MCP HTTP endpoint has DNS-rebinding protection, so send a `Host` of
   `127.0.0.1`/`localhost` (any real client does).
-* OTPs are **not** delivered anywhere: they are recorded in the in-memory outbox and,
-  while `PORTAL_AUTH_EXPOSE_OTP` is on (the default), echoed back as `dev_otp`.
-  Set `PORTAL_AUTH_EXPOSE_OTP=0` to hide them, and swap in a real SMS/e-mail provider by
-  replacing `auth._deliver`.
+* Until a provider is configured, OTPs are **not** delivered anywhere: they are recorded in
+  the outbox and, in development, echoed back as `dev_otp`. Configure SMTP / Twilio /
+  WhatsApp / an HTTP SMS gateway in `backend/.env` (`delivery.py`; Administration Guide
+  §4.4) to send them for real.
 * Language coverage is intentionally partial: unmapped strings stay in English. Add a
   phrase to `gis.TRANSLATIONS["ur"]` to translate it, or a new entry to
   `gis.SUPPORTED_LANGUAGES` to add a language.

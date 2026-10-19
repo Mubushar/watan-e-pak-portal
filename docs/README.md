@@ -18,12 +18,14 @@ exposed **both** as an **MCP server** and a **FastAPI REST API** from one source
 | Document | Audience | What it covers |
 | --- | --- | --- |
 | [USER_MANUAL.md](USER_MANUAL.md) | Brokers, agents, staff, end users | Signing in, the portal pages, and step-by-step daily workflows for every wing. |
-| [ADMINISTRATION_GUIDE.md](ADMINISTRATION_GUIDE.md) | Portal admins, DevOps, IT | Deployment, configuration, roles & permissions, security, data/storage & backups, monitoring, runbook. |
+| [ADMINISTRATION_GUIDE.md](ADMINISTRATION_GUIDE.md) | Portal admins, DevOps, IT | Deployment, configuration, roles & permissions, the admin screens (base data, property database, GIS layers), security, data/storage & backups, monitoring, runbook. |
+| [SECURITY_AND_OPERATIONS.md](SECURITY_AND_OPERATIONS.md) | DevOps, IT, the portal owner | Every environment variable, the access guard and permissions per area, MCP access, webhooks, durable storage and backups, the production checklist. |
 | [MCP_GUIDE.md](MCP_GUIDE.md) | Integration engineers, AI builders | The MCP server: transports, client setup, discovery, calling tools/resources/prompts, auth, limits. |
 | [API_GUIDE.md](API_GUIDE.md) | Backend/frontend engineers | The FastAPI REST API + WebSockets + the OpenAI-compatible facade: auth, conventions, key flows, errors. |
-| [AGENTIC_AI_GUIDE.md](AGENTIC_AI_GUIDE.md) | AI engineers, product owners | The Agentic OS: the 8 products, the 24-agent catalogue, the run engine, approval gates, smart actions. |
+| [AGENTIC_AI_GUIDE.md](AGENTIC_AI_GUIDE.md) | AI engineers, product owners | The Agentic OS: the 8 products, the 24-agent catalogue, the run engine, approval gates, smart actions; the assistant's knowledge base, citations and memory. |
 | [MESSAGING_GUIDE.md](MESSAGING_GUIDE.md) | Everyone using the messaging wing | The internal-first messaging + notification system end to end, including e-mail, Telegram and real-time. |
-| [TESTING_GUIDE.md](TESTING_GUIDE.md) | Developers, QA | Running and extending the test suites; how to test MCP, the API, messaging and the agentic flows. |
+| [TESTING_GUIDE.md](TESTING_GUIDE.md) | Developers, QA | Running and extending the test suites; how to test MCP, the API, messaging, security, storage and the agentic flows. |
+| [DATA_MIGRATION_GUIDE.md](DATA_MIGRATION_GUIDE.md) | Admins, data engineers | Exporting the stores into a typed relational PostgreSQL schema (separate from the live storage). |
 
 ### Generated reference (do not edit by hand)
 
@@ -66,8 +68,8 @@ uv run python ..\docs\_gen\gen_docs.py
              ┌───────────────────────┴────────────────────────┐
              ▼                                                 ▼
    framework-free domain modules (backend/*.py)      in-memory stores
-   agents • transactions • intelligence • leasing    (seeded on startup,
-   marketing • commercial • accounting • crm         behind a DB seam)
+   agents • transactions • intelligence • leasing    (saved by storage.py to
+   marketing • commercial • accounting • crm         PostgreSQL or SQLite)
    gis • construction • maintenance • tools • pmo
    messaging • content • auth …
 ```
@@ -76,11 +78,11 @@ uv run python ..\docs\_gen\gen_docs.py
 
 | Surface | Count |
 | --- | --- |
-| MCP tools | **605** across **30 groups** |
+| MCP tools | **609** across **30 groups** |
 | MCP resources / templates | **112** / **34** |
-| MCP prompts | **31** |
-| REST routes | **649** across **39 tags** |
-| Portal roles / permissions | **19** / **30** |
+| MCP prompts | **36** |
+| REST routes | **700** across **40 tags** |
+| Portal roles / permissions | **19** / **31** |
 | Agentic agents / products | **24** / **8** |
 
 ### Wing → MCP group → REST tag
@@ -115,9 +117,15 @@ uv run python ..\docs\_gen\gen_docs.py
   GeoPandas reprojection, PyMuPDF text extraction, GDAL) do **not** fake results. They
   return a structured descriptor naming the extra dependency, so a caller can degrade
   gracefully.
-* **Storage seam** — data lives in in-memory stores seeded on startup, but every store
-  sits behind a thin seam so it can be swapped for PostgreSQL/PostGIS + object storage.
-  This is deliberate; see [ADMINISTRATION_GUIDE.md](ADMINISTRATION_GUIDE.md#5-data-storage--backups).
+* **Storage** — the code works on in-memory stores for speed; `storage.py` saves them to
+  PostgreSQL (`DATABASE_URL`) or SQLite (`backend/data/portal.sqlite3`) a few seconds after
+  each change and restores them on start. See
+  [ADMINISTRATION_GUIDE.md](ADMINISTRATION_GUIDE.md#5-data-storage--backups) and
+  [SECURITY_AND_OPERATIONS.md](SECURITY_AND_OPERATIONS.md#3-durable-storage).
+* **Access** — every HTTP request passes one access guard (`access.py`): reads are public
+  unless a rule names them, writes need the permission their rule names (an admin when
+  none does). Examples in these guides leave the `Authorization: Bearer <token>` header out
+  where it isn't the point.
 * **Language & theme** — every HTML page accepts `?lang=xx` (English, Urdu, …) and
   `?theme=auto|light|dark`.
 
@@ -131,6 +139,7 @@ uv run python main.py                     # REST :8000 · MCP /mcp · OpenAI /v1
 # MCP        -> http://127.0.0.1:8000/mcp
 ```
 
-Then open <http://127.0.0.1:8000/docs> for the interactive REST API, or connect an MCP
-client per [MCP_GUIDE.md](MCP_GUIDE.md). New to the portal? Start with the
-[User Manual](USER_MANUAL.md).
+Then open <http://127.0.0.1:8000/docs> for the interactive REST API (development only), or
+connect an MCP client per [MCP_GUIDE.md](MCP_GUIDE.md). New to the portal? Start with the
+[User Manual](USER_MANUAL.md). Deploying? Read
+[SECURITY_AND_OPERATIONS.md](SECURITY_AND_OPERATIONS.md) first.

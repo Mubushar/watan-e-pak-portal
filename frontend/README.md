@@ -17,8 +17,11 @@ npm install
 npm run dev                      # http://localhost:5173
 ```
 
-Sign in with a seeded demo account — the login page has one-click buttons
-(`admin@portal.pk` / `Admin@12345`, agent, finance, developer, investor, buyer, …).
+In development, sign in with a seeded demo account — the login page has one-click buttons
+(`admin@portal.pk` / `Admin@12345`, agent, finance, developer, investor, buyer, …). The
+buttons come from `GET /auth/config` (`demo_accounts`), which is empty in production, so a
+production build shows none. Signing up as an agent or developer explains that an
+administrator approves that role.
 
 Vite proxies `/api/*` (including WebSockets), `/media/*` (uploaded listing photos) and
 `/ads.txt` to the backend, so the portal is same-origin in development. Point it elsewhere with `VITE_API_TARGET` (see
@@ -54,13 +57,40 @@ Vite proxies `/api/*` (including WebSockets), `/media/*` (uploaded listing photo
 | Tools | `/tools`, `/tools/:key` | tools (calculators, converters, calendar, GIS, CAD) |
 | Content | `/pages/:key`, `/stories`, `/pricing` | content, commercial |
 | Auth | `/login`, `/signup`, `/forgot` | auth (password + OTP) |
-| Dashboard | `/app/*` — overview, Agentic OS, CRM, transactions, leasing, marketing, accounting, advertising, PMO, construction, maintenance, messages, admin, profile, my listings, new listing | `/me/listings` (+ photo upload), crm, transactions, leasing, marketing, accounting, ads, pmo, construction, maintenance, messaging (+ WebSocket), roles |
+| Dashboard | `/app/*` — overview, Agentic OS, CRM, transactions, leasing, marketing, accounting, advertising, PMO, construction, maintenance, messages, profile, my listings, new listing | `/me/listings` (+ photo upload), crm, transactions, leasing, marketing, accounting, ads, pmo, construction, maintenance, messaging (+ WebSocket) |
+| Administration | `/app/admin` (users & roles), `/app/admin/base-data`, `/app/admin/properties` (property database), `/app/admin/gis-layers` | roles, `/admin/basedata/*`, `/admin/properties*` (CSV export / import), `/gis/layers*` (upload, publish) |
 
 Cross-cutting features: live market + news ticker, rotating advertisement slots
 (`/ads/{id}/event` view/click billing for flat / CPM / CPC campaigns, AdSense for unsold
 slots when configured), floating AI assistant (with OpenAI connected it searches and acts
 through the backend's tools; otherwise a RAG chat with listing cards and agent hand-off), ⌘K federated search, natural-language property search, favourites and
 side-by-side comparison, dark mode, English/Urdu (RTL), responsive down to 360 px.
+
+**The assistant** gets its system prompt, knowledge hits and the user's memory from one
+`POST /ai/context` call per question, saves replies with `POST /ai/turn`, runs independent
+tool calls in parallel, and shows a **Sources** list under answers with a trust badge per
+source (Official, Verified, Reference, Listing, Unverified). Its `remember` tool writes to
+`/me/memory` for signed-in users.
+
+**Map layers** come from the backend's layer records: the map shows only layers an admin
+has published (`GET /gis/layers`), and the overlay endpoints return empty results with
+`unpublished: true` until then. Admins publish them under Administration › GIS layers.
+
+## Permissions and security
+
+* Routes and menu items check the user's permissions (`RequirePermission`,
+  `DashboardLayout`): CRM, transactions and marketing need `crm.view`, accounting
+  `accounting.view`, PMO `projects.view`, advertising `ads.view`, Users & roles `users.view`
+  or `settings.manage`, Base data `basedata.manage`, the property database
+  `properties.manage`, GIS layers `gis.manage`. The server enforces the same rules; the UI
+  only hides what would fail.
+* The MCP console and tool runner (`/ai/mcp`) are for administrators only. Guests don't call
+  protected endpoints (agent runs, saved projects, CRM smart actions, P&L, PMO).
+* React Query doesn't retry `401` / `403`. An expired session signs the user out and shows a
+  **Sign in** prompt.
+* Markdown and news links are limited to `http(s)`, `mailto`, `tel` and relative URLs, and
+  map tooltips, labels and popups escape their data (`escapeHtml` / `safeHref` in
+  `src/lib/utils.ts`). Use them for any new HTML string or link built from data.
 
 ## Project layout
 

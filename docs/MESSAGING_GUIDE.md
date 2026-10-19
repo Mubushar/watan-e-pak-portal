@@ -47,6 +47,25 @@ Concretely:
 Conversation kinds, statuses, roles, categories, attachment rules and limits are listed in
 the generated [reference/MESSAGING.md](reference/MESSAGING.md).
 
+### 2.1 Who may call the messaging API
+
+Over REST every `/messaging` route needs a signed-in user (`Authorization: Bearer <token>`),
+and the request may only **act as that user**: an `author_id`, `actor_id`, `created_by`,
+`uploaded_by` or `user_id` in the body, query or path must be the caller's own id, or the
+request gets `403` ("You can only act as yourself"). Administrators may act for anyone.
+`revoke-access`, `telegram/alert` and `dispatch` take a `user_id` naming the person acted
+on, so they are exempt from that check. The operator routes need more:
+
+| Routes | Permission |
+| --- | --- |
+| `GET /messaging/audit`, `/outbox`, `/retention`, `/statistics`, `/telegram/links` | `audit.view` |
+| `POST /messaging/purge`, `/dispatch`, `/telegram/alert`, `/reports/{id}/moderate` | `settings.manage` |
+| `POST /messaging/telegram/update` (the bot webhook) | public, checked with the webhook secret (§9.1) |
+
+Membership, channel restrictions and sensitivity are then checked by `messaging.py` as
+before. MCP tools take the `user_id` explicitly; the `/mcp` endpoint itself is limited to
+MCP-token holders and administrators.
+
 ---
 
 ## 3. Conversations
@@ -271,6 +290,11 @@ individually.
 3. `msg_telegram_update` (REST `POST /messaging/telegram/update`) processes the inbound
    update and binds the chat id with the user's allowed categories.
 
+Register the webhook with Telegram's `setWebhook` and a `secret_token`, and put the same
+value in `PORTAL_TELEGRAM_WEBHOOK_SECRET` (`backend/.env`). Telegram then sends it in the
+`X-Telegram-Bot-Api-Secret-Token` header, and updates without it get `401`. Without the
+variable the endpoint accepts any update, so set it before the bot goes live.
+
 ### 9.2 Bot commands
 
 | Command | Effect |
@@ -304,12 +328,15 @@ individually.
 The messaging wing pushes events in real time over a per-conversation socket:
 
 ```
-WS /ws/messaging/{conversation_id}?user_id=<user_id>
+WS /ws/messaging/{conversation_id}?token=<session token>&user_id=<user_id>
 ```
 
-* **Access is re-checked on connect.** A client without access is closed with code
-  **`4403`**.
-* `user_id` is required — there is no ambient HTTP session.
+* **Sign-in.** Browsers can't set headers on a WebSocket, so the caller passes its session
+  token as `?token=`. A missing or expired token, or a `user_id` that isn't the signed-in
+  user (unless an admin), closes the socket with **`4401`**. `user_id` is optional and
+  defaults to the signed-in user.
+* **Access is re-checked on connect.** A client without access to the conversation is
+  closed with code **`4403`**.
 * Events cover new messages, edits, reactions, read receipts and action changes.
 * The broker is a **stdlib in-process pub/sub registry** (no `asyncio` coupling in the
   domain module); the FastAPI handler uses a pump task plus a receive loop so a client
@@ -400,42 +427,50 @@ Implement and enable the wing in this order (each stage is useful on its own):
 
 ## 14. End-to-end recipe (PowerShell)
 
+Signed in as the seeded administrator, who may act for every user in this walk-through
+(a normal user can only act as themselves):
+
 ```powershell
 $base = "http://127.0.0.1:8000"
+$token = (Invoke-RestMethod -Method Post -Uri "$base/auth/login" -ContentType "application/json" `
+  -Body '{"identifier":"admin@portal.pk","password":"Admin@12345"}').token
+$auth = "Authorization: Bearer $token"
 
 # 1. the workspace, channels and a directory of members
-curl "$base/messaging/overview"
-curl "$base/messaging/channels"
-curl "$base/messaging/profiles"
+curl "$base/messaging/overview" -H $auth
+curl "$base/messaging/channels" -H $auth
+curl "$base/messaging/profiles" -H $auth
 
 # 2. open a 1-to-1 conversation and post a message with a mention
-curl -X POST "$base/messaging/direct" -H "Content-Type: application/json" `
+curl -X POST "$base/messaging/direct" -H $auth -H "Content-Type: application/json" `
   -d '{"user_a":"USR-0001","user_b":"USR-0003"}'
-curl -X POST "$base/messaging/conversations/CNV-0001/messages" -H "Content-Type: application/json" `
+curl -X POST "$base/messaging/conversations/CNV-0001/messages" -H $auth -H "Content-Type: application/json" `
   -d '{"author_id":"USR-0001","body":"Please confirm the DHA rate list","mentions":["USR-0003"]}'
 
 # 3. turn it into an action that also lands in the CRM task list
-curl -X POST "$base/messaging/conversations/CNV-0001/actions" -H "Content-Type: application/json" `
+curl -X POST "$base/messaging/conversations/CNV-0001/actions" -H $auth -H "Content-Type: application/json" `
   -d '{"created_by":"USR-0001","title":"Confirm DHA rate list","kind":"request","owner_id":"USR-0003","due_on":"2026-07-05","create_crm_task":true}'
 
-# 4. queue and drain notifications, then read the outbox
-curl "$base/messaging/notifications/USR-0003"
-curl -X POST "$base/messaging/dispatch" -H "Content-Type: application/json" -d '{"force":true}'
-curl "$base/messaging/outbox"
+# 4. queue and drain notifications (settings.manage), then read the outbox (audit.view)
+curl "$base/messaging/notifications/USR-0003" -H $auth
+curl -X POST "$base/messaging/dispatch" -H $auth -H "Content-Type: application/json" -d '{"force":true}'
+curl "$base/messaging/outbox" -H $auth
 
-# 5. opt into Telegram (mint a code, then simulate /start)
-curl -X POST "$base/messaging/telegram/link-code" -H "Content-Type: application/json" -d '{"user_id":"USR-0003"}'
+# 5. opt into Telegram (mint a code, then simulate /start; add the
+#    X-Telegram-Bot-Api-Secret-Token header when PORTAL_TELEGRAM_WEBHOOK_SECRET is set)
+curl -X POST "$base/messaging/telegram/link-code" -H $auth -H "Content-Type: application/json" -d '{"user_id":"USR-0003"}'
 curl -X POST "$base/messaging/telegram/update" -H "Content-Type: application/json" `
   -d '{"chat_id":"90001","text":"/start CODE_FROM_PREVIOUS_STEP"}'
-curl "$base/messaging/telegram/status/USR-0003"
+curl "$base/messaging/telegram/status/USR-0003" -H $auth
 
 # 6. summarise the conversation and extract action items
-curl "$base/messaging/conversations/CNV-0001/summary"
-curl -X POST "$base/messaging/conversations/CNV-0001/action-items" -H "Content-Type: application/json" `
+curl "$base/messaging/conversations/CNV-0001/summary" -H $auth
+curl -X POST "$base/messaging/conversations/CNV-0001/action-items" -H $auth -H "Content-Type: application/json" `
   -d '{"user_id":"USR-0001","create":false}'
 
-# 7. open the workspace page
-start "$base/messaging/portal"
+# 7. the workspace page (needs the token, so save it and open the file;
+#    in the web portal it is /app/messages)
+curl "$base/messaging/portal.html" -H $auth -o messaging.html; start messaging.html
 ```
 
 ---
@@ -451,15 +486,19 @@ start "$base/messaging/portal"
   `messaging://unread/{user_id}`.
 * **Prompts** — `messaging_briefing_prompt`, `messaging_thread_digest_prompt`,
   `messaging_escalation_prompt`.
-* **HTML** — `msg_portal` / `GET /messaging/portal[.html]`.
+* **HTML** — `msg_portal` / `GET /messaging/portal[.html]` (signed in).
 
 ---
 
-## 16. Storage seam & production plan
+## 16. Storage & production plan
 
-For now the wing uses the portal's in-memory stores (seeded on startup). This is
-deliberate: it keeps the whole platform runnable with zero infrastructure while every store
-sits behind a **thin seam**. The intended production schema maps directly to the model:
+The wing works on the portal's in-memory stores, and the portal's durable storage saves
+every one of them (conversations, memberships, messages, attachments, actions,
+notifications, outbox, Telegram links, audit, reports, profiles) to PostgreSQL or SQLite a
+few seconds after each change and restores them on start — see
+[Administration §5](ADMINISTRATION_GUIDE.md#5-data-storage--backups). Telegram link codes
+and the per-minute rate counters are not saved (they expire within minutes). For a larger
+deployment the model maps directly to a relational schema:
 
 * tables for **conversations**, **memberships**, **messages**, **attachments**,
   **notification records** and **outbox items** (plus Telegram links, audit events and

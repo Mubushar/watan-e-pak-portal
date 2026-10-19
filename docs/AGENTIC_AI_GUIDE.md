@@ -67,8 +67,9 @@ Every agent has an **autonomy level**, from the `agentic` settings group:
 | `autonomous` | Runs end-to-end without a gate. |
 
 An agent's `requires_approval` flag is derived from its level: agents at `suggest`/`assist`
-pause unless the caller explicitly overrides. Autonomous agents (e.g. `routing_agent`,
-`anomaly_agent`, `renewal_agent`, `autonomous_leasing_agent`) run freely.
+pause at the gate. Runs start with `approve=false`, so they pause **by default**; only the
+portal's own scheduled jobs pre-approve (`approve=true`). Autonomous agents (e.g.
+`routing_agent`, `anomaly_agent`, `renewal_agent`, `autonomous_leasing_agent`) run freely.
 
 You can tune the default level and the approval-required set at runtime through the
 `agentic` settings group (`GET/PUT /portal/settings`) or `portal_settings`.
@@ -87,15 +88,15 @@ output.
 
 | MCP tool | REST | Purpose |
 | --- | --- | --- |
-| `agent_plan` | `POST /agents/plan` | Plan a run **without** executing it. |
-| `agent_run` | `POST /agents/run` | Execute a run. |
+| `agent_plan` | `POST /agents/plan` | Plan a run **without** executing it (signed in). |
+| `agent_run` | `POST /agents/run` | Execute a run up to the gate (signed in). |
 | `agent_runs` | `GET /agents/runs` | The recorded run audit trail. |
 | `agent_run_get` | `GET /agents/runs/{run_id}` | One run with steps, outputs and approvals. |
-| `agent_approve` | `POST /agents/runs/{run_id}/approve` | Approve a paused run (human-in-the-loop gate). |
+| `agent_approve` | `POST /agents/runs/{run_id}/approve` | Approve a paused run and run its approved steps (`crm.manage`). |
 | `agent_orchestrate` | `POST /agents/orchestrate` | Plan a multi-agent hand-off chain. |
-| `agent_smart_actions` | `GET /agents/smart-actions` | The prioritised morning brief. |
-| `agent_move_likelihood` | `GET /agents/move-likelihood/{lead_id}` | Score a lead's likelihood of moving. |
-| `agent_seller_intent` | `GET /agents/seller-intent` | Score how likely a contact is to sell. |
+| `agent_smart_actions` | `GET /agents/smart-actions` | The prioritised morning brief (`crm.view`). |
+| `agent_move_likelihood` | `GET /agents/move-likelihood/{lead_id}` | Score a lead's likelihood of moving (`crm.view`). |
+| `agent_seller_intent` | `GET /agents/seller-intent` | Score how likely a contact is to sell (`crm.view`). |
 | `agents_overview` | `GET /agents/overview` | Counts, products, autonomy mix, run activity. |
 | `agents_catalog` | `GET /agents/catalog` | The catalogue. |
 | `agent_get` | `GET /agents/{key}` | One agent's full definition. |
@@ -106,21 +107,33 @@ output.
 
 ## 6. Approval gates
 
-This is the core safety mechanism. When a run reaches a step flagged
-`requires_approval`:
+This is the core safety mechanism. **Look first, act after the human gate:**
 
-1. The run **pauses** with that step's status `awaiting_approval` (use `approve=false`
-   when starting, or a gated step will pause automatically).
-2. A human reviews the step output.
-3. `agent_approve(run_id, approver=..., execute=true)` resumes and finishes the run.
+* An agent's workflow runs the tools that only **read or analyse** (search, score, extract,
+  check deadlines …) before the review step, and the tools that **create, send or change**
+  something (names containing `create`, `send`, `update`, `delete`, `publish`, `assign`,
+  `book`, `schedule`, `sign`, `post`, `dispatch`, `record`, `pay`, `notify`, `message`,
+  `email`, `whatsapp`, `add`, `apply`, `renew` …) only after it.
+* Runs start with `approve=false` (the default over MCP and REST). When a run reaches a step
+  flagged `requires_approval` it **pauses** with status `awaiting_approval`; nothing that
+  writes has run yet.
+* A human reviews the outputs so far, then calls `agent_approve`. That runs the approved
+  step and continues; a later gated step pauses again for its own approval.
+* The approval is recorded under the **signed-in user's** name and id (the `approver`
+  argument is only used by token-based MCP clients that have no user). Approving a run that
+  is not waiting returns an error.
+* Running an agent needs sign-in; approving needs `crm.manage`.
+* An agent never silently falls back to some other record (for example the first listing)
+  when the one it needs is missing.
 
 ```powershell
-# start a run that will pause at the gate
-curl -X POST "http://127.0.0.1:8000/agents/run" -H "Content-Type: application/json" `
-  -d '{"agent_key":"transaction_agent","objective":"review a deal","approve":false}'
+$H = @{ Authorization = "Bearer $token" }
+# start a run: it pauses at the gate
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/agents/run" -Headers $H `
+  -ContentType "application/json" -Body '{"agent_key":"transaction_agent","objective":"review a deal"}'
 
-# the run id comes back in the response; approve it
-curl -X POST "http://127.0.0.1:8000/agents/runs/ARUN-0001/approve?approver=USR-0001"
+# the run id comes back in the response; approve it to run the write steps
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/agents/runs/ARUN-0001/approve" -Headers $H
 ```
 
 Workflows that contain a gated step are listed in
@@ -190,7 +203,11 @@ The AI surface ships prompts that package the portal's context for a model, incl
 * `transaction_close_prompt`, `market_briefing_prompt`.
 * `conversational_buyer_brief`, `site_selection_prompt`.
 
-See [reference/MCP_PROMPTS.md](reference/MCP_PROMPTS.md) for all 31 and their arguments.
+* `scheme_legality_check`, `property_due_diligence`, `comparative_market_analysis`,
+  `mega_project_impact`, `urdu_assistant_reply` — expert prompts that work from the
+  knowledge base and cite their sources ([MCP Guide §4](MCP_GUIDE.md#4-calling-tools)).
+
+See [reference/MCP_PROMPTS.md](reference/MCP_PROMPTS.md) for all 36 and their arguments.
 
 ---
 
@@ -208,11 +225,11 @@ arguments: { "agent_key": "conversational_buyer_agent",
              "text": "3 crore, 3 bed, Lahore, 35 min commute" }
 ```
 
-**REST**:
+**REST** (signed in; smart actions need `crm.view`):
 
 ```powershell
-curl "http://127.0.0.1:8000/agents/smart-actions?user_id=USR-0001"
-curl -X POST "http://127.0.0.1:8000/agents/run" -H "Content-Type: application/json" `
+curl "http://127.0.0.1:8000/agents/smart-actions?user_id=USR-0001" -H "Authorization: Bearer $token"
+curl -X POST "http://127.0.0.1:8000/agents/run" -H "Authorization: Bearer $token" -H "Content-Type: application/json" `
   -d '{"agent_key":"conversational_buyer_agent","objective":"find a 3-bed house","text":"3 crore, 3 bed, Lahore"}'
 ```
 
@@ -220,7 +237,10 @@ curl -X POST "http://127.0.0.1:8000/agents/run" -H "Content-Type: application/js
 
 ## 12. Guardrails
 
-* **Human approval** for `suggest`/`assist` agents before external effects.
+* **Human approval** for `suggest`/`assist` agents before external effects; write tools
+  run only after it, and the approval names the person.
+* **MCP tool hints** — every tool is marked read-only, destructive and/or open-world, so a
+  client can ask before deletes and outbound messages ([MCP Guide](MCP_GUIDE.md#tool-annotations)).
 * **Audited runs** — every run, step and approval is recorded and readable.
 * **Transparent scoring** — weighted, inspectable signals; no opaque model needed.
 * **No fake capabilities** — heavy/licensed operations return a
@@ -249,7 +269,34 @@ See the [Messaging Guide](MESSAGING_GUIDE.md#12-ai-in-messaging) for the full lo
 
 ---
 
-## 14. Extending the catalogue
+## 14. The assistant: knowledge, citations and memory
+
+The chat and voice assistant in the web portal and the app (and any MCP client) answers
+from the same server-side pieces:
+
+| Piece | Module | What it does |
+| --- | --- | --- |
+| Knowledge base | `knowledge.py` | BM25 search (a few milliseconds a query) over listings, housing schemes with their approval status and sources, cities, mega projects, big projects, news and guide pages. Understands crore / lakh / arab, marla / kanal / sq ft, bedrooms, Urdu script and Roman Urdu, and "Phase II" = "phase 2"; prices, sizes and bedrooms become hard filters on listings. Every hit has a `[n]` citation. |
+| Trust tiers | `sources.py` | `official` (government, regulators, development authorities: `.gov.pk`, `.gop.pk`, `.gos.pk`, `.gkp.pk`, `.gob.pk`, SBP, SECP, DHA …), `verified` (checked by the portal), `reference` (Wikipedia, Dawn, Business Recorder …), `listing` (an owner's or agent's listing), `unverified` (everything else, including the sample news). Stronger tiers rank higher. |
+| Memory | `memory.py` | Per signed-in user, private: recent conversation turns (14 days) and long-term facts (budget, areas, size, type, bedrooms, purpose, language, explicit notes). Never stores CNIC, card or bank numbers. Users can see, delete, clear or switch it off (`/me/memory`). |
+| System prompt | `prompts.py` | One prompt for every app and channel (`chat` / `voice`): accuracy first, cite `[n]`, say plainly when a scheme is unapproved or illegal, no legal or investment advice. |
+
+**One call per question.** `POST /ai/context` returns the composed system prompt with the
+MEMORY and KNOWLEDGE blocks, the hits, the memory items and the last turns; the app then
+calls the model, and `POST /ai/turn` saves the reply. The web chat shows the cited hits as
+a **Sources** list under the answer, each with its trust badge and a link to the original,
+and runs independent tool calls in parallel.
+
+**Web look-ups** (`web_lookup`, `POST /ai/web-lookup`) ask for official sources first, rank
+the returned links by trust tier, and answer a repeated question from a 6-hour cache.
+
+Over MCP the same pieces are `knowledge_search`, `rag_search` and the `my_memory_*` tools
+([MCP Guide](MCP_GUIDE.md#knowledge-and-memory-tools)); the REST shapes are in the
+[API Guide §4.9](API_GUIDE.md#49-assistant-context-knowledge-and-memory).
+
+---
+
+## 15. Extending the catalogue
 
 To add an agent:
 

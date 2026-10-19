@@ -23,6 +23,8 @@ assistant gets.
 | **PMO** | Projects, phases, WBS, earned value, risks, portfolio dashboard. |
 | **Messaging** | Internal channels and DMs, property discussions, actionable messages, notifications. |
 | **Agentic OS** | AI agents that draft outreach, price a property, screen investments and route leads. |
+| **AI assistant** | Ask about listings, areas, schemes and projects in English, Urdu or Roman Urdu; answers cite their sources and remember your preferences. |
+| **Administration** | Base data, the property database, GIS map layers, users and roles (staff with the permission). |
 
 ---
 
@@ -37,8 +39,11 @@ assistant gets.
 
 ### 2.2 Demo accounts (seeded)
 
-The portal ships with seeded demo accounts so you can explore every role. Passwords
-follow the `Role@12345` pattern.
+In **development** the portal ships with seeded demo accounts so you can explore every
+role, and the login page offers one-click buttons for the main ones. Passwords follow the
+`Role@12345` pattern. A production installation (`PORTAL_ENV=production`) has no demo
+accounts and the login page shows no demo buttons: sign in with the account an
+administrator gave you.
 
 | Role | E-mail | Password | Sees |
 | --- | --- | --- | --- |
@@ -56,7 +61,7 @@ follow the `Role@12345` pattern.
 | Buyer | `bilal@example.com` | `Buyer@12345` | Buyer-side search. |
 | Tenant | `tenant@portal.pk` | `Tenant@12345` | Own unit / maintenance requests. |
 
-> Change these before any real deployment — see the
+> These passwords are public. They are never created in production — see the
 > [Administration Guide](ADMINISTRATION_GUIDE.md#10-security-hardening-checklist).
 
 ### 2.3 Create your own account
@@ -68,9 +73,17 @@ Sign-up is **OTP-verified** and takes three steps:
 3. **Use the token** — the verification returns a session token; send it as
    `Authorization: Bearer <token>` on later requests.
 
-In the REST API this is `POST /auth/signup` → `POST /auth/otp/verify`. In the MCP tools it
-is `auth_signup` and `auth_verify_otp`. OTPs also appear in the **auth outbox** (a
-simulated SMS/e-mail outbox) for demos: `GET /auth/notifications`.
+In the REST API this is `POST /auth/signup` → `POST /auth/verify-otp`. In the MCP tools it
+is `auth_signup` and `auth_verify_otp`. In development, when no SMS / e-mail provider is set
+up, the code is shown on screen ("Test mode") instead of being sent.
+
+* You can pick buyer, tenant, seller, landlord, investor or a plain user account yourself.
+  If you sign up as an **agent** or **developer**, your account starts as a normal user and
+  the role waits for an administrator's approval; you'll see a note saying so.
+* After **5 wrong passwords** in 15 minutes, password sign-in for that account pauses for 15
+  minutes. You can still sign in with a one-time code, or reset your password.
+* A session lasts 24 hours. When it expires the portal signs you out and shows a **Sign in**
+  prompt. Changing your password signs you out everywhere else.
 
 ---
 
@@ -85,16 +98,21 @@ The portal home page links to the public pages and the working wings:
 | Construction wing | `/construction/portal` | Construction calculators and estimates. |
 | Maintenance wing | `/maintenance/portal` | Maintenance planning and triage. |
 | Tools Center | `/tools/portal` | All utilities and calculators. |
-| PMO dashboard | `/pmo/portal` | Projects, portfolio, earned value. |
-| Messaging workspace | `/messaging/portal` | Channels, DMs and notifications. |
+| PMO dashboard | `/pmo/portal` | Projects, portfolio, earned value (needs `projects.view`). |
+| Messaging workspace | `/messaging/portal` | Channels, DMs and notifications (needs sign-in). |
 | Agentic OS | `/agents/portal` | The AI products and agents. |
 
 Every HTML page accepts **`?lang=xx`** (e.g. `?lang=ur`) and **`?theme=auto|light|dark`**,
 for example:
 
 ```powershell
-start "http://127.0.0.1:8000/messaging/portal?lang=ur&theme=dark"
+start "http://127.0.0.1:8000/tools/portal?lang=ur&theme=dark"
 ```
+
+The PMO and messaging pages (like the CRM, accounting and transactions pages) contain
+staff data, so the server only serves them with a sign-in token. A browser address bar
+can't send one: use the web portal's dashboard (`/app/pmo`, `/app/messages` …) after
+signing in, or fetch the page with your token.
 
 ---
 
@@ -143,6 +161,12 @@ thematic maps, cost and forecast views, and exportable GeoJSON/KML.
 
 Maps respect your **language** and **theme** and embed the portal's basemaps and layer
 switch. See the GIS section of `backend/README.md` for the full layer list.
+
+**Which layers you see depends on publishing.** Overlays such as boundaries, roads, water,
+points of interest, mega projects and the DHA master plans appear on the public map only
+after an administrator has **published** them (Administration › GIS layers). If the map
+shows only the base map, nothing has been published yet. Published layers can be switched
+on and off in the map's **Layers** panel; some are on by default.
 
 ---
 
@@ -279,11 +303,68 @@ plain terms, they can:
 * **Route and qualify leads**, and re-engage dormant ones.
 
 Anything with an **approval gate** waits for a human before acting — you are always in
-control. Read [AGENTIC_AI_GUIDE.md](AGENTIC_AI_GUIDE.md) to go deeper.
+control. Agents first gather and analyse; anything that sends, books or changes a record
+runs only after someone with CRM rights approves the run, and the approval carries their
+name. Running agents needs you to be signed in. Read [AGENTIC_AI_GUIDE.md](AGENTIC_AI_GUIDE.md)
+to go deeper.
 
 ---
 
-## 14. Language & theme
+## 14. The AI assistant
+
+The floating assistant in the web portal (and the **Assistant** tab in the app) answers in
+the language you write in: English, Urdu or Roman Urdu. Ask things like "5 marla house in
+Bahria under 2 crore", "Is Blue World City approved?" or "لاہور میں 10 مرلہ گھر".
+
+* **Sources under every answer.** When the reply uses the portal's knowledge, a
+  **Sources** list appears under it: the `[1]`, `[2]` … markers in the text point to these
+  entries. Each has a badge for how far to trust it — **Official** (a government body or
+  development authority), **Verified** (checked by the portal), **Reference** (an
+  established reference or news outlet), **Listing** (as listed by the owner or agent) or
+  **Unverified** — and a link to the original where there is one. Check approval status
+  with the authority before paying anything.
+* **It remembers your preferences.** When you are signed in, the assistant remembers what
+  helps the next search — your budget, cities and schemes, property type and size,
+  bedrooms, buying or renting, reply language — and anything you ask it to remember
+  ("remember that I work in Blue Area"). Follow-ups like "and in Lahore?" keep the rest of
+  your search. Guests get no memory. It never stores CNIC, card or bank numbers or
+  passwords, and no one else (not even an administrator) can see your memories.
+* **Seeing and clearing what it remembers.** There is no screen for this yet; use the API
+  with your sign-in token:
+
+  | To | Call |
+  | --- | --- |
+  | See your memories | `GET /me/memory` |
+  | Forget one | `DELETE /me/memory/{id}` |
+  | Forget everything (including recent conversations) | `DELETE /me/memory` |
+  | Switch memory off / on | `PUT /me/memory/settings` with `{"enabled": false}` / `{"enabled": true}` |
+
+  ```powershell
+  $H = @{ Authorization = "Bearer $token" }
+  Invoke-RestMethod -Uri "http://127.0.0.1:8000/me/memory" -Headers $H
+  Invoke-RestMethod -Method Put -Uri "http://127.0.0.1:8000/me/memory/settings" -Headers $H `
+    -ContentType "application/json" -Body '{"enabled": false}'
+  ```
+
+---
+
+## 15. Administration (staff)
+
+Staff whose role has the permission see an **Administration** menu in the dashboard:
+
+| Screen | For | What you do there |
+| --- | --- | --- |
+| **Users & roles** | administrators | Accounts, roles (including approving requested agent / developer roles), permissions. |
+| **Base data** | `basedata.manage` | Cities, housing schemes / societies (with approval status and sources) and blocks. |
+| **Property database** | `properties.manage` | Every listing with every field: search, filter, edit, bulk feature / status / agent / delete, CSV export and import (always checked first). |
+| **GIS layers** | `gis.manage` | Upload map layers (GeoJSON, KML, GPX, CSV), edit their style, and publish them to the public map. |
+
+Step-by-step details are in the
+[Administration Guide §3.4](ADMINISTRATION_GUIDE.md#34-administration-screens-web-portal).
+
+---
+
+## 16. Language & theme
 
 * Add `?lang=ur` (or another supported code) to any HTML page for Urdu.
 * Add `?theme=dark` or `?theme=light`; `auto` follows the operating system.
@@ -291,7 +372,7 @@ control. Read [AGENTIC_AI_GUIDE.md](AGENTIC_AI_GUIDE.md) to go deeper.
 
 ---
 
-## 15. Handy URLs
+## 17. Handy URLs
 
 | Purpose | URL |
 | --- | --- |
@@ -306,10 +387,15 @@ control. Read [AGENTIC_AI_GUIDE.md](AGENTIC_AI_GUIDE.md) to go deeper.
 
 ---
 
-## 16. Getting help
+## 18. Getting help
 
 * **A page looks empty** — confirm the server is running and you are signed in; some wings
-  filter by your role.
+  filter by your role, and pages your role can't use are hidden from the menu.
+* **"Please sign in" or "Your role doesn't include … access"** — the feature needs a
+  signed-in account or a role you don't have; ask an administrator.
+* **"Too many failed sign-ins"** — wait 15 minutes, or sign in with a one-time code /
+  reset your password.
+* **The map shows no overlays** — an administrator hasn't published the map layers yet.
 * **You can't see a channel** — the **Management** channel is restricted to admin roles;
   ask an administrator to grant access.
 * **A file link has expired** — attachment links are time-limited by design; open the

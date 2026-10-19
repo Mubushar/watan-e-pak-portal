@@ -28,15 +28,26 @@ cd backend
 
 # 1. In-process integration (MCP + REST), prints every check and a summary
 uv run python test_integration.py
-#   ... 1005/1005 checks passed
+#   ... 1243/1243 checks passed
 
-# 2. Live HTTP smoke on :8011, prints PASS/FAIL
-uv run python smoke_http.py
+# 2. Live HTTP smoke on :8011, prints PASS/FAIL (keep it off your local database)
+$env:PORTAL_PERSIST = "0"; uv run python smoke_http.py
 #   ... SMOKE: PASS
 ```
 
-**Expected result:** `test_integration.py` prints `1005/1005 checks passed` and exits `0`.
+**Expected result:** `test_integration.py` prints `1243/1243 checks passed` and exits `0`.
 `smoke_http.py` prints `SMOKE: PASS`.
+
+**Persistence is off in the suite.** `test_integration.py` sets `PORTAL_PERSIST=0` before it
+imports the app, so it runs on the seed data only and never touches
+`backend/data/portal.sqlite3` or `DATABASE_URL`. The storage checks use their own temporary
+SQLite file. `smoke_http.py` does **not** set it: without `PORTAL_PERSIST=0` it starts the real
+storage and writes into your local database.
+
+> **Known gap:** `smoke_http.py` predates the access guard. It calls signed-in routes
+> (`/crm/dashboard` and others) without a token, so it currently stops with a `KeyError`
+> right after `/properties`. Until it signs in first, rely on `test_integration.py`, which
+> covers the same routes with tokens.
 
 > PowerShell note: piping output can make `$LASTEXITCODE`-style checks noisy. To read the
 > real exit code reliably, run without a pipeline or capture it explicitly.
@@ -64,7 +75,13 @@ Suite functions (each prints its own `===` header):
 | --- | --- |
 | `run_mcp_checks()` | MCP protocol, discovery, resources, prompts, core tools. |
 | `run_wing_checks()` | Construction & maintenance wings (MCP). |
-| `run_fastapi_checks(...)` | REST routes (properties, GIS, CRM, accounting, auth, …). |
+| `run_fastapi_checks(...)` | REST routes (properties, GIS, CRM, accounting, auth, …). Signs in as the seeded admin first (`_sign_in_guarded`) and calls the groups below. |
+| `run_access_checks(client)` | The access guard: `401` without sign-in, `403` for the wrong role, agents limited to their own book, messaging "act as yourself", deny-by-default writes, security headers, login lockout, agent sign-ups starting as `user`, versioned PBKDF2 hashes, Base data CRUD. |
+| `run_hardening_checks(client)` | Search privacy for guests, WhatsApp / Telegram / lead webhook signatures, saving study areas needs `aoi.manage`, `400`s for bad map input, capped geo searches, `/portal/storage` permission. |
+| `run_ai_checks(client)` | Knowledge base (crore / marla / Urdu parsing, `[n]` citations, trust tiers, speed), `/ai/context`, `/ai/turn`, `/ai/knowledge/search`, per-user memory (learning, recall, privacy, refusal of CNIC numbers, delete / clear / switch off), agent runs pausing at the gate and approvals recorded under the signed-in user. |
+| `run_admin_crud_checks(client)` | Property database (paging, sorting, validation, unit sync, bulk, CSV export / dry-run import, a bad row blocking the import) and GIS layers (built-in overlay records, unpublished overlays empty for guests, publish, upload KML / CSV with dry run, `[lat, lon]` flip, shapefile message, built-ins not deletable). |
+| `run_geo_checks(client)` / `run_masterplan_checks(client)` / `run_ai_guard_checks()` | Places and areas, DHA master plans, AI rate limits and sign-in requirement. |
+| `run_storage_checks()` | Durable storage on a temporary SQLite file: the first start saves the seed, unchanged data writes nothing, one edit writes one row, a restart restores it, master-plan geometry is rebuilt instead of stored, a broken row freezes its store and it is never overwritten. |
 | `run_products_checks()` | Agentic products (MCP). |
 | `run_products_rest_checks(client)` | Agentic products (REST). |
 | `run_tools_checks()` / `run_tools_rest_checks(client)` | Tools & Utilities (MCP/REST). |
@@ -72,7 +89,10 @@ Suite functions (each prints its own `===` header):
 | `run_messaging_checks()` / `run_messaging_rest_checks(client)` | Messaging (MCP/REST). |
 
 MCP checks use `async with Client(core.mcp)`, where `core` is `server.py`. REST checks use a
-Starlette/FastAPI `TestClient` built from `api.app`.
+Starlette/FastAPI `TestClient` built from `api.app`. Every REST call carries the seeded
+admin's token unless the check passes its own `Authorization` header; negative checks pass
+`{"Authorization": ""}` to act as a guest, or sign in as another demo account (buyer, agent,
+support …).
 
 ---
 
@@ -98,7 +118,7 @@ import server as core
 async def run_mcp_checks() -> None:
     async with Client(core.mcp) as client:
         tools = await client.list_tools()
-        check("MCP exposes 593 tools", len(tools) >= 593, f"got {len(tools)}")
+        check("MCP exposes 609 tools", len(tools) >= 609, f"got {len(tools)}")
 
         result = await client.call_tool("portal_health", {})
         check("portal_health responds", "status" in text_of(result))
@@ -121,7 +141,8 @@ and serialisation without a running server.
 
 1. **Status codes** — `200`/`201` on success, `4xx` on bad input.
 2. **Body shape** — expected keys/counts, not just "truthy".
-3. **Auth** — protected routes behave with and without a bearer token.
+3. **Auth** — protected routes answer `401` for a guest (`headers={"Authorization": ""}`),
+   `403` for a signed-in role without the permission, and succeed for the right role.
 4. **HTML routes** — `GET …/portal` returns HTML; the `.html` alias always does.
 5. **Cross-check** — where a route mirrors an MCP tool, compare both.
 
@@ -134,7 +155,11 @@ def run_products_rest_checks(client) -> None:
 
     r = client.post("/agents/run", json={"agent_key": "conversational_buyer_agent",
                                          "objective": "3-bed in Lahore"})
-    check("POST /agents/run returns a run", r.status_code == 200 and r.json().get("run_id"))
+    check("POST /agents/run returns a run", r.status_code == 200 and r.json().get("id"))
+
+    guest = {"Authorization": ""}
+    check("agent runs need sign-in", client.post("/agents/run", headers=guest,
+          json={"agent_key": "crm_agent"}).status_code == 401)
 ```
 
 The generated [endpoint reference](reference/REST_ENDPOINTS.md) lists every route.
@@ -164,8 +189,9 @@ isolated calls.
    that preferences/quiet hours are respected (urgent exempt).
 9. **Telegram** — mint a link code, simulate `/start`, assert status; assert
    `attach_allowed=false` (no documents) and that payloads are sanitised + deep-linked.
-10. **WebSocket** — connect with `?user_id=`, receive a push, and assert a **denied** client
-    is closed with code `4403`.
+10. **WebSocket** — connect with `?token=` (and optionally `?user_id=`), receive a push, and
+    assert a client **without a token** is refused (`4401`) and a **non-member** is closed
+    with code `4403`.
 11. **Governance** — report + moderate, revoke access (user removed from all conversations),
     retention report + dry-run purge (pinned exempt).
 
@@ -201,9 +227,10 @@ Agentic checks (`run_products_checks`, `run_products_rest_checks`) should verify
 1. **Catalogue** — `agents_catalog` / `GET /agents/catalog` lists 24 agents and 8 products.
 2. **Plan vs run** — `agent_plan` records a plan **without** side effects; `agent_run`
    executes and returns a `run_id`.
-3. **Approval gate** — start a run with `approve=false` (or an `assist` agent) and assert a
-   step is `awaiting_approval`; then `agent_approve` completes it. This is the single most
-   important agentic test.
+3. **Approval gate** — start a run (the default is `approve=false`) and assert it is
+   `awaiting_approval` and that its **write** steps (e.g. `transaction_create`) have not run;
+   then `agent_approve` runs them, the approval carries the signed-in user's name, and a
+   second approval is refused. This is the single most important agentic test.
 4. **Determinism of scoring** — `agent_move_likelihood` and `agent_seller_intent` return a
    score in `0..100` with contributing signals.
 5. **Smart Actions** — `agent_smart_actions` returns prioritised items with owners/SLAs.
@@ -218,8 +245,7 @@ async def run_products_checks() -> None:
     async with Client(core.mcp) as client:
         run = await client.call_tool("agent_run",
                                      {"agent_key": "transaction_agent",
-                                      "objective": "review a deal",
-                                      "approve": False})
+                                      "objective": "review a deal"})  # approve=False by default
         rid = json.loads(text_of(run))["run"]["id"]
         got = await client.call_tool("agent_run_get", {"run_id": rid})
         check("agent paused at the gate", "awaiting_approval" in text_of(got))
@@ -232,7 +258,24 @@ workflows there tell you which agents must pause.
 
 ---
 
-## 8. Testing Tools & Utilities and PMO
+## 8. Testing security, AI, administration and storage
+
+* **Security** — for every new write route, add the method and path to the
+  deny-by-default loop in `run_access_checks` (anonymous → `401`) and one check with a role
+  that lacks the permission (→ `403`). If the route is meant to be public, add a check that
+  it stays open. Rules live in `_RULES` in `access.py`; the first match wins.
+* **Webhooks** — set the secret in `os.environ` inside the check, send a wrong and a right
+  signature, then delete the variable again (see `run_hardening_checks`).
+* **AI** — `knowledge.parse_query` and `knowledge.search` can be called directly (no OpenAI
+  key needed); memory checks sign in as two different users to prove privacy.
+* **Admin CRUD** — clean up what you create (delete the listing / layer) so later checks
+  see the seed counts; restore any `published` flag you change.
+* **Storage** — build a `storage.Storage(<temp file>)` yourself, as `run_storage_checks`
+  does; never point a test at the real database.
+
+---
+
+## 9. Testing Tools & Utilities and PMO
 
 * **Tools** — assert each calculator's maths (e.g. the mortgage monthly installment), the
   two **marla standards** (272.25 vs 225.0 sq-ft) and the calendar bindings.
@@ -243,14 +286,14 @@ workflows there tell you which agents must pause.
 
 ---
 
-## 9. Adding a new check
+## 10. Adding a new check
 
 1. Pick the right suite function and add a `check(...)` call.
 2. Prefer **cross-checks** (MCP vs REST) over duplicating expectations.
 3. Assert on **structure and values**, and include a helpful `detail` for failures.
 4. Run `uv run python test_integration.py` and confirm the total increases with no failures.
 5. If you changed the surface, regenerate the docs reference
-   ([§11](#11-keeping-the-docs-in-sync)).
+   ([§12](#12-keeping-the-docs-in-sync)).
 
 ```python
 def run_tools_rest_checks(client) -> None:
@@ -263,12 +306,24 @@ def run_tools_rest_checks(client) -> None:
 
 ---
 
-## 10. Manual QA checklist
+## 11. Manual QA checklist
 
 With the server running (`uv run python main.py`):
 
-- [ ] `/docs` loads and every tag has operations.
-- [ ] `/tools/portal`, `/pmo/portal`, `/messaging/portal` render; `?lang=ur&theme=dark` works.
+- [ ] `/docs` loads and every tag has operations (development; in production it is `404`).
+- [ ] The login page shows demo buttons in development and none with `PORTAL_ENV=production`.
+- [ ] A guest gets "Please sign in" on a CRM page; a buyer doesn't see staff menus.
+- [ ] Five wrong passwords lock password sign-in; an OTP sign-in still works.
+- [ ] On a fresh database the public map shows only base maps; **Publish all** in
+      Administration › GIS layers brings the overlays back.
+- [ ] Upload a small KML / CSV layer (dry run first) and see it on the map once published.
+- [ ] In the property database, export CSV and re-import it as a dry run with no errors.
+- [ ] Ask the assistant about a scheme and see a **Sources** list with trust badges; ask it
+      to remember something, then check `GET /me/memory`.
+- [ ] Edit a listing, restart the backend, and see the edit is still there
+      (`GET /portal/storage` shows the last save).
+- [ ] `/tools/portal` renders and `?lang=ur&theme=dark` works; `/pmo/portal` and
+      `/messaging/portal` render with a token and answer `401` without one.
 - [ ] A GIS report opens and shows a map.
 - [ ] Create a PMO project and see its earned-value view.
 - [ ] Post a messaging message, then a WebSocket client receives the push.
@@ -279,7 +334,7 @@ With the server running (`uv run python main.py`):
 
 ---
 
-## 11. Keeping the docs in sync
+## 12. Keeping the docs in sync
 
 The reference docs are generated from the live code, so they cannot silently drift:
 
@@ -293,7 +348,7 @@ messaging catalogs, settings). Run it after any surface change and commit the re
 
 ---
 
-## 12. CI suggestion
+## 13. CI suggestion
 
 A minimal pipeline:
 
@@ -305,6 +360,8 @@ steps:
     working-directory: backend
   - run: uv run python smoke_http.py
     working-directory: backend
+    env:
+      PORTAL_PERSIST: "0"
 ```
 
 Fail the build on a non-zero exit from either suite. Because `main()` in

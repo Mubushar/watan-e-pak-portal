@@ -30,6 +30,10 @@ One React codebase that ships as a native app on **Android**, **iOS**, **Windows
   crore", "لاہور میں 10 مرلہ گھر 5 کروڑ تک" or "meri listings dikhao". It answers with real
   listings and buttons that do the next step, such as opening the results or a
   **pre-filled listing form**. You can also fill the listing wizard's first step by voice.
+* The assistant uses the backend's shared prompt, knowledge base and the user's memory
+  (`POST /ai/context`): signed-in users' preferences (budget, area, size …) carry over
+  between conversations, and it can `remember` what the user asks it to. It runs
+  independent tool calls in parallel.
 * Light/dark theme, offline fallback (sample listings), configurable server URL.
 
 ## Backend endpoints used
@@ -38,15 +42,20 @@ The app talks to the same FastAPI backend as the portal (`backend/`):
 
 | Feature | Endpoints |
 | --- | --- |
-| Auth | `POST /auth/signup` (no password), `/auth/verify-otp`, `/auth/resend-otp`, `/auth/otp/request`, `/auth/otp/verify`, `/auth/logout` |
+| Auth | `POST /auth/signup` (no password), `/auth/verify-otp`, `/auth/resend-otp`, `/auth/otp/request`, `/auth/otp/verify`, `/auth/logout`, `GET /auth/me` (refreshes the signed-in user on start) |
 | Browse | `GET /search`, `/properties`, `/properties/{id}`, `/cities`, `/hierarchy` |
 | My listings | `GET/POST /me/listings`, `PUT/DELETE /me/listings/{id}`, `POST /me/listings/{id}/photos`, `GET /media/uploads/{file}` |
 | Enquiries | `POST /crm/leads` |
-| AI (OpenAI) | `POST /v1/chat/completions`, `GET /rag/search`, `GET /ai/capabilities`, `POST /ai/realtime/session`, `POST /ai/transcribe`, `POST /ai/speak` |
+| AI (OpenAI) | `POST /v1/chat/completions`, `POST /ai/context` (shared prompt + knowledge + memory), `POST /ai/turn`, `POST /ai/knowledge/search`, `POST /ai/web-lookup`, `POST /me/memory`, `GET /rag/search`, `GET /ai/capabilities`, `GET /ai/tools`, `POST /ai/realtime/session`, `POST /ai/transcribe`, `POST /ai/speak` |
 
-The backend has CORS enabled (override it with `PORTAL_CORS_ORIGINS`), so the desktop app
-and any separately hosted build can call it. On Android/iOS, requests go through
-Capacitor's native HTTP.
+The backend allows every origin in development, so the desktop app and any separately
+hosted build can call it. In production (`PORTAL_ENV=production`) list the origins in
+`PORTAL_CORS_ORIGINS`: the desktop app's is `app://arzepak`, plus the web build's domain. On
+Android/iOS, requests go through Capacitor's native HTTP and need no CORS entry.
+
+An expired session signs the user out with a *Sign in* prompt. Sign-up as an agent creates
+a normal account until an administrator approves the agent role; the sign-up screen says
+so. Markdown links in the chat open only `http(s)`, `mailto`, `tel` and relative URLs.
 
 ## Develop
 

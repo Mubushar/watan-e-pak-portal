@@ -4,6 +4,21 @@
 
 This guide walks you through migrating the Arz-e-Pak real-estate portal's in-memory data stores to a PostgreSQL database. The portal stores everything in module-level containers (`*_db`, `GIS_LAYERS`, `image_storage`, etc.) that are seeded on startup. The goal is to preserve the exact state — including row counts, primary keys, and referential relationships — in a relational database that can be queried with standard SQL tools, connected to an ORM, or used as the backbone for future features (PostGIS spatial search, analytics, etc.).
 
+> **Do you need this guide?** The running portal already saves its data: `backend/storage.py`
+> writes every store to PostgreSQL (`DATABASE_URL`) or a SQLite file (`backend/data/portal.sqlite3`)
+> and restores it on start — see [Security & Operations §3](SECURITY_AND_OPERATIONS.md#3-durable-storage).
+> That live storage uses its own two-table layout (`portal_rows`, `portal_kv`, one JSON row per
+> item). This toolkit is separate: it **exports** the current state into a typed relational
+> schema (one table per store, foreign keys, optional PostGIS) for analytics, reporting, an
+> ORM or a future rewrite. The portal does not read these tables back, and you can point both
+> at the same PostgreSQL server as long as they use different databases or schemas. Both find
+> the stores with the same reflection (`db_migration.discover_tables`).
+>
+> **Note:** `migrate_to_postgres.py` imports the modules in its own process and does not open
+> durable storage, so it exports the **seed** data, not what the running portal has saved.
+> Exporting the live data needs the saved rows loaded first (`storage.start()` in the same
+> process) — the CLI doesn't do that yet.
+
 The migration is **lossless**: nested models (`JournalEntry.lines`, `Transaction.milestones`, `AgentRun.steps`, `Invoice.lines`, `PmInspection.checklist`) are embedded as JSONB, and every Python type maps to a Postgres type (str → TEXT, int → BIGINT, float → DOUBLE PRECISION, bool → BOOLEAN, datetime → TIMESTAMPTZ, date → DATE). List-of-scalars become TEXT[] and list-of-models becomes JSONB.
 
 ## Prerequisites
@@ -71,10 +86,11 @@ The ``apply`` command in the CLI also supports this path automatically (it falls
 
 ### B. Python driver (``psycopg``)
 
-Install ``psycopg[binary]`` if you prefer an all-Python route:
+Install ``psycopg[binary]`` if you prefer an all-Python route (it is the backend's optional
+``postgres`` extra, also used by durable storage):
 
 ```bash
-uv add psycopg[binary]
+uv sync --extra postgres
 uv run python migrate_to_postgres.py apply --dsn "postgresql://postgres:postgres@localhost:5432/arzepak"
 ```
 
