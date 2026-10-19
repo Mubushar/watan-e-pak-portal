@@ -49,13 +49,46 @@ export interface MapCard {
   focus: { name: string; latitude: number; longitude: number };
   markers: { name: string; kind: string; latitude: number; longitude: number; distance_km?: number }[];
 }
+/** A knowledge-base hit the reply can cite as [n] (POST /ai/knowledge/search, /ai/context). */
+export interface KnowledgeSource {
+  cite: string;
+  type: string;
+  id: string;
+  title: string;
+  url: string;
+  tier: "official" | "verified" | "reference" | "listing" | "unverified";
+  trust: string;
+  snippet?: string;
+  sources?: { title?: string; url?: string }[];
+}
 /** What tool calls add under the reply. */
 export interface AgentEffect {
   listings?: Property[];
   links?: ChatLink[];
   image?: { url: string; caption: string };
   map?: MapCard;
+  sources?: KnowledgeSource[];
 }
+
+interface AiContext {
+  system_prompt: string;
+  knowledge: { results: KnowledgeSource[] };
+  memory: { enabled: boolean; items: { kind: string; value: string }[] };
+}
+
+/** One id per browser tab, so the server's short-term memory keeps this conversation together. */
+const conversationId = (() => {
+  try {
+    const key = "arzepak.chat.conversation";
+    const existing = sessionStorage.getItem(key);
+    if (existing) return existing;
+    const id = `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    sessionStorage.setItem(key, id);
+    return id;
+  } catch {
+    return `web-${Date.now().toString(36)}`;
+  }
+})();
 export interface AgentReply extends AgentEffect {
   content: string;
 }
@@ -212,12 +245,40 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<{ o
       effect: { links: [{ label: "List a property", to: "/app/listings/new", primary: true }] },
     };
   }
+  if (name === "knowledge_search") {
+    const r = await post<{ results: KnowledgeSource[]; context: string }>("/ai/knowledge/search", {
+      query: str(args, "query") ?? "",
+      types: Array.isArray(args.types) ? args.types : undefined,
+      k: 6,
+    });
+    return { output: { results: r.context || "nothing found in the portal's knowledge base", cite_with: "the [n] markers" }, effect: { sources: r.results } };
+  }
+  if (name === "remember") {
+    if (!useAuth.getState().token) return { output: { ok: false, reason: "The user is not signed in, so nothing can be remembered." }, effect: {} };
+    const r = await post<{ remembered?: boolean; error?: string }>("/me/memory", { text: str(args, "note") ?? "" });
+    return { output: r, effect: {} };
+  }
   return { output: { error: `unknown tool ${name}` }, effect: {} };
 }
 
 function merge(a: AgentEffect, b: AgentEffect): AgentEffect {
   const links = [...(b.listings ? [] : a.links ?? []), ...(b.links ?? [])].filter((x, i, all) => all.findIndex((y) => y.label === x.label) === i);
-  return { listings: b.listings ?? a.listings, links: links.length ? links : undefined, image: b.image ?? a.image, map: b.map ?? a.map };
+  return { listings: b.listings ?? a.listings, links: links.length ? links : undefined, image: b.image ?? a.image, map: b.map ?? a.map, sources: a.sources || b.sources ? [...(a.sources ?? []), ...(b.sources ?? [])] : undefined };
+}
+
+/** Knowledge, memory and the shared system prompt for this question (one fast call). */
+async function aiContext(query: string): Promise<AiContext | null> {
+  try {
+    return await post<AiContext>("/ai/context", { query, conversation_id: conversationId, channel: "chat", k: 5 });
+  } catch {
+    return null; // the built-in prompt below still works
+  }
+}
+
+/** Keep only the sources the reply actually cites ([1], [2] …). */
+function cited(content: string, sources?: KnowledgeSource[]): KnowledgeSource[] | undefined {
+  const used = (sources ?? []).filter((s) => content.includes(s.cite));
+  return used.length ? used : undefined;
 }
 
 function systemPrompt(): string {
@@ -250,9 +311,14 @@ interface ChatMessage {
 
 /** Answer one user turn with the tool-calling agent. Throws when the model can't be reached. */
 export async function agentReply(history: { role: "user" | "assistant"; content: string }[], model: string): Promise<AgentReply> {
-  const tools = await chatTools();
-  const messages: ChatMessage[] = [{ role: "system", content: systemPrompt() }, ...history.slice(-12).map((m) => ({ role: m.role, content: m.content }))];
-  let effect: AgentEffect = {};
+  const question = [...history].reverse().find((m) => m.role === "user")?.content ?? "";
+  const [tools, ctx] = await Promise.all([chatTools(), aiContext(question)]);
+  const messages: ChatMessage[] = [{ role: "system", content: ctx?.system_prompt || systemPrompt() }, ...history.slice(-12).map((m) => ({ role: m.role, content: m.content }))];
+  let effect: AgentEffect = { sources: ctx?.knowledge?.results };
+  const finish = (content: string): AgentReply => {
+    if (useAuth.getState().token) void post("/ai/turn", { content, conversation_id: conversationId }).catch(() => undefined);
+    return { content, ...effect, sources: cited(content, effect.sources) };
+  };
   for (let round = 0; round < 4; round++) {
     const r = await post<{ choices: { message: ChatMessage }[] }>("/v1/chat/completions", {
       model,
@@ -267,25 +333,36 @@ export async function agentReply(history: { role: "user" | "assistant"; content:
     if (!msg.tool_calls?.length) {
       const content = (msg.content ?? "").trim();
       if (!content) throw new Error("empty reply");
-      return { content, ...effect };
+      return finish(content);
     }
     messages.push({ role: "assistant", content: msg.content ?? null, tool_calls: msg.tool_calls });
-    for (const call of msg.tool_calls) {
-      let args: Record<string, unknown> = {};
-      try {
-        args = JSON.parse(call.function.arguments || "{}");
-      } catch {
-        /* keep {} */
+    // Independent tool calls run in parallel; results go back in the order they were asked.
+    const runs = await Promise.all(
+      msg.tool_calls.map(async (call) => {
+        let args: Record<string, unknown> = {};
+        try {
+          args = JSON.parse(call.function.arguments || "{}");
+        } catch {
+          /* keep {} */
+        }
+        try {
+          return { call, ...(await runTool(call.function.name, args)) };
+        } catch (e) {
+          return { call, output: { error: (e as Error).message } as unknown, effect: {} as AgentEffect };
+        }
+      }),
+    );
+    for (const run of runs) {
+      // Knowledge found by a tool continues the numbering of what the context already gave ([6], [7] …).
+      const offset = effect.sources?.length ?? 0;
+      if (offset && run.effect.sources?.length) {
+        const shift = (cite: string) => `[${Number(cite.replace(/\D/g, "")) + offset}]`;
+        run.effect.sources = run.effect.sources.map((s) => ({ ...s, cite: shift(s.cite) }));
+        const out = run.output as { results?: unknown };
+        if (typeof out?.results === "string") out.results = out.results.replace(/^\[(\d+)\]/gm, (m) => shift(m));
       }
-      let output: unknown;
-      try {
-        const run = await runTool(call.function.name, args);
-        effect = merge(effect, run.effect);
-        output = run.output;
-      } catch (e) {
-        output = { error: (e as Error).message };
-      }
-      messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(output ?? {}) });
+      effect = merge(effect, run.effect);
+      messages.push({ role: "tool", tool_call_id: run.call.id, content: JSON.stringify(run.output ?? {}) });
     }
   }
   throw new Error("too many tool rounds");

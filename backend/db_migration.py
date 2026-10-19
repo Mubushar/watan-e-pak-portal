@@ -52,7 +52,7 @@ MIGRATION_VERSION = 1
 MODULES = [
     "server", "auth", "gis", "content", "accounting", "construction", "maintenance",
     "tools", "pmo", "messaging", "agents", "transactions", "intelligence", "leasing",
-    "marketing", "commercial",
+    "marketing", "commercial", "memory",
 ]
 
 # Module -> table-name prefix. ``server`` becomes ``core`` because it owns the

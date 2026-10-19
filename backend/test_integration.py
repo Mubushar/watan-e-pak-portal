@@ -1051,6 +1051,87 @@ def run_hardening_checks(client: TestClient) -> None:
     check("storage: admin sees the status (off in tests)", r.status_code == 200 and r.json().get("enabled") is False, r.text[:120])
 
 
+def run_ai_checks(client: TestClient) -> None:
+    """Knowledge base (BM25 + citations + trust), per-user memory, /ai/context, agent approvals."""
+    import knowledge
+    import memory as user_memory
+
+    f = knowledge.parse_query("5 marla house under 2 crore")
+    check("knowledge: 'under 2 crore' -> max 20,000,000", f.get("max_price") == 20_000_000 and f.get("marla") == 5, str(f))
+    f = knowledge.parse_query("1 kanal plot between 3 crore and 4.5 crore")
+    check("knowledge: kanal + price range", f.get("marla") == 20 and f.get("min_price") == 30_000_000
+          and f.get("max_price") == 45_000_000, str(f))
+    f = knowledge.parse_query("اسلام آباد میں 3 کمرے کا گھر 1.5 کروڑ تک")
+    check("knowledge: Urdu budget, bedrooms and type", f.get("max_price") == 15_000_000 and f.get("bedrooms") == 3
+          and f.get("category") == "house", str(f))
+    check("knowledge: 'Phase II' matches 'phase 2'", "phase2" in knowledge.tokens("DHA Phase II") and "phase2" in knowledge.tokens("dha phase 2"))
+    r = knowledge.search("DHA phase 2 approval status", k=3)
+    check("knowledge: scheme question finds the scheme first", r["results"] and r["results"][0]["title"] == "DHA Phase II",
+          str([h["title"] for h in r["results"]]))
+    check("knowledge: hits carry [n], tier and trust", all(h["cite"] == f"[{i + 1}]" and h["tier"] in knowledge.sources.TIERS
+                                                          for i, h in enumerate(r["results"])))
+    check("knowledge: context block cites [1]", r["context"].startswith("[1]"), r["context"][:80])
+    check("knowledge: fast", r["took_ms"] < 500, str(r["took_ms"]))
+    blue = knowledge.search("Blue World City legal status", k=3, types=["scheme"])["results"]
+    check("knowledge: illegal scheme comes with its official source", blue and blue[0]["tier"] == "official"
+          and "illegal" in blue[0]["snippet"].lower(), str(blue[:1])[:200])
+    news = [h for h in knowledge.search("policy rate", k=5, types=["news"])["results"]]
+    check("knowledge: sample news on a homepage link is 'unverified'", all(h["tier"] != "official" for h in news) and news, str(news[:1])[:160])
+
+    anon = {"Authorization": ""}
+    r = client.post("/ai/knowledge/search", json={"query": "Rawalpindi Ring Road"}, headers=anon)
+    check("POST /ai/knowledge/search (public)", r.status_code == 200 and r.json()["count"] > 0, r.text[:120])
+    r = client.post("/ai/context", json={"query": "plots in Islamabad"}, headers=anon)
+    body = r.json()
+    check("POST /ai/context (guest: prompt + knowledge, no memory)", r.status_code == 200 and "Arz-e-Pak AI" in body["system_prompt"]
+          and "KNOWLEDGE" in body["system_prompt"] and body["memory"]["enabled"] is False, r.text[:160])
+
+    def login(ident: str, pw: str) -> Dict[str, str]:
+        return {"Authorization": "Bearer " + client.post("/auth/login", json={"identifier": ident, "password": pw}).json()["token"]}
+
+    buyer, investor = login("bilal@example.com", "Buyer@12345"), login("investor@portal.pk", "Investor@12345")
+    client.delete("/me/memory", headers=buyer)
+    r = client.post("/ai/context", json={"query": "Remember that I work in Blue Area. Need a 10 marla house under 4 crore in Rawalpindi",
+                                         "conversation_id": "t1"}, headers=buyer)
+    learned = {m["kind"] for m in r.json()["memory"]["learned"]}
+    check("memory: learns budget, size, type, city and the explicit note", {"budget", "size", "property_type", "city", "note"} <= learned, str(learned))
+    r = client.post("/ai/context", json={"query": "what about near my office?", "conversation_id": "t1"}, headers=buyer).json()
+    check("memory: recalled on the next question", "MEMORY" in r["system_prompt"] and "Blue Area" in r["system_prompt"], r["system_prompt"][-300:])
+    check("memory: 'my office' is not taken as wanting an office", all(m["value"] != "office" for m in r["memory"]["items"]))
+    check("memory: short-term turns kept per conversation", len(r["recent"]) >= 1 and r["recent"][0]["content"].startswith("Remember"))
+    client.post("/ai/turn", json={"content": "Here are three houses…", "conversation_id": "t1"}, headers=buyer)
+    mine = client.get("/me/memory", headers=buyer).json()
+    check("GET /me/memory lists only my memories", mine["memories"] and all("user_id" not in m for m in mine["memories"]))
+    theirs = client.get("/me/memory", headers=investor).json()
+    check("memory: private to each user", not any("Blue Area" in m["value"] for m in theirs["memories"]))
+    check("GET /me/memory needs sign-in", client.get("/me/memory", headers=anon).status_code == 401)
+    r = client.post("/me/memory", json={"text": "my CNIC is 35202-1234567-1"}, headers=buyer)
+    check("memory: refuses CNIC / card numbers", r.status_code == 409, str(r.status_code))
+    one = mine["memories"][0]["id"]
+    check("DELETE /me/memory/{id}", client.delete(f"/me/memory/{one}", headers=buyer).status_code == 200)
+    client.put("/me/memory/settings", json={"enabled": False}, headers=buyer)
+    r = client.post("/ai/context", json={"query": "5 marla plot under 1 crore"}, headers=buyer).json()
+    check("memory: switched off -> nothing learned or recalled", r["memory"]["learned"] == [] and r["memory"]["enabled"] is False)
+    client.put("/me/memory/settings", json={"enabled": True}, headers=buyer)
+    check("DELETE /me/memory clears everything", client.delete("/me/memory", headers=buyer).json()["forgotten"] >= 1
+          and not user_memory.recent(client.get("/auth/me", headers=buyer).json()["user"]["id"]))
+
+    r = client.post("/agents/run", json={"agent_key": "transaction_agent", "objective": "review a deal"})
+    run = r.json()
+    check("agents: runs pause at the approval gate by default", run.get("status") == "awaiting_approval", str(run.get("status")))
+    create = next((st for st in run.get("steps", []) if st["name"] == "transaction_create"), {})
+    check("agents: the write step waits behind the gate", create and create.get("status") not in ("done", "failed"), str(create)[:160])
+    r = client.post(f"/agents/runs/{run['id']}/approve")
+    after = r.json()
+    approved = [a for a in after.get("approvals", []) if a.get("approved_by") != "auto"]
+    check("agents: approval is recorded under the signed-in user", approved and "Portal Admin" in approved[0]["approved_by"], str(approved)[:160])
+    create = next((st for st in after.get("steps", []) if st["name"] == "transaction_create"), {})
+    check("agents: approving runs the write step", create.get("status") in ("done", "failed") and after.get("status") == "completed",
+          str(create)[:200])
+    check("agents: approving twice is refused", "error" in client.post(f"/agents/runs/{run['id']}/approve").json()
+          or after.get("status") == "awaiting_approval")
+
+
 def run_storage_checks() -> None:
     """Durable storage: seed, incremental save, restart, delete, broken row."""
     import tempfile
@@ -1104,6 +1185,7 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         _sign_in_guarded(client)
         run_access_checks(client)
         run_hardening_checks(client)
+        run_ai_checks(client)
         r = client.get("/health")
         check("GET /health", r.status_code == 200 and r.json().get("status") == "ok", str(r.status_code))
 
@@ -1516,7 +1598,8 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         names = [t["function"]["name"] for t in r.json().get("tools", [])] if r.status_code == 200 else []
         check("GET /ai/tools (chat tool definitions)",
               names == ["search_listings", "get_listing", "request_call", "find_places", "area_info", "master_plan",
-                        "show_plan", "show_map", "web_lookup", "my_listings", "draft_listing"], str(names))
+                        "show_plan", "show_map", "web_lookup", "my_listings", "draft_listing", "knowledge_search", "remember"],
+              str(names))
         r = client.get("/search", params={"min_bathrooms": 6, "limit": 50})
         baths = [x.get("bathrooms") for x in r.json().get("results", [])] if r.status_code == 200 else []
         check("GET /search?min_bathrooms=6", bool(baths) and all((b or 0) >= 6 for b in baths), str(baths))

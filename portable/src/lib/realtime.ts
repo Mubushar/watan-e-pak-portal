@@ -46,6 +46,8 @@ export class RealtimeAgent {
   private audio: HTMLAudioElement | null = null;
   private userText = new Map<string, string>();
   private agentText = new Map<string, string>();
+  /** Tool calls still running, per model response: answered together once the response ends. */
+  private pendingTools = new Map<string, Promise<void>[]>();
   private ended = false;
   private limitTimer: ReturnType<typeof setTimeout> | null = null;
   muted = false;
@@ -189,20 +191,33 @@ export class RealtimeAgent {
         } catch {
           /* keep {} */
         }
-        let output: unknown;
-        try {
-          output = await this.h.runTool(ev.name, args, ev.response_id);
-        } catch (e) {
-          output = { error: (e as Error).message };
-        }
-        this.send({ type: "conversation.item.create", item: { type: "function_call_output", call_id: ev.call_id, output: JSON.stringify(output ?? {}) } });
-        this.send({ type: "response.create" });
+        // Run calls from the same response in parallel; one response.create follows them all
+        // (one per call would start overlapping responses).
+        const run = (async () => {
+          let output: unknown;
+          try {
+            output = await this.h.runTool(ev.name, args, ev.response_id);
+          } catch (e) {
+            output = { error: (e as Error).message };
+          }
+          this.send({ type: "conversation.item.create", item: { type: "function_call_output", call_id: ev.call_id, output: JSON.stringify(output ?? {}) } });
+        })();
+        const list = this.pendingTools.get(ev.response_id) ?? [];
+        list.push(run);
+        this.pendingTools.set(ev.response_id, list);
         break;
       }
-      case "response.done":
+      case "response.done": {
         if (ev.response?.status === "failed") this.h.onError(ev.response?.status_details?.error?.message ?? "The voice agent couldn't answer.");
         if (ev.response?.id) this.h.onResponseDone?.(ev.response.id);
+        const calls = ev.response?.id ? this.pendingTools.get(ev.response.id) : undefined;
+        if (calls?.length) {
+          this.pendingTools.delete(ev.response.id);
+          await Promise.all(calls);
+          this.send({ type: "response.create" });
+        }
         break;
+      }
       case "error":
         // Cancelling when nothing is playing is harmless; don't alarm the user.
         if (ev.error?.code !== "response_cancel_not_active") this.h.onError(ev.error?.message ?? "Voice agent error");

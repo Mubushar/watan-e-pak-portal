@@ -55,7 +55,10 @@ import auth
 import commercial
 import construction
 import content
+import access
 import geo
+import knowledge
+import memory as user_memory
 import storage
 import masterplan
 import gis
@@ -3878,7 +3881,19 @@ def _tokens(text: str) -> List[str]:
 
 @mcp.tool()
 def rag_search(query: str, top_k: int = 5) -> str:
-    """Natural-language retrieval over properties, schemes and big projects."""
+    """Natural-language retrieval over the portal's knowledge (listings, schemes and their approval
+    status, cities, big and mega projects, news, guides). Understands crore/lakh, marla/kanal,
+    bedrooms, Urdu and Roman Urdu; every hit has a source, a trust tier and a [n] citation."""
+    result = knowledge.search(query, k=top_k)
+    for h in result["results"]:  # keep the fields older clients read
+        h.setdefault("name", h["title"])
+    long_term_memory["search_history"].append({"at": datetime.now().isoformat(), "rag": query, "results": result["count"]})
+    remember("rag", {"query": query, "results": result["count"]})
+    return dump(result)
+
+
+def _legacy_rag_search(query: str, top_k: int = 5) -> str:
+    """The original keyword retrieval (kept for comparison in tests)."""
     q_tokens = _tokens(query)
     q_set = set(q_tokens)
 
@@ -10476,9 +10491,9 @@ def _agent_tool_dispatch(name: str, ctx: Dict[str, Any]) -> Any:
                                          mortgage_payoff=float(ctx.get("mortgage_payoff") or 0.0))
     if name == "seller_marketing_assets":
         pid = ctx.get("property_id")
-        p = find_property(pid) if pid else (properties_db[0] if properties_db else None)
+        p = find_property(pid) if pid else None
         if not p:
-            return {"error": "no property"}
+            return {"error": "Give the property_id of the listing to market"}
         return intelligence.generate_listing_assets({
             "id": p.id, "title": p.title, "city": city_name(p.city_id),
             "scheme": _scheme_label(p.scheme_id), "price": p.price, "covered_area": p.covered_area,
@@ -10673,7 +10688,7 @@ def agent_plan(agent_key: str, objective: str = "", subject_type: Optional[str] 
 @mcp.tool()
 def agent_run(agent_key: str, objective: str = "", text: Optional[str] = None,
               subject_type: Optional[str] = None, subject_id: Optional[str] = None,
-              approve: bool = True, extra: Optional[Dict[str, Any]] = None) -> str:
+              approve: bool = False, extra: Optional[Dict[str, Any]] = None) -> str:
     """Execute an agent run against the live portal.
 
     The run engine calls the real portal functions bound to the agent, recording every
@@ -10709,9 +10724,12 @@ def agent_run_get(run_id: str) -> str:
 
 @mcp.tool()
 def agent_approve(run_id: str, approver: str = "user", execute: bool = True) -> str:
-    """Approve a paused agent run (human-in-the-loop gate) and optionally finish executing it."""
+    """Approve a paused agent run (human-in-the-loop gate) and run the approved step. The approval
+    is recorded under the signed-in user's name; ``approver`` is only used by token-based MCP clients."""
+    me = access.current()
+    who = f"{me.get('name') or me.get('email')} ({me.get('id')})" if me else f"mcp:{(approver or 'client')[:40]}"
     dispatch = _agent_tool_dispatch if execute else None
-    return dump(agents.approve_run(run_id, approver=approver, dispatch=dispatch))
+    return dump(agents.approve_run(run_id, approver=who, dispatch=dispatch))
 
 
 @mcp.tool()
@@ -14552,6 +14570,54 @@ def _restore_layer(row: Dict[str, Any]) -> Dict[str, Any]:
 storage.register_codec("gis.GIS_LAYERS", _slim_layer, _restore_layer)
 
 
+# ---------- assistant memory (per user) ----------
+
+
+def _mcp_user_id() -> Optional[str]:
+    me = access.current()
+    return me.get("id") if me else None
+
+
+@mcp.tool()
+def knowledge_search(query: str, k: int = 6, types: Optional[List[str]] = None) -> str:
+    """Search the portal's knowledge base with citations: housing schemes (approval status,
+    authority, developer, possession), cities, infrastructure mega projects, listings, news and
+    guides. ``types`` narrows it (scheme, city, mega_project, property, news, guide, big_project).
+    Quote facts with their [n] marker and prefer official / verified sources."""
+    return dump(knowledge.search(query, k=k, types=types))
+
+
+@mcp.tool()
+def my_memory_recall(query: str = "") -> str:
+    """What the assistant remembers about the signed-in user (budget, areas, size, notes),
+    most relevant to ``query`` first. Private to that user."""
+    uid = _mcp_user_id()
+    if not uid:
+        return dump({"error": "Sign in to use memory", "code": "auth_required"})
+    return dump({"memories": user_memory.recall(uid, query), "recent": user_memory.recent(uid, limit=6)})
+
+
+@mcp.tool()
+def my_memory_remember(note: str) -> str:
+    """Remember a fact the signed-in user asked to keep (e.g. "works in Blue Area", "needs a
+    ground-floor home"). Never store passwords, CNIC, card or bank numbers."""
+    uid = _mcp_user_id()
+    if not uid:
+        return dump({"error": "Sign in to use memory", "code": "auth_required"})
+    if re.search(r"\b\d{5}-?\d{7}-?\d\b|\b(?:\d[ -]?){13,19}\b|password|pin code", note, re.IGNORECASE):
+        return dump({"error": "That looks like an ID, card number or password; I won't store it."})
+    return dump(user_memory.remember(uid, note))
+
+
+@mcp.tool()
+def my_memory_forget(memory_id: Optional[str] = None) -> str:
+    """Forget one memory (by id) or, without an id, everything remembered about the signed-in user."""
+    uid = _mcp_user_id()
+    if not uid:
+        return dump({"error": "Sign in to use memory", "code": "auth_required"})
+    return dump(user_memory.forget(uid, memory_id))
+
+
 def _seed_master_plans() -> None:
     """Register each built DHA master plan as a housing scheme with GIS layers: its outline,
     the georeferenced plan (map tiles) and the PDF's text as annotation layers."""
@@ -16587,6 +16653,99 @@ init_sample_data()
 # ============================================================
 # ENTRY POINT
 # ============================================================
+
+
+# ============================================================
+# MCP: expert prompts and tool annotations
+# ============================================================
+
+
+@mcp.prompt(name="scheme_legality_check", description="Is a housing scheme approved? Authority, status and sources.")
+def prompt_scheme_legality_check(scheme: str) -> str:
+    return (
+        f"Check the legal status of the housing scheme '{scheme}' for a buyer in Pakistan.\n"
+        "1. knowledge_search with types=['scheme'] for the scheme; note approval_status, the approving authority "
+        "(CDA, RDA, LDA, KDA, DHA act …), possession and the sources with their trust level.\n"
+        "2. If the portal has no official source, or the information may be dated, use web_lookup on the authority's "
+        "own list (e.g. RDA illegal societies, CDA approved schemes, LDA approved/illegal lists).\n"
+        "3. Answer: status in one line, the authority, what the sources say with [n] citations and dates, red flags "
+        "(NOC missing, only partly approved, on an illegal list), and what to verify in person before paying "
+        "(NOC letter, layout plan approval, the authority's helpline). No investment advice."
+    )
+
+
+@mcp.prompt(name="property_due_diligence", description="Due-diligence checklist and findings for one listing.")
+def prompt_property_due_diligence(property_id: str) -> str:
+    return (
+        f"Run due diligence on listing {property_id}.\n"
+        "Use get_property for the facts, knowledge_search for the scheme's approval status, master_plan / area_info "
+        "for the location (roads, schools, flood or water bodies nearby), megaproject impact for upcoming ring roads "
+        "or motorways, and investment_analysis for price per marla against the area.\n"
+        "Report: the facts as listed (say they are owner/agent supplied), scheme legality with sources, location "
+        "pros and cons, price check, and a document checklist (fard / registry / allotment letter, NOC, no-dues, "
+        "transfer fee, CNIC verification at the authority office). Cite every fact."
+    )
+
+
+@mcp.prompt(name="comparative_market_analysis", description="CMA: what a property is worth against nearby comparables.")
+def prompt_comparative_market_analysis(property_id: str) -> str:
+    return (
+        f"Prepare a comparative market analysis for listing {property_id}.\n"
+        "Call seller_cma (or investment_analysis) and search_properties for comparables in the same scheme and size "
+        "(±15% marla). Show a small table: comparable, size, price, price per marla, distance. Give a fair price range "
+        "with the reasoning, what pushes it up or down (corner, park-facing, possession, mega projects nearby), and "
+        "say plainly how many comparables it rests on."
+    )
+
+
+@mcp.prompt(name="mega_project_impact", description="How an infrastructure project may affect land prices in an area.")
+def prompt_mega_project_impact(place: str) -> str:
+    return (
+        f"Explain how infrastructure mega projects affect property around {place}.\n"
+        "knowledge_search with types=['mega_project'] and the place; for each nearby project give its status, "
+        "authority, expected completion and typical uplift, with [n] citations. Separate what is built from what "
+        "is only announced, and note risks (delays, route changes, land acquisition)."
+    )
+
+
+@mcp.prompt(name="urdu_assistant_reply", description="Answer a buyer in clear, polite Urdu with sources.")
+def prompt_urdu_assistant_reply(question: str) -> str:
+    return (
+        f"Answer this property question in clear, polite Urdu (Urdu script): {question}\n"
+        "Use the portal tools for facts (search_listings, knowledge_search, area_info). Prices in کروڑ / لاکھ, sizes in "
+        "مرلہ / کنال. Keep it under 120 words, keep scheme and place names in their usual spelling, and put the [n] "
+        "citation after each fact."
+    )
+
+
+_RO = re.compile(r"^(get|list|search|find|show|view|rag|knowledge|compare|analy[sz]e|calc|calculate|estimate|explain|"
+                 r"summar|score|forecast|predict|check|validate|lookup|nearby|map|my_memory_recall|agent_plan|agent_runs|"
+                 r"agent_run_get|auth_config|geo_|portal_search)|_(get|list|search|stats|statistics|summary|report|analysis|"
+                 r"insights|view|status|overview|lookup|preview|estimate|score|dashboard|catalog|config|query|near|nearby|"
+                 r"compare|assumptions|history|feed)$")
+_DESTRUCTIVE = re.compile(r"(delete|remove|purge|clear|forget|revoke|reset|wipe|cancel|terminate|deactivate)")
+_OPEN_WORLD = re.compile(r"(web_lookup|send|whatsapp|telegram|email|sms|notify|dispatch|publish|webhook|transcribe|speak)")
+
+
+def _annotate_tools() -> int:
+    """Mark every MCP tool as read-only, destructive and/or open-world so clients (Claude Desktop,
+    LM Studio …) can auto-approve safe reads and ask before deletes or outbound messages."""
+    from mcp.types import ToolAnnotations
+
+    count = 0
+    for tool in mcp._tool_manager._tools.values():
+        if getattr(tool, "annotations", None):
+            continue
+        name = tool.name
+        destructive = bool(_DESTRUCTIVE.search(name))
+        read_only = bool(_RO.search(name)) and not destructive
+        tool.annotations = ToolAnnotations(read_only_hint=read_only, destructive_hint=destructive and not read_only,
+                                           idempotent_hint=read_only, open_world_hint=bool(_OPEN_WORLD.search(name)))
+        count += 1
+    return count
+
+
+_annotate_tools()
 
 
 def main() -> None:

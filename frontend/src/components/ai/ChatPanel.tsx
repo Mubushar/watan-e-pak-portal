@@ -14,11 +14,11 @@ import { Link, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bot, Calculator, Map as MapIcon, Send, Sparkles, User as UserIcon, Wand2 } from "lucide-react";
 import type { Property } from "@/types";
-import { agentReply, capabilities, type AgentEffect } from "@/lib/agent";
+import { agentReply, capabilities, type AgentEffect, type KnowledgeSource } from "@/lib/agent";
 import { toast } from "sonner";
 import { ApiError, get, post } from "@/lib/api";
 import { pkrShort, titleCase } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { cn, safeHref } from "@/lib/utils";
 import { PropertyRow } from "@/components/property/PropertyCard";
 // Leaflet (~150 kB) loads only when a reply actually contains a map.
 const ChatMap = lazy(() => import("./ChatMap"));
@@ -45,6 +45,54 @@ interface Msg extends AgentEffect {
 }
 
 let aiWarned = false;
+
+const TIER_STYLE: Record<KnowledgeSource["tier"], string> = {
+  official: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200",
+  verified: "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-200",
+  reference: "bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-200",
+  listing: "bg-gold-50 text-gold-700 dark:bg-gold-500/10 dark:text-gold-200",
+  unverified: "bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300",
+};
+const TIER_LABEL: Record<KnowledgeSource["tier"], string> = {
+  official: "Official",
+  verified: "Verified",
+  reference: "Reference",
+  listing: "Listing",
+  unverified: "Unverified",
+};
+
+/** The knowledge the reply cites: [n], title, how far to trust it, and the original source. */
+function Sources({ items }: { items: KnowledgeSource[] }) {
+  return (
+    <div className="mt-2 space-y-1 rounded-xl bg-white p-2 text-[12px] dark:bg-black/20">
+      <div className="px-0.5 text-[11px] font-semibold uppercase tracking-wide text-ink-mute">Sources</div>
+      {items.map((s) => {
+        const origin = s.sources?.find((o) => safeHref(o.url ?? ""));
+        const href = safeHref(origin?.url ?? "");
+        return (
+          <div key={`${s.cite}-${s.id}`} className="flex flex-wrap items-baseline gap-1.5">
+            <span className="font-semibold text-brand-700 dark:text-brand-200">{s.cite}</span>
+            {s.url.startsWith("/") ? (
+              <Link to={s.url} className="font-medium hover:underline">
+                {s.title}
+              </Link>
+            ) : (
+              <span className="font-medium">{s.title}</span>
+            )}
+            <span className={cn("chip px-1.5 py-0 text-[10px]", TIER_STYLE[s.tier] ?? TIER_STYLE.unverified)} title={s.trust}>
+              {TIER_LABEL[s.tier] ?? "Unverified"}
+            </span>
+            {href && (
+              <a href={href} target="_blank" rel="noopener noreferrer" className="truncate text-ink-mute hover:underline">
+                {origin?.title || new URL(href, window.location.href).hostname}
+              </a>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export const SUGGESTIONS = [
   "10 marla house in DHA Lahore under 5 crore",
@@ -171,6 +219,7 @@ export function ChatPanel({ compact, className, initial }: { compact?: boolean; 
                     ))}
                   </div>
                 )}
+                {!!m.sources?.length && <Sources items={m.sources} />}
                 {!!m.hits?.length && (
                   <div className="mt-2 space-y-1 rounded-xl bg-white p-1.5 dark:bg-black/20">
                     {m.hits

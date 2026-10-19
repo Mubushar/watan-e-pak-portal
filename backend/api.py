@@ -49,7 +49,10 @@ import directions as routing
 import megaprojects
 import roads
 import access
+import knowledge
+import memory as user_memory
 import portal_env
+import prompts
 import storage
 import basedata
 import crm_ai
@@ -1033,8 +1036,9 @@ def ai_tools() -> Any:
     The app runs the calls itself against this API, so typed chat and voice notes can
     search listings, open details, read the user's listings and draft a listing.
     """
+    tools = [*openai_voice.REALTIME_TOOLS, *openai_voice.CHAT_TOOLS]
     return {"tools": [{"type": "function", "function": {k: t[k] for k in ("name", "description", "parameters")}}
-                      for t in openai_voice.REALTIME_TOOLS]}
+                      for t in tools]}
 
 
 # OpenAI accepts audio files up to 25 MB; base64 adds a third.
@@ -1093,6 +1097,117 @@ async def ai_web_lookup(payload: WebLookupRequest, request: Request) -> Any:
         return await asyncio.to_thread(web_lookup.lookup, payload.question)
     except (web_lookup.WebLookupError, openai_voice.VoiceError) as exc:
         raise HTTPException(status_code=exc.status, detail=str(exc))
+
+
+class AiContextRequest(BaseModel):
+    query: str = Field(..., min_length=1, max_length=2000)
+    conversation_id: Optional[str] = Field(default=None, max_length=80)
+    channel: str = "chat"  # chat | voice
+    k: int = Field(default=5, ge=0, le=12)
+    record: bool = True     # save the question in the user's conversation memory
+
+
+class AiTurnRequest(BaseModel):
+    content: str = Field(..., min_length=1, max_length=8000)
+    conversation_id: Optional[str] = Field(default=None, max_length=80)
+    role: str = "assistant"
+
+
+class KnowledgeSearchRequest(BaseModel):
+    query: str = Field(..., min_length=1, max_length=1000)
+    k: int = Field(default=6, ge=1, le=20)
+    types: Optional[List[str]] = None
+
+
+class MemoryNote(BaseModel):
+    text: str = Field(..., min_length=2, max_length=300)
+
+
+class MemorySettings(BaseModel):
+    enabled: bool
+
+
+def _me_or_401() -> Dict[str, Any]:
+    me = access.current()
+    if not me:
+        raise HTTPException(status_code=401, detail="Sign in to use your assistant memory")
+    return me
+
+
+@app.post("/ai/context", tags=["ai"])
+def ai_context(payload: AiContextRequest) -> Any:
+    """Everything the assistant needs for one question, in one fast call: the system prompt
+    (one source for every app), the knowledge base hits with numbered citations, what it
+    remembers about this user and the last turns of the conversation. Signed-in users' questions
+    are remembered (unless they switched memory off); guests get knowledge only."""
+    me = access.current()
+    uid = me.get("id") if me else None
+    hits = knowledge.search(payload.query, k=payload.k) if payload.k else {"results": [], "context": "", "took_ms": 0}
+    recent = user_memory.recent(uid, payload.conversation_id) if uid else []
+    learned: List[Dict[str, Any]] = []
+    if uid and payload.record:
+        learned = user_memory.learn(uid, payload.query)
+        user_memory.add_turn(uid, "user", payload.query, payload.conversation_id)
+    memory_block = user_memory.context(uid, payload.query)
+    return {
+        "system_prompt": prompts.compose(me, payload.channel, memory_block, hits.get("context", "")),
+        "prompt_version": prompts.PROMPT_VERSION,
+        # the same blocks on their own, for apps that keep their own base prompt
+        "memory_block": memory_block,
+        "knowledge_block": hits.get("context", ""),
+        "knowledge": {k: hits.get(k) for k in ("results", "filters", "took_ms")},
+        "memory": {"enabled": user_memory.enabled(uid), "items": user_memory.recall(uid, payload.query) if uid else [],
+                   "learned": learned},
+        "recent": recent,
+    }
+
+
+@app.post("/ai/turn", tags=["ai"])
+def ai_turn(payload: AiTurnRequest) -> Any:
+    """Save the assistant's reply (or a user turn) in the signed-in user's conversation memory."""
+    me = _me_or_401()
+    turn = user_memory.add_turn(me["id"], payload.role, payload.content, payload.conversation_id)
+    return {"saved": turn is not None}
+
+
+@app.post("/ai/knowledge/search", tags=["ai"])
+def ai_knowledge_search(payload: KnowledgeSearchRequest) -> Any:
+    """BM25 search over the portal's knowledge (schemes and their approval status, cities, mega
+    projects, listings, news, guides) with sources, trust tiers and [n] citation markers."""
+    return knowledge.search(payload.query, k=payload.k, types=payload.types)
+
+
+@app.get("/me/memory", tags=["me"])
+def me_memory() -> Any:
+    """What the assistant remembers about me (only I can see this)."""
+    return user_memory.list_for(_me_or_401()["id"])
+
+
+@app.post("/me/memory", tags=["me"], status_code=201)
+def me_memory_add(payload: MemoryNote) -> Any:
+    result = user_memory.remember(_me_or_401()["id"], payload.text)
+    if "error" in result:
+        raise HTTPException(status_code=409, detail=result["error"])
+    return result
+
+
+@app.delete("/me/memory/{memory_id}", tags=["me"])
+def me_memory_delete(memory_id: str) -> Any:
+    result = user_memory.forget(_me_or_401()["id"], memory_id)
+    if not result["forgotten"]:
+        raise HTTPException(status_code=404, detail="No such memory")
+    return result
+
+
+@app.delete("/me/memory", tags=["me"])
+def me_memory_clear() -> Any:
+    """Forget everything the assistant remembers about me, including recent conversations."""
+    return user_memory.forget(_me_or_401()["id"])
+
+
+@app.put("/me/memory/settings", tags=["me"])
+def me_memory_settings(payload: MemorySettings) -> Any:
+    return user_memory.set_enabled(_me_or_401()["id"], payload.enabled)
 
 
 @app.post("/ai/realtime/session", tags=["ai"])
@@ -4399,7 +4514,7 @@ class AgentPlanRequest(BaseModel):
 
 class AgentRunRequest(AgentPlanRequest):
     text: Optional[str] = None
-    approve: bool = True
+    approve: bool = False
     extra: Optional[Dict[str, Any]] = None
 
 

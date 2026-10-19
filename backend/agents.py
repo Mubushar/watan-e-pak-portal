@@ -16,6 +16,7 @@ It is deliberately free of MCP/FastAPI code: the server layer supplies the data 
 a tool *dispatcher*, so the exact same engine powers MCP tools and REST.
 """
 
+import re
 import uuid
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
@@ -452,17 +453,30 @@ def agentic_overview() -> Dict[str, Any]:
 def _workflow(agent: Dict[str, Any]) -> List[Dict[str, Any]]:
     if agent.get("workflow"):
         return agent["workflow"]
+    # Look first, act after the human gate: tools that only read or analyse run before the
+    # review; tools that create, send or change something run only once it is approved.
+    tools = list(agent.get("tools", []))
+    reads = [t for t in tools if not WRITE_TOOL.search(t)]
+    writes = [t for t in tools if WRITE_TOOL.search(t)]
     steps: List[Dict[str, Any]] = [
         {"name": "intake", "tool": None, "capability": "understand the request",
          "requires_approval": False}]
-    for tool in agent.get("tools", []):
+    for tool in reads:
         steps.append({"name": tool, "tool": tool,
                       "capability": tool.replace("_", " "), "requires_approval": False})
     steps.append({"name": "review", "tool": None, "capability": "human review",
                   "requires_approval": bool(agent.get("requires_approval"))})
+    for tool in writes:
+        steps.append({"name": tool, "tool": tool,
+                      "capability": tool.replace("_", " "), "requires_approval": False})
     steps.append({"name": "deliver", "tool": None, "capability": "deliver the result",
                   "requires_approval": False})
     return steps
+
+
+# Tool names that change the portal or reach people outside it.
+WRITE_TOOL = re.compile(r"(^|_)(create|send|update|delete|publish|assign|book|schedule|sign|post|dispatch|record|"
+                        r"convert|transfer|pay|notify|message|email|whatsapp|add|log|apply|renew)(_|s?$)")
 
 
 def plan_run(agent_key: str, objective: str = "", subject_type: Optional[str] = None,
@@ -499,8 +513,12 @@ def run_agent(agent_key: str, objective: str = "",
               dispatch: Optional[Callable[[str, Dict[str, Any]], Any]] = None,
               context: Optional[Dict[str, Any]] = None, args: Optional[Dict[str, Any]] = None,
               subject_type: Optional[str] = None, subject_id: Optional[str] = None,
-              approve: bool = True, persist: bool = True) -> Dict[str, Any]:
+              approve: bool = False, persist: bool = True) -> Dict[str, Any]:
     """Plan and execute an agent run.
+
+    Steps marked ``requires_approval`` (sending messages, publishing, changing deals) pause the
+    run until a person approves it with :func:`approve_run`; ``approve=True`` pre-approves them
+    (scheduled jobs the portal itself runs).
 
     ``dispatch(tool_name, args)`` is supplied by the server so the engine can call
     the real portal functions; when it is ``None`` the tool steps are *skipped*
@@ -526,7 +544,7 @@ def run_agent(agent_key: str, objective: str = "",
 
 
 def resume_run(run_id: str, dispatch: Optional[Callable[[str, Dict[str, Any]], Any]] = None,
-               approve: bool = True) -> Dict[str, Any]:
+               approve: bool = False) -> Dict[str, Any]:
     run = next((r for r in runs_db if r.id == run_id), None)
     if not run:
         return {"error": f"Unknown run: {run_id}"}
@@ -542,16 +560,16 @@ def _execute(run: AgentRun, dispatch: Optional[Callable[[str, Dict[str, Any]], A
     for step in run.steps:
         if step.status in ("done", "skipped"):
             continue
-        if step.requires_approval and not approve:
+        if step.requires_approval and step.status != "approved" and not approve:
             step.status = "awaiting_approval"
             run.status = "awaiting_approval"
             run.updated_at = datetime.now()
             return
-        step.status = "running"
-        if step.requires_approval and approve:
-            step.approved_by = "auto" if approve else None
+        if step.requires_approval and step.status != "approved":  # pre-approved by the caller
+            step.approved_by = "auto"
             run.approvals.append({"step": step.name, "approved_by": "auto",
                                   "at": datetime.now().isoformat(timespec="seconds")})
+        step.status = "running"
         if step.tool and dispatch is not None:
             ctx = dict(run.context)
             ctx.update(step.args or {})
@@ -583,19 +601,22 @@ def approve_run(run_id: str, approver: str = "user",
     if not run:
         return {"error": f"Unknown run: {run_id}"}
     pending = [s for s in run.steps if s.status == "awaiting_approval"]
+    if not pending:
+        return {"error": "This run is not waiting for an approval", "status": run.status}
     for step in pending:
         step.status = "approved"
         step.approved_by = approver
         run.approvals.append({"step": step.name, "approved_by": approver,
                               "at": datetime.now().isoformat(timespec="seconds")})
-    for step in run.steps:
-        if step.status == "approved":
-            step.status = "done"
-            step.output = step.output or (step.capability or "approved")
     run.status = "running"
     if dispatch is not None:
-        _execute(run, dispatch, approve=True)
+        # Run the approved step's tool now; a later gate pauses again for its own approval.
+        _execute(run, dispatch, approve=False)
         return run_view(run)
+    for step in run.steps:
+        if step.status == "approved":
+            step.status = "skipped"
+            step.output = step.output or "approved (not executed)"
     run.status = "completed"
     run.completed_at = datetime.now()
     run.updated_at = run.completed_at

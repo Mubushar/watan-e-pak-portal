@@ -190,6 +190,29 @@ KIND_ENUM = ['school', 'high school', 'primary school', 'college', 'university',
 PLAN_CATEGORIES = ["sector", "road", "plot_number", "plot_size", "park", "mosque", "education", "health", "commercial",
                    "mixed_use", "apartments", "community", "water", "gate", "fuel", "amenity", "parking", "graveyard"]
 
+# Tools the typed chat gets on top of the live voice agent's (the apps run them via REST).
+CHAT_TOOLS: List[Dict[str, Any]] = [
+    {
+        "type": "function",
+        "name": "knowledge_search",
+        "description": "Search the portal's knowledge base: housing schemes (approval status, authority, developer, "
+                       "possession), cities, infrastructure mega projects (ring roads, motorways, industrial zones), "
+                       "news and guides. Results carry [n] citation markers and a trust level; cite them.",
+        "parameters": {"type": "object", "properties": {
+            "query": {"type": "string", "description": "The question, in the user's words"},
+            "types": {"type": "array", "items": {"type": "string", "enum": ["scheme", "city", "mega_project", "property",
+                                                                              "news", "guide", "big_project"]}}},
+            "required": ["query"]},
+    },
+    {
+        "type": "function",
+        "name": "remember",
+        "description": "Remember a fact the signed-in user asks you to keep for later conversations (budget, where they "
+                       "work, family needs). Never store passwords, CNIC, card or bank numbers.",
+        "parameters": {"type": "object", "properties": {"note": {"type": "string"}}, "required": ["note"]},
+    },
+]
+
 REALTIME_TOOLS: List[Dict[str, Any]] = [
     {
         "type": "function",

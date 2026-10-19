@@ -7,6 +7,7 @@ OpenAI model with web search, with the source links.
 from __future__ import annotations
 
 import os
+import time
 from typing import Any, Dict, List
 from urllib.parse import urlsplit, urlunsplit
 
@@ -14,12 +15,19 @@ import httpx
 
 import envfile  # noqa: F401  (loads backend/.env)
 import openai_voice
+import sources as trust
+
+CACHE_SECONDS = 6 * 3600  # the same question within six hours is answered from cache
+_cache: Dict[str, Any] = {}
 
 MODEL = os.getenv("OPENAI_WEB_MODEL") or os.getenv("OPENAI_MODEL") or "gpt-6-luna"
 INSTRUCTIONS = (
     "You look up facts for a Pakistani real-estate assistant. Search the web, then answer in at most "
     "5 short sentences or bullet points, in English, with concrete facts: names, numbers, dates, the "
-    "approving authority (RDA, CDA, LDA, KDA, SBCA …). Say when sources disagree or may be out of date. "
+    "approving authority (RDA, CDA, LDA, KDA, SBCA …). Prefer official sources first (government and "
+    "development-authority sites: .gov.pk, .gop.pk, .gos.pk, .gkp.pk, SBP, DHA), then established news "
+    "(Dawn, Business Recorder, The News, Express Tribune); avoid property-portal adverts and social media "
+    "as sole evidence. Give the date of each fact. Say when sources disagree or may be out of date. "
     "No marketing language, no advice to buy."
 )
 
@@ -38,6 +46,18 @@ def _clean(url: str) -> str:
 
 
 def lookup(question: str) -> Dict[str, Any]:
+    key = " ".join(question.lower().split())
+    hit = _cache.get(key)
+    if hit and time.time() - hit[0] < CACHE_SECONDS:
+        return {**hit[1], "cached": True}
+    result = _lookup(question)
+    if len(_cache) > 500:
+        _cache.clear()
+    _cache[key] = (time.time(), result)
+    return result
+
+
+def _lookup(question: str) -> Dict[str, Any]:
     if not openai_voice.API_KEY:
         raise WebLookupError("Web lookup needs OPENAI_API_KEY in backend/.env", 501)
     try:
@@ -74,4 +94,7 @@ def lookup(question: str) -> Dict[str, Any]:
     answer = "\n".join(texts).strip()
     if not answer:
         raise WebLookupError("The web search returned no answer")
-    return {"question": question, "answer": answer, "sources": list(sources.values())[:6]}
+    ranked = trust.sort_sources(list(sources.values()))[:6]
+    best = ranked[0]["tier"] if ranked else "unverified"
+    return {"question": question, "answer": answer, "sources": ranked, "best_source_tier": best,
+            "trust": trust.describe(best), "checked_at": time.strftime("%Y-%m-%d")}

@@ -256,10 +256,35 @@ function agentSystem(user: User | null, lang: Lang, opts: RespondOptions): strin
   ].join("\n");
 }
 
+/** The app's own conversation id, so the server's short-term memory keeps this chat together. */
+const conversationId = `app-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+interface AiContext {
+  memory_block?: string;
+  knowledge_block?: string;
+}
+
+/** What the server remembers about the user and what its knowledge base says (empty when offline). */
+async function serverContext(text: string, mode: RespondOptions["mode"]): Promise<string> {
+  try {
+    const ctx = await post<AiContext>("/ai/context", { query: text, conversation_id: conversationId, channel: mode === "voice" ? "voice" : "chat", k: 4 }, { timeoutMs: 8_000 });
+    const parts: string[] = [];
+    if (ctx.memory_block) parts.push(`# Memory\n${ctx.memory_block}`);
+    if (ctx.knowledge_block)
+      parts.push(
+        "# Knowledge (portal knowledge base)\nUse these facts when they answer the question. Don't write the [n] markers in this app; name the source in words instead (e.g. 'according to RDA', 'per the CDA list'). Prefer official sources; listing details are as given by the owner/agent.\n" +
+          ctx.knowledge_block,
+      );
+    return parts.length ? `\n\n${parts.join("\n\n")}` : "";
+  } catch {
+    return "";
+  }
+}
+
 async function agentReply(text: string, history: ChatMsg[], user: User | null, lang: Lang, opts: RespondOptions, model: string): Promise<Reply> {
-  const tools = await chatTools();
+  const [tools, extra] = await Promise.all([chatTools(), serverContext(text, opts.mode)]);
   const messages: ChatMessage[] = [
-    { role: "system", content: agentSystem(user, lang, opts) },
+    { role: "system", content: agentSystem(user, lang, opts) + extra },
     ...history
       .filter((m) => !m.pending && m.id !== "welcome" && m.content)
       .slice(-12)
@@ -281,26 +306,31 @@ async function agentReply(text: string, history: ChatMsg[], user: User | null, l
       // Drop any [context: …] note the model copied from earlier turns.
       const content = (msg.content ?? "").replace(/\s*\[context:[^\]]*\]/gi, "").trim();
       if (!content) throw new Error("empty reply");
+      if (user) void post("/ai/turn", { content, conversation_id: conversationId }).catch(() => undefined);
       return { lang, content, listings: effect.listings, actions: effect.actions, map: effect.map, image: effect.image, context: notes.join(" | ") || undefined };
     }
     messages.push({ role: "assistant", content: msg.content ?? null, tool_calls: msg.tool_calls });
-    for (const call of msg.tool_calls) {
-      let args: Record<string, unknown> = {};
-      try {
-        args = JSON.parse(call.function.arguments || "{}");
-      } catch {
-        /* keep {} */
-      }
-      let output: unknown;
-      try {
-        const run = await runAgentTool(call.function.name, args, lang);
-        effect = mergeEffects(effect, run.effect);
-        output = run.output;
-      } catch (e) {
-        output = { error: (e as Error).message };
-      }
-      notes.push(summarizeCall(call.function.name, args, output));
-      messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(output ?? {}) });
+    // Independent tool calls run in parallel; results go back in the order they were asked.
+    const runs = await Promise.all(
+      msg.tool_calls.map(async (call) => {
+        let args: Record<string, unknown> = {};
+        try {
+          args = JSON.parse(call.function.arguments || "{}");
+        } catch {
+          /* keep {} */
+        }
+        try {
+          const run = await runAgentTool(call.function.name, args, lang);
+          return { call, args, output: run.output, effect: run.effect };
+        } catch (e) {
+          return { call, args, output: { error: (e as Error).message } as unknown, effect: {} };
+        }
+      }),
+    );
+    for (const run of runs) {
+      effect = mergeEffects(effect, run.effect);
+      notes.push(summarizeCall(run.call.function.name, run.args, run.output));
+      messages.push({ role: "tool", tool_call_id: run.call.id, content: JSON.stringify(run.output ?? {}) });
     }
   }
   throw new Error("too many tool rounds");

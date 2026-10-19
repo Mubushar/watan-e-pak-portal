@@ -208,6 +208,18 @@ export async function runAgentTool(name: string, args: Record<string, unknown>, 
       effect: { actions: [{ label: tr.createListing, draft, primary: true }] },
     };
   }
+  if (name === "knowledge_search") {
+    const r = await post<{ context: string }>("/ai/knowledge/search", {
+      query: String(args.query ?? ""),
+      types: Array.isArray(args.types) ? args.types : undefined,
+      k: 5,
+    });
+    return { output: { results: r.context || "nothing found in the portal's knowledge base", note: "name the source in words, no [n] markers" }, effect: {} };
+  }
+  if (name === "remember") {
+    if (!useAuth.getState().token) return { output: { ok: false, reason: "not_signed_in" }, effect: {} };
+    return { output: await post("/me/memory", { text: String(args.note ?? "") }), effect: {} };
+  }
   return { output: { error: `unknown tool ${name}` }, effect: {} };
 }
 
