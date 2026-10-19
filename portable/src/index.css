@@ -14,6 +14,21 @@
   html.dark {
     color-scheme: dark;
   }
+  /* Native dropdown lists: give the options their own colours — otherwise a dark-theme select
+     opens a white list with the theme's near-white text (unreadable). */
+  select option,
+  select optgroup {
+    background-color: #ffffff;
+    color: #0f172a;
+  }
+  html.dark select option,
+  html.dark select optgroup {
+    background-color: #0d1f16;
+    color: #e5ece8;
+  }
+  select option:disabled {
+    color: #94a3b8;
+  }
   html {
     -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%;
