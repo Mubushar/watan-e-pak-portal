@@ -66,7 +66,7 @@ export function cityImage(name?: string | null, image?: string | null): string {
   return `/seed/cities/rawalpindi.svg`;
 }
 
-/** Image for a scheme / big project / story, chosen by keyword then hash. */
+/** Image for a society / big project / story, chosen by keyword then hash. */
 export function themedImage(key: string, hint?: string | null): string {
   const h = (hint ?? "").toLowerCase();
   let cat = "building";

@@ -20,7 +20,7 @@ export interface Intent {
   max_price?: number;
   price?: number;
   purpose?: "buy" | "rent" | "invest";
-  /** Words that look like a scheme/society name, e.g. "DHA", "Bahria Town". */
+  /** Words that look like a society name, e.g. "DHA", "Bahria Town". */
   area_hint?: string;
 }
 

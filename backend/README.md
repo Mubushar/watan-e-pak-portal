@@ -7,7 +7,7 @@ one data store**:
 * **REST** (FastAPI) — a normal HTTP/JSON API with Swagger docs.
 
 ```
-City ─▶ Housing Scheme / Society ─▶ Block / Zone / Area ─▶ Property
+City ─▶ Housing Society / Society ─▶ Block / Zone / Area ─▶ Property
                                    └────────────▶ Big Project  (mall, tower, mixed-use, compound, plaza)
 CRM:  Agents ─▶ Leads ─▶ Customers ─▶ Deals ─▶ Tasks / Appointments / Interactions
 ```
@@ -240,7 +240,7 @@ The portal's map explorer uses these endpoints (all GET):
 
 | Endpoint | What it returns |
 | --- | --- |
-| `/geo/suggest?q=` | Type-ahead suggestions: cities, housing schemes, listings, sectors / societies, places |
+| `/geo/suggest?q=` | Type-ahead suggestions: cities, housing societies, listings, sectors / societies, places |
 | `/geo/geocode?q=` | One address or place: local data first, then OpenStreetMap's Nominatim (cached, ≤ 1 request/s; `GEO_ONLINE_LOOKUP=0` turns it off) |
 | `/geo/places?south=&west=&north=&east=&categories=` | Points of interest in a map's visible box (Islamabad / Rawalpindi, Lahore, Karachi) |
 | `/geo/provinces` | Pakistan's provinces & territories (GeoJSON) with the number of portal listings in each |
@@ -339,7 +339,7 @@ To turn real sending on:
 - **WhatsApp:** `WHATSAPP_TOKEN` and `WHATSAPP_PHONE_ID`. Free text only reaches people who messaged you in the last 24 hours; outside that window set `PORTAL_WHATSAPP_CRM_TEMPLATE` to an approved template with one body parameter.
 - **Voice notes and spoken answers:** `OPENAI_API_KEY`.
 
-## Base data: cities and housing schemes
+## Base data: cities and housing societies
 
 The base data was researched in October 2026 and is loaded at start-up by `basedata.load_seed()`:
 
@@ -347,7 +347,7 @@ The base data was researched in October 2026 and is loaded at start-up by `based
   district, coordinates and development authority. 41 have their 2023 Census urban population
   (Pakistan Bureau of Statistics tables). Gilgit-Baltistan and Azad Kashmir aren't covered by the
   2023 Census, so those figures are empty. Area is the district or tehsil area, as noted.
-- **`geodata/pk_housing_schemes.json`:** 102 housing schemes in Islamabad, Rawalpindi, Lahore,
+- **`geodata/pk_housing_schemes.json`:** 102 housing societies in Islamabad, Rawalpindi, Lahore,
   Karachi and 11 other cities, with developer, approval authority and **approval status**
   (`approved`, `noc_issued`, `partially_approved`, `under_process`, `unapproved`, `illegal`,
   `cancelled`), plus approved area, plot counts, coordinates and website where available. Status
@@ -376,7 +376,7 @@ by editing the JSON (geometry is a `line` path, a `polygon` ring or a `point` wi
 `study_area.py` builds the report: scores (amenities, facilities per resident, development,
 portal market activity, 5-year outlook, mega-project pipeline) and a grade from A to E;
 strengths, concerns and a recommendation; population and neighbourhoods; facilities inside and
-the nearest of each kind; listings, price per marla and nearby comparables; housing schemes;
+the nearest of each kind; listings, price per marla and nearby comparables; housing societies;
 the DHA master plan; mega projects; valuation and economics; forecast; and news. It is
 rule-based and uses no AI credit. Body: `{"kind": "circle", "center": [lat, lon],
 "radius_m": 1500}`, `{"kind": "rectangle", "bounds": {south, west, north, east}}` or

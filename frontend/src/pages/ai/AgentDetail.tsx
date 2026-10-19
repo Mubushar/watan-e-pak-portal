@@ -48,7 +48,7 @@ const EXAMPLES: Record<string, string> = {
   transaction_agent: "Check overdue milestones on open transactions",
   accounting_agent: "Commission projection for this quarter",
   marketing_agent: "Create a campaign for a new 1 kanal listing in Bahria Town",
-  marketing_conductor: "Plan a launch campaign for a new housing scheme in Islamabad",
+  marketing_conductor: "Plan a launch campaign for a new housing society in Islamabad",
   lead_engine_agent: "Generate and score leads for luxury homes in DHA",
   routing_agent: "Route new website leads to the best-fit agents",
   reengagement_agent: "Re-engage cold leads from the last 90 days",

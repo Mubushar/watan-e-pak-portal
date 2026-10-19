@@ -54,7 +54,7 @@ SYNONYMS = {
     "pindi": "rawalpindi", "isb": "islamabad", "lhr": "lahore", "khi": "karachi", "پشاور": "peshawar",
     "ملتان": "multan", "فیصل": "faisalabad", "بحریہ": "bahria", "ڈی": "dha", "defence": "dha",
     "منظور": "approved", "منظوری": "approval", "غیرقانونی": "illegal", "illegal": "illegal",
-    "approved": "approved", "noc": "approval", "سکول": "school", "school": "school", "schools": "school",
+    "approved": "approved", "noc": "approval", "societies": "society", "سوسائٹی": "society", "سوسائٹیز": "society", "سکول": "school", "school": "school", "schools": "school",
     "مسجد": "mosque", "masjid": "mosque", "hospital": "hospital", "ہسپتال": "hospital",
     "کمرے": "bedroom", "کمرہ": "bedroom", "kamre": "bedroom", "kamra": "bedroom", "bedrooms": "bedroom",
     "beds": "bedroom", "bed": "bedroom", "bhk": "bedroom", "br": "bedroom",
@@ -408,6 +408,7 @@ def invalidate() -> None:
 
 _FILTER_WORDS = {"crore", "lakh", "arab", "million", "thousand", "marla", "kanal", "bedroom", "rent", "sale", "buy",
                  "house", "plot", "apartment", "shop", "office", "between", "and"}
+TYPE_LABEL = {"scheme": "housing society", "big_project": "project", "mega_project": "infrastructure project"}
 TYPE_BOOST = {"scheme": 1.15, "city": 1.1, "mega_project": 1.05, "guide": 1.0, "property": 1.0, "news": 0.95,
               "big_project": 0.95, "guideline": 0.9}
 TIER_BOOST = {"official": 1.15, "verified": 1.1, "reference": 1.05, "listing": 1.0, "unverified": 0.9}
@@ -476,7 +477,7 @@ def search(query: str, k: int = 6, types: Optional[Iterable[str]] = None) -> Dic
             hit.update(price=p.price, marla=p.marla_area, bedrooms=p.bedrooms, category=p.category, use_type=p.use_type)
         hits.append(hit)
     context = "\n".join(
-        f"{h['cite']} {h['title']} ({h['type'].replace('_', ' ')}; {h['trust']}"
+        f"{h['cite']} {h['title']} ({TYPE_LABEL.get(h['type'], h['type'].replace('_', ' '))}; {h['trust']}"
         + (f"; {h['sources'][0].get('title')}" if h["sources"] else "") + f"): {h['snippet']}"
         for h in hits)
     return {"query": query, "filters": filters, "count": len(hits), "results": hits, "context": context,

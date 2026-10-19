@@ -355,7 +355,7 @@ Staff whose role has the permission see an **Administration** menu in the dashbo
 | Screen | For | What you do there |
 | --- | --- | --- |
 | **Users & roles** | administrators | Accounts, roles (including approving requested agent / developer roles), permissions. |
-| **Base data** | `basedata.manage` | Cities, housing schemes / societies (with approval status and sources) and blocks. |
+| **Base data** | `basedata.manage` | Cities, housing societies / societies (with approval status and sources) and blocks. |
 | **Property database** | `properties.manage` | Every listing with every field: search, filter, edit, bulk feature / status / agent / delete, CSV export and import (always checked first). |
 | **GIS layers** | `gis.manage` | Upload map layers (GeoJSON, KML, GPX, CSV), edit their style, and publish them to the public map. |
 

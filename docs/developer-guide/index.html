@@ -407,7 +407,7 @@ footer { color: var(--mute); font-size: .9rem; border-top: 1px solid var(--line)
       <pre><code># 1. business logic as an MCP tool (server.py) — AI clients get it for free
 @mcp.tool()
 def scheme_summary(scheme_id: str) -> str:
-    """One-paragraph summary of a housing scheme with its approval status."""
+    """One-paragraph summary of a housing society with its approval status."""
     s = find_scheme(scheme_id)
     return dump({"error": "Unknown scheme"} if not s else {"name": s.name, "approval": s.approval_status})
 
@@ -454,7 +454,7 @@ _add("GET", r"^/schemes/[^/]+/summary$", "public")
       <div class="sec-head">
         <span class="eyebrow">08 · Knowledge &amp; RAG</span>
         <h2>Answers that show their sources</h2>
-        <p><code>knowledge.py</code> indexes listings, cities, housing schemes (with approval status and sources), infrastructure mega projects, news and guide pages, and ranks them with BM25, a classic and fast search formula, in about 2 ms per question. It understands how people in Pakistan ask.</p>
+        <p><code>knowledge.py</code> indexes listings, cities, housing societies (with approval status and sources), infrastructure mega projects, news and guide pages, and ranks them with BM25, a classic and fast search formula, in about 2 ms per question. It understands how people in Pakistan ask.</p>
       </div>
       <figure>
         <div class="diagram">
@@ -711,7 +711,7 @@ pg_dump -Fc arzepak &gt; arzepak-$(date +%F).dump</code></pre>
       </div>
       <figure>
         <div class="shot"><div class="bar"><i></i><i></i><i></i><span>/app/admin/base-data</span></div><img src="img/14-admin-base-data.png" alt="Base data administration for cities, schemes and blocks" loading="lazy"></div>
-        <figcaption><b>Base data</b> (<code>basedata.manage</code>). 44 cities and 110 housing schemes with approval status and their sources. These records feed the knowledge base, so a source added here becomes a citation in the assistant's answers.</figcaption>
+        <figcaption><b>Base data</b> (<code>basedata.manage</code>). 44 cities and 110 housing societies with approval status and their sources. These records feed the knowledge base, so a source added here becomes a citation in the assistant's answers.</figcaption>
       </figure>
     </section>
 
@@ -791,7 +791,7 @@ cd ../portable &amp;&amp; npx tsc -b --noEmit   # app types</code></pre>
         <div><dt>Hallucination</dt><dd>A confident answer that is not supported by facts.</dd></div>
         <div><dt>Marla / kanal</dt><dd>Land units: 1 kanal = 20 marla; the portal counts 225 sq ft per marla.</dd></div>
         <div><dt>Crore / lakh</dt><dd>1 crore = 10,000,000 PKR; 1 lakh = 100,000 PKR.</dd></div>
-        <div><dt>NOC</dt><dd>No-objection certificate from a development authority (RDA, CDA, LDA…); a key legality check for a housing scheme.</dd></div>
+        <div><dt>NOC</dt><dd>No-objection certificate from a development authority (RDA, CDA, LDA…); a key legality check for a housing society.</dd></div>
         <div><dt>GeoJSON</dt><dd>The JSON format for map features; coordinates are [longitude, latitude].</dd></div>
       </dl>
     </section>

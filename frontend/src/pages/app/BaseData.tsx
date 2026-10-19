@@ -1,7 +1,7 @@
 /**
- * Administration › Base data: create, edit and delete the portal's cities, housing schemes /
+ * Administration › Base data: create, edit and delete the portal's cities, housing societies /
  * societies and their blocks / zones (/admin/basedata/*, permission basedata.manage).
- * Deleting is refused while schemes, blocks or listings still use a record.
+ * Deleting is refused while societies, blocks or listings still use a record.
  */
 import { useState } from "react";
 import { Building, Database, ExternalLink, Landmark, MapPinned, Pencil, Plus, Search, Trash2, X } from "lucide-react";
@@ -79,7 +79,7 @@ export default function BaseData() {
     <div className="space-y-6">
       <PageHeader
         title="Base data"
-        subtitle="Cities, housing schemes / societies and their blocks — the reference data behind listings, maps and reports"
+        subtitle="Cities, housing societies and their blocks — the reference data behind listings, maps and reports"
         actions={
           <Button size="sm" icon={<Plus className="h-4 w-4" />} onClick={() => setEdit({ ...EMPTY[table] })}>
             Add {table === "cities" ? "city" : table === "schemes" ? "scheme" : "block"}
@@ -96,7 +96,7 @@ export default function BaseData() {
           }}
           tabs={[
             { value: "cities", label: "Cities", icon: <Building className="h-4 w-4" />, count: count("cities") },
-            { value: "schemes", label: "Housing schemes", icon: <Landmark className="h-4 w-4" />, count: count("schemes") },
+            { value: "schemes", label: "Housing societies", icon: <Landmark className="h-4 w-4" />, count: count("schemes") },
             { value: "blocks", label: "Blocks & zones", icon: <MapPinned className="h-4 w-4" />, count: count("blocks") },
           ]}
         />
@@ -127,7 +127,7 @@ export default function BaseData() {
           )}
           {table === "blocks" && (
             <Select value={schemeFilter} onChange={(e) => setSchemeFilter(e.target.value)} className="!h-9 !w-auto !py-0 text-sm">
-              <option value="">All schemes</option>
+              <option value="">All societies</option>
               {(schemes.data?.rows ?? []).map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name} · {s.city}
@@ -161,7 +161,7 @@ export default function BaseData() {
                       <th className="px-2 py-2 text-start">Province</th>
                       <th className="px-2 py-2 text-end">Population (2023)</th>
                       <th className="px-2 py-2 text-start">Authority</th>
-                      <th className="px-2 py-2 text-end">Schemes</th>
+                      <th className="px-2 py-2 text-end">Societies</th>
                       <th className="px-2 py-2 text-end">Listings</th>
                     </>
                   )}
@@ -176,7 +176,7 @@ export default function BaseData() {
                   )}
                   {table === "blocks" && (
                     <>
-                      <th className="px-2 py-2 text-start">Scheme</th>
+                      <th className="px-2 py-2 text-start">Society</th>
                       <th className="px-2 py-2 text-start">Type</th>
                     </>
                   )}
@@ -251,7 +251,7 @@ export default function BaseData() {
         open={!!confirm}
         onClose={() => setConfirm(null)}
         title={`Delete “${confirm?.name ?? ""}”?`}
-        subtitle="This can't be undone. Records still used by schemes, blocks or listings can't be deleted."
+        subtitle="This can't be undone. Records still used by societies, blocks or listings can't be deleted."
         footer={
           <>
             <Button variant="ghost" onClick={() => setConfirm(null)}>
@@ -264,7 +264,7 @@ export default function BaseData() {
         }
       >
         <p className="text-sm text-ink-soft dark:text-slate-300">
-          {table === "cities" ? `${confirm?.schemes ?? 0} schemes and ${confirm?.properties ?? 0} listings use this city.` : table === "schemes" ? `${confirm?.blocks ?? 0} blocks and ${confirm?.properties ?? 0} listings use this scheme.` : "Listings in this block keep their scheme and city."}
+          {table === "cities" ? `${confirm?.schemes ?? 0} societies and ${confirm?.properties ?? 0} listings use this city.` : table === "schemes" ? `${confirm?.blocks ?? 0} blocks and ${confirm?.properties ?? 0} listings use this society.` : "Listings in this block keep their society and city."}
         </p>
       </Modal>
     </div>
@@ -326,7 +326,7 @@ function RecordForm({ table, record, cities, schemes, onClose, onSaved }: { tabl
     }
   };
 
-  const title = `${isNew ? "Add" : "Edit"} ${table === "cities" ? "city" : table === "schemes" ? "housing scheme" : "block / zone"}`;
+  const title = `${isNew ? "Add" : "Edit"} ${table === "cities" ? "city" : table === "schemes" ? "housing society" : "block / zone"}`;
   return (
     <Drawer open={!!record} onClose={onClose} title={title} width="max-w-xl">
       <div className="space-y-4 pb-24">
@@ -421,9 +421,9 @@ function RecordForm({ table, record, cities, schemes, onClose, onSaved }: { tabl
 
         {table === "blocks" && (
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Housing scheme *">
+            <Field label="Housing society *">
               <Select value={form.scheme_id ?? ""} onChange={(e) => set("scheme_id", e.target.value)}>
-                <option value="">Choose a scheme</option>
+                <option value="">Choose a society</option>
                 {schemes.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name} · {s.city}

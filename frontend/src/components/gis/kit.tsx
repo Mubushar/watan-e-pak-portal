@@ -1,6 +1,6 @@
 /**
  * Small building blocks shared by the GIS / insights pages (map explorer, insights,
- * news, schemes, city pages, projects). Local to src/components/gis.
+ * news, societies, city pages, projects). Local to src/components/gis.
  */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";

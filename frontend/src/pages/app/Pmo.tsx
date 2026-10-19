@@ -535,7 +535,7 @@ function NewProjectModal({ open, onClose, onCreated }: { open: boolean; onClose:
         <Field label="City">
           <Input value={f.city} onChange={set("city")} placeholder="Lahore" />
         </Field>
-        <Field label="Scheme / society">
+        <Field label="Housing society">
           <Input value={f.scheme} onChange={set("scheme")} placeholder="DHA Phase 6" />
         </Field>
         <Field label="Client">

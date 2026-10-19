@@ -80,14 +80,14 @@ export default function Schemes() {
     <div className="pb-16">
       <PageHeader
         image={HERO.panorama}
-        eyebrow="Housing schemes"
+        eyebrow="Housing societies"
         title={
           <>
             Explore every <span className="text-gradient">society & block</span>
           </>
         }
-        subtitle="Navigate the City → Scheme → Block hierarchy, see live listings on the map, and open GIS-grade analysis for any scheme."
-        crumbs={[{ label: "Home", to: "/" }, { label: "Schemes", to: "/schemes" }, ...(scheme ? [{ label: scheme.name }] : [])]}
+        subtitle="Navigate the City → Society → Block hierarchy, see live listings on the map, and open GIS-grade analysis for any society."
+        crumbs={[{ label: "Home", to: "/" }, { label: "Housing societies", to: "/schemes" }, ...(scheme ? [{ label: scheme.name }] : [])]}
       />
 
       <div className="container mt-8 grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
@@ -104,7 +104,7 @@ export default function Schemes() {
                 ) : schemesQ.error ? (
                   <ErrorState error={schemesQ.error} onRetry={() => schemesQ.refetch()} />
                 ) : !scheme ? (
-                  <EmptyState title="Scheme not found" hint="It may have been removed — pick another from the tree." action={<Button variant="outline" size="sm" onClick={() => select(null)}>Browse all schemes</Button>} />
+                  <EmptyState title="Society not found" hint="It may have been removed — pick another from the tree." action={<Button variant="outline" size="sm" onClick={() => select(null)}>Browse all societies</Button>} />
                 ) : (
                   <SchemeDetail scheme={scheme} h={hScheme} properties={(propsQ.data?.results ?? []).filter((p) => p.scheme_id === scheme.id)} propsLoading={propsQ.isLoading} onBack={() => select(null)} />
                 )}
@@ -141,7 +141,7 @@ function HierarchyTree({
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // expand the city / scheme holding the current selection
+  // expand the city / society holding the current selection
   useEffect(() => {
     if (!tree) return;
     setOpen((prev) => {
@@ -177,18 +177,18 @@ function HierarchyTree({
           </span>
           <span>
             <span className="block font-display text-sm font-bold text-ink dark:text-white">Hierarchy</span>
-            <span className="block text-[11px] text-ink-mute">City → Scheme → Block</span>
+            <span className="block text-[11px] text-ink-mute">City → Society → Block</span>
           </span>
         </span>
         <ChevronRight className={cn("h-4 w-4 text-ink-mute transition lg:hidden", mobileOpen && "rotate-90")} />
       </button>
       <div className={cn("p-3", !mobileOpen && "hidden lg:block")}>
-        <Input icon={<Search className="h-4 w-4" />} placeholder="Filter schemes or blocks" value={q} onChange={(e) => setQ(e.target.value)} />
+        <Input icon={<Search className="h-4 w-4" />} placeholder="Filter societies or blocks" value={q} onChange={(e) => setQ(e.target.value)} />
         <button
           onClick={() => onSelect(null)}
           className={cn("mt-2 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold transition", !selected ? "bg-brand-700 text-white" : "text-ink-soft hover:bg-brand-50 dark:text-slate-300 dark:hover:bg-white/5")}
         >
-          <Grid3x3 className="h-4 w-4" /> All schemes
+          <Grid3x3 className="h-4 w-4" /> All societies
         </button>
         <div className="mt-1 max-h-[60vh] overflow-y-auto pe-1">
           {loading ? (
@@ -214,7 +214,7 @@ function HierarchyTree({
                     <AnimatePresence initial={false}>
                       {cOpen && (
                         <motion.ul initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="ms-4 overflow-hidden border-s border-black/10 ps-2 dark:border-white/10">
-                          {!c.schemes.length && <li className="px-2 py-1.5 text-xs text-ink-mute">No schemes yet</li>}
+                          {!c.schemes.length && <li className="px-2 py-1.5 text-xs text-ink-mute">No societies yet</li>}
                           {c.schemes.map((sc) => (
                             <SchemeNode key={sc.id} sc={sc} active={sc.id === selected} expanded={open.has(sc.id) || !!s} onToggle={() => toggle(sc.id)} onSelect={() => onSelect(sc.id)} />
                           ))}
@@ -288,8 +288,8 @@ function BrowseAll({
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="section-eyebrow">Browse</p>
-          <h2 className="mt-1 font-display text-2xl font-bold text-brand-900 dark:text-white">All housing schemes</h2>
-          <p className="text-sm text-ink-mute">{schemes.length} schemes across {cities.length} cities</p>
+          <h2 className="mt-1 font-display text-2xl font-bold text-brand-900 dark:text-white">All housing societies</h2>
+          <p className="text-sm text-ink-mute">{schemes.length} societies across {cities.length} cities</p>
         </div>
         <div className="no-scrollbar flex gap-1.5 overflow-x-auto">
           {["", ...cities].map((c) => (
@@ -312,7 +312,7 @@ function BrowseAll({
       ) : error ? (
         <ErrorState error={error} onRetry={retry} />
       ) : !list.length ? (
-        <EmptyState title="No schemes yet" />
+        <EmptyState title="No societies yet" />
       ) : (
         <motion.div layout className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
           <AnimatePresence>
@@ -349,7 +349,7 @@ function BrowseAll({
                   ))}
                 </div>
                 <div className="flex items-center justify-between border-t border-black/5 px-4 py-2.5 text-xs font-semibold text-brand-700 dark:border-white/10 dark:text-brand-300">
-                  Explore scheme <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" />
+                  Explore society <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" />
                 </div>
               </motion.button>
             ))}
@@ -395,7 +395,7 @@ function SchemeDetail({
         <div className="absolute inset-0 bg-gradient-to-r from-brand-950 via-brand-950/80 to-brand-900/20 rtl:bg-gradient-to-l" />
         <div className="relative p-6 sm:p-8">
           <button onClick={onBack} className="inline-flex items-center gap-1 text-xs font-semibold text-white/70 transition hover:text-white">
-            <ArrowLeft className="h-3.5 w-3.5 rtl:rotate-180" /> All schemes
+            <ArrowLeft className="h-3.5 w-3.5 rtl:rotate-180" /> All societies
           </button>
           <p className="section-eyebrow mt-4 !text-gold-300">
             <Link to={`/cities/${encodeURIComponent(scheme.city)}`} className="hover:underline">
@@ -465,7 +465,7 @@ function SchemeDetail({
       {/* map + GIS analysis */}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
         <Card className="overflow-hidden">
-          <CardHeader title="On the map" subtitle="Scheme footprint and live listings" icon={<MapPin className="h-5 w-5" />} action={<Link to="/map" className="btn btn-ghost btn-sm"><Compass className="h-3.5 w-3.5" /> Explorer</Link>} />
+          <CardHeader title="On the map" subtitle="Society footprint and live listings" icon={<MapPin className="h-5 w-5" />} action={<Link to="/map" className="btn btn-ghost btn-sm"><Compass className="h-3.5 w-3.5" /> Explorer</Link>} />
           {anaQ.isLoading ? (
             <Skeleton className="h-[380px] rounded-none" />
           ) : (
@@ -561,7 +561,7 @@ function SchemeDetail({
               <ForecastChart scenarios={fc.scenarios} height={300} />
             </div>
           ) : (
-            <p className="py-6 text-center text-sm text-ink-mute">No forecast available for this scheme.</p>
+            <p className="py-6 text-center text-sm text-ink-mute">No forecast available for this society.</p>
           )}
         </CardBody>
       </Card>
@@ -584,7 +584,7 @@ function SchemeDetail({
             ))}
           </div>
         ) : !properties.length ? (
-          <EmptyState title="No live listings in this scheme" hint="Check back soon or browse nearby schemes." icon={<Users className="h-6 w-6" />} />
+          <EmptyState title="No live listings in this society" hint="Check back soon or browse nearby societies." icon={<Users className="h-6 w-6" />} />
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {properties.map((p) => (

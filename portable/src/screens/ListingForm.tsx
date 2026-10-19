@@ -307,9 +307,9 @@ export default function ListingForm() {
                     ))}
                   </Select>
                 </Field>
-                <Field label="Scheme / society" hint={f.city_id && !schemes.length ? "No registered schemes in this city yet — that's fine." : undefined}>
+                <Field label="Housing society" hint={f.city_id && !schemes.length ? "No registered societies in this city yet — that's fine." : undefined}>
                   <Select value={f.scheme_id} disabled={!schemes.length} onChange={(e) => set({ scheme_id: e.target.value, block_zone_area_id: "" })}>
-                    <option value="">{schemes.length ? "Choose a scheme (optional)" : "—"}</option>
+                    <option value="">{schemes.length ? "Choose a society (optional)" : "—"}</option>
                     {schemes.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.name}

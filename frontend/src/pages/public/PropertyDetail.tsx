@@ -832,7 +832,7 @@ export default function PropertyDetail() {
                         cols={3}
                         items={[
                           { label: "City", value: p.city_name ?? "—" },
-                          { label: "Scheme / society", value: p.scheme_name ?? "—" },
+                          { label: "Housing society", value: p.scheme_name ?? "—" },
                           { label: "Block / sector", value: p.block_name ?? p.sector ?? "—" },
                           { label: "Marla", value: p.marla_area ?? "—" },
                           { label: "Kanal", value: p.kanal_area ?? "—" },

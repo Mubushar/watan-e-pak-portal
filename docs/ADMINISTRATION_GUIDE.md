@@ -196,7 +196,7 @@ with its permission:
 | Property database | `/app/admin/properties` | `properties.manage` |
 | GIS layers | `/app/admin/gis-layers` | `gis.manage` |
 
-**Base data** — cities, housing schemes / societies and blocks / zones
+**Base data** — cities, housing societies / societies and blocks / zones
 (`/admin/basedata/{cities|schemes|blocks}`): add, edit and delete with validation (unique
 names, known approval statuses, sources). A city or scheme that is still in use can't be
 deleted (`409`). See `backend/README.md` › *Base data* for where the seed data comes from.
@@ -445,7 +445,7 @@ narrows the search. Names the bundled data doesn't know are looked up on Nominat
 `GEO_ONLINE_LOOKUP=1`.
 
 **Your own society data.** Staff can record what maps can't know: `development_status`,
-`approval_authority`, `possession_status`, `utilities` and `population` on a housing scheme
+`approval_authority`, `possession_status`, `utilities` and `population` on a housing society
 (`update_housing_scheme` MCP tool, or `PUT /schemes/{id}`). `area_info` includes them
 whenever the scheme matches.
 
@@ -494,7 +494,7 @@ georeferenced images (ground control points; about 10–20 m absolute accuracy).
 - **Outline and area statement.** The plan outline, plus the sheet's legend and
   area-statement text.
 
-**GIS registration.** At start-up each plan becomes a housing scheme (`DHA Phase II`, …)
+**GIS registration.** At start-up each plan becomes a housing society (`DHA Phase II`, …)
 with these GIS layers:
 - `boundary`: the plan outline;
 - `master_plan`: the outline plus the tile URL in `image_url`;

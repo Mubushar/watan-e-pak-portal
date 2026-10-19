@@ -99,7 +99,7 @@ export default function CityPage() {
             Property in <span className="text-gradient">{cityName}</span>
           </>
         }
-        subtitle={d?.city.description ?? `Listings, housing schemes, market trends and amenities across ${cityName}.`}
+        subtitle={d?.city.description ?? `Listings, housing societies, market trends and amenities across ${cityName}.`}
         crumbs={[{ label: "Home", to: "/" }, { label: "Insights", to: "/insights" }, { label: cityName }]}
         actions={
           <>
@@ -116,7 +116,7 @@ export default function CityPage() {
           <div className="mt-8 flex flex-wrap gap-3">
             {[
               ["Listings", d.property_count],
-              ["Schemes", d.schemes.length],
+              ["Societies", d.schemes.length],
               ["Mega projects", d.big_projects],
               ["Places mapped", pois.length],
             ].map(([l, v]) => (
@@ -152,7 +152,7 @@ export default function CityPage() {
         <motion.section {...fade}>
           <div className="mb-5 flex items-end justify-between gap-3">
             <div>
-              <p className="section-eyebrow">Housing schemes</p>
+              <p className="section-eyebrow">Housing societies</p>
               <h2 className="mt-1 font-display text-2xl font-bold text-brand-900 dark:text-white">Societies in {cityName}</h2>
             </div>
             <Link to="/schemes" className="link shrink-0 text-sm">
@@ -166,7 +166,7 @@ export default function CityPage() {
               ))}
             </div>
           ) : !d?.schemes.length ? (
-            <EmptyState title={`No schemes listed in ${cityName} yet`} icon={<Building2 className="h-6 w-6" />} />
+            <EmptyState title={`No societies listed in ${cityName} yet`} icon={<Building2 className="h-6 w-6" />} />
           ) : (
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {d.schemes.map((s, i) => (
@@ -356,7 +356,7 @@ export default function CityPage() {
                     <div className="absolute bottom-3 start-3 text-white">
                       <p className="font-display text-lg font-bold">{c.name}</p>
                       <p className="text-[11px] text-white/75">
-                        {c.properties} listings · {c.schemes} schemes
+                        {c.properties} listings · {c.schemes} societies
                       </p>
                     </div>
                   </Link>

@@ -415,7 +415,7 @@ export default function Insights() {
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold text-ink group-hover:text-brand-700 dark:text-white">{c.name}</span>
                     <span className="block text-[11px] text-ink-mute">
-                      {c.schemes} schemes · {compact(c.properties)} listings
+                      {c.schemes} societies · {compact(c.properties)} listings
                     </span>
                   </span>
                   <ArrowRight className="h-4 w-4 text-ink-mute transition group-hover:translate-x-0.5 rtl:rotate-180" />

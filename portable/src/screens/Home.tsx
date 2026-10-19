@@ -184,7 +184,7 @@ export default function Home() {
                 <div className="absolute bottom-2.5 start-3 text-white">
                   <p className="font-display font-bold">{c.name}</p>
                   <p className="text-[11px] text-white/75">
-                    {c.properties} listings · {c.schemes} schemes
+                    {c.properties} listings · {c.schemes} societies
                   </p>
                 </div>
               </Link>

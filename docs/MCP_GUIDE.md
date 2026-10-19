@@ -191,7 +191,7 @@ arguments. Five expert prompts build on the knowledge base and cite their source
 
 | Prompt | Argument | What it does |
 | --- | --- | --- |
-| `scheme_legality_check` | `scheme` | Is a housing scheme approved? Authority, status, sources, and what to verify before paying. |
+| `scheme_legality_check` | `scheme` | Is a housing society approved? Authority, status, sources, and what to verify before paying. |
 | `property_due_diligence` | `property_id` | Due-diligence checklist and findings for one listing. |
 | `comparative_market_analysis` | `property_id` | CMA: what a property is worth against nearby comparables. |
 | `mega_project_impact` | `place` | How infrastructure mega projects may affect land prices around a place. |

@@ -17,7 +17,7 @@ const NAV: Hit[] = [
   { group: "Go to", label: "Map explorer (GIS)", to: "/map", icon: <MapPin className="h-4 w-4" /> },
   { group: "Go to", label: "Infrastructure mega projects", to: "/infrastructure", icon: <MapPin className="h-4 w-4" /> },
   { group: "Go to", label: "CRM dashboard", to: "/app/crm-dashboard", icon: <MapPin className="h-4 w-4" /> },
-  { group: "Go to", label: "Base data — cities, housing schemes, blocks (admin)", to: "/app/admin/base-data", icon: <MapPin className="h-4 w-4" /> },
+  { group: "Go to", label: "Base data — cities, housing societies, blocks (admin)", to: "/app/admin/base-data", icon: <MapPin className="h-4 w-4" /> },
   { group: "Go to", label: "AI Hub & agents", to: "/ai", icon: <Sparkles className="h-4 w-4" /> },
   { group: "Go to", label: "Tools & calculators", to: "/tools", icon: <Wrench className="h-4 w-4" /> },
   { group: "Go to", label: "Market insights", to: "/insights", icon: <Landmark className="h-4 w-4" /> },
@@ -64,7 +64,7 @@ export function CommandPalette() {
     const add = (key: string, group: string, map: (x: any) => Omit<Hit, "group">) => (r[key] ?? []).forEach((x) => out.push({ group, ...map(x) }));
     add("properties", "Properties", (x) => ({ label: x.title, sub: `${x.city ?? ""} · ${x.category ?? ""}`, to: `/properties/${x.id}`, icon: <Home className="h-4 w-4" /> }));
     add("cities", "Cities", (x) => ({ label: x.name, sub: x.state, to: `/cities/${encodeURIComponent(x.name)}`, icon: <MapPin className="h-4 w-4" /> }));
-    add("schemes", "Schemes", (x) => ({ label: x.name, sub: x.city, to: `/schemes?scheme=${x.id}`, icon: <Building2 className="h-4 w-4" /> }));
+    add("schemes", "Societies", (x) => ({ label: x.name, sub: x.city, to: `/schemes?scheme=${x.id}`, icon: <Building2 className="h-4 w-4" /> }));
     add("big_projects", "Projects", (x) => ({ label: x.name, sub: x.city, to: `/projects`, icon: <Building2 className="h-4 w-4" /> }));
     add("news", "News", (x) => ({ label: x.title, sub: x.source, to: `/news`, icon: <Newspaper className="h-4 w-4" /> }));
     add("agents", "Agents", (x) => ({ label: x.name, sub: x.region, to: `/app/crm`, icon: <Users className="h-4 w-4" /> }));
@@ -111,7 +111,7 @@ export function CommandPalette() {
                   } else if (e.key === "Enter") go(hits[sel]);
                   else if (e.key === "Escape") setOpen(false);
                 }}
-                placeholder="Search cities, schemes, properties, news, tools…"
+                placeholder="Search cities, societies, properties, news, tools…"
                 className="h-14 flex-1 bg-transparent text-base outline-none placeholder:text-ink-mute"
               />
               <kbd className="kbd">ESC</kbd>

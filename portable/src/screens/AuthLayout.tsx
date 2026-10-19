@@ -7,7 +7,7 @@ import { Logo } from "@/components/ui";
 
 const PERKS: [typeof Bot, string][] = [
   [Bot, "Voice & chat AI assistant for buying, selling and investing"],
-  [MapPinned, "Verified listings across Pakistan's top cities and schemes"],
+  [MapPinned, "Verified listings across Pakistan's top cities and societies"],
   [LineChart, "Live prices, trends and investment insights"],
   [ShieldCheck, "Sign in with a one-time code — no password needed"],
 ];

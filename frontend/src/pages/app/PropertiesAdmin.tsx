@@ -513,7 +513,7 @@ function PropertyForm({ record, meta, onClose, onSaved }: { record: Row | null; 
                 ))}
               </Select>
             </Field>
-            <Field label="Housing scheme">
+            <Field label="Housing society">
               <Select value={current.scheme_id ?? ""} onChange={(e) => set({ scheme_id: e.target.value || null, block_zone_area_id: null })} disabled={!current.city_id}>
                 <option value="">None</option>
                 {schemes.map((s) => (

@@ -173,7 +173,7 @@ function Hero() {
             <span className="text-gradient">{t("Property with AI")}</span>
           </motion.h1>
           <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="mt-5 max-w-xl text-lg text-ink-soft dark:text-slate-300">
-            Explore verified properties, housing schemes and investment opportunities across Pakistan — with live market intelligence and AI agents at your side.
+            Explore verified properties, housing societies and investment opportunities across Pakistan — with live market intelligence and AI agents at your side.
           </motion.p>
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm font-semibold text-brand-800 dark:text-brand-100">
             {[
@@ -202,7 +202,7 @@ function Hero() {
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
-                  placeholder="Search city, housing scheme, block, area or property…"
+                  placeholder="Search city, housing society, block, area or property…"
                   className="h-12 w-full bg-transparent text-[15px] outline-none placeholder:text-ink-mute"
                 />
               </div>
@@ -342,7 +342,7 @@ function StatsBand() {
   const inv = s.data?.inventory;
   const items = [
     { icon: HomeIcon, value: inv?.properties ?? 0, label: "Live properties", suffix: "" },
-    { icon: MapPin, value: inv?.schemes ?? 0, label: "Housing schemes", suffix: "" },
+    { icon: MapPin, value: inv?.schemes ?? 0, label: "Housing societies", suffix: "" },
     { icon: Building2, value: inv?.cities ?? 0, label: "Major cities", suffix: "" },
     { icon: Landmark, value: Math.round((s.data?.portfolio.total_market_value ?? 0) / 10_000_000), label: "Crore market value", suffix: "+" },
   ];
@@ -547,7 +547,7 @@ function Cities() {
     <Section
       eyebrow="Explore Pakistan"
       title="Top cities"
-      subtitle="From Lahore’s heritage to Karachi’s coastline — dive into every city’s schemes, prices and growth."
+      subtitle="From Lahore’s heritage to Karachi’s coastline — dive into every city’s societies, prices and growth."
       action={
         <Link to="/schemes" className="btn btn-outline">
           All cities <ArrowRight className="h-4 w-4 rtl:rotate-180" />
@@ -574,7 +574,7 @@ function Cities() {
                 <p className="font-display text-xl font-bold">{c.name}</p>
                 <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/80">
                   <span className="inline-flex items-center gap-1">
-                    <Building className="h-3.5 w-3.5" /> {c.schemes} schemes
+                    <Building className="h-3.5 w-3.5" /> {c.schemes} societies
                   </span>
                   <span className="inline-flex items-center gap-1">
                     <MapPin className="h-3.5 w-3.5" /> {c.properties} listings

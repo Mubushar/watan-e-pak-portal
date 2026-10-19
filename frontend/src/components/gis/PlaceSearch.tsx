@@ -1,6 +1,6 @@
 /**
  * Google-style place / address search field with type-ahead suggestions.
- *   GET /geo/suggest?q=…   cities, housing schemes, listings, sectors / societies, places
+ *   GET /geo/suggest?q=…   cities, housing societies, listings, sectors / societies, places
  *   GET /geo/geocode?q=…   on Enter without a pick: local data, then OpenStreetMap (once)
  * Used by the map's search bar and the route finder's From / To fields.
  */

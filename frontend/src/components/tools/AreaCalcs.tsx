@@ -21,7 +21,7 @@ const UNIT_LABEL: Record<string, string> = Object.fromEntries(AREA_UNITS.map((u)
 
 const MARLA_STD = [
   { value: 272.25, label: "272.25 sqft (standard)" },
-  { value: 225, label: "225 sqft (old / some schemes)" },
+  { value: 225, label: "225 sqft (old / some societies)" },
 ];
 
 function MarlaChips({ value, onChange }: { value: number; onChange: (v: number) => void }) {
@@ -195,7 +195,7 @@ export function PlotDimensionsCalc() {
           <Field label="Unit">
             <Select value={unit} onChange={(e) => setUnit(e.target.value)} options={AREA_UNITS.slice(0, 5)} />
           </Field>
-          <NumField label="Depth : frontage ratio" value={ratio} onChange={setRatio} min={1} max={4} step={0.05} display={(v) => `${v.toFixed(2)} : 1`} hint="Typical scheme plots are ~1.8–2.25 : 1" />
+          <NumField label="Depth : frontage ratio" value={ratio} onChange={setRatio} min={1} max={4} step={0.05} display={(v) => `${v.toFixed(2)} : 1`} hint="Typical society plots are ~1.8–2.25 : 1" />
           <MarlaChips value={marla} onChange={setMarla} />
         </>
       }

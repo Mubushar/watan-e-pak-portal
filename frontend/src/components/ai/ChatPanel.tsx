@@ -104,7 +104,7 @@ export const SUGGESTIONS = [
 const WELCOME: Msg = {
   role: "assistant",
   content:
-    "Assalam-o-Alaikum! I’m **Arz-e-Pak AI**. Tell me what you’re looking for — city, budget, size or purpose — and I’ll search live listings, schemes and market data for you.",
+    "Assalam-o-Alaikum! I’m **Arz-e-Pak AI**. Tell me what you’re looking for — city, budget, size or purpose — and I’ll search live listings, societies and market data for you.",
 };
 
 export function ChatPanel({ compact, className, initial }: { compact?: boolean; className?: string; initial?: string }) {

@@ -4,7 +4,7 @@ import { usePrefs, type Lang } from "@/store/prefs";
 const UR: Record<string, string> = {
   Home: "ہوم",
   Properties: "جائیدادیں",
-  Schemes: "ہاؤسنگ اسکیمیں",
+  Schemes: "ہاؤسنگ سوسائٹیز",
   Map: "نقشہ",
   Insights: "مارکیٹ بصیرت",
   News: "خبریں",

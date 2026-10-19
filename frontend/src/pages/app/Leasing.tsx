@@ -824,7 +824,7 @@ function AddUnitModal({ open, onClose }: { open: boolean; onClose: () => void })
         <Field label="City">
           <Select value={f.city} onChange={(e) => set("city")(e.target.value)} options={["Lahore", "Karachi", "Islamabad", "Rawalpindi", "Faisalabad", "Multan", "Peshawar", "Quetta"]} />
         </Field>
-        <Field label="Scheme / area">
+        <Field label="Society / area">
           <Input value={f.scheme} onChange={(e) => set("scheme")(e.target.value)} placeholder="DHA Lahore" />
         </Field>
         <Field label="Bedrooms">

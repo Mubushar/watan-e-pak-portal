@@ -113,7 +113,7 @@ function Hero({ initial }: { initial?: string }) {
               </span>
               <div className="min-w-0">
                 <p className="font-display font-semibold">Arz-e-Pak AI</p>
-                <p className="text-xs text-ink-mute">RAG over live listings, schemes & market data</p>
+                <p className="text-xs text-ink-mute">RAG over live listings, societies & market data</p>
               </div>
               <Badge tone="gold" className="ms-auto hidden sm:inline-flex">
                 OpenAI-compatible
@@ -348,14 +348,14 @@ function RagSearch() {
     <Section eyebrow="Retrieval" title="Search the knowledge base" subtitle="The same retrieval index the assistant and agents ground their answers on.">
       <form onSubmit={submit} className="flex flex-col gap-2 sm:flex-row">
         <div className="flex-1">
-          <Input icon={<FileSearch className="h-4 w-4" />} placeholder="e.g. corner house in DHA Lahore, smart city schemes, commercial shop" value={input} onChange={(e) => setInput(e.target.value)} />
+          <Input icon={<FileSearch className="h-4 w-4" />} placeholder="e.g. corner house in DHA Lahore, smart city societies, commercial shop" value={input} onChange={(e) => setInput(e.target.value)} />
         </div>
         <Button type="submit" icon={<Search className="h-4 w-4" />} disabled={!input.trim()} loading={q.isFetching}>
           Search
         </Button>
       </form>
       <div className="mt-2 flex flex-wrap gap-1.5">
-        {["1 kanal house Lahore", "Islamabad schemes", "apartment under 5 crore"].map((s) => (
+        {["1 kanal house Lahore", "Islamabad societies", "apartment under 5 crore"].map((s) => (
           <button
             key={s}
             type="button"
@@ -400,7 +400,7 @@ function RagSearch() {
                   ))}
                 </div>
               ) : (
-                <EmptyState title="No matches" hint="Try a city, scheme or property type." />
+                <EmptyState title="No matches" hint="Try a city, society or property type." />
               )
             }
           </QueryState>

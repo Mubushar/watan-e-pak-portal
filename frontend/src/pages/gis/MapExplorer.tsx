@@ -1622,8 +1622,8 @@ function ReportsCard({ properties, cities, schemes, onOpen }: { properties: Prop
         </div>
         <div className="space-y-1.5">
           <Select value={sid} onChange={(e) => setSchemeId(e.target.value)} options={schemes.map((s) => ({ value: s.id, label: `${s.name} · ${s.city}` }))} />
-          <ReportButton disabled={!sid} onClick={() => sid && onOpen({ title: "Scheme investment outlook", path: `/gis/outlook/scheme/${sid}` })} icon={<Eye className="h-4 w-4" />}>
-            Scheme investment outlook
+          <ReportButton disabled={!sid} onClick={() => sid && onOpen({ title: "Society investment outlook", path: `/gis/outlook/scheme/${sid}` })} icon={<Eye className="h-4 w-4" />}>
+            Society investment outlook
           </ReportButton>
         </div>
         <div className="space-y-1.5">

@@ -390,7 +390,7 @@ function GenerateContentModal({ open, onClose, kinds }: { open: boolean; onClose
           />
         </Field>
         {!needsListing && (
-          <Field label="Topic" className="sm:col-span-2" hint="e.g. a city or scheme for a market report">
+          <Field label="Topic" className="sm:col-span-2" hint="e.g. a city or society for a market report">
             <Input value={f.topic} onChange={(e) => set("topic")(e.target.value)} placeholder="Lahore" />
           </Field>
         )}

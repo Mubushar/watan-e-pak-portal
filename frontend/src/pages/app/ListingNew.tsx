@@ -244,7 +244,7 @@ export default function ListingNew() {
                           ))}
                         </Select>
                       </Field>
-                      <Field label="Scheme / society">
+                      <Field label="Housing society">
                         <Select value={f.scheme_id} onChange={(e) => set({ scheme_id: e.target.value, block_zone_area_id: "" })} disabled={!schemes.length}>
                           <option value="">—</option>
                           {schemes.map((s) => (

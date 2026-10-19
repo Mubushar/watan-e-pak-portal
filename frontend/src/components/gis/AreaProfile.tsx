@@ -1,7 +1,7 @@
 /**
- * Area profile of a housing scheme / sector / neighbourhood (GET /areas/profile):
+ * Area profile of a housing society / sector / neighbourhood (GET /areas/profile):
  * population, development level and facilities from OpenStreetMap + Kontur, plus the
- * portal's own development details for registered schemes — which admins can edit
+ * portal's own development details for registered societies — which admins can edit
  * here (PUT /schemes/{id}).
  */
 import { useState } from "react";
@@ -132,7 +132,7 @@ export function AreaProfileCard({ schemeId, area }: { schemeId: string; area: st
             {d.sources && <p className="text-xs text-ink-mute">{d.sources}</p>}
           </>
         ) : (
-          <p className="text-sm text-ink-mute">{d?.note ?? "Area data (population, facilities) isn’t available for this scheme yet."}</p>
+          <p className="text-sm text-ink-mute">{d?.note ?? "Area data (population, facilities) isn’t available for this society yet."}</p>
         )}
       </CardBody>
       {editing && <EditSchemeModal schemeId={schemeId} facts={facts} onClose={() => setEditing(false)} />}
@@ -159,14 +159,14 @@ function EditSchemeModal({ schemeId, facts, onClose }: { schemeId: string; facts
         population: f.population ? Number(f.population) : undefined,
         utilities: f.utilities,
       }),
-    { invalidate: ["/areas/profile", "/schemes", "/hierarchy"], success: "Scheme details saved", onSuccess: onClose },
+    { invalidate: ["/areas/profile", "/schemes", "/hierarchy"], success: "Society details saved", onSuccess: onClose },
   );
   const toggle = (u: string) => setF((x) => ({ ...x, utilities: x.utilities.includes(u) ? x.utilities.filter((y) => y !== u) : [...x.utilities, u] }));
   return (
     <Modal
       open
       onClose={onClose}
-      title="Scheme development details"
+      title="Society development details"
       subtitle="Shown to buyers and used by the AI assistant."
       footer={
         <>

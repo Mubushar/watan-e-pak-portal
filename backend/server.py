@@ -16796,11 +16796,11 @@ init_sample_data()
 # ============================================================
 
 
-@mcp.prompt(name="scheme_legality_check", description="Is a housing scheme approved? Authority, status and sources.")
+@mcp.prompt(name="scheme_legality_check", description="Is a housing society approved? Authority, status and sources.")
 def prompt_scheme_legality_check(scheme: str) -> str:
     return (
-        f"Check the legal status of the housing scheme '{scheme}' for a buyer in Pakistan.\n"
-        "1. knowledge_search with types=['scheme'] for the scheme; note approval_status, the approving authority "
+        f"Check the legal status of the housing society '{scheme}' for a buyer in Pakistan.\n"
+        "1. knowledge_search with types=['scheme'] for the society; note approval_status, the approving authority "
         "(CDA, RDA, LDA, KDA, DHA act …), possession and the sources with their trust level.\n"
         "2. If the portal has no official source, or the information may be dated, use web_lookup on the authority's "
         "own list (e.g. RDA illegal societies, CDA approved schemes, LDA approved/illegal lists).\n"

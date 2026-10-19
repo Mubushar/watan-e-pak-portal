@@ -182,7 +182,7 @@ export default function Overview() {
         {(s) => (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <StatCard label="Market value" value={rs(s.portfolio.total_market_value)} icon={<Building2 className="h-5 w-5" />} hint={`avg ${pkrShort(s.portfolio.avg_price)}`} />
-            <StatCard label="Listings" value={num(s.inventory.properties)} icon={<LineChart className="h-5 w-5" />} hint={`${s.inventory.cities} cities · ${s.inventory.schemes} schemes`} tone="blue" />
+            <StatCard label="Listings" value={num(s.inventory.properties)} icon={<LineChart className="h-5 w-5" />} hint={`${s.inventory.cities} cities · ${s.inventory.schemes} societies`} tone="blue" />
             <StatCard label="Revenue" value={rs(s.finance.revenue)} icon={<CircleDollarSign className="h-5 w-5" />} hint="year to date" tone="gold" />
             <StatCard
               label="Net profit"

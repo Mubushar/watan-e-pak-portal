@@ -372,7 +372,7 @@ export function StudyReport({
                 </div>
                 {!!market.schemes?.length && (
                   <p className="mt-3 text-sm">
-                    <span className="font-semibold">Housing schemes:</span> {market.schemes.map((s: { name: string }) => s.name).join(", ")}
+                    <span className="font-semibold">Housing societies:</span> {market.schemes.map((s: { name: string }) => s.name).join(", ")}
                   </p>
                 )}
                 {!!market.listings_sample?.length && (

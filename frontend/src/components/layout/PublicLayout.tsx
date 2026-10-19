@@ -34,7 +34,7 @@ import { LangToggle, Logo, OfflineBanner, ThemeToggle, UserMenu } from "./Chrome
 const MAIN_NAV = [
   { to: "/", label: "Home", end: true },
   { to: "/properties", label: "Properties" },
-  { to: "/schemes", label: "Schemes" },
+  { to: "/schemes", label: "Societies" },
   { to: "/map", label: "Map" },
   { to: "/insights", label: "Insights" },
   { to: "/tools", label: "Tools" },
@@ -191,7 +191,7 @@ function Footer() {
   const email = ch.find((c) => c.channel_type === "email");
   const office = ch.find((c) => c.channel_type === "office" || c.channel_type === "address");
   const cols = [
-    { title: "Explore", links: [["Properties", "/properties"], ["Housing schemes", "/schemes"], ["Infrastructure", "/infrastructure"], ["Mega projects", "/projects"], ["Map explorer", "/map"], ["Compare", "/compare"]] },
+    { title: "Explore", links: [["Properties", "/properties"], ["Housing societies", "/schemes"], ["Infrastructure", "/infrastructure"], ["Mega projects", "/projects"], ["Map explorer", "/map"], ["Compare", "/compare"]] },
     { title: "Intelligence", links: [["Market insights", "/insights"], ["News & impact", "/news"], ["AI Hub", "/ai"], ["MCP console", "/ai/mcp"], ["Tools center", "/tools"]] },
     { title: "Company", links: [["About", "/pages/about"], ["Mission", "/pages/mission"], ["Careers", "/pages/careers"], ["Success stories", "/stories"], ["Pricing", "/pricing"]] },
     { title: "Help", links: [["How it works", "/pages/how-it-works"], ["FAQ", "/pages/faq"], ["Terms", "/pages/terms"], ["Privacy", "/pages/privacy"], ["Dashboard", "/app"]] },
