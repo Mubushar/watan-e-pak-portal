@@ -55,7 +55,7 @@ import { useSavedState } from "@/hooks/useSavedState";
 import { compact, num, pkrShort, titleCase } from "@/lib/format";
 import { coverImage } from "@/lib/images";
 import { cn } from "@/lib/utils";
-import { PortalMap, PIN_STYLES, pin, type BaseMapKey } from "@/components/map/PortalMap";
+import { PortalMap, PIN_STYLES, listingPin, pin, placePin, type BaseMapKey } from "@/components/map/PortalMap";
 import { Badge, BarList, Button, EmptyState, ErrorState, Input, ScoreRing, Select, Segmented, Skeleton, Slider, Tabs, Toggle } from "@/components/ui";
 import { ChipRow, FilterChip, MapClick, MiniStat, ReportButton, ReportModal, fitTo, type ReportRef } from "@/components/gis/kit";
 import { ZoomArea } from "@/components/gis/ZoomArea";
@@ -92,12 +92,6 @@ const LAYER_COLORS: Record<string, string> = {
 };
 const RING_COLORS = ["#146f45", "#c99a22", "#2c7fb8", "#7c3aed", "#e4572e"];
 
-function propKind(p: Property) {
-  if (p.featured) return "featured";
-  if (p.use_type === "commercial") return "commercial";
-  return "property";
-}
-
 /** Horizontal room taken by the desktop side panel. */
 const sidePad = () => (window.innerWidth >= 768 ? { start: 390 } : { bottom: Math.round(window.innerHeight * 0.45) });
 
@@ -129,7 +123,7 @@ export default function MapExplorer() {
   const [tab, setTab] = useState<TabKey>("properties");
   const [open, setOpen] = useState(true);
   // Layer choices are saved per user and come back on the next visit.
-  const [vis, setVis] = useSavedState<Vis>("map.vis", { props: true, pois: false, layers: true, aois: false, provinces: true, cities: true, districts: false, districtNames: true });
+  const [vis, setVis] = useSavedState<Vis>("map.vis.v2", { props: true, pois: true, layers: true, aois: false, provinces: true, cities: true, districts: false, districtNames: true });
   const [report, setReport] = useState<ReportRef | null>(null);
   const markerRefs = useRef(new Map<string, L.Marker>());
   const zoomMoved = useRef(false);
@@ -260,7 +254,7 @@ export default function MapExplorer() {
   const appLang = usePrefs((s) => s.lang);
   const [mapLang, setMapLang] = useSavedState<MapLang>("map.lang", appLang === "ur" ? "both" : "en");
   const nav = useNavigator();
-  const [osmCats, setOsmCats] = useSavedState<Set<string>>("map.poi", () => new Set());
+  const [osmCats, setOsmCats] = useSavedState<Set<string>>("map.poi.v2", () => new Set(POI_CATEGORIES.map((c) => c.key)));
   const [poiStatus, setPoiStatus] = useState<{ count: number; total: number; zoomIn: boolean } | null>(null);
   const togglePoiCat = (k: string, on: boolean) =>
     setOsmCats((s) => {
@@ -652,7 +646,7 @@ export default function MapExplorer() {
             <Marker
               key={p.id}
               position={[p.latitude!, p.longitude!]}
-              icon={pin(propKind(p))}
+              icon={listingPin(p)}
               ref={(m) => {
                 if (m) markerRefs.current.set(p.id, m);
               }}
@@ -667,7 +661,7 @@ export default function MapExplorer() {
         {vis.pois &&
           on("featured_places") &&
           pois.map((p) => (
-            <Marker key={p.id} position={[p.latitude, p.longitude]} icon={pin(PIN_STYLES[p.category] ? p.category : "other", { size: 28 })}>
+            <Marker key={p.id} position={[p.latitude, p.longitude]} icon={placePin(p.category)}>
               <Popup>
                 <PoiPopup p={p} />
               </Popup>
@@ -688,7 +682,7 @@ export default function MapExplorer() {
             ))}
             {(nearPropQ.data?.results ?? []).map((p) =>
               p.latitude != null && p.longitude != null ? (
-                <Marker key={`n-${p.id}`} position={[p.latitude, p.longitude]} icon={pin(propKind(p))}>
+                <Marker key={`n-${p.id}`} position={[p.latitude, p.longitude]} icon={listingPin(p)}>
                   <Popup>
                     <PropertyPopup p={p} />
                   </Popup>

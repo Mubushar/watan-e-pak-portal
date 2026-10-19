@@ -8,7 +8,8 @@
  *   MegaProjectCard    a project's details (used in map popups and the Infrastructure page)
  */
 import { Fragment } from "react";
-import { Circle, CircleMarker, Polygon, Polyline, Popup, Tooltip } from "react-leaflet";
+import { Circle, Marker, Polygon, Polyline, Popup, Tooltip } from "react-leaflet";
+import { iconPin } from "@/components/map/PortalMap";
 import { Link } from "react-router-dom";
 import { Building, CalendarRange, Construction, Factory, Landmark, Plane, Route, TrainFront, TramFront, type LucideIcon } from "lucide-react";
 import { useApi } from "@/hooks/useApi";
@@ -291,19 +292,11 @@ export function MegaProjectLayer({
               {tip}
               {popup}
             </Circle>
-            {zoom < 11 && (
-              <CircleMarker
-                center={g.center}
-                radius={6}
-                pathOptions={{
-                  color: "#fff",
-                  weight: 2,
-                  fillColor: color,
-                  fillOpacity: 1,
-                }}
-                interactive={false}
-              />
-            )}
+            {/* a pin with the project type's icon (tower, mall, interchange, zone …) */}
+            <Marker position={g.center} icon={iconPin(color, megaIcon(p.type), { size: zoom < 11 ? 26 : 32 })}>
+              {tip}
+              {popup}
+            </Marker>
           </Fragment>
         );
       })}

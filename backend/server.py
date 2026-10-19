@@ -16768,7 +16768,7 @@ def init_sample_data() -> None:
     # master plans, which are attached by default (an admin can still hide them) ----
     for layer in gis.GIS_LAYERS:
         layer.published = is_master_plan_layer(layer)
-    ensure_builtin_layers()
+    ensure_builtin_layers()  # the core overlays (DEFAULT_PUBLISHED) start published
 
 
 # ---------- the portal's built-in map overlays, registered as layers ----------
@@ -16798,8 +16798,14 @@ BUILTIN_LAYERS = [
 ]
 
 
+# Built-in overlays shown on the map from the start: listings, mega projects and places (an admin can
+# still hide them). Every other built-in overlay waits for an admin to publish it.
+DEFAULT_PUBLISHED = {"builtin:listings", "builtin:mega_projects", "builtin:osm_pois", "builtin:featured_places"}
+
+
 def ensure_builtin_layers() -> int:
-    """Make sure each built-in overlay has its layer record (new ones start unpublished)."""
+    """Make sure each built-in overlay has its layer record (new ones start unpublished, except the
+    core overlays in DEFAULT_PUBLISHED)."""
     have = {getattr(l, "geojson_ref", None) for l in gis.GIS_LAYERS}
     added = 0
     for z, (ref, name, kind, on, about, source) in enumerate(BUILTIN_LAYERS):
@@ -16807,7 +16813,7 @@ def ensure_builtin_layers() -> int:
             continue
         gis.GIS_LAYERS.append(gis.GeoLayer(name=name, layer_type=kind, entity_type="city", entity_id="pakistan",
                                            description=about, source_url=source, geojson_ref=ref, visible=on,
-                                           published=False, z_index=-100 + z, created_by="system"))
+                                           published=ref in DEFAULT_PUBLISHED, z_index=-100 + z, created_by="system"))
         added += 1
     return added
 
@@ -16827,14 +16833,22 @@ def _master_plan_names() -> set:
 def publish_master_plans_once(store: Any) -> int:
     """Databases saved before master plans were attached by default have them unpublished: publish
     them once (kept as an admin's choice afterwards — the flag stops it running again)."""
-    if store is None or store.kv_get("masterplans_published_v1") == "1":
-        return 0
     changed = 0
-    for layer in gis.GIS_LAYERS:
-        if is_master_plan_layer(layer) and not layer.published:
-            layer.published, layer.updated_at = True, datetime.now()
-            changed += 1
-    store.kv_set("masterplans_published_v1", "1")
+    if store is None:
+        return 0
+    if store.kv_get("masterplans_published_v1") != "1":
+        for layer in gis.GIS_LAYERS:
+            if is_master_plan_layer(layer) and not layer.published:
+                layer.published, layer.updated_at = True, datetime.now()
+                changed += 1
+        store.kv_set("masterplans_published_v1", "1")
+    # the core overlays (listings, mega projects, places) — once, then it's the admin's choice
+    if store.kv_get("core_layers_published_v1") != "1":
+        for layer in gis.GIS_LAYERS:
+            if getattr(layer, "geojson_ref", None) in DEFAULT_PUBLISHED and not layer.published:
+                layer.published, layer.updated_at = True, datetime.now()
+                changed += 1
+        store.kv_set("core_layers_published_v1", "1")
     if changed:
         store.mark_dirty()
     return changed

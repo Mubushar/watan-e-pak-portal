@@ -11,7 +11,7 @@ import { coverImage, HERO } from "@/lib/images";
 import { cn } from "@/lib/utils";
 import { Badge, Button, Drawer, EmptyState, ErrorState, RangeSlider, Segmented, Skeleton, Toggle } from "@/components/ui";
 import { CompareButton, FavoriteButton, NearbyNote, PropertyCard } from "@/components/property/PropertyCard";
-import { PortalMap, pin } from "@/components/map/PortalMap";
+import { PortalMap, listingPin } from "@/components/map/PortalMap";
 import { AdSlot } from "@/components/ads/AdSlot";
 import { UnitGroupCard } from "@/components/property/UnitGroupCard";
 import { floorOf, groupProjectUnits, isGroup, priceRange, projectNameOf, unitTypeOf } from "@/lib/projectGroups";
@@ -691,7 +691,7 @@ export default function Properties() {
             <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
               <PortalMap height="72vh" fit={pts.map((p) => [p.latitude!, p.longitude!])} scrollWheelZoom>
                 {pts.map((p) => (
-                  <Marker key={p.id} position={[p.latitude!, p.longitude!]} icon={pin(p.featured ? "featured" : p.use_type === "commercial" ? "commercial" : p.category === "plot" ? "plot" : "property", { label: pkrShort(p.price, false) })}>
+                  <Marker key={p.id} position={[p.latitude!, p.longitude!]} icon={listingPin(p, { label: pkrShort(p.price, false) })}>
                     <Popup>
                       <Link to={`/properties/${p.id}`}>
                         <img src={coverImage(p)} alt="" className="h-28 w-full object-cover" />

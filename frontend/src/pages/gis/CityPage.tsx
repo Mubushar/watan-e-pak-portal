@@ -10,7 +10,7 @@ import { cityImage, sized, themedImage } from "@/lib/images";
 import { ButtonLink, Badge, Card, CardBody, CardHeader, Carousel, EmptyState, ErrorState, PageHeader, ScoreRing, Skeleton, StatCard } from "@/components/ui";
 import { Donut, Legendish } from "@/components/ui/charts";
 import { PropertyCard } from "@/components/property/PropertyCard";
-import { PortalMap, PIN_STYLES, pin } from "@/components/map/PortalMap";
+import { PortalMap, PIN_STYLES, pin, listingPin } from "@/components/map/PortalMap";
 import { AdSlot } from "@/components/ads/AdSlot";
 import { FactorBars, ForecastChart, backendError, bandTone, entriesToDonut } from "@/components/gis/kit";
 import type { MarketTrends, Poi } from "@/components/gis/types";
@@ -265,7 +265,7 @@ export default function CityPage() {
               <PortalMap height={420} className="rounded-none" center={d ? [d.city.latitude, d.city.longitude] : undefined} zoom={d ? 11 : 5} fit={mapPts.length ? mapPts : undefined}>
                 {props.map((p) =>
                   p.latitude != null && p.longitude != null ? (
-                    <Marker key={p.id} position={[p.latitude, p.longitude]} icon={pin(p.featured ? "featured" : p.use_type === "commercial" ? "commercial" : "property")}>
+                    <Marker key={p.id} position={[p.latitude, p.longitude]} icon={listingPin(p)}>
                       <Popup>
                         <div className="p-3">
                           <p className="text-sm font-semibold">{p.title}</p>

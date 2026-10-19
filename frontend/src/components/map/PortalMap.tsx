@@ -7,10 +7,11 @@
  *
  * Children are any react-leaflet layers. `fit` auto-fits the view to points.
  */
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createElement, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import L from "leaflet";
 import { MapContainer, TileLayer, useMap } from "react-leaflet";
-import { Layers } from "lucide-react";
+import { BedDouble, BookOpen, Briefcase, Building, Building2, Bus, Dumbbell, Fuel, HeartPulse, Home, Landmark, LandPlot, Layers, MapPin, ShoppingBag, Store, Trees, Utensils, Wallet, Warehouse, type LucideIcon } from "lucide-react";
 import { cn, escapeHtml } from "@/lib/utils";
 
 export const BASE_MAPS = {
@@ -71,6 +72,88 @@ export function pin(kind: string = "property", opts: { label?: string; size?: nu
   const icon = L.divIcon({ html, className: "arz-pin", iconSize: [size, size + 8], iconAnchor: [size / 2, size + 6], popupAnchor: [0, -size] });
   iconCache.set(key, icon);
   return icon;
+}
+
+// ------------------------------------------------------------------ vector icon pins
+
+const svgCache = new Map<string, string>();
+/** A Lucide icon as an SVG string (white, for drawing inside pins and badges). */
+export function iconSvg(Icon: LucideIcon, size = 16, color = "#ffffff"): string {
+  const key = `${Icon.displayName ?? Icon.name}|${size}|${color}`;
+  let svg = svgCache.get(key);
+  if (!svg) {
+    svg = renderToStaticMarkup(createElement(Icon, { size, color, strokeWidth: 2.25 }));
+    svgCache.set(key, svg);
+  }
+  return svg;
+}
+
+/** A map pin in `color` with a vector icon in it (crisper than emoji, same on every device). */
+export function iconPin(color: string, Icon: LucideIcon, opts: { size?: number; label?: string; pulse?: boolean; star?: boolean } = {}): L.DivIcon {
+  const size = opts.size ?? 34;
+  const key = `ip|${color}|${Icon.displayName ?? Icon.name}|${size}|${opts.label ?? ""}|${opts.pulse ? 1 : 0}|${opts.star ? 1 : 0}`;
+  const hit = iconCache.get(key);
+  if (hit) return hit;
+  const g = Math.round(size * 0.46);
+  const html = `
+    <div style="position:relative;width:${size}px;height:${size + 8}px">
+      ${opts.pulse ? `<span style="position:absolute;left:50%;top:${size / 2}px;width:${size}px;height:${size}px;margin:-${size / 2}px 0 0 -${size / 2}px;border-radius:9999px;background:${color};opacity:.35" class="animate-pulse-ring"></span>` : ""}
+      <svg viewBox="0 0 40 48" width="${size}" height="${size + 8}" style="position:absolute;inset:0;filter:drop-shadow(0 4px 6px rgba(0,0,0,.3))">
+        <path d="M20 47s16-14.6 16-27A16 16 0 0 0 4 20c0 12.4 16 27 16 27z" fill="${color}" stroke="#fff" stroke-width="2.5"/>
+      </svg>
+      <span style="position:absolute;left:0;right:0;top:${Math.round(size * 0.2)}px;display:flex;justify-content:center;line-height:0">${iconSvg(Icon, g)}</span>
+      ${opts.star ? `<span style="position:absolute;right:-3px;top:-3px;width:15px;height:15px;border-radius:9999px;background:#f2c94c;border:2px solid #fff;color:#5c4407;font:700 9px/11px sans-serif;text-align:center">★</span>` : ""}
+      ${opts.label ? `<span style="position:absolute;left:50%;top:-22px;transform:translateX(-50%);white-space:nowrap;background:#fff;color:#0c472e;font:600 11px/1 'Plus Jakarta Sans',sans-serif;padding:4px 7px;border-radius:999px;box-shadow:0 2px 6px rgba(0,0,0,.2)">${escapeHtml(opts.label)}</span>` : ""}
+    </div>`;
+  const icon = L.divIcon({ html, className: "arz-pin", iconSize: [size, size + 8], iconAnchor: [size / 2, size + 6], popupAnchor: [0, -size] });
+  iconCache.set(key, icon);
+  return icon;
+}
+
+/** A small round badge with a vector icon (places / points of interest). */
+export function iconBadge(color: string, Icon: LucideIcon, size = 24): L.DivIcon {
+  const key = `ib|${color}|${Icon.displayName ?? Icon.name}|${size}`;
+  const hit = iconCache.get(key);
+  if (hit) return hit;
+  const html = `<div style="width:${size}px;height:${size}px;border-radius:9999px;background:${color};border:2px solid #fff;box-shadow:0 2px 5px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center">${iconSvg(Icon, Math.round(size * 0.55))}</div>`;
+  const icon = L.divIcon({ html, className: "arz-badge", iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -size / 2] });
+  iconCache.set(key, icon);
+  return icon;
+}
+
+/** Listing pins: the icon says what it is, the colour says how it is used; featured get a star. */
+export const LISTING_ICONS: Record<string, LucideIcon> = {
+  house: Home, villa: Home, farmhouse: Home, apartment: Building2, flat: Building2, plot: LandPlot,
+  shop: Store, office: Briefcase, floor: Layers, portion: Layers, building: Building, space: Warehouse, warehouse: Warehouse, shed: Warehouse,
+};
+export function listingPin(p: { category?: string | null; use_type?: string | null; featured?: boolean | null }, opts: { size?: number; label?: string } = {}): L.DivIcon {
+  const cat = (p.category ?? "").toLowerCase();
+  const color = p.featured ? "#b8860b" : cat === "plot" ? "#8a5a35" : p.use_type === "commercial" ? "#2c7fb8" : "#0f5a39";
+  return iconPin(color, LISTING_ICONS[cat] ?? MapPin, { ...opts, star: !!p.featured });
+}
+
+/** Places (points of interest) by category. */
+export const PLACE_ICONS: Record<string, { color: string; icon: LucideIcon }> = {
+  education: { color: "#2563eb", icon: BookOpen },
+  worship: { color: "#059669", icon: Landmark },
+  health: { color: "#dc2626", icon: HeartPulse },
+  shopping: { color: "#db2777", icon: ShoppingBag },
+  park: { color: "#16a34a", icon: Trees },
+  bank: { color: "#0d9488", icon: Wallet },
+  restaurant: { color: "#ea580c", icon: Utensils },
+  transport: { color: "#7c3aed", icon: Bus },
+  fuel: { color: "#64748b", icon: Fuel },
+  government: { color: "#1e3a8a", icon: Building },
+  hotel: { color: "#9333ea", icon: BedDouble },
+  sports: { color: "#65a30d", icon: Dumbbell },
+};
+export function placeBadge(category: string, size = 24): L.DivIcon {
+  const c = PLACE_ICONS[category] ?? { color: "#475569", icon: MapPin };
+  return iconBadge(c.color, c.icon, size);
+}
+export function placePin(category: string, size = 30): L.DivIcon {
+  const c = PLACE_ICONS[category] ?? { color: "#475569", icon: MapPin };
+  return iconPin(c.color, c.icon, { size });
 }
 
 function FitPoints({ points, maxZoom = 14 }: { points: [number, number][]; maxZoom?: number }) {

@@ -30,7 +30,7 @@ import { HERO, sized, themedImage } from "@/lib/images";
 import { cn } from "@/lib/utils";
 import { Badge, Button, Card, CardBody, CardHeader, EmptyState, ErrorState, Input, JsonView, PageHeader, ScoreRing, Skeleton, StatCard } from "@/components/ui";
 import { PropertyCard } from "@/components/property/PropertyCard";
-import { PortalMap, pin } from "@/components/map/PortalMap";
+import { PortalMap, listingPin } from "@/components/map/PortalMap";
 import { AreaProfileCard } from "@/components/gis/AreaProfile";
 import { FactorBars, ForecastChart, MiniStat, ReportButton, ReportModal, bandTone, type ReportRef } from "@/components/gis/kit";
 import type { GisAreaAnalysis, HierarchyCity, HierarchyScheme, Scenarios } from "@/components/gis/types";
@@ -474,7 +474,7 @@ function SchemeDetail({
               {ana?.geometry && <GeoJSON key={scheme.id} data={ana.geometry} style={() => ({ color: "#c99a22", weight: 3, fillColor: "#c99a22", fillOpacity: 0.12, dashArray: "6 4" })} />}
               {properties.map((p) =>
                 p.latitude != null && p.longitude != null ? (
-                  <Marker key={p.id} position={[p.latitude, p.longitude]} icon={pin(p.featured ? "featured" : p.use_type === "commercial" ? "commercial" : "property")}>
+                  <Marker key={p.id} position={[p.latitude, p.longitude]} icon={listingPin(p)}>
                     <Popup>
                       <div className="p-3">
                         <p className="text-sm font-semibold">{p.title}</p>

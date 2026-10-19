@@ -4,7 +4,7 @@ import { Marker, Popup } from "react-leaflet";
 import type { Property } from "@/types";
 import { pkrShort } from "@/lib/format";
 import { coverImage } from "@/lib/images";
-import { PortalMap, pin } from "@/components/map/PortalMap";
+import { PortalMap, pin, listingPin } from "@/components/map/PortalMap";
 
 export interface HomePoi {
   id: string;
@@ -19,7 +19,7 @@ export default function HomeMap({ pts, pois, layers, fit }: { pts: Property[]; p
     <PortalMap height={420} fit={fit} className="rounded-none" scrollWheelZoom={false}>
       {layers.includes("property") &&
         pts.map((p) => (
-          <Marker key={p.id} position={[p.latitude!, p.longitude!]} icon={pin(p.featured ? "featured" : p.use_type === "commercial" ? "commercial" : "property")}>
+          <Marker key={p.id} position={[p.latitude!, p.longitude!]} icon={listingPin(p)}>
             <Popup>
               <Link to={`/properties/${p.id}`} className="block">
                 <img src={coverImage(p)} alt="" className="h-28 w-full object-cover" />

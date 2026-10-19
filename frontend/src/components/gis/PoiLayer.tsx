@@ -1,12 +1,14 @@
 /**
  * Points of interest from the portal's OpenStreetMap place data (GET /geo/places): schools,
  * mosques, hospitals, markets, parks, banks … in the visible area, reloaded as you pan.
- * Dots on one canvas (cheap even for 1,500 places), names written on the map when zoomed in.
+ * Coloured dots on one canvas while zoomed out (cheap even for 1,500 places); from street level
+ * (zoom 15) each place gets its category icon; names are written on the map when zoomed in.
  */
 import { useEffect, useMemo, useState } from "react";
 import L from "leaflet";
 import type { FeatureCollection } from "geojson";
-import { CircleMarker, Tooltip, useMap } from "react-leaflet";
+import { CircleMarker, Marker, Tooltip, useMap } from "react-leaflet";
+import { iconBadge } from "@/components/map/PortalMap";
 import { BookOpen, Building, Bus, Fuel, HeartPulse, Landmark, ShoppingBag, Trees, Utensils, Wallet, type LucideIcon } from "lucide-react";
 import { get } from "@/lib/api";
 import { PlanLabels } from "./MasterPlans";
@@ -25,6 +27,9 @@ export const POI_CATEGORIES: { key: string; label: string; color: string; icon: 
   { key: "government", label: "Government", color: "#1e3a8a", icon: Building },
 ];
 const COLOR = Object.fromEntries(POI_CATEGORIES.map((c) => [c.key, c.color]));
+const ICON = Object.fromEntries(POI_CATEGORIES.map((c) => [c.key, c.icon]));
+/** From this zoom places show their category icon instead of a dot. */
+export const POI_ICON_ZOOM = 15;
 export const POI_MIN_ZOOM = 14;
 
 interface Place {
@@ -93,7 +98,15 @@ export function PoiLayer({ categories, onStatus, lang = "en" }: { categories: Se
 
   return (
     <>
-      {places.map((p, i) => (
+      {zoom >= POI_ICON_ZOOM &&
+        places.map((p, i) => (
+          <Marker key={`i${p.lat},${p.lon},${i}`} position={[p.lat, p.lon]} icon={iconBadge(COLOR[p.category] ?? "#475569", ICON[p.category] ?? Building, zoom >= 17 ? 26 : 22)}>
+            <Tooltip direction="top" offset={[0, -10]}>
+              <b>{labelText(p.name, p.name_ur, lang)}</b> · {p.kind_label}
+            </Tooltip>
+          </Marker>
+        ))}
+      {zoom < POI_ICON_ZOOM && places.map((p, i) => (
         <CircleMarker
           key={`${p.lat},${p.lon},${i}`}
           center={[p.lat, p.lon]}
