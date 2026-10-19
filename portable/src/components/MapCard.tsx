@@ -9,7 +9,7 @@ import type { Map as LeafletMap } from "leaflet";
 import type { MapView } from "@/types";
 import { pkrShort } from "@/lib/format";
 import { apiBase } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { cn, escapeHtml as esc } from "@/lib/utils";
 
 const GROUPS: Record<string, { label: string; color: string; glyph: string }> = {
   school: { label: "School", color: "#2563eb", glyph: "🏫" },
@@ -44,8 +44,6 @@ const group = (g: string) => GROUPS[g] ?? { label: g, color: "#475569", glyph: "
 const pin = (color: string, glyph: string, size = 30) =>
   `<div style="width:${size}px;height:${size}px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${color};border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);display:grid;place-items:center">` +
   `<span style="transform:rotate(45deg);font-size:${Math.round(size * 0.5)}px;line-height:1">${glyph}</span></div>`;
-
-const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 export function MapCard({ view, className, height = 260 }: { view: MapView; className?: string; height?: number }) {
   const el = useRef<HTMLDivElement>(null);
@@ -84,13 +82,13 @@ export function MapCard({ view, className, height = 260 }: { view: MapView; clas
           const g = group(p.group);
           L.marker([p.latitude, p.longitude], { icon: L.divIcon({ className: "", html: pin(g.color, g.glyph), iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -26] }) })
             .addTo(m)
-            .bindPopup(`<b>${esc(p.name)}</b><br>${esc(g.label)}${p.distance_km != null ? ` · ${p.distance_km} km (~${p.walk_minutes} min walk)` : ""}`);
+            .bindPopup(`<b>${esc(p.name)}</b><br>${esc(g.label)}${p.distance_km != null ? ` · ${esc(p.distance_km)} km (~${esc(p.walk_minutes)} min walk)` : ""}`);
           bounds.extend([p.latitude, p.longitude]);
         }
         for (const l of view.listings ?? []) {
           L.marker([l.latitude, l.longitude], { icon: L.divIcon({ className: "", html: pin("#065f46", "🏠"), iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -26] }) })
             .addTo(m)
-            .bindPopup(`<b>${esc(l.name)}</b><br>${esc(pkrShort(l.price))} · ${l.distance_km} km`);
+            .bindPopup(`<b>${esc(l.name)}</b><br>${esc(pkrShort(l.price))} · ${esc(l.distance_km)} km`);
           bounds.extend([l.latitude, l.longitude]);
         }
         m.fitBounds(bounds.pad(0.15), { maxZoom: 16 });

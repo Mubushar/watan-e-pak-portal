@@ -1,6 +1,8 @@
 import { RequirePermission } from "@/components/layout/RequirePermission";
-import { lazy, Suspense, type ComponentType } from "react";
-import { Route, Routes } from "react-router-dom";
+import { lazy, Suspense, useEffect, useRef, type ComponentType } from "react";
+import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import { onSessionExpired } from "@/store/auth";
 import { PublicLayout } from "@/components/layout/PublicLayout";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { CommandPalette } from "@/components/layout/CommandPalette";
@@ -59,6 +61,9 @@ const P: Record<string, ComponentType> = {
   NotFound: lazy(() => import("@/pages/NotFound")),
 };
 
+/** Any of these opens Administration (users, roles, settings); the API checks each call. */
+const ADMIN_PERMS = ["users.view", "settings.manage"];
+
 function Fallback() {
   return (
     <div className="flex min-h-[60vh] items-center justify-center">
@@ -67,10 +72,30 @@ function Fallback() {
   );
 }
 
+/** A session that ends on its own (401 from the API, or the token expired) leaves the user signed out:
+ *  dashboard pages redirect to sign-in themselves; elsewhere a toast offers to sign back in. */
+function SessionExpiryNotice() {
+  const nav = useNavigate();
+  const loc = useLocation();
+  const here = useRef(loc.pathname + loc.search);
+  here.current = loc.pathname + loc.search;
+  useEffect(
+    () =>
+      onSessionExpired(() =>
+        toast.info("Your session has ended — please sign in again.", {
+          action: { label: "Sign in", onClick: () => nav(`/login?next=${encodeURIComponent(here.current)}`) },
+        }),
+      ),
+    [nav],
+  );
+  return null;
+}
+
 export default function App() {
   return (
     <>
       <PrefsSync />
+      <SessionExpiryNotice />
       <CommandPalette />
       <Suspense fallback={<Fallback />}>
         <Routes>
@@ -105,17 +130,17 @@ export default function App() {
             <Route path="agents" element={<P.AgentOps />} />
             <Route path="crm-dashboard" element={<RequirePermission perm="crm.view" area="the CRM"><P.CrmDashboard /></RequirePermission>} />
             <Route path="crm" element={<RequirePermission perm="crm.view" area="the CRM"><P.Crm /></RequirePermission>} />
-            <Route path="accounting" element={<P.Accounting />} />
-            <Route path="transactions" element={<P.Transactions />} />
+            <Route path="accounting" element={<RequirePermission perm="accounting.view" area="Accounting"><P.Accounting /></RequirePermission>} />
+            <Route path="transactions" element={<RequirePermission perm="crm.view" area="Transactions"><P.Transactions /></RequirePermission>} />
             <Route path="leasing" element={<P.Leasing />} />
             <Route path="maintenance" element={<P.Maintenance />} />
             <Route path="marketing" element={<RequirePermission perm="crm.view" area="Marketing"><P.Marketing /></RequirePermission>} />
-            <Route path="pmo" element={<P.Pmo />} />
-            <Route path="pmo/:id" element={<P.PmoProject />} />
+            <Route path="pmo" element={<RequirePermission perm="projects.view" area="Projects (PMO)"><P.Pmo /></RequirePermission>} />
+            <Route path="pmo/:id" element={<RequirePermission perm="projects.view" area="Projects (PMO)"><P.PmoProject /></RequirePermission>} />
             <Route path="messages" element={<P.Messages />} />
-            <Route path="ads" element={<P.Ads />} />
+            <Route path="ads" element={<RequirePermission perm="ads.view" area="Advertising"><P.Ads /></RequirePermission>} />
             <Route path="construction" element={<P.Construction />} />
-            <Route path="admin" element={<P.Admin />} />
+            <Route path="admin" element={<RequirePermission perm={ADMIN_PERMS} area="Users & roles"><P.Admin /></RequirePermission>} />
             <Route path="admin/base-data" element={<RequirePermission perm="basedata.manage" area="base data"><P.BaseData /></RequirePermission>} />
             <Route path="profile" element={<P.Profile />} />
             <Route path="listings" element={<P.MyListings />} />

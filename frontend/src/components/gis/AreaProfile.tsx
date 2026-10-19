@@ -47,7 +47,8 @@ const POSSESSION = ["possession given", "partial", "not yet"];
 const UTILITIES = ["electricity", "gas", "water", "sewerage", "fibre internet", "underground wiring"];
 
 export function AreaProfileCard({ schemeId, area }: { schemeId: string; area: string }) {
-  const canEdit = useAuth((s) => s.hasRole("super_admin", "admin"));
+  // Editing writes PUT /schemes/{id}, which the API allows to holders of basedata.manage.
+  const canEdit = useAuth((s) => s.can("basedata.manage"));
   const [editing, setEditing] = useState(false);
   // 503 when the geodata isn't installed: the card then only shows the portal's own facts.
   const q = useApi<AreaProfileResult>("/areas/profile", { area }, { retry: false, staleTime: 10 * 60_000 });

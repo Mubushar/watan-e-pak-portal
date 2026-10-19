@@ -162,6 +162,12 @@ export default function SignUp() {
                 );
               })}
             </div>
+            {/* Mirrors the server: agent / developer are requested at sign-up and granted by an admin. */}
+            <p className={cn("mt-4 rounded-xl p-3 text-xs", role === "agent" ? "bg-gold-50 text-gold-900 dark:bg-gold-500/10 dark:text-gold-100" : "text-ink-mute dark:text-slate-400")}>
+              {role === "agent"
+                ? "Agent accounts are approved by an administrator. You’ll start as a regular member and get agent access once your request is approved."
+                : "Agent and developer accounts are approved by an administrator."}
+            </p>
             <Button size="lg" className="mt-6 w-full" onClick={() => setStep("details")}>
               Continue as {SIGNUP_ROLES.find((r) => r.value === role)?.label}
             </Button>

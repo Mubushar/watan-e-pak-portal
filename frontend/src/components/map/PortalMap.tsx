@@ -11,7 +11,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import L from "leaflet";
 import { MapContainer, TileLayer, useMap } from "react-leaflet";
 import { Layers } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, escapeHtml } from "@/lib/utils";
 
 export const BASE_MAPS = {
   streets: { label: "Streets", url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", attribution: "© OpenStreetMap" },
@@ -66,7 +66,7 @@ export function pin(kind: string = "property", opts: { label?: string; size?: nu
         <path d="M20 47s16-14.6 16-27A16 16 0 0 0 4 20c0 12.4 16 27 16 27z" fill="${s.color}" stroke="#fff" stroke-width="2.5"/>
       </svg>
       <span style="position:absolute;left:0;right:0;top:${size * 0.18}px;text-align:center;font-size:${size * 0.4}px;line-height:1;color:#fff">${s.glyph}</span>
-      ${opts.label ? `<span style="position:absolute;left:50%;top:-22px;transform:translateX(-50%);white-space:nowrap;background:#fff;color:#0c472e;font:600 11px/1 'Plus Jakarta Sans',sans-serif;padding:4px 7px;border-radius:999px;box-shadow:0 2px 6px rgba(0,0,0,.2)">${opts.label}</span>` : ""}
+      ${opts.label ? `<span style="position:absolute;left:50%;top:-22px;transform:translateX(-50%);white-space:nowrap;background:#fff;color:#0c472e;font:600 11px/1 'Plus Jakarta Sans',sans-serif;padding:4px 7px;border-radius:999px;box-shadow:0 2px 6px rgba(0,0,0,.2)">${escapeHtml(opts.label)}</span>` : ""}
     </div>`;
   const icon = L.divIcon({ html, className: "arz-pin", iconSize: [size, size + 8], iconAnchor: [size / 2, size + 6], popupAnchor: [0, -size] });
   iconCache.set(key, icon);

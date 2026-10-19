@@ -43,9 +43,12 @@ interface NavItem {
   icon: LucideIcon;
   end?: boolean;
   badge?: number;
-  /** Shown only to users with this permission. */
-  perm?: string;
+  /** Shown only to users with this permission (or any of these). */
+  perm?: string | string[];
 }
+
+/** Permissions that open Administration → Users & roles (matches the route guard in App.tsx). */
+const ADMIN_PERMS = ["users.view", "settings.manage"];
 
 export function useDashboardNav(unread: number): { title: string; items: NavItem[] }[] {
   const can = useAuth((s) => s.can);
@@ -66,7 +69,7 @@ export function useDashboardNav(unread: number): { title: string; items: NavItem
         { to: "/app/crm", label: "CRM", icon: Users, perm: "crm.view" },
         { to: "/app/listings", label: "My listings", icon: Building2, end: true },
         { to: "/app/listings/new", label: "List a property", icon: PlusSquare },
-        { to: "/app/transactions", label: "Transactions", icon: FileSignature },
+        { to: "/app/transactions", label: "Transactions", icon: FileSignature, perm: "crm.view" },
         { to: "/app/leasing", label: "Leasing", icon: KeyRound },
         { to: "/app/marketing", label: "Marketing", icon: Target, perm: "crm.view" },
       ],
@@ -74,14 +77,14 @@ export function useDashboardNav(unread: number): { title: string; items: NavItem
     {
       title: "Finance & Ads",
       items: [
-        { to: "/app/accounting", label: "Accounting", icon: Calculator },
-        { to: "/app/ads", label: "Advertising", icon: Megaphone },
+        { to: "/app/accounting", label: "Accounting", icon: Calculator, perm: "accounting.view" },
+        { to: "/app/ads", label: "Advertising", icon: Megaphone, perm: "ads.view" },
       ],
     },
     {
       title: "Delivery",
       items: [
-        { to: "/app/pmo", label: "Projects (PMO)", icon: BriefcaseBusiness },
+        { to: "/app/pmo", label: "Projects (PMO)", icon: BriefcaseBusiness, perm: "projects.view" },
         { to: "/app/construction", label: "Construction", icon: HardHat },
         { to: "/app/maintenance", label: "Maintenance", icon: Wrench },
       ],
@@ -89,13 +92,14 @@ export function useDashboardNav(unread: number): { title: string; items: NavItem
     {
       title: "Administration",
       items: [
-        { to: "/app/admin", label: "Users & roles", icon: ShieldCheck, end: true },
+        { to: "/app/admin", label: "Users & roles", icon: ShieldCheck, end: true, perm: ADMIN_PERMS },
         { to: "/app/admin/base-data", label: "Base data", icon: Database, perm: "basedata.manage" },
         { to: "/app/profile", label: "Profile", icon: UserRound },
       ],
     },
   ];
-  return groups.map((g) => ({ ...g, items: g.items.filter((i) => !i.perm || can(i.perm)) })).filter((g) => g.items.length);
+  const allowed = (p?: string | string[]) => !p || (Array.isArray(p) ? p : [p]).some((x) => can(x));
+  return groups.map((g) => ({ ...g, items: g.items.filter((i) => allowed(i.perm)) })).filter((g) => g.items.length);
 }
 
 function Sidebar({ collapsed, onToggle, unread }: { collapsed: boolean; onToggle?: () => void; unread: number }) {
@@ -199,7 +203,7 @@ function NotificationBell({ userId }: { userId: string }) {
 }
 
 export function DashboardLayout() {
-  const { token, user } = useAuth();
+  const { token, user, can } = useAuth();
   const loc = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobile, setMobile] = useState(false);
@@ -251,9 +255,11 @@ export function DashboardLayout() {
             <LangToggle className="hidden md:inline-flex" />
             <ThemeToggle />
             <NotificationBell userId={user.id} />
-            <Link to="/app/admin" className="btn btn-ghost btn-icon hidden sm:inline-flex" aria-label="Settings">
-              <Settings className="h-5 w-5" />
-            </Link>
+            {ADMIN_PERMS.some((p) => can(p)) && (
+              <Link to="/app/admin" className="btn btn-ghost btn-icon hidden sm:inline-flex" aria-label="Settings">
+                <Settings className="h-5 w-5" />
+              </Link>
+            )}
             <UserMenu />
           </div>
         </header>

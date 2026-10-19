@@ -12,6 +12,7 @@ import type { FeatureCollection } from "geojson";
 import { GeoJSON, Marker, Tooltip } from "react-leaflet";
 import { useApi } from "@/hooks/useApi";
 import { compact } from "@/lib/format";
+import { escapeHtml } from "@/lib/utils";
 
 const PROVINCE_COLORS: Record<string, string> = {
   Punjab: "#16a34a",
@@ -26,12 +27,13 @@ const PROVINCE_COLORS: Record<string, string> = {
 /** Map label language: English, Urdu, or both. */
 export type MapLang = "en" | "ur" | "both";
 
-/** Label HTML in the chosen language(s); Urdu is right-to-left in the Nastaliq font. */
+/** Label HTML in the chosen language(s); Urdu is right-to-left in the Nastaliq font. Names are escaped. */
 export function labelHtml(en: string, ur: string | null | undefined, lang: MapLang): string {
-  const u = ur ? `<span class="map-ur" dir="rtl">${ur}</span>` : "";
-  if (lang === "ur") return u || en;
-  if (lang === "both" && u) return `<span>${en}</span>${u}`;
-  return en;
+  const e = escapeHtml(en);
+  const u = ur ? `<span class="map-ur" dir="rtl">${escapeHtml(ur)}</span>` : "";
+  if (lang === "ur") return u || e;
+  if (lang === "both" && u) return `<span>${e}</span>${u}`;
+  return e;
 }
 /** Plain-text label in the chosen language(s) (canvas text, tooltips). */
 export function labelText(en: string, ur: string | null | undefined, lang: MapLang): string {
@@ -83,7 +85,7 @@ export function ProvinceLayer({ map, lang = "en", zoom = 5 }: { map: L.Map | nul
         const p = f.properties as { name: string; name_ur?: string; listings?: number };
         const count = p.listings ? (lang === "ur" ? `${p.listings} اشتہارات` : `${p.listings} listing${p.listings === 1 ? "" : "s"}`) : "";
         if (!hidden.split("|").includes(p.name)) layer.bindTooltip(
-          `<div class="province-inner">${labelHtml(p.name, p.name_ur, lang)}${count ? `<span class="province-count">${count}</span>` : ""}</div>`,
+          `<div class="province-inner">${labelHtml(p.name, p.name_ur, lang)}${count ? `<span class="province-count">${escapeHtml(count)}</span>` : ""}</div>`,
           { permanent: true, direction: "center", className: "province-label", interactive: false },
         );
         layer.on("click", () => {

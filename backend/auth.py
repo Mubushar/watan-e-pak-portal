@@ -1018,7 +1018,7 @@ def get_config() -> Dict[str, Any]:
     cfg["active_sessions"] = sum(1 for s in sessions_db if s.is_valid())
     cfg["pending_otps"] = sum(1 for o in otps_db if not o.consumed_at and not o.is_expired())
     cfg["delivery"] = delivery.summary()
-    cfg["demo_accounts"] = portal_env.SEED_DEMO and any(u.email == "admin@portal.pk" for u in users_db)
+    cfg["demo_accounts"] = demo_accounts()
     cfg["environment"] = portal_env.ENV
     for k in ("users", "active_sessions", "pending_otps"):  # operational counts are not public
         cfg.pop(k, None)
@@ -1285,6 +1285,54 @@ def seed_roles() -> None:
 # ============================================================
 
 
+DEMO_USERS: List[Dict[str, Any]] = [
+    # ---- admin tier ----
+    {"name": "Portal Admin", "email": "admin@portal.pk", "mobile": "+923001234567",
+     "password": "Admin@12345", "roles": ["super_admin"]},
+    {"name": "Rina Auditor", "email": "auditor@portal.pk", "mobile": "+923101234567",
+     "password": "Auditor@12345", "roles": ["auditor"]},
+    # ---- staff tier ----
+    {"name": "Ayesha Khan", "email": "agent@portal.pk", "mobile": "+923011234567",
+     "password": "Agent@12345", "roles": ["agent"]},
+    {"name": "Hamza Iqbal", "email": "developer@portal.pk", "mobile": "+923031234567",
+     "password": "Developer@12345", "roles": ["developer"]},
+    {"name": "Faisal Rehman", "email": "finance@portal.pk", "mobile": "+923051234567",
+     "password": "Finance@12345", "roles": ["finance_manager", "accountant"]},
+    {"name": "Nadia Aslam", "email": "content@portal.pk", "mobile": "+923061234567",
+     "password": "Content@12345", "roles": ["content_editor"]},
+    {"name": "Omar Sheikh", "email": "ads@portal.pk", "mobile": "+923071234567",
+     "password": "Ads@12345", "roles": ["ad_manager"]},
+    {"name": "Zara Malik", "email": "valuer@portal.pk", "mobile": "+923081234567",
+     "password": "Valuer@12345", "roles": ["valuer"]},
+    {"name": "Kamran Ali", "email": "support@portal.pk", "mobile": "+923091234567",
+     "password": "Support@12345", "roles": ["customer_support"]},
+    # ---- client tier ----
+    {"name": "Sana Tariq", "email": "investor@portal.pk", "mobile": "+923041234567",
+     "password": "Investor@12345", "roles": ["investor"]},
+    {"name": "Imran Yousaf", "email": "landlord@portal.pk", "mobile": "+923111234567",
+     "password": "Landlord@12345", "roles": ["landlord"]},
+    # ---- public tier ----
+    {"name": "Bilal Ahmed", "email": "bilal@example.com", "mobile": "+923021234567",
+     "password": "Buyer@12345", "roles": ["buyer"]},
+    {"name": "Sara Naveed", "email": "tenant@portal.pk", "mobile": "+923121234567",
+     "password": "Tenant@12345", "roles": ["tenant"]},
+]
+
+
+# Demo sign-ins offered on the login page (development only; the passwords are public).
+DEMO_LOGIN_LABELS = {"admin@portal.pk": "Super admin", "agent@portal.pk": "Agent", "finance@portal.pk": "Finance",
+                     "developer@portal.pk": "Developer", "investor@portal.pk": "Investor", "bilal@example.com": "Buyer",
+                     "landlord@portal.pk": "Landlord", "ads@portal.pk": "Ad manager"}
+
+
+def demo_accounts() -> List[Dict[str, str]]:
+    if not portal_env.SEED_DEMO:
+        return []
+    present = {u.email for u in users_db}
+    return [{"label": DEMO_LOGIN_LABELS[d["email"]], "role": d["roles"][0], "name": d["name"], "email": d["email"],
+             "password": d["password"]} for d in DEMO_USERS if d["email"] in DEMO_LOGIN_LABELS and d["email"] in present]
+
+
 def seed_users() -> None:
     """Idempotent demo accounts covering every portal role (documented in the README).
     Only with PORTAL_SEED_DEMO (on in development, off in production): their passwords are public."""
@@ -1292,38 +1340,7 @@ def seed_users() -> None:
     if users_db or not portal_env.SEED_DEMO:
         return
 
-    seeded = [
-        # ---- admin tier ----
-        {"name": "Portal Admin", "email": "admin@portal.pk", "mobile": "+923001234567",
-         "password": "Admin@12345", "roles": ["super_admin"]},
-        {"name": "Rina Auditor", "email": "auditor@portal.pk", "mobile": "+923101234567",
-         "password": "Auditor@12345", "roles": ["auditor"]},
-        # ---- staff tier ----
-        {"name": "Ayesha Khan", "email": "agent@portal.pk", "mobile": "+923011234567",
-         "password": "Agent@12345", "roles": ["agent"]},
-        {"name": "Hamza Iqbal", "email": "developer@portal.pk", "mobile": "+923031234567",
-         "password": "Developer@12345", "roles": ["developer"]},
-        {"name": "Faisal Rehman", "email": "finance@portal.pk", "mobile": "+923051234567",
-         "password": "Finance@12345", "roles": ["finance_manager", "accountant"]},
-        {"name": "Nadia Aslam", "email": "content@portal.pk", "mobile": "+923061234567",
-         "password": "Content@12345", "roles": ["content_editor"]},
-        {"name": "Omar Sheikh", "email": "ads@portal.pk", "mobile": "+923071234567",
-         "password": "Ads@12345", "roles": ["ad_manager"]},
-        {"name": "Zara Malik", "email": "valuer@portal.pk", "mobile": "+923081234567",
-         "password": "Valuer@12345", "roles": ["valuer"]},
-        {"name": "Kamran Ali", "email": "support@portal.pk", "mobile": "+923091234567",
-         "password": "Support@12345", "roles": ["customer_support"]},
-        # ---- client tier ----
-        {"name": "Sana Tariq", "email": "investor@portal.pk", "mobile": "+923041234567",
-         "password": "Investor@12345", "roles": ["investor"]},
-        {"name": "Imran Yousaf", "email": "landlord@portal.pk", "mobile": "+923111234567",
-         "password": "Landlord@12345", "roles": ["landlord"]},
-        # ---- public tier ----
-        {"name": "Bilal Ahmed", "email": "bilal@example.com", "mobile": "+923021234567",
-         "password": "Buyer@12345", "roles": ["buyer"]},
-        {"name": "Sara Naveed", "email": "tenant@portal.pk", "mobile": "+923121234567",
-         "password": "Tenant@12345", "roles": ["tenant"]},
-    ]
+    seeded = DEMO_USERS
     for row in seeded:
         password_hash, salt = hash_password(row["password"])
         roles = list(row["roles"])

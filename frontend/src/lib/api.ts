@@ -6,7 +6,7 @@
  * - GET requests fall back to the bundled snapshot (src/seed/snapshot.json)
  *   when the backend is unreachable, so the UI stays explorable offline.
  */
-import { useAuth } from "@/store/auth";
+import { sessionExpired, useAuth } from "@/store/auth";
 
 export const API_BASE: string = import.meta.env.VITE_API_BASE ?? "/api";
 const FORCE_SEED = import.meta.env.VITE_FORCE_SEED === "1";
@@ -119,7 +119,12 @@ export async function api<T = any>(path: string, opts: ApiOptions = {}): Promise
   }
 
   const headers: Record<string, string> = { Accept: opts.text ? "text/html, */*" : "application/json" };
-  const token = useAuth.getState().token;
+  let token = useAuth.getState().token;
+  // An expired session is a signed-out one: drop it rather than send a token the server will refuse.
+  if (token && sessionExpired(useAuth.getState().expiresAt)) {
+    useAuth.getState().expire();
+    token = null;
+  }
   if (token) headers.Authorization = `Bearer ${token}`;
   if (opts.body !== undefined) headers["Content-Type"] = "application/json";
 

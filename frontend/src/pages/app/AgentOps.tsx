@@ -283,6 +283,9 @@ function LeadIntent() {
 
 export default function AgentOps() {
   const ov = useApi<Overview>("/agents/overview");
+  // Smart actions and lead intent read the CRM: only for roles with crm.view.
+  useAuth((s) => s.user); // re-render when the user (and so their permissions) changes
+  const canCrm = useAuth((s) => s.can)("crm.view");
   const d = ov.data;
   const autonomy = d ? Object.entries(d.by_autonomy).map(([k, v], i) => ({ name: AUTONOMY[k]?.label ?? titleCase(k), value: v, color: [PALETTE[0], PALETTE[1], PALETTE[2]][i % 3] })) : [];
   const cats = d ? Object.entries(d.by_category).map(([k, v]) => ({ category: titleCase(k), agents: v })) : [];
@@ -348,9 +351,9 @@ export default function AgentOps() {
         </Card>
       </div>
 
-      <SmartActions />
+      {canCrm && <SmartActions />}
       <Runs />
-      <LeadIntent />
+      {canCrm && <LeadIntent />}
     </div>
   );
 }

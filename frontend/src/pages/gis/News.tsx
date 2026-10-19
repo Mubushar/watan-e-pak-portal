@@ -5,7 +5,7 @@ import type { City, NewsItem } from "@/types";
 import { useApi } from "@/hooks/useApi";
 import { pct, timeAgo, titleCase } from "@/lib/format";
 import { HERO, themedImage } from "@/lib/images";
-import { cn } from "@/lib/utils";
+import { cn, safeHref } from "@/lib/utils";
 import { Badge, Card, CardBody, CardHeader, Carousel, EmptyState, ErrorState, Input, PageHeader, QueryState, Skeleton } from "@/components/ui";
 import { Donut } from "@/components/ui/charts";
 import { AdSlot } from "@/components/ads/AdSlot";
@@ -384,8 +384,8 @@ function NewsCard({ n, i, city }: { n: NewsItem; i: number; city?: string }) {
           <span className="truncate font-semibold text-ink-soft dark:text-slate-300">{n.source}</span>
           <span>·</span>
           <span className="shrink-0">{timeAgo(n.published_at)}</span>
-          {n.url && (
-            <a href={n.url} target="_blank" rel="noreferrer" className="ms-auto inline-flex shrink-0 items-center gap-0.5 font-semibold text-brand-700 hover:underline dark:text-brand-300">
+          {safeHref(n.url) && (
+            <a href={safeHref(n.url)!} target="_blank" rel="noreferrer" className="ms-auto inline-flex shrink-0 items-center gap-0.5 font-semibold text-brand-700 hover:underline dark:text-brand-300">
               Read <ArrowUpRight className="h-3 w-3" />
             </a>
           )}

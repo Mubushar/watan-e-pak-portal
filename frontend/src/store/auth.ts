@@ -14,6 +14,8 @@ export interface User {
   agent_id?: string | null;
   customer_id?: string | null;
   last_login_at?: string | null;
+  /** A staff role (agent / developer) asked for at sign-up, waiting for an administrator. */
+  requested_role?: string | null;
 }
 
 export interface Session {
@@ -29,7 +31,7 @@ interface AuthState {
   setSession: (s: Session) => void;
   setUser: (u: User) => void;
   logout: () => void;
-  /** Called by the API client on a 401 for an authenticated request. */
+  /** Called by the API client on a 401 for an authenticated request, and when the token's expiry passes. */
   expire: () => void;
   can: (permission: string) => boolean;
   hasRole: (...roles: string[]) => boolean;
@@ -44,10 +46,14 @@ export const useAuth = create<AuthState>()(
       setSession: (s) => set({ token: s.token, expiresAt: s.expires_at ?? null, user: s.user }),
       setUser: (user) => set({ user }),
       logout: () => set({ token: null, expiresAt: null, user: null }),
-      expire: () => set({ token: null, expiresAt: null, user: null }),
+      expire: () => {
+        if (!get().token) return;
+        set({ token: null, expiresAt: null, user: null });
+        expiryListeners.forEach((l) => l());
+      },
       can: (p) => {
         const u = get().user;
-        if (!u) return false;
+        if (!u || sessionExpired(get().expiresAt)) return false;
         return u.roles?.includes("super_admin") || u.permissions?.includes(p);
       },
       hasRole: (...roles) => {
@@ -59,14 +65,49 @@ export const useAuth = create<AuthState>()(
   ),
 );
 
-/** Seeded demo accounts from docs/USER_MANUAL.md §2.2. */
-export const DEMO_ACCOUNTS = [
-  { role: "Super admin", email: "admin@portal.pk", password: "Admin@12345" },
-  { role: "Agent", email: "agent@portal.pk", password: "Agent@12345" },
-  { role: "Finance", email: "finance@portal.pk", password: "Finance@12345" },
-  { role: "Developer", email: "developer@portal.pk", password: "Developer@12345" },
-  { role: "Investor", email: "investor@portal.pk", password: "Investor@12345" },
-  { role: "Buyer", email: "bilal@example.com", password: "Buyer@12345" },
-  { role: "Landlord", email: "landlord@portal.pk", password: "Landlord@12345" },
-  { role: "Ad manager", email: "ads@portal.pk", password: "Ads@12345" },
-];
+/** True once the session's `expires_at` has passed (the token is then treated as signed out). */
+export function sessionExpired(expiresAt: string | null | undefined): boolean {
+  if (!expiresAt) return false;
+  const t = Date.parse(expiresAt);
+  return Number.isFinite(t) && t <= Date.now();
+}
+
+const expiryListeners = new Set<() => void>();
+/** Run `l` whenever a signed-in session ends on its own (401 from the API, or the token expired). */
+export function onSessionExpired(l: () => void): () => void {
+  expiryListeners.add(l);
+  return () => {
+    expiryListeners.delete(l);
+  };
+}
+
+// Sign out when the stored token's expiry passes (also right away for an already-expired stored session).
+let expiryTimer: ReturnType<typeof setTimeout> | undefined;
+function scheduleExpiry(expiresAt: string | null) {
+  clearTimeout(expiryTimer);
+  if (!expiresAt) return;
+  const ms = Date.parse(expiresAt) - Date.now();
+  if (!Number.isFinite(ms)) return;
+  if (ms <= 0) useAuth.getState().expire();
+  else expiryTimer = setTimeout(() => useAuth.getState().expire(), Math.min(ms, 2 ** 31 - 1));
+}
+scheduleExpiry(useAuth.getState().expiresAt);
+useAuth.subscribe((s, prev) => {
+  if (s.expiresAt !== prev.expiresAt) scheduleExpiry(s.expiresAt);
+});
+
+/** A seeded demo account, as listed by `GET /auth/config` → `demo_accounts` (only where the server seeds them). */
+export interface DemoAccount {
+  email: string;
+  password?: string;
+  role?: string;
+  label?: string;
+  name?: string;
+}
+
+/** The demo accounts to offer on the sign-in page: only a non-empty list from the server counts. */
+export function demoAccountsFrom(cfg: { demo_accounts?: unknown } | undefined): DemoAccount[] {
+  const list = cfg?.demo_accounts;
+  if (!Array.isArray(list)) return [];
+  return list.filter((a): a is DemoAccount => !!a && typeof a === "object" && typeof (a as DemoAccount).email === "string");
+}

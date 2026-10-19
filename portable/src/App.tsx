@@ -1,12 +1,13 @@
-import { lazy, Suspense, useEffect, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, type ReactNode } from "react";
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "sonner";
+import { toast, Toaster } from "sonner";
 import { App as CapApp } from "@capacitor/app";
 import { SplashScreen } from "@capacitor/splash-screen";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { isNative, runtime } from "@/lib/platform";
-import { useAuth } from "@/store/auth";
+import { ApiError, get } from "@/lib/api";
+import { onSessionExpired, useAuth, type User } from "@/store/auth";
 import { usePrefs } from "@/store/prefs";
 import { AppShell } from "@/components/AppShell";
 import { Spinner } from "@/components/ui";
@@ -23,7 +24,37 @@ const ListingForm = lazy(() => import("@/screens/ListingForm"));
 const Saved = lazy(() => import("@/screens/Saved"));
 const Profile = lazy(() => import("@/screens/Profile"));
 
-const qc = new QueryClient({ defaultOptions: { queries: { staleTime: 60_000, retry: 1, refetchOnWindowFocus: false } } });
+/** Sign-in / permission errors won't fix themselves on a retry. */
+const retry = (count: number, e: unknown) => !(e instanceof ApiError && (e.status === 401 || e.status === 403)) && count < 1;
+const qc = new QueryClient({ defaultOptions: { queries: { staleTime: 60_000, retry, refetchOnWindowFocus: false } } });
+
+/** Refresh the signed-in account on start (roles and permissions can change on the server),
+ *  and tell someone whose session ended (401 or expiry) how to sign back in. */
+function SessionSync() {
+  const token = useAuth((s) => s.token);
+  const setUser = useAuth((s) => s.setUser);
+  const nav = useNavigate();
+  const loc = useLocation();
+  const here = useRef(loc.pathname + loc.search);
+  here.current = loc.pathname + loc.search;
+  useEffect(() => {
+    if (!token) return;
+    get<{ user?: User }>("/auth/me", undefined, { noFallback: true })
+      .then((r) => r?.user && setUser(r.user))
+      .catch(() => undefined); // a 401 already signed the user out
+  }, [token, setUser]);
+  useEffect(
+    () =>
+      // Screens that need an account redirect on their own (RequireAuth); elsewhere offer a sign-in.
+      onSessionExpired(() =>
+        toast.info("Your session has ended — please sign in again.", {
+          action: { label: "Sign in", onClick: () => nav(`/signin?next=${encodeURIComponent(here.current)}`) },
+        }),
+      ),
+    [nav],
+  );
+  return null;
+}
 
 /** Applies the theme (and native status-bar colours) whenever it changes. */
 function ThemeSync() {
@@ -92,6 +123,7 @@ export default function App() {
       <HashRouter>
         <ThemeSync />
         <NativeBridge />
+        <SessionSync />
         <Suspense fallback={fallback}>
           <Routes>
             <Route path="/welcome" element={<Welcome />} />

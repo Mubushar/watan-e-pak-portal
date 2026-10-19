@@ -240,6 +240,9 @@ export default function AgentDetail() {
   const { key = "" } = useParams();
   const [params] = useSearchParams();
   const user = useAuth((s) => s.user);
+  const signedIn = !!useAuth((s) => s.token) && !!user;
+  // CRM leads / transactions as a subject need crm.view; everyone else picks a property or none.
+  const subjectTypes = useAuth((s) => s.can)("crm.view") ? SUBJECT_TYPES : SUBJECT_TYPES.filter((t) => t.value !== "lead" && t.value !== "transaction");
   const q = useApi<AgentDef & { error?: string }>(key ? `/agents/${key}` : null);
   const a = q.data && !q.data.error ? q.data : undefined;
 
@@ -280,7 +283,8 @@ export default function AgentDetail() {
     success: "Approved — run continued",
     onSuccess: (r) => setRun(r),
   });
-  const runs = useApi<{ count: number; runs: AgentRun[] }>("/agents/runs", { agent_key: key });
+  // Running agents and their audit trail need an account (the API answers 401 to guests).
+  const runs = useApi<{ count: number; runs: AgentRun[] }>(signedIn ? "/agents/runs" : null, { agent_key: key });
   const recent = useMemo(() => [...(runs.data?.runs ?? [])].sort((x, y) => (y.created_at > x.created_at ? 1 : -1)).slice(0, 8), [runs.data]);
 
   if (q.isLoading)
@@ -353,6 +357,16 @@ export default function AgentDetail() {
                 </div>
               </div>
             </div>
+            {!signedIn ? (
+              <CardBody>
+                <EmptyState
+                  icon={<Rocket className="h-6 w-6" />}
+                  title="Sign in to run this agent"
+                  hint="Agent runs execute against the live portal and are recorded in an audit trail, so they need an account."
+                  action={<ButtonLink to={`/login?next=${encodeURIComponent(`/ai/agents/${key}`)}`}>Sign in</ButtonLink>}
+                />
+              </CardBody>
+            ) : (
             <CardBody className="space-y-4">
               <Field label="Objective">
                 <Textarea value={objective} onChange={(e) => setObjective(e.target.value)} className="min-h-[88px]" placeholder="What should the agent achieve?" />
@@ -365,7 +379,7 @@ export default function AgentDetail() {
                       setSubjectType(e.target.value);
                       setSubjectId("");
                     }}
-                    options={SUBJECT_TYPES}
+                    options={subjectTypes}
                   />
                 </Field>
                 <SubjectPicker type={subjectType} value={subjectId} onChange={setSubjectId} />
@@ -383,6 +397,7 @@ export default function AgentDetail() {
                 </Button>
               </div>
             </CardBody>
+            )}
           </Card>
 
           <AnimatePresence mode="wait">
@@ -415,11 +430,15 @@ export default function AgentDetail() {
             ) : null}
           </AnimatePresence>
 
-          <Orchestrate key={a.key} agent={a} objective={objective} />
+          {signedIn && <Orchestrate key={a.key} agent={a} objective={objective} />}
 
           <Card>
             <CardHeader title="Recent runs" subtitle="Audit trail for this agent" icon={<History className="h-4 w-4" />} />
-            {runs.isLoading ? (
+            {!signedIn ? (
+              <CardBody>
+                <EmptyState title="Sign in to see runs" hint="The audit trail is visible to signed-in users." />
+              </CardBody>
+            ) : runs.isLoading ? (
               <CardBody>
                 <Skeleton className="h-32" />
               </CardBody>

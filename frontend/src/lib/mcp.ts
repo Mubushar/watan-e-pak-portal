@@ -28,7 +28,22 @@ export interface McpCallResult {
 
 let seq = 0;
 
+/** The MCP endpoint exposes every portal tool, so the server only admits administrators. */
+export const MCP_ROLES = ["super_admin", "admin"];
+export function isMcpAdmin(u: { role?: string; roles?: string[] } | null | undefined): boolean {
+  return !!u && MCP_ROLES.some((r) => u.roles?.includes(r) || u.role === r);
+}
+
+export class McpError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 async function rpc<T>(method: string, params: Record<string, unknown> = {}): Promise<T> {
+  // The signed-in session token authorises the call (the server requires an administrator's).
   const token = useAuth.getState().token;
   const res = await fetch(`${API_BASE}/mcp`, {
     method: "POST",
@@ -39,7 +54,9 @@ async function rpc<T>(method: string, params: Record<string, unknown> = {}): Pro
     },
     body: JSON.stringify({ jsonrpc: "2.0", id: ++seq, method, params }),
   });
-  if (!res.ok) throw new Error(`MCP ${method} failed: ${res.status} ${res.statusText}`);
+  if (res.status === 401 || res.status === 403)
+    throw new McpError(token ? "The MCP console is for administrators only." : "Sign in with an administrator account to use the MCP console.", res.status);
+  if (!res.ok) throw new McpError(`MCP ${method} failed: ${res.status} ${res.statusText}`, res.status);
   const ct = res.headers.get("content-type") ?? "";
   let msg: { result?: T; error?: { message: string } } | undefined;
   if (ct.includes("text/event-stream")) {

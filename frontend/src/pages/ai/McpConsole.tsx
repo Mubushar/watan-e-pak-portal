@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
-import { Braces, ChevronRight, Clock, Database, FileCode2, MessageSquareText, Play, Plug, RotateCcw, Search, Server, Terminal, Trash2, Wrench, Zap } from "lucide-react";
+import { Braces, ChevronRight, Clock, Database, FileCode2, MessageSquareText, Play, Plug, RotateCcw, Search, Server, ShieldAlert, Terminal, Trash2, Wrench, Zap } from "lucide-react";
 import { mcp, parseToolResult, type McpTool } from "@/lib/mcp";
 import { cn } from "@/lib/utils";
 import { Badge, Breadcrumbs, Button, Card, CardBody, CardHeader, CopyButton, EmptyState, ErrorState, Field, Input, JsonView, Segmented, Skeleton, Spinner, Tabs } from "@/components/ui";
 import { HeroBackdrop } from "@/components/agents/AgentBits";
 import { buildArgs, initialValues, SchemaForm, type FormValues } from "@/components/tools/SchemaForm";
-import { useMcpTools } from "@/components/tools/MiscTools";
+import { useMcpAdmin, useMcpTools } from "@/components/tools/MiscTools";
 
 const MCP_URL = "http://127.0.0.1:8000/mcp";
 const CONFIG = JSON.stringify({ mcpServers: { arzepak: { type: "http", url: MCP_URL } } }, null, 2);
@@ -502,10 +502,12 @@ function PromptsTab() {
 
 // ------------------------------------------------------------------ page
 export default function McpConsole() {
-  const init = useQuery({ queryKey: ["mcp", "initialize"], queryFn: () => mcp.initialize(), retry: false });
+  // The MCP endpoint admits administrators only (session token or PORTAL_MCP_TOKEN).
+  const admin = useMcpAdmin();
+  const init = useQuery({ queryKey: ["mcp", "initialize"], queryFn: () => mcp.initialize(), retry: false, enabled: admin });
   const tq = useMcpTools();
-  const rq = useQuery({ queryKey: ["mcp", "resources/list"], queryFn: () => mcp.listResources() });
-  const pq = useQuery({ queryKey: ["mcp", "prompts/list"], queryFn: () => mcp.listPrompts() });
+  const rq = useQuery({ queryKey: ["mcp", "resources/list"], queryFn: () => mcp.listResources(), enabled: admin });
+  const pq = useQuery({ queryKey: ["mcp", "prompts/list"], queryFn: () => mcp.listPrompts(), enabled: admin });
   const [tab, setTab] = useState<"tools" | "resources" | "prompts">("tools");
   const [client, setClient] = useState<"claude" | "cursor" | "code">("claude");
   const info = init.data;
@@ -525,7 +527,11 @@ export default function McpConsole() {
             </h1>
             <p className="mt-3 max-w-xl text-white/75">Inspect and call every tool, resource and prompt the Arz-e-Pak Model Context Protocol server exposes — exactly what Claude, ChatGPT or Cursor see.</p>
             <div className="mt-5 flex flex-wrap items-center gap-2 text-xs">
-              {init.isLoading ? (
+              {!admin ? (
+                <span className="chip bg-gold-400/20 text-gold-100">
+                  <ShieldAlert className="h-3 w-3" /> admins only
+                </span>
+              ) : init.isLoading ? (
                 <span className="chip bg-white/10">
                   <Spinner className="h-3 w-3 text-white" /> connecting…
                 </span>
@@ -594,6 +600,20 @@ export default function McpConsole() {
         </div>
       </section>
 
+      {!admin ? (
+        <div className="container mx-auto mt-8 max-w-xl">
+          <EmptyState
+            icon={<ShieldAlert className="h-6 w-6" />}
+            title="Admins only"
+            hint="The MCP server exposes every portal tool, so only administrators can use this console. Sign in with an admin account, or connect an AI client with the server's PORTAL_MCP_TOKEN."
+            action={
+              <Link to="/login?next=/ai/mcp" className="btn btn-outline btn-sm">
+                Sign in
+              </Link>
+            }
+          />
+        </div>
+      ) : (
       <div className="container mt-8 space-y-6">
         <Tabs
           value={tab}
@@ -613,6 +633,7 @@ export default function McpConsole() {
           Tools are grouped by name prefix (crm_, pm_, gis_, msg_…). Calls run against the live portal with your session token.
         </p>
       </div>
+      )}
     </div>
   );
 }

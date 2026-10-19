@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { safeHref } from "@/lib/utils";
 
 /** Tiny markdown renderer for assistant replies: headings, bullets, **bold**, `code`, links. */
 export function Markdown({ text }: { text: string }) {
@@ -45,10 +46,16 @@ function inline(s: string): ReactNode[] {
     else if (t.startsWith("`")) parts.push(<code key={m.index} className="rounded bg-black/5 px-1 font-mono text-[12px] dark:bg-white/10">{t.slice(1, -1)}</code>);
     else {
       const lm = t.match(/^\[([^\]]+)\]\(([^)]+)\)$/)!;
+      // Only http(s) / mailto / tel / relative links; javascript:, data: etc. render as plain text.
+      const href = safeHref(lm[2]);
       parts.push(
-        <a key={m.index} href={lm[2]} target="_blank" rel="noreferrer" className="link">
-          {lm[1]}
-        </a>,
+        href ? (
+          <a key={m.index} href={href} target="_blank" rel="noreferrer" className="link">
+            {lm[1]}
+          </a>
+        ) : (
+          <span key={m.index}>{lm[1]}</span>
+        ),
       );
     }
     last = m.index + t.length;

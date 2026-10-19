@@ -8,7 +8,7 @@
  * - Browse GETs fall back to a small bundled snapshot when the backend is down,
  *   so the app stays explorable offline.
  */
-import { useAuth } from "@/store/auth";
+import { sessionExpired, useAuth } from "@/store/auth";
 import { usePrefs } from "@/store/prefs";
 import { DEFAULT_API_BASE } from "./config";
 
@@ -119,7 +119,12 @@ export async function api<T = unknown>(path: string, opts: ApiOptions = {}): Pro
   const canFallback = method === "GET" && !opts.noFallback;
 
   const headers: Record<string, string> = { Accept: "application/json" };
-  const token = useAuth.getState().token;
+  let token = useAuth.getState().token;
+  // An expired session is a signed-out one: drop it rather than send a token the server will refuse.
+  if (token && sessionExpired(useAuth.getState().expiresAt)) {
+    useAuth.getState().expire();
+    token = null;
+  }
   if (token) headers.Authorization = `Bearer ${token}`;
   if (opts.body !== undefined) headers["Content-Type"] = "application/json";
 
@@ -164,7 +169,7 @@ export async function api<T = unknown>(path: string, opts: ApiOptions = {}): Pro
   const payload: unknown = ct.includes("json") ? await res.json() : await res.text();
   if (!res.ok) {
     const detail = typeof payload === "object" && payload && "detail" in payload ? (payload as { detail: unknown }).detail : payload;
-    if (res.status === 401 && token) useAuth.getState().logout();
+    if (res.status === 401 && token) useAuth.getState().expire();
     throw new ApiError(errorMessage(detail, `${res.status} ${res.statusText}`), res.status, detail);
   }
   // Many engine functions report failures as a 200 with `{"error": "..."}`.

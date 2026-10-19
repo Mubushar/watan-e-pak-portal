@@ -19,6 +19,8 @@ const ROLES = [
   { value: "developer", label: "Developer", icon: Building },
   { value: "user", label: "Just browsing", icon: UserRound },
 ];
+/** Staff roles that are requested at sign-up and granted by an administrator. */
+const REQUEST_ONLY = ["agent", "developer"];
 
 interface SignupResult {
   verification: {
@@ -82,6 +84,7 @@ export default function Signup() {
       if (r.token) {
         setSession(r);
         toast.success("Account verified — welcome to Arz-e-Pak!");
+        if (r.user.requested_role) toast.info(`Your ${r.user.requested_role} access request is waiting for an administrator's approval.`);
         nav("/app", { replace: true });
       } else {
         toast.success("Verified — please sign in");
@@ -139,6 +142,13 @@ export default function Signup() {
                   </button>
                 ))}
               </div>
+              {REQUEST_ONLY.includes(form.role) ? (
+                <p className="mt-2 rounded-xl bg-gold-50 p-3 text-xs text-gold-900 dark:bg-gold-500/10 dark:text-gold-100">
+                  {form.role === "agent" ? "Agent" : "Developer"} accounts are approved by an administrator. You’ll start as a regular member and get {form.role} access once your request is approved.
+                </p>
+              ) : (
+                <p className="mt-2 text-[11px] text-ink-mute">Agent and developer accounts are approved by an administrator.</p>
+              )}
             </div>
             <Field label="Full name">
               <Input icon={<UserRound className="h-4 w-4" />} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ahmed Khan" required />

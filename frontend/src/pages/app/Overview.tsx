@@ -93,16 +93,16 @@ interface Unread {
   overdue_actions: number;
 }
 
-const MODULES: { to: string; label: string; hint: string; icon: LucideIcon; tone: string }[] = [
-  { to: "/app/crm", label: "CRM", hint: "Leads, deals & pipeline", icon: Users, tone: "from-brand-500 to-brand-700" },
-  { to: "/app/accounting", label: "Accounting", hint: "Ledger, invoices, P&L", icon: Calculator, tone: "from-gold-400 to-gold-600" },
-  { to: "/app/pmo", label: "PMO", hint: "Projects & delivery", icon: BriefcaseBusiness, tone: "from-sky-500 to-sky-700" },
+const MODULES: { to: string; label: string; hint: string; icon: LucideIcon; tone: string; perm?: string }[] = [
+  { to: "/app/crm", label: "CRM", hint: "Leads, deals & pipeline", icon: Users, tone: "from-brand-500 to-brand-700", perm: "crm.view" },
+  { to: "/app/accounting", label: "Accounting", hint: "Ledger, invoices, P&L", icon: Calculator, tone: "from-gold-400 to-gold-600", perm: "accounting.view" },
+  { to: "/app/pmo", label: "PMO", hint: "Projects & delivery", icon: BriefcaseBusiness, tone: "from-sky-500 to-sky-700", perm: "projects.view" },
   { to: "/app/messages", label: "Messages", hint: "Team inbox & alerts", icon: MessagesSquare, tone: "from-violet-500 to-violet-700" },
-  { to: "/app/ads", label: "Ads", hint: "Campaigns & slots", icon: Megaphone, tone: "from-orange-400 to-orange-600" },
+  { to: "/app/ads", label: "Ads", hint: "Campaigns & slots", icon: Megaphone, tone: "from-orange-400 to-orange-600", perm: "ads.view" },
   { to: "/app/leasing", label: "Leasing", hint: "Units, tenants, renewals", icon: KeyRound, tone: "from-teal-500 to-teal-700" },
   { to: "/app/maintenance", label: "Maintenance", hint: "Work orders & reserves", icon: Wrench, tone: "from-rose-500 to-rose-700" },
   { to: "/app/construction", label: "Construction", hint: "Estimates & materials", icon: HardHat, tone: "from-amber-500 to-amber-700" },
-  { to: "/app/marketing", label: "Marketing", hint: "Funnel, content, routing", icon: Target, tone: "from-fuchsia-500 to-fuchsia-700" },
+  { to: "/app/marketing", label: "Marketing", hint: "Funnel, content, routing", icon: Target, tone: "from-fuchsia-500 to-fuchsia-700", perm: "crm.view" },
   { to: "/ai", label: "AI Hub", hint: "Agents & assistant", icon: Sparkles, tone: "from-brand-600 to-gold-500" },
 ];
 
@@ -115,11 +115,16 @@ function greeting() {
 
 export default function Overview() {
   const user = useAuth((s) => s.user);
+  const can = useAuth((s) => s.can);
+  // Each panel is fetched only for roles the API lets read it (the rest would just 403).
+  const canCrm = can("crm.view");
+  const canAccounts = can("accounting.view");
+  const canProjects = can("projects.view");
   const stats = useApi<PortalStats>("/portal/statistics");
-  const pnl = useApi<Pnl>("/accounting/profit-and-loss");
-  const actions = useApi<{ count: number; by_band: Record<string, number>; actions: SmartAction[] }>("/agents/smart-actions", { user_id: user?.id, limit: 6 });
-  const pmo = useApi<PmoPortfolio>("/pmo/portfolio");
-  const deadlines = useApi<{ count: number; overdue: number; deadlines: Deadline[] }>("/transactions/deadlines");
+  const pnl = useApi<Pnl>(canAccounts ? "/accounting/profit-and-loss" : null);
+  const actions = useApi<{ count: number; by_band: Record<string, number>; actions: SmartAction[] }>(canCrm ? "/agents/smart-actions" : null, { user_id: user?.id, limit: 6 });
+  const pmo = useApi<PmoPortfolio>(canProjects ? "/pmo/portfolio" : null);
+  const deadlines = useApi<{ count: number; overdue: number; deadlines: Deadline[] }>(canCrm ? "/transactions/deadlines" : null);
   const unread = useApi<Unread>(user ? `/messaging/unread-summary/${encodeURIComponent(user.id)}` : null);
 
   const firstName = (user?.name ?? "there").split(/\s+/)[0];
@@ -165,8 +170,8 @@ export default function Overview() {
             </div>
           </div>
           <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            <BannerPill icon={Zap} label="Smart actions" value={actions.data?.count} loading={actions.isLoading} />
-            <BannerPill icon={AlarmClock} label="Overdue" value={deadlines.data?.overdue} loading={deadlines.isLoading} warn />
+            {canCrm && <BannerPill icon={Zap} label="Smart actions" value={actions.data?.count} loading={actions.isLoading} />}
+            {canCrm && <BannerPill icon={AlarmClock} label="Overdue" value={deadlines.data?.overdue} loading={deadlines.isLoading} warn />}
             <BannerPill icon={Bell} label="Unread" value={unread.data ? unread.data.conversations_unread + unread.data.notifications_unread : undefined} loading={unread.isLoading} />
           </div>
         </div>
@@ -234,7 +239,9 @@ export default function Overview() {
       </div>
 
       {/* -------------------------------------------------- P&L + smart actions */}
+      {(canAccounts || canCrm) && (
       <div className="grid gap-6 lg:grid-cols-5">
+        {canAccounts && (
         <Panel
           title="Income vs expenses"
           subtitle="Profit & loss by account"
@@ -276,7 +283,9 @@ export default function Overview() {
             }}
           </QueryState>
         </Panel>
+        )}
 
+        {canCrm && (
         <Panel
           title="Smart actions"
           subtitle="Prioritised by the agentic OS"
@@ -323,10 +332,13 @@ export default function Overview() {
             }
           </QueryState>
         </Panel>
+        )}
       </div>
+      )}
 
       {/* -------------------------------------------------- PMO / deadlines / inbox */}
       <div className="grid gap-6 lg:grid-cols-3">
+        {canProjects && (
         <Panel
           title="Project portfolio"
           subtitle="PMO health & earned value"
@@ -385,7 +397,9 @@ export default function Overview() {
             }}
           </QueryState>
         </Panel>
+        )}
 
+        {canCrm && (
         <Panel
           title="Upcoming deadlines"
           subtitle="Transaction milestones · next 14 days"
@@ -430,6 +444,7 @@ export default function Overview() {
             }
           </QueryState>
         </Panel>
+        )}
 
         <Panel
           title="Inbox"
@@ -469,7 +484,7 @@ export default function Overview() {
           </div>
         </div>
         <motion.div variants={stagger.container} initial="hidden" animate="show" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          {MODULES.map((m) => (
+          {MODULES.filter((m) => !m.perm || can(m.perm)).map((m) => (
             <motion.div key={m.to} variants={stagger.item}>
               <Link to={m.to} className="card card-hover group flex h-full flex-col gap-3 p-4">
                 <span className={cn("flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-soft", m.tone)}>

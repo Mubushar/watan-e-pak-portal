@@ -5,6 +5,7 @@ import { ArrowLeft, Cpu, FolderOpen, Info } from "lucide-react";
 import { useApi } from "@/hooks/useApi";
 import { titleCase, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/store/auth";
 import { Badge, Breadcrumbs, ButtonLink, Card, CardBody, CardHeader, EmptyState, Skeleton } from "@/components/ui";
 import { CATEGORY_ICON, EXTRA_TOOLS, INTERACTIVE_TOOLS, phaseTone, ToolIcon, type ToolCard } from "@/components/tools/toolMeta";
 import { AppreciationCalc, InstallmentCalc, MortgageCalc, RentalYieldCalc, RentVsBuyCalc } from "@/components/tools/FinanceCalcs";
@@ -88,7 +89,9 @@ function Rail({ tools, current }: { tools: ToolCard[]; current: string }) {
 }
 
 function SavedProjects({ toolKey }: { toolKey: string }) {
-  const q = useApi<{ count: number; projects: { id: string; name: string; tool: string; created_at?: string; notes?: string }[] }>("/tools/projects", { tool: toolKey });
+  // Saved projects belong to an account: guests have none (the API answers 401).
+  const signedIn = !!useAuth((s) => s.token);
+  const q = useApi<{ count: number; projects: { id: string; name: string; tool: string; created_at?: string; notes?: string }[] }>(signedIn ? "/tools/projects" : null, { tool: toolKey });
   const list = q.data?.projects ?? [];
   if (!list.length) return null;
   return (

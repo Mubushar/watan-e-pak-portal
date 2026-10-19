@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import { TileLayer, useMap } from "react-leaflet";
 import { get } from "@/lib/api";
+import { escapeHtml as esc } from "@/lib/utils";
 import type { MapLang } from "./PakistanLayers";
 
 export const ROAD_CLASSES = [
@@ -46,8 +47,6 @@ export interface RoadStatus {
   hint?: string;
   date?: string;
 }
-
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
 function roadName(r: Road, lang: MapLang): string {
   const name = lang === "ur" ? r.u || r.n : lang === "both" && r.u && r.n ? `${r.n} · ${r.u}` : r.n || r.u;
@@ -172,7 +171,7 @@ export function RoadLayer({
       const building = r.s === "construction";
       L.polyline(r.p, { renderer, pane: "roads", color: c.casing, weight: w + 2, opacity: building ? 0.35 : 0.85, interactive: false, lineCap: "round" }).addTo(g);
       L.polyline(r.p, { renderer, pane: "roads", color: building ? "#ffffff" : c.color, weight: w, opacity: 1, dashArray: building ? "6 6" : undefined, lineCap: "round" })
-        .bindTooltip(roadName(r, lang) + (building ? " (under construction)" : ""), { sticky: true, className: "mega-tip" })
+        .bindTooltip(esc(roadName(r, lang)) + (building ? " (under construction)" : ""), { sticky: true, className: "mega-tip" })
         .bindPopup(popupHtml(r))
         .addTo(g);
     }

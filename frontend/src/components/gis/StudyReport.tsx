@@ -11,7 +11,7 @@ import { AlertTriangle, Bot, Building2, CheckCircle2, Coins, Construction, Downl
 import { toast } from "sonner";
 import { post } from "@/lib/api";
 import { compact, num, pkrShort } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { cn, safeHref } from "@/lib/utils";
 import { BarList, Button, Input, ScoreRing, Skeleton } from "@/components/ui";
 import type { StudyShape } from "./AreaDraw";
 import { megaColor, StatusPill, type MegaProject } from "./MegaProjects";
@@ -548,8 +548,8 @@ export function StudyReport({
                           )}
                         />
                         <span>
-                          {n.url ? (
-                            <a href={n.url} target="_blank" rel="noreferrer" className="link">
+                          {safeHref(n.url) ? (
+                            <a href={safeHref(n.url)!} target="_blank" rel="noreferrer" className="link">
                               {n.title}
                             </a>
                           ) : (

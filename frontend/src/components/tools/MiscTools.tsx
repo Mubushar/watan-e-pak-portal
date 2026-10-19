@@ -5,7 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { CircleMarker, Polygon, Polyline, Tooltip as LTooltip, useMapEvents } from "react-leaflet";
 import { ArrowRightLeft, CalendarDays, Clock, Eraser, Hexagon, Moon, Play, Route, Ruler, Sun, Terminal, Undo2 } from "lucide-react";
-import { mcp, parseToolResult, type McpTool } from "@/lib/mcp";
+import { isMcpAdmin, mcp, parseToolResult, type McpTool } from "@/lib/mcp";
+import { useAuth } from "@/store/auth";
 import { date as fmtDate, num } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Badge, Button, ButtonLink, Card, CardBody, CardHeader, EmptyState, ErrorState, Field, Input, JsonView, KeyValue, Select, Skeleton, Spinner, StatCard } from "@/components/ui";
@@ -266,11 +267,18 @@ export function MapMeasureTool() {
 }
 
 // ================================================================== generic (MCP-backed)
+/** The MCP endpoint admits administrators only, so the tools list is fetched just for them. */
+export function useMcpAdmin() {
+  return isMcpAdmin(useAuth((s) => s.user));
+}
+
 export function useMcpTools() {
-  return useQuery({ queryKey: ["mcp", "tools/list"], queryFn: () => mcp.listTools(), staleTime: 5 * 60_000 });
+  const admin = useMcpAdmin();
+  return useQuery({ queryKey: ["mcp", "tools/list"], queryFn: () => mcp.listTools(), staleTime: 5 * 60_000, enabled: admin });
 }
 
 export function GenericTool({ tool }: { tool: ToolCard }) {
+  const admin = useMcpAdmin();
   const tq = useMcpTools();
   const def: McpTool | undefined = useMemo(() => tq.data?.tools.find((t) => t.name === tool.mcp_tool), [tq.data, tool.mcp_tool]);
   return (
@@ -278,7 +286,9 @@ export function GenericTool({ tool }: { tool: ToolCard }) {
       <Card>
         <CardHeader title="Run via MCP" subtitle={tool.mcp_tool ? <code>{tool.mcp_tool}</code> : "No MCP tool"} icon={<Terminal className="h-4 w-4" />} action={<ButtonLink to="/ai/mcp" variant="ghost" size="sm">Console</ButtonLink>} />
         <CardBody>
-          {tq.isLoading ? (
+          {!admin ? (
+            <EmptyState title="Admins only" hint="Running tools over MCP needs an administrator account. The portal's calculators and pages work for everyone." />
+          ) : tq.isLoading ? (
             <Skeleton className="h-48" />
           ) : tq.error ? (
             <ErrorState error={tq.error} onRetry={() => tq.refetch()} />

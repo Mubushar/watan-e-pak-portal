@@ -8,6 +8,7 @@ import L from "leaflet";
 import type { FeatureCollection, MultiPolygon, Polygon } from "geojson";
 import { useMap } from "react-leaflet";
 import { useApi } from "@/hooks/useApi";
+import { escapeHtml } from "@/lib/utils";
 import { labelHtml, labelText, type MapLang } from "./PakistanLayers";
 
 export const DISTRICT_LABEL_ZOOM = 7;
@@ -55,7 +56,7 @@ export function DistrictLayer({ lang, zoom, labels }: { lang: MapLang; zoom: num
         const p = f.properties as DistrictProps;
         const n = p.listings ?? 0;
         l.bindTooltip(
-          `<b>${labelText(p.name, p.name_ur, lang)}</b><br>${p.province}${p.area_km2 ? ` · ${Math.round(p.area_km2).toLocaleString()} km²` : ""}${n ? `<br>${n} listing${n === 1 ? "" : "s"} on the portal` : ""}`,
+          `<b>${escapeHtml(labelText(p.name, p.name_ur, lang))}</b><br>${escapeHtml(p.province)}${p.area_km2 ? ` · ${Math.round(p.area_km2).toLocaleString()} km²` : ""}${n ? `<br>${escapeHtml(n)} listing${n === 1 ? "" : "s"} on the portal` : ""}`,
           { sticky: true, className: "mega-tip" },
         );
         l.on("mouseover", () => (l as L.Path).setStyle({ weight: 2.5, opacity: 1, dashArray: "", fillOpacity: 0.12 }));

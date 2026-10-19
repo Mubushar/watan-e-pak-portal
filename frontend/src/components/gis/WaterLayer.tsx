@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import { useMap } from "react-leaflet";
 import { get } from "@/lib/api";
+import { escapeHtml as esc } from "@/lib/utils";
 import { labelText, type MapLang } from "./PakistanLayers";
 
 export const WATER_CLASSES = [
@@ -43,8 +44,6 @@ export interface WaterStatus {
   hint?: string;
   date?: string;
 }
-
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
 function popupHtml(w: Water): string {
   const rows = [
@@ -136,7 +135,7 @@ export function WaterLayer({ classes, labels, lang, onStatus }: { classes: Set<s
             opacity: 0.95,
             lineCap: "round",
           });
-      layer.bindTooltip(name!, { sticky: true, className: "mega-tip" }).bindPopup(popupHtml(w)).addTo(g);
+      layer.bindTooltip(esc(name), { sticky: true, className: "mega-tip" }).bindPopup(popupHtml(w)).addTo(g);
     }
     // Name labels for the larger lakes and reservoirs.
     if (labels && z >= 9) {

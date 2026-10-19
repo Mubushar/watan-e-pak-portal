@@ -3,7 +3,8 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { KeyRound, Lock, Mail, Smartphone, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { ApiError, post } from "@/lib/api";
-import { DEMO_ACCOUNTS, useAuth, type Session } from "@/store/auth";
+import { demoAccountsFrom, useAuth, type Session } from "@/store/auth";
+import { useApi } from "@/hooks/useApi";
 import { Button, Field, Input, Segmented } from "@/components/ui";
 import { announceCode, AuthShell, DevOtpHint, OtpInput, type OtpHint } from "./AuthShell";
 
@@ -20,6 +21,9 @@ export default function Login() {
   const [code, setCode] = useState("");
   const [otpSent, setOtpSent] = useState<{ purpose: "login" | "signup"; dev?: string | null } | null>(null);
   const [busy, setBusy] = useState(false);
+  // Demo accounts are listed only where the server seeds them (never in production).
+  const cfg = useApi<{ demo_accounts?: unknown }>("/auth/config", undefined, { staleTime: 5 * 60_000 });
+  const demoAccounts = demoAccountsFrom(cfg.data);
 
   const finish = (s: Session) => {
     setSession(s);
@@ -130,12 +134,13 @@ export default function Login() {
         </Link>
       </p>
 
+      {demoAccounts.length > 0 && (
       <div className="mt-8 rounded-2xl border border-black/5 bg-white p-4 dark:border-white/10 dark:bg-white/5">
         <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-ink-mute">
           <UserRound className="h-3.5 w-3.5" /> Demo accounts (seeded)
         </p>
         <div className="mt-3 grid grid-cols-2 gap-2">
-          {DEMO_ACCOUNTS.map((a) => (
+          {demoAccounts.map((a) => (
             <button
               key={a.email}
               type="button"
@@ -143,17 +148,18 @@ export default function Login() {
               onClick={() => {
                 setMode("password");
                 setIdentifier(a.email);
-                setPassword(a.password);
-                void loginPassword(a.email, a.password);
+                setPassword(a.password ?? "");
+                if (a.password) void loginPassword(a.email, a.password);
               }}
               className="rounded-xl border border-black/5 px-3 py-2 text-start transition hover:border-brand-300 hover:bg-brand-50 dark:border-white/10 dark:hover:bg-white/5"
             >
-              <span className="block text-sm font-semibold">{a.role}</span>
+              <span className="block text-sm font-semibold">{a.label ?? (a.role ? a.role.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase()) : a.name ?? a.email)}</span>
               <span className="block truncate text-[11px] text-ink-mute">{a.email}</span>
             </button>
           ))}
         </div>
       </div>
+      )}
     </AuthShell>
   );
 }
