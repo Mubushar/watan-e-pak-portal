@@ -51,7 +51,14 @@ export function gallery(p: Imageable): string[] {
   return [...ext.slice(0, 3), ...interiors, ...plan];
 }
 
-export function cityImage(name?: string | null): string {
+/** A Wikimedia Commons thumbnail at a smaller standard width (phones don't need 1280 px). */
+export function sized(url: string, width: 330 | 500 | 960 | 1280 = 500): string {
+  return url.includes("upload.wikimedia.org") ? url.replace(/\/\d+px-/, `/${width}px-`) : url;
+}
+
+/** A city's real (credited) photo when it has one, else the bundled illustration. */
+export function cityImage(name?: string | null, image?: string | null): string {
+  if (image) return sized(image, 500);
   const n = (name ?? "").toLowerCase();
   if (["lahore", "karachi", "islamabad", "rawalpindi"].includes(n)) return asset(`seed/cities/${n}.svg`);
   return asset("seed/cities/rawalpindi.svg");

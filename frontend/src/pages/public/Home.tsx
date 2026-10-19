@@ -1,17 +1,13 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { AnimatePresence, animate, motion, useInView } from "framer-motion";
+import { Link } from "react-router-dom";
+import { animate, motion, useInView } from "framer-motion";
 import {
   ArrowRight,
   BadgeCheck,
-  Bot,
   Building,
   Building2,
   Calculator,
-  CheckCircle2,
-  Cpu,
   Factory,
-  Heart,
   Home as HomeIcon,
   KeyRound,
   Landmark,
@@ -20,11 +16,6 @@ import {
   MapPin,
   Quote,
   Ruler,
-  Scale,
-  Search,
-  Send,
-  ShieldCheck,
-  Sparkles,
   Star,
   Store,
   Trees,
@@ -34,21 +25,18 @@ import {
 } from "lucide-react";
 import type { City, NewsItem, Property, PropertyList, Story } from "@/types";
 import { useApi } from "@/hooks/useApi";
-import { get } from "@/lib/api";
 import { compact, pkrShort, timeAgo, titleCase } from "@/lib/format";
 import { cityImage, HERO, themedImage } from "@/lib/images";
-import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { usePrefs } from "@/store/prefs";
-import { Badge, Carousel, Section, Segmented, Skeleton } from "@/components/ui";
+import { Carousel, Section, Skeleton } from "@/components/ui";
 import { Deferred } from "@/components/ui/Deferred";
-import { PropertyCard, PropertyRow } from "@/components/property/PropertyCard";
 import type { HomePoi } from "./home/HomeMap";
 
 // Below-the-fold widgets load their libraries (Leaflet ~150 kB, recharts ~400 kB) on scroll.
 const HomeMap = lazy(() => import("./home/HomeMap"));
 const AreaTrend = lazy(() => import("@/components/ui/charts").then((m) => ({ default: m.AreaTrend })));
 import { AdSlot } from "@/components/ads/AdSlot";
+import { ComposerHero, MapShowcase, MarketShowcase, Together } from "./home/Landing";
 
 // ---------------------------------------------------------------- helpers
 function CountUp({ to, suffix = "" }: { to: number; suffix?: string }) {
@@ -68,28 +56,6 @@ function CountUp({ to, suffix = "" }: { to: number; suffix?: string }) {
   );
 }
 
-const HERO_SLIDES = [
-  { img: HERO.panorama, caption: "Islamabad · Margalla foothills" },
-  { img: HERO.villa, caption: "Luxury villas · DHA & Bahria" },
-  { img: HERO.landscape, caption: "From the north to the coast" },
-];
-
-const PURPOSES = [
-  { value: "buy", label: "Buy", icon: <HomeIcon className="h-4 w-4" /> },
-  { value: "rent", label: "Rent", icon: <KeyRound className="h-4 w-4" /> },
-  { value: "plot", label: "Plot", icon: <LandPlot className="h-4 w-4" /> },
-  { value: "commercial", label: "Commercial", icon: <Building2 className="h-4 w-4" /> },
-] as const;
-
-const FEATURES = [
-  { icon: ShieldCheck, title: "Verified Listings", sub: "Trusted & authentic" },
-  { icon: Cpu, title: "AI Recommendations", sub: "Smarter property search" },
-  { icon: MapPin, title: "Interactive Map", sub: "Explore locations" },
-  { icon: LineChart, title: "Market Insights", sub: "Data-driven decisions" },
-  { icon: Scale, title: "Easy Comparisons", sub: "Find the best deal" },
-  { icon: Heart, title: "Save & Shortlist", sub: "Your favourite properties" },
-];
-
 const CATEGORIES = [
   { key: "house", label: "Houses", icon: HomeIcon },
   { key: "apartment", label: "Apartments", icon: Building },
@@ -107,235 +73,6 @@ const SHOWCASE_AGENTS = [
   { key: "investment_screener", name: "Investment Screener", blurb: "Screens the market into risk-adjusted top picks with IRR, DSCR and exit timing.", icon: LineChart },
   { key: "autonomous_leasing_agent", name: "Leasing Agent", blurb: "Answers tenant enquiries 24/7, screens applicants and recommends renewals.", icon: KeyRound },
 ];
-
-// ---------------------------------------------------------------- hero
-function Hero() {
-  const t = useT();
-  const nav = useNavigate();
-  const lang = usePrefs((s) => s.lang);
-  const [slide, setSlide] = useState(0);
-  const [purpose, setPurpose] = useState<(typeof PURPOSES)[number]["value"]>("buy");
-  const [q, setQ] = useState("");
-  const [city, setCity] = useState("");
-  const cities = useApi<{ cities: City[] }>("/cities");
-
-  useEffect(() => {
-    const id = setInterval(() => setSlide((s) => (s + 1) % HERO_SLIDES.length), 6500);
-    return () => clearInterval(id);
-  }, []);
-
-  const submit = (e?: React.FormEvent) => {
-    e?.preventDefault();
-    const params = new URLSearchParams();
-    if (q.trim()) params.set("q", q.trim());
-    if (city) params.set("city", city);
-    if (purpose === "plot") params.set("category", "plot");
-    if (purpose === "commercial") params.set("use_type", "commercial");
-    if (purpose === "rent") params.set("purpose", "rent");
-    nav(`/properties?${params.toString()}`);
-  };
-
-  return (
-    <section className="relative isolate overflow-hidden">
-      {/* crossfading background slider */}
-      <div className="absolute inset-0 -z-10">
-        <AnimatePresence>
-          <motion.img
-            key={slide}
-            src={HERO_SLIDES[slide]!.img}
-            alt=""
-            initial={{ opacity: 0, scale: 1.08 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ opacity: { duration: 1.2 }, scale: { duration: 7, ease: "linear" } }}
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        </AnimatePresence>
-        <div className="absolute inset-0 bg-gradient-to-r from-white via-white/85 to-white/10 dark:from-[#07130d] dark:via-[#07130d]/85 dark:to-[#07130d]/20 rtl:bg-gradient-to-l" />
-        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#f6f8f6] to-transparent dark:from-[#07130d]" />
-      </div>
-
-      <div className="container grid gap-10 pb-28 pt-12 lg:grid-cols-[1.25fr_1fr] lg:pt-20">
-        <div className="min-w-0">
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-            <Badge tone="gold" icon={<Sparkles className="h-3 w-3" />}>
-              Pakistan’s first agentic real-estate portal
-            </Badge>
-          </motion.div>
-          <motion.h1
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-            className={cn("mt-5 font-display text-4xl font-extrabold leading-[1.05] text-brand-900 sm:text-6xl dark:text-white", lang === "ur" && "font-urdu leading-[1.6]")}
-          >
-            {t("Find the Perfect")}
-            <br />
-            <span className="text-gradient">{t("Property with AI")}</span>
-          </motion.h1>
-          <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="mt-5 max-w-xl text-lg text-ink-soft dark:text-slate-300">
-            Explore verified properties, housing societies and investment opportunities across Pakistan — with live market intelligence and AI agents at your side.
-          </motion.p>
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm font-semibold text-brand-800 dark:text-brand-100">
-            {[
-              [Trees, t("Your Land")],
-              [Cpu, t("Our Intelligence")],
-              [TrendingUp, t("A Brighter Pakistan")],
-            ].map(([I, l], i) => {
-              const Icon = I as typeof Trees;
-              return (
-                <span key={i} className="inline-flex items-center gap-2">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white shadow-card dark:bg-white/10">
-                    <Icon className="h-4 w-4 text-brand-600 dark:text-gold-300" />
-                  </span>
-                  {l as string}
-                </span>
-              );
-            })}
-          </motion.div>
-
-          {/* search */}
-          <motion.form onSubmit={submit} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="mt-10">
-            <Segmented value={purpose} onChange={setPurpose} options={PURPOSES.map((p) => ({ ...p, label: t(p.label) }))} className="glass no-scrollbar max-w-full overflow-x-auto shadow-soft" />
-            <div className="glass mt-3 flex flex-col gap-2 rounded-3xl p-2 shadow-soft sm:flex-row sm:items-center sm:rounded-full">
-              <div className="flex flex-1 items-center gap-3 px-4">
-                <Search className="h-5 w-5 shrink-0 text-brand-600" />
-                <input
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="Search city, housing society, block, area or property…"
-                  className="h-12 w-full bg-transparent text-[15px] outline-none placeholder:text-ink-mute"
-                />
-              </div>
-              <select value={city} onChange={(e) => setCity(e.target.value)} className="h-12 rounded-full border-0 bg-brand-50/80 px-4 text-sm font-semibold text-brand-800 outline-none dark:bg-white/10 dark:text-white">
-                <option value="">All cities</option>
-                {cities.data?.cities.map((c) => (
-                  <option key={c.id} value={c.name}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              <button type="submit" className="btn btn-primary h-12 rounded-full px-7 text-[15px]">
-                {t("Search Properties")} <ArrowRight className="h-4 w-4 rtl:rotate-180" />
-              </button>
-            </div>
-          </motion.form>
-          <div className="mt-4 flex flex-wrap gap-2 text-xs">
-            <span className="font-semibold text-ink-mute">Popular:</span>
-            {["DHA Lahore", "Bahria Town Karachi", "Islamabad apartments", "10 Marla house", "Commercial plaza"].map((s) => (
-              <button key={s} onClick={() => nav(`/properties?q=${encodeURIComponent(s)}`)} className="rounded-full bg-white/70 px-3 py-1 font-medium text-brand-800 ring-1 ring-brand-100 transition hover:bg-white dark:bg-white/5 dark:text-brand-100 dark:ring-white/10">
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* AI panel */}
-        <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="hidden lg:block">
-          <AiSearchPanel />
-          <div className="mt-4 flex items-center justify-end gap-2">
-            {HERO_SLIDES.map((s, i) => (
-              <button key={i} onClick={() => setSlide(i)} className={cn("h-1.5 rounded-full transition-all", i === slide ? "w-8 bg-brand-700 dark:bg-gold-400" : "w-3 bg-brand-900/20 dark:bg-white/30")} aria-label={s.caption} />
-            ))}
-            <span className="ms-2 text-xs font-medium text-ink-mute">{HERO_SLIDES[slide]!.caption}</span>
-          </div>
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
-function AiSearchPanel() {
-  const setOpen = usePrefs((s) => s.setAssistantOpen);
-  const nav = useNavigate();
-  const [q, setQ] = useState("");
-  const [hits, setHits] = useState<{ id: string; title: string; price: number; city?: string; category?: string; type: string }[] | null>(null);
-  const [busy, setBusy] = useState(false);
-  const run = async (text: string) => {
-    if (!text.trim()) return;
-    setBusy(true);
-    try {
-      const r = await get<{ results: typeof hits }>("/rag/search", { query: text, limit: 6 });
-      setHits((r.results ?? []).filter((h) => h.type === "property").slice(0, 3));
-    } catch {
-      setHits([]);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <div className="glass relative overflow-hidden rounded-3xl p-6 shadow-soft">
-      <div className="pointer-events-none absolute -end-16 -top-16 h-48 w-48 rounded-full bg-gold-300/30 blur-3xl" />
-      <div className="flex items-center gap-3">
-        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-gradient text-white shadow-soft">
-          <Bot className="h-6 w-6" />
-        </span>
-        <div>
-          <p className="font-display text-lg font-bold text-brand-900 dark:text-white">AI Powered Property Search</p>
-          <p className="text-xs text-ink-mute">RAG over live listings · MCP agents</p>
-        </div>
-      </div>
-      <ul className="mt-5 grid grid-cols-2 gap-2.5 text-sm font-medium text-ink-soft dark:text-slate-300">
-        {["Smart recommendations", "Market insights", "Compare properties", "Nearby places", "Investment analysis", "Price predictions"].map((f) => (
-          <li key={f} className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-brand-600 dark:text-gold-300" /> {f}
-          </li>
-        ))}
-      </ul>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void run(q);
-        }}
-        className="mt-5 flex items-center gap-2 rounded-2xl bg-white p-1.5 ring-1 ring-brand-100 dark:bg-white/5 dark:ring-white/10"
-      >
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a 10-marla house in DHA under 7 crore…" className="h-10 flex-1 bg-transparent px-3 text-sm outline-none" />
-        <button className="btn btn-primary btn-icon h-10 w-10" aria-label="Ask" disabled={busy}>
-          <Send className="h-4 w-4 rtl:rotate-180" />
-        </button>
-      </form>
-      <div className="mt-3 min-h-[60px]">
-        {busy && <Skeleton className="h-16 w-full" />}
-        {!busy && hits && (
-          <div className="space-y-1">
-            <p className="flex items-center gap-1.5 px-1 text-xs font-semibold text-brand-700 dark:text-brand-300">
-              <Sparkles className="h-3.5 w-3.5" /> Best matches for you
-            </p>
-            {hits.length ? hits.map((h) => <PropertyRow key={h.id} p={{ id: h.id, title: h.title, price: h.price, category: h.category ?? "house", city_name: h.city }} />) : <p className="px-1 text-sm text-ink-mute">No direct matches — try the full assistant.</p>}
-          </div>
-        )}
-      </div>
-      <div className="mt-3 flex gap-2">
-        <button onClick={() => setOpen(true)} className="btn btn-gold flex-1">
-          <Sparkles className="h-4 w-4" /> Chat with AI
-        </button>
-        <button onClick={() => nav("/ai")} className="btn btn-outline">
-          Agents
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------- sections
-function FeatureStrip() {
-  return (
-    <div className="container relative z-10 -mt-16">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        {FEATURES.map((f, i) => (
-          <motion.div key={f.title} initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.05 }} className="card card-hover flex items-center gap-3 p-4">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-gold-300">
-              <f.icon className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-bold text-ink dark:text-white">{f.title}</p>
-              <p className="truncate text-xs text-ink-mute">{f.sub}</p>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function StatsBand() {
   const s = useApi<{ inventory: Record<string, number>; portfolio: { total_market_value: number }; users_and_roles: { users: number } }>("/portal/statistics");
@@ -372,38 +109,6 @@ function StatsBand() {
         </div>
       </div>
     </section>
-  );
-}
-
-function Featured({ props, loading }: { props: Property[]; loading: boolean }) {
-  const t = useT();
-  const featured = props.filter((p) => p.featured);
-  const list = featured.length >= 4 ? featured : props;
-  return (
-    <Section
-      eyebrow="Handpicked for you"
-      title={t("Featured Properties")}
-      subtitle="Verified homes, plots and commercial spaces — refreshed live from the portal."
-      action={
-        <Link to="/properties" className="btn btn-outline">
-          {t("View all")} <ArrowRight className="h-4 w-4 rtl:rotate-180" />
-        </Link>
-      }
-    >
-      {loading ? (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-80" />
-          ))}
-        </div>
-      ) : (
-        <Carousel slideClass="basis-[85%] sm:basis-1/2 lg:basis-1/3 xl:basis-1/4" autoplay>
-          {list.map((p) => (
-            <PropertyCard key={p.id} p={p} />
-          ))}
-        </Carousel>
-      )}
-    </Section>
   );
 }
 
@@ -825,14 +530,15 @@ function Cta() {
 
 // ---------------------------------------------------------------- page
 export default function Home() {
-  const q = useApi<PropertyList>("/properties", { limit: 50 });
+  const q = useApi<PropertyList>("/properties", { limit: 600 });
   const props = q.data?.results ?? [];
   return (
     <div>
-      <Hero />
-      <FeatureStrip />
+      <ComposerHero />
       <StatsBand />
-      <Featured props={props} loading={q.isLoading} />
+      <MarketShowcase props={props} loading={q.isLoading} />
+      <Together />
+      <MapShowcase />
       <MapAndAssistant props={props} />
       <div className="container mt-12">
         <AdSlot slot="banner" placement="home" />
