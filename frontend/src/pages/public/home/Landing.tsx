@@ -7,7 +7,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, Bot, Home as HomeIcon, KeyRound, MapPin, Mic, Shuffle, Sparkles, TrendingUp, UserRound } from "lucide-react";
+import { ArrowRight, BadgeCheck, Bot, Home as HomeIcon, KeyRound, Lock, MapPin, Mic, Quote, ShieldCheck, Shuffle, Sparkles, TrendingUp, UserRound } from "lucide-react";
 import type { Property } from "@/types";
 import { useApi } from "@/hooks/useApi";
 import { pkrShort } from "@/lib/format";
@@ -280,8 +280,8 @@ const TOGETHER: [string, string][] = [
 
 export function Together() {
   return (
-    <section className="container mt-14">
-      <div className="card p-6 sm:p-8">
+    <section className="container mt-14 grid gap-6 lg:grid-cols-3">
+      <div className="card p-6 sm:p-8 lg:col-span-2">
         <p className="section-eyebrow">How we work together</p>
         <h2 className="mt-1 font-display text-2xl font-bold text-brand-900 sm:text-3xl dark:text-white">You stay in charge. Arz-e-Pak AI does the legwork.</h2>
         <div className="mt-6 grid gap-x-5 gap-y-3 md:grid-cols-2">
@@ -303,7 +303,50 @@ export function Together() {
           ))}
         </div>
       </div>
+      <TrustCard />
     </section>
+  );
+}
+
+// The right third beside "You stay in charge": why the answers can be trusted.
+const TRUST: { icon: typeof Quote; title: string; text: string }[] = [
+  { icon: Quote, title: "Every answer is cited", text: "Numbered sources you can open and check." },
+  { icon: BadgeCheck, title: "Official sources first", text: "Authority lists outrank listing data." },
+  { icon: ShieldCheck, title: "Approval checks", text: "Society status from the CDA, RDA, LDA and others." },
+  { icon: Lock, title: "Private memory", text: "Never CNIC or card numbers. Clear it any time." },
+];
+const TIERS = ["Official", "Verified", "Reference", "Listing"];
+
+function TrustCard() {
+  return (
+    <motion.div initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex flex-col rounded-3xl bg-brand-gradient p-6 text-white shadow-soft sm:p-8">
+      <p className="text-xs font-semibold uppercase tracking-[.18em] text-gold-300">Why you can trust it</p>
+      <h3 className="mt-1 font-display text-xl font-bold">Answers you can check.</h3>
+      <ul className="mt-4 space-y-3">
+        {TRUST.map(({ icon: Icon, title, text }) => (
+          <li key={title} className="flex gap-3">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-gold-300">
+              <Icon className="h-4 w-4" />
+            </span>
+            <span className="text-sm">
+              <span className="block font-semibold">{title}</span>
+              <span className="text-white/75">{text}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-4 flex flex-wrap gap-1.5">
+        {TIERS.map((t, i) => (
+          <span key={t} className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-semibold", i === 0 ? "bg-gold-gradient text-brand-950" : "bg-white/10 text-white/85")}>
+            {t}
+          </span>
+        ))}
+      </div>
+      <div className="min-h-6 flex-1" />
+      <Link to="/ai" className="btn btn-gold justify-center">
+        <Sparkles className="h-4 w-4" /> Ask Arz-e-Pak AI
+      </Link>
+    </motion.div>
   );
 }
 
