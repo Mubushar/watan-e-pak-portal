@@ -887,6 +887,45 @@ def geo_megaprojects(type: Optional[str] = None, status: Optional[str] = None, p
             "statuses": megaprojects.STATUS_LABELS, "projects": rows}
 
 
+@app.post("/geo/megaprojects", tags=["places"], status_code=201)
+def geo_megaproject_create(payload: Dict[str, Any]) -> Any:
+    """Add an infrastructure mega project (GIS managers; saved in the database)."""
+    try:
+        return megaprojects.admin_save(None, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.put("/geo/megaprojects/{project_id}", tags=["places"])
+def geo_megaproject_update(project_id: str, payload: Dict[str, Any]) -> Any:
+    """Change a mega project — fields and / or geometry (point, line or polygon)."""
+    try:
+        return megaprojects.admin_save(project_id, payload)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Project not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.delete("/geo/megaprojects/{project_id}", tags=["places"])
+def geo_megaproject_delete(project_id: str) -> Any:
+    try:
+        return megaprojects.admin_delete(project_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Project not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/geo/megaprojects/{project_id}/reset", tags=["places"])
+def geo_megaproject_reset(project_id: str) -> Any:
+    """Undo every admin change to a shipped mega project."""
+    try:
+        return megaprojects.admin_reset(project_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Not a shipped project")
+
+
 @app.get("/geo/megaprojects/near", tags=["places"])
 def geo_megaprojects_near(lat: float, lon: float, radius_km: float = 0.0) -> Any:
     """Mega projects whose price effect reaches a point (or an area ``radius_km`` around it), strongest first."""

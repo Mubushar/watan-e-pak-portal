@@ -58,7 +58,158 @@ def all_projects() -> List[Dict[str, Any]]:
         photos = {}
     base = [{**p, "image": photos[p["id"]]["url"], "image_credit": photos[p["id"]].get("credit")} if p["id"] in photos else p
             for p in _load()["projects"]]
-    return base + extra
+    return _with_edits(base + extra)
+
+
+def _edits() -> Dict[str, Dict[str, Any]]:
+    import sys
+
+    for name in ("server", "__main__"):
+        mod = sys.modules.get(name)
+        if mod is not None and hasattr(mod, "megaproject_edits_db"):
+            return mod.megaproject_edits_db
+    return {}
+
+
+def _portal_positions() -> Dict[str, Tuple[float, float]]:
+    """Inventory projects an admin moved on the map (big projects with an "admin" location)."""
+    import sys
+
+    core = sys.modules.get("server") or sys.modules.get("__main__")
+    return {b.name.lower(): (b.latitude, b.longitude) for b in getattr(core, "big_projects_db", None) or []
+            if getattr(b, "location_precision", None) == "admin" and b.latitude is not None}
+
+
+def _with_edits(projects: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    edits = _edits()
+    moved = _portal_positions()
+    out = []
+    for p in projects:
+        e = edits.get(p["id"])
+        if e and e.get("deleted"):
+            continue
+        if e and e.get("fields"):
+            p = {**p, **e["fields"], "edited": True}
+        if p.get("portal_project") and p["name"].lower() in moved:
+            lat, lon = moved[p["name"].lower()]
+            p = {**p, "geometry": {**p["geometry"], "center": [lat, lon]}}
+        out.append(p)
+    out += [{**e["fields"], "id": k, "created_by_admin": True} for k, e in edits.items() if e.get("created") and not e.get("deleted")]
+    return out
+
+
+def is_shipped(project_id: str) -> bool:
+    return any(p["id"] == project_id for p in _load()["projects"])
+
+
+GEOMETRY_TYPES = ("point", "line", "polygon")
+EDITABLE = ("name", "name_ur", "type", "status", "city", "province", "authority", "start_year", "completion",
+            "length_km", "summary", "impact", "uplift", "impact_radius_km", "geometry", "sources")
+
+
+def _in_pk(pt: Any) -> bool:
+    return (isinstance(pt, (list, tuple)) and len(pt) == 2 and all(isinstance(x, (int, float)) for x in pt)
+            and 23.0 <= pt[0] <= 37.5 and 60.0 <= pt[1] <= 78.0)
+
+
+def check_fields(f: Dict[str, Any], creating: bool) -> Dict[str, Any]:
+    """Validate an admin edit; returns the cleaned fields (raises ValueError with a plain message)."""
+    out = {k: v for k, v in f.items() if k in EDITABLE}
+    if creating or "name" in out:
+        if not str(out.get("name") or "").strip():
+            raise ValueError("A name is required")
+        out["name"] = str(out["name"]).strip()[:160]
+    if "type" in out and out["type"] not in TYPE_LABELS:
+        raise ValueError(f"type must be one of: {', '.join(TYPE_LABELS)}")
+    if "status" in out and out["status"] not in STATUS_LABELS:
+        raise ValueError(f"status must be one of: {', '.join(STATUS_LABELS)}")
+    if "uplift" in out and out["uplift"] not in UPLIFT_WEIGHT:
+        raise ValueError("uplift must be high, medium or low")
+    if "impact_radius_km" in out:
+        r = out["impact_radius_km"]
+        if not isinstance(r, (int, float)) or not 0 < r <= 50:
+            raise ValueError("impact radius must be between 0 and 50 km")
+    if creating or "geometry" in out:
+        g = out.get("geometry") or {}
+        t = g.get("type")
+        if t not in GEOMETRY_TYPES:
+            raise ValueError("geometry type must be point, line or polygon")
+        if t == "point":
+            if not _in_pk(g.get("center")):
+                raise ValueError("The point must be inside Pakistan")
+            g = {"type": "point", "center": [round(g["center"][0], 6), round(g["center"][1], 6)],
+                 "radius_km": float(g.get("radius_km") or 0.3)}
+        else:
+            key = "path" if t == "line" else "ring"
+            pts = g.get(key) or []
+            need = 2 if t == "line" else 3
+            if len(pts) < need or not all(_in_pk(x) for x in pts):
+                raise ValueError(f"A {t} needs at least {need} points inside Pakistan")
+            if len(pts) > 2000:
+                raise ValueError("Too many points (2000 at most)")
+            g = {"type": t, key: [[round(x[0], 6), round(x[1], 6)] for x in pts]}
+        out["geometry"] = g
+    if creating:
+        out.setdefault("type", "cbd")
+        out.setdefault("status", "planned")
+        out.setdefault("uplift", "medium")
+        out.setdefault("impact_radius_km", 2)
+        out.setdefault("summary", "")
+        out.setdefault("impact", "")
+        out.setdefault("city", "")
+        out.setdefault("province", "")
+        out.setdefault("sources", [])
+    return out
+
+
+def admin_save(project_id: Optional[str], fields: Dict[str, Any]) -> Dict[str, Any]:
+    """Create (project_id None) or change a mega project; returns the project as listed."""
+    import re
+    from datetime import datetime
+
+    edits = _edits()
+    now = datetime.now().isoformat(timespec="seconds")
+    if project_id is None:
+        clean = check_fields(fields, creating=True)
+        base = re.sub(r"[^a-z0-9]+", "-", clean["name"].lower()).strip("-")[:48] or "project"
+        new_id, n = f"admin-{base}", 2
+        while any(p["id"] == new_id for p in all_projects()) or new_id in edits:
+            new_id, n = f"admin-{base}-{n}", n + 1
+        edits[new_id] = {"created": True, "deleted": False, "fields": clean, "updated_at": now}
+        return summary(next(p for p in all_projects() if p["id"] == new_id))
+    current = get(project_id)
+    if current is None:
+        raise KeyError(project_id)
+    if current.get("portal_project"):
+        raise ValueError("This is a portal project — edit it as a big project (its units follow it)")
+    clean = check_fields(fields, creating=False)
+    e = edits.setdefault(project_id, {"created": False, "deleted": False, "fields": {}})
+    e["fields"] = {**e.get("fields", {}), **clean}
+    e["updated_at"] = now
+    return summary(get(project_id))
+
+
+def admin_delete(project_id: str) -> Dict[str, Any]:
+    edits = _edits()
+    current = get(project_id)
+    if current is None:
+        raise KeyError(project_id)
+    if current.get("portal_project"):
+        raise ValueError("This is a portal project — delete it as a big project")
+    if project_id in edits and edits[project_id].get("created"):
+        edits.pop(project_id)
+    else:
+        edits[project_id] = {**edits.get(project_id, {"fields": {}}), "deleted": True}
+    return {"deleted": True, "id": project_id}
+
+
+def admin_reset(project_id: str) -> Dict[str, Any]:
+    """Drop the admin's changes to a shipped project (back to the data file)."""
+    edits = _edits()
+    if not is_shipped(project_id):
+        raise KeyError(project_id)
+    edits.pop(project_id, None)
+    return summary(get(project_id))
 
 
 def get(project_id: str) -> Optional[Dict[str, Any]]:

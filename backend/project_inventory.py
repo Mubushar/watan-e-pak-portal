@@ -132,12 +132,15 @@ def sync(data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         units = p.get("units", [])
         prices = [u["price"] for u in units]
         b = next((x for x in core.big_projects_db if x.name.lower() == p["name"].lower()), None)
+        # an admin moved this project on the map: keep that position for it and its units
+        pinned = (b.latitude, b.longitude) if b is not None and b.location_precision == "admin" and b.latitude is not None else None
+        loc = {"lat": pinned[0], "lon": pinned[1]} if pinned else p["location"]
         fields = dict(
             description=p["description"], project_type=p["project_type"], status=p["status"], city_id=city.id,
-            scheme_id=scheme.id if scheme else None, latitude=p["location"]["lat"], longitude=p["location"]["lon"],
+            scheme_id=scheme.id if scheme else None, latitude=loc["lat"], longitude=loc["lon"],
             developer=p["developer"], address=p.get("address"), website=(p.get("sources") or [{}])[0].get("url"),
             marketed_by=p.get("marketed_by"), floors_label=p.get("floors"), floor_count=p.get("floor_count") or 0,
-            total_units=p.get("total_units"), location_precision=p["location"]["precision"],
+            total_units=p.get("total_units"), location_precision="admin" if pinned else p["location"]["precision"],
             payment_plan=p.get("payment_plan"), offer=p.get("offer"), unit_types=unit_types(units),
             price_from=min(prices) if prices else None, price_to=max(prices) if prices else None,
             units_available=len(units), inventory_checked=checked, inventory_source=p.get("inventory_source"),
@@ -172,7 +175,7 @@ def sync(data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
                 city_id=city.id, scheme_id=scheme.id if scheme else None,
                 bedrooms=u.get("bedrooms") or None, floors=None, sector=p["name"], landmark=p.get("address"),
                 street_address=p.get("address"), plot_number=u["unit"],
-                latitude=p["location"]["lat"], longitude=p["location"]["lon"],
+                latitude=loc["lat"], longitude=loc["lon"],
                 amenities=[a for a in (u.get("facing"), "Private pool" if u["kind"] == "pool_apartment" else None,
                                        "Instalment plan", p.get("offer") and "Offer available") if a],
                 project_id=b.id, project_unit=u["unit"], source_url=fields["website"],

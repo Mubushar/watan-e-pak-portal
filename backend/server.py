@@ -4210,12 +4210,44 @@ def update_big_project(
     total_retail_space: Optional[float] = None,
     total_office_space: Optional[float] = None,
     total_residential_units: Optional[int] = None,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
+    city_id: Optional[str] = None,
+    scheme_id: Optional[str] = None,
+    project_type: Optional[str] = None,
+    address: Optional[str] = None,
+    website: Optional[str] = None,
 ) -> str:
-    """Update editable fields of a big project."""
+    """Update editable fields of a big project, including where it is (moving a project moves its
+    unit listings too, and the inventory sync then keeps the admin's position)."""
     b = find_project(project_id)
     if not b:
         return dump({"error": f"Big project not found: {project_id}"})
+    if (latitude is None) != (longitude is None):
+        return dump({"error": "Give both latitude and longitude"})
+    if latitude is not None and not (23.0 <= latitude <= 37.5 and 60.0 <= longitude <= 78.0):
+        return dump({"error": "The location must be inside Pakistan (latitude 23–37.5, longitude 60–78)"})
+    if city_id is not None and not find_city(city_id):
+        return dump({"error": "Choose a valid city"})
+    if scheme_id:
+        s = find_scheme(scheme_id)
+        if not s:
+            return dump({"error": "That housing society doesn't exist"})
+        if s.city_id != (city_id or b.city_id):
+            return dump({"error": f"{s.name} is not in {city_name(city_id or b.city_id)}"})
+    if latitude is not None:
+        b.latitude, b.longitude, b.location_precision = latitude, longitude, "admin"
+        for p in properties_db:
+            if p.project_id == b.id:
+                p.latitude, p.longitude, p.updated_at = latitude, longitude, datetime.now()
+    if city_id is not None:
+        b.city_id = city_id
+    if scheme_id is not None:
+        b.scheme_id = scheme_id or None
     fields = {
+        "project_type": project_type,
+        "address": address,
+        "website": website,
         "name": name,
         "description": description,
         "status": status,
@@ -16806,6 +16838,12 @@ def publish_master_plans_once(store: Any) -> int:
     if changed:
         store.mark_dirty()
     return changed
+
+
+# ---------- admin edits to the infrastructure mega projects (the data file stays as shipped) ----------
+# id -> {"created": bool, "deleted": bool, "fields": {...}, "updated_at": iso}. megaprojects.all_projects()
+# lays these over geodata/pk_megaprojects.json, so an admin can move, reshape, add or remove projects.
+megaproject_edits_db: Dict[str, Dict[str, Any]] = {}
 
 
 def builtin_layer(ref: str) -> Optional[Any]:

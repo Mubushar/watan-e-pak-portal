@@ -38,6 +38,11 @@ export interface MegaProject {
   bounds: [number, number, number, number];
   center: [number, number];
   geometry?: { type: "line"; path: [number, number][] } | { type: "polygon"; ring: [number, number][] } | { type: "point"; center: [number, number]; radius_km: number };
+  /** An inventory project (edited as a big project). */
+  portal_project?: boolean;
+  /** A shipped project an admin has changed / one an admin added. */
+  edited?: boolean;
+  created_by_admin?: boolean;
   /** From /near and the study report. */
   distance_km?: number;
   inside?: boolean;

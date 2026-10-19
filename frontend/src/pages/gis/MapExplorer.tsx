@@ -65,6 +65,8 @@ import { NavigatorLayer, NavigatorPanel, useNavigator } from "@/components/gis/N
 import { POI_CATEGORIES, POI_MIN_ZOOM, PoiLayer } from "@/components/gis/PoiLayer";
 import { AreaDraw, shapeAreaKm2, type DrawMode, type StudyShape } from "@/components/gis/AreaDraw";
 import { StudyReport, useStudyReport } from "@/components/gis/StudyReport";
+import { GeoEditLayer, GeoEditPanel, loadDraft, newDraft, pick, type Draft, type EditMode } from "@/components/gis/GeoEditor";
+import { useAuth } from "@/store/auth";
 import { ANNOTATION_MIN_ZOOM, MEGA_TYPES, MegaProjectLayer, useMegaProjects } from "@/components/gis/MegaProjects";
 import { LiveRoadOverlay, ROAD_CLASSES, RoadLayer, type RoadStatus } from "@/components/gis/RoadLayer";
 import { WATER_CLASSES, WaterLayer, type WaterStatus } from "@/components/gis/WaterLayer";
@@ -402,6 +404,51 @@ export default function MapExplorer() {
     [mode],
   );
 
+  // -------------------------------------------------------------- admin map editing
+  const can = useAuth((s) => s.can);
+  const editRights = { property: can("properties.manage"), project: can("projects.manage"), mega: can("gis.manage") };
+  const [editMode, setEditModeRaw] = useState<EditMode>(null);
+  const [editDraft, setEditDraft] = useState<Draft | null>(null);
+  const editProjectsQ = useApi<{ projects: { id: string; name: string; latitude?: number | null; longitude?: number | null }[] }>(editMode ? "/bigprojects" : null);
+  const setEditMode = (m: EditMode) => {
+    setEditModeRaw(m);
+    setEditDraft(null);
+    if (m) {
+      setZoomMode(null);
+      setDrawMode(null);
+      nav.setPicking(null);
+    }
+  };
+  const onEditClick = async (at: L.LatLng) => {
+    if (editDraft?.drawing && editDraft.geom.type !== "point") {
+      setEditDraft({ ...editDraft, geom: { ...editDraft.geom, pts: [...editDraft.geom.pts, [at.lat, at.lng]] } });
+      return;
+    }
+    if (editMode && editMode !== "select") {
+      if (!editDraft) setEditDraft(newDraft(editMode, [at.lat, at.lng]));
+      else if (editDraft.geom.type === "point" && !editDraft.id) setEditDraft({ ...editDraft, geom: { ...editDraft.geom, at: [at.lat, at.lng] } });
+      return;
+    }
+    if (!map) return;
+    const hit = pick(map, at, editRights, properties, editProjectsQ.data?.projects ?? [], megaQ.data?.projects ?? []);
+    if (!hit) return;
+    try {
+      setEditDraft(await loadDraft(hit));
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+  useEffect(() => {
+    if (!editMode) return;
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (editDraft) setEditDraft(null);
+      else setEditModeRaw(null);
+    };
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [editMode, editDraft]);
+
   // -------------------------------------------------------------- view history ("Last view")
   const viewHistory = useRef<{ c: [number, number]; z: number }[]>([]);
   const goingBack = useRef(false);
@@ -685,7 +732,16 @@ export default function MapExplorer() {
         <MapClick enabled={analysing && !zoomDraw && !drawMode && !nav.picking} onClick={onMapClick} />
         <ZoomArea active={zoomDraw} mode={zoomMode ?? "in"} onDone={endZoomDraw} padding={sidePad()} sticky />
         <AreaDraw mode={drawMode} shape={studyShape} onShape={onStudyShape} onCancel={cancelDraw} />
+        <GeoEditLayer mode={editMode} draft={editDraft} setDraft={setEditDraft} onPick={onEditClick} />
       </PortalMap>
+      <GeoEditPanel
+        mode={editMode}
+        draft={editDraft}
+        setDraft={setEditDraft}
+        onDone={() => (editDraft ? setEditDraft(null) : setEditModeRaw(null))}
+        megaTypes={(megaQ.data as { types?: Record<string, string> } | undefined)?.types ?? {}}
+        megaStatuses={(megaQ.data as { statuses?: Record<string, string> } | undefined)?.statuses ?? {}}
+      />
 
       {/* ------------------------------------------------------- map controls (grouped) */}
       <MapControls
@@ -699,12 +755,14 @@ export default function MapExplorer() {
           }
           setZoomMode(m);
         }}
-        panActive={!zoomMode && !drawMode && !nav.picking}
+        panActive={!zoomMode && !drawMode && !nav.picking && !editMode}
         onPan={() => {
           setZoomMode(null);
           setDrawMode(null);
           nav.setPicking(null);
+          setEditMode(null);
         }}
+        edit={{ rights: editRights, mode: editMode, onMode: setEditMode }}
         drawMode={drawMode}
         onDraw={startDraw}
         onFit={properties.length ? () => fitTo(map, filtered.map((p) => [p.latitude!, p.longitude!]), 13, sidePad()) : undefined}
