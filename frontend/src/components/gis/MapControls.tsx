@@ -5,7 +5,7 @@
  *          map was before the last move or zoom) · box zoom in / out
  *          (each box tool stays on until clicked again or another tool is picked)
  *   Study  draw a case-study area (circle / rectangle / polygon)
- *   Edit   (admins) select a listing / project / mega project to edit · add one (pin, line, area)
+ * The admin Edit tools sit apart, in a horizontal bar (EditBar) at the bottom left.
  *
  * The layers panel: a filter box, "All on / All off", then collapsible sections (Portal data,
  * Points of interest, Reference, DHA master plans, GIS layers). Each section has a master switch
@@ -239,10 +239,7 @@ export function MapControls({
   onLang,
   drawMode,
   onDraw,
-  edit,
 }: {
-  /** Admin map editing (only when the user may edit something). */
-  edit?: { rights: EditRights; mode: EditMode; onMode: (m: EditMode) => void };
   drawMode?: DrawMode | null;
   onDraw?: (m: DrawMode | null) => void;
   lang: MapLang;
@@ -262,7 +259,7 @@ export function MapControls({
   /** Switch every tool off: back to dragging the map. */
   onPan: () => void;
 }) {
-  const [open, setOpen] = useState<"base" | "layers" | "lang" | "draw" | "add" | null>(null);
+  const [open, setOpen] = useState<"base" | "layers" | "lang" | "draw" | null>(null);
   const [filter, setFilter] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(readCollapsed);
   const ref = useRef<HTMLDivElement>(null);
@@ -337,59 +334,6 @@ export function MapControls({
             onClick={other(() => (drawMode ? onDraw(null) : setOpen(open === "draw" ? null : "draw")))}
           />
         </ToolGroup>
-      )}
-
-      {edit && (edit.rights.property || edit.rights.project || edit.rights.mega) && (
-        <ToolGroup label="Edit">
-          <Btn
-            icon={PencilLine}
-            text="Edit"
-            title={edit.mode === "select" ? "Stop editing" : "Edit: click a listing, project or mega project to change it (saved to the database)"}
-            active={edit.mode === "select"}
-            onClick={other(() => edit.onMode(edit.mode === "select" ? null : "select"))}
-          />
-          <Btn
-            icon={Plus}
-            text="Add"
-            title="Add a listing, a big project or a mega project on the map"
-            active={open === "add" || (!!edit.mode && edit.mode !== "select")}
-            onClick={other(() => (edit.mode && edit.mode !== "select" ? edit.onMode(null) : setOpen(open === "add" ? null : "add")))}
-          />
-        </ToolGroup>
-      )}
-
-      {open === "add" && edit && (
-        <Popover title="Add to the map" onClose={() => setOpen(null)} wide>
-          <div className="p-2">
-            {(
-              [
-                ["add-property", MapPin, "Property listing", "Click where it is, then fill in the details", edit.rights.property],
-                ["add-project", Building2, "Big project", "A mall, tower or mixed-use project (pin)", edit.rights.project],
-                ["add-mega-point", Milestone, "Mega project · point", "An interchange, a tower, a zone centre", edit.rights.mega],
-                ["add-mega-line", Spline, "Mega project · line", "A road, rail or transit line — click each bend", edit.rights.mega],
-                ["add-mega-polygon", Square, "Mega project · area", "A new sector, zone or district — click its corners", edit.rights.mega],
-              ] as [EditMode, LucideIcon, string, string, boolean][]
-            )
-              .filter((x) => x[4])
-              .map(([m, Icon, label, hint]) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => {
-                    edit.onMode(m);
-                    setOpen(null);
-                  }}
-                  className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-start transition hover:bg-brand-50 dark:hover:bg-white/10"
-                >
-                  <Icon className="mt-0.5 h-4 w-4 shrink-0 text-gold-600" />
-                  <span>
-                    <span className="block text-sm font-semibold">{label}</span>
-                    <span className="block text-xs text-ink-mute">{hint}</span>
-                  </span>
-                </button>
-              ))}
-          </div>
-        </Popover>
       )}
 
       {open === "draw" && onDraw && (
@@ -496,6 +440,82 @@ export function MapControls({
             ))}
           </div>
         </Popover>
+      )}
+    </div>
+  );
+}
+
+const ADD_OPTIONS: [EditMode, LucideIcon, string, string, keyof EditRights][] = [
+  ["add-property", MapPin, "Property listing", "Click where it is, then fill in the details", "property"],
+  ["add-project", Building2, "Big project", "A mall, tower or mixed-use project (pin)", "project"],
+  ["add-mega-point", Milestone, "Mega project · point", "An interchange, a tower, a zone centre", "mega"],
+  ["add-mega-line", Spline, "Mega project · line", "A road, rail or transit line — click each bend", "mega"],
+  ["add-mega-polygon", Square, "Mega project · area", "A new sector, zone or district — click its corners", "mega"],
+];
+
+/**
+ * Admin map editing, as a horizontal bar (placed by the map page at the bottom left, beside the
+ * explorer panel): Edit selects a feature to change; Add places a new one (menu opens upwards).
+ */
+export function EditBar({ edit, className }: { edit: { rights: EditRights; mode: EditMode; onMode: (m: EditMode) => void }; className?: string }) {
+  const [menu, setMenu] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const close = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setMenu(false);
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [menu]);
+  if (!edit.rights.property && !edit.rights.project && !edit.rights.mega) return null;
+  const adding = !!edit.mode && edit.mode !== "select";
+  const item = (active: boolean) =>
+    cn("flex h-10 items-center gap-1.5 px-3 text-xs font-bold transition first:rounded-s-xl last:rounded-e-xl", active ? "bg-brand-700 text-white" : "text-brand-800 hover:bg-brand-50 dark:text-white dark:hover:bg-white/10");
+  return (
+    <div ref={ref} className={cn("absolute z-[450] flex items-center gap-2", className)}>
+      <span className="rounded-full bg-white/90 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-ink-mute shadow-sm dark:bg-brand-950/90">Edit</span>
+      <div className="flex divide-x divide-black/5 rounded-xl bg-white shadow-soft ring-1 ring-black/5 dark:divide-white/10 dark:bg-brand-950">
+        <button
+          type="button"
+          className={item(edit.mode === "select")}
+          aria-pressed={edit.mode === "select"}
+          title={edit.mode === "select" ? "Stop editing" : "Edit: click a listing, project or mega project to change it (saved to the database)"}
+          onClick={() => {
+            setMenu(false);
+            edit.onMode(edit.mode === "select" ? null : "select");
+          }}
+        >
+          <PencilLine className="h-4 w-4" /> Edit
+        </button>
+        <button
+          type="button"
+          className={item(menu || adding)}
+          aria-expanded={menu}
+          title={adding ? "Stop adding" : "Add a listing, a big project or a mega project on the map"}
+          onClick={() => (adding ? edit.onMode(null) : setMenu((m) => !m))}
+        >
+          <Plus className="h-4 w-4" /> {adding ? "Adding…" : "Add"}
+        </button>
+      </div>
+      {menu && (
+        <div className="absolute bottom-full start-0 mb-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-white p-2 shadow-2xl ring-1 ring-black/5 dark:bg-brand-950">
+          {ADD_OPTIONS.filter((o) => edit.rights[o[4]]).map(([m, Icon, label, hint]) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => {
+                edit.onMode(m);
+                setMenu(false);
+              }}
+              className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-start transition hover:bg-brand-50 dark:hover:bg-white/10"
+            >
+              <Icon className="mt-0.5 h-4 w-4 shrink-0 text-gold-600" />
+              <span>
+                <span className="block text-sm font-semibold">{label}</span>
+                <span className="block text-xs text-ink-mute">{hint}</span>
+              </span>
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );

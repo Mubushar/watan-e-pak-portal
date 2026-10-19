@@ -65,6 +65,7 @@ import { NavigatorLayer, NavigatorPanel, useNavigator } from "@/components/gis/N
 import { POI_CATEGORIES, POI_MIN_ZOOM, PoiLayer } from "@/components/gis/PoiLayer";
 import { AreaDraw, shapeAreaKm2, type DrawMode, type StudyShape } from "@/components/gis/AreaDraw";
 import { StudyReport, useStudyReport } from "@/components/gis/StudyReport";
+import { EditBar } from "@/components/gis/MapControls";
 import { GeoEditLayer, GeoEditPanel, loadDraft, newDraft, pick, type Draft, type EditMode } from "@/components/gis/GeoEditor";
 import { useAuth } from "@/store/auth";
 import { ANNOTATION_MIN_ZOOM, MEGA_TYPES, MegaProjectLayer, useMegaProjects } from "@/components/gis/MegaProjects";
@@ -734,6 +735,10 @@ export default function MapExplorer() {
         <AreaDraw mode={drawMode} shape={studyShape} onShape={onStudyShape} onCancel={cancelDraw} />
         <GeoEditLayer mode={editMode} draft={editDraft} setDraft={setEditDraft} onPick={onEditClick} />
       </PortalMap>
+      <EditBar
+        edit={{ rights: editRights, mode: editMode, onMode: setEditMode }}
+        className={cn("start-3", open ? "bottom-[calc(56%+0.75rem)] md:bottom-3 md:start-[408px]" : "bottom-[4.5rem] md:bottom-3 md:start-3")}
+      />
       <GeoEditPanel
         mode={editMode}
         draft={editDraft}
@@ -762,7 +767,6 @@ export default function MapExplorer() {
           nav.setPicking(null);
           setEditMode(null);
         }}
-        edit={{ rights: editRights, mode: editMode, onMode: setEditMode }}
         drawMode={drawMode}
         onDraw={startDraw}
         onFit={properties.length ? () => fitTo(map, filtered.map((p) => [p.latitude!, p.longitude!]), 13, sidePad()) : undefined}
