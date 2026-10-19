@@ -188,10 +188,10 @@ export function MarketShowcase({ props, loading }: { props: Property[]; loading:
     const f = FILTERS.find((x) => x.key === filter)!;
     const rows = props.filter(f.match);
     if (filter !== "all") return rows;
-    // a mix: one unit from each new project (real photos) first, then the other listings
+    // the portal's order from the API (DHA / Bahria phases first, Islamabad first); one unit per
+    // new project so a big inventory doesn't fill the row
     const seen = new Set<string>();
-    const projectPicks = rows.filter((p) => p.project_id && !seen.has(p.project_id) && seen.add(p.project_id));
-    return [...projectPicks, ...rows.filter((p) => !p.project_id)];
+    return rows.filter((p) => !p.project_id || (!seen.has(p.project_id) && !!seen.add(p.project_id)));
   }, [props, filter]);
   const shown = list.slice(0, more ? 12 : 8);
   return (

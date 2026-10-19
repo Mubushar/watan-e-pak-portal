@@ -225,7 +225,7 @@ def as_megaprojects() -> List[Dict[str, Any]]:
         n = len(p.get("units", []))
         out.append({
             "id": p["id"], "name": p["name"], "name_ur": None, "type": "tower", "status": p["status"],
-            "city": p["city"], "province": PROVINCE.get(p["city"]), "authority": p["developer"],
+            "city": p["city"], "scheme": p.get("scheme"), "province": PROVINCE.get(p["city"]), "authority": p["developer"],
             "start_year": None, "completion": "To be confirmed by the developer",
             "summary": f"{p['tagline']} — {p['address']}. {n} units available"
                        + (f" from {_money(min(prices))} to {_money(max(prices))}" if prices else "")

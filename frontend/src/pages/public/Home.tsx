@@ -259,6 +259,9 @@ function FeatureStrip() {
   );
 }
 
+// A real photo behind the stats band, under a see-through brand overlay (credited in the corner).
+const STATS_PHOTO = HERO_PHOTOS.find((p) => p.caption.startsWith("Pakistan Monument")) ?? HERO_PHOTOS[0]!;
+
 function StatsBand() {
   const s = useApi<{ inventory: Record<string, number>; portfolio: { total_market_value: number }; users_and_roles: { users: number } }>("/portal/statistics");
   const inv = s.data?.inventory;
@@ -270,8 +273,10 @@ function StatsBand() {
   ];
   return (
     <section className="container mt-12">
-      <div className="relative overflow-hidden rounded-3xl bg-brand-gradient text-white shadow-soft">
-        <div className="pointer-events-none absolute inset-0 bg-mesh opacity-70" />
+      <div className="relative overflow-hidden rounded-3xl bg-brand-900 text-white shadow-soft">
+        <img src={STATS_PHOTO.img} alt={STATS_PHOTO.caption} loading="lazy" className="pointer-events-none absolute inset-0 h-full w-full object-cover object-[center_60%]" />
+        <div className="pointer-events-none absolute inset-0 bg-brand-gradient opacity-[.72]" />
+        <div className="pointer-events-none absolute inset-0 bg-mesh opacity-30" />
         <div className="relative grid gap-6 p-6 sm:grid-cols-2 sm:p-8 lg:grid-cols-[repeat(4,1fr)_1.2fr]">
           {items.map((it) => (
             <div key={it.label} className="flex items-center gap-4">
@@ -292,6 +297,9 @@ function StatsBand() {
             </p>
           </div>
         </div>
+        <p className="absolute bottom-1.5 end-4 text-[10px] text-white/60">
+          {STATS_PHOTO.caption} · Photo: {STATS_PHOTO.credit}
+        </p>
       </div>
     </section>
   );

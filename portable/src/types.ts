@@ -15,6 +15,8 @@ export interface Property {
   kanal_area?: number | null;
   city_id?: string | null;
   scheme_id?: string | null;
+  project_id?: string | null;
+  project_unit?: string | null;
   block_zone_area_id?: string | null;
   bedrooms?: number | null;
   bathrooms?: number | null;

@@ -1168,16 +1168,9 @@ def search_properties(
         place_info = {"query": near_place, "found": True, "name": loc["name"], "latitude": round(loc["lat"], 5),
                       "longitude": round(loc["lon"], 5), "radius_km": near_km}
     if not near_cat and not near_place:
-        # The portal's order: Islamabad / Rawalpindi first, DHA and Bahria phases first among
-        # societies, then featured and newest listings (priority.py).
-        society = priority.society_sort_key_for(sys.modules[__name__])
-        schemes = {s.id: s for s in housing_schemes_db}
-        cities = {c.id: c for c in cities_db}
-        results.sort(key=lambda p: (
-            priority.city_key(cities[p.city_id].name if p.city_id in cities else None,
-                              cities[p.city_id].population if p.city_id in cities else None),
-            society(schemes[p.scheme_id]) if p.scheme_id in schemes else (9,),
-            not p.featured, -(p.created_at.timestamp() if p.created_at else 0)))
+        # The portal's order (priority.py): DHA Islamabad–Rawalpindi phases, Bahria phases, other
+        # DHA, Islamabad, then the rest of the country by city; featured and newest inside each.
+        results.sort(key=priority.listing_sort_key_for(sys.modules[__name__]))
 
     long_term_memory["search_history"].append(
         {
@@ -4171,7 +4164,7 @@ def list_big_projects(city: Optional[str] = None, project_type: Optional[str] = 
     """List big projects, filtered by city and/or type."""
     c = resolve_city(city) if city else None
     out = []
-    for b in big_projects_db:
+    for b in sorted(big_projects_db, key=priority.big_project_sort_key_for(sys.modules[__name__])):
         if c and b.city_id != c.id:
             continue
         if project_type and b.project_type != project_type:

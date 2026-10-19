@@ -70,9 +70,11 @@ export default function Projects() {
         const v = String(p[k] ?? "");
         if (v) m.set(v, (m.get(v) ?? 0) + 1);
       });
-      return [...m.entries()].sort((a, b) => b[1] - a[1]);
+      return [...m.entries()];
     };
-    return { types: count("project_type"), statuses: count("status"), cities: count("city") };
+    const byCount = (rows: [string, number][]) => [...rows].sort((a, b) => b[1] - a[1]);
+    // cities keep the portal's order (the API lists projects Islamabad-first)
+    return { types: byCount(count("project_type")), statuses: byCount(count("status")), cities: count("city") };
   }, [projects]);
 
   const list = projects.filter((p) => (!type || p.project_type === type) && (!status || p.status === status) && (!city || p.city === city));

@@ -137,6 +137,10 @@ def search(type: Optional[str] = None, status: Optional[str] = None, province: O
         if q and q.lower() not in f"{p['name']} {p.get('city', '')} {p.get('summary', '')}".lower():
             continue
         out.append(summary(p))
+    # the portal's order (priority.py): projects in the DHA / Bahria phases first, then by city
+    import priority
+
+    out.sort(key=lambda p: priority.project_key(p.get("scheme"), p.get("city")))
     return out
 
 

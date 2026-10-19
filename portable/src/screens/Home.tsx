@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight, Bot, Building, Building2, Compass, Heart, Home as HomeIcon, KeyRound, LandPlot, LineChart, Mic, PlusCircle, Search, Shuffle, Sparkles, Store, TrendingUp, UserRound, Wand2 } from "lucide-react";
-import type { City, PropertyList } from "@/types";
+import type { City, Property, PropertyList } from "@/types";
 import { useApi } from "@/hooks/useApi";
 import { cityImage } from "@/lib/images";
 import { roleLabel, useAuth } from "@/store/auth";
@@ -14,6 +14,13 @@ import { AdSlot, BannerSpacer, useNativeBanner } from "@/components/Ads";
 type Action = { icon: typeof HomeIcon; label: string; to: string; tone?: "gold" };
 
 /** Shortcuts tuned to what each kind of member usually does first. */
+// Listings arrive in the portal's order (DHA / Bahria phases first, Islamabad first); keep one unit
+// per new project so a big inventory doesn't fill a strip.
+function onePerProject(rows: Property[] | undefined, n: number): Property[] {
+  const seen = new Set<string>();
+  return (rows ?? []).filter((p) => !p.project_id || (!seen.has(p.project_id) && !!seen.add(p.project_id))).slice(0, n);
+}
+
 function actionsFor(role?: string): Action[] {
   const ask = (q: string) => `/assistant?q=${encodeURIComponent(q)}`;
   switch (role) {
@@ -88,8 +95,8 @@ export default function Home() {
   const current = MODES.find((m) => m.value === mode)!;
   const ask = (text: string) => nav(`/assistant?q=${encodeURIComponent(current.prefix + (text.trim() || current.placeholder.replace(/…$/, "")))}`);
   const projects = useApi<{ projects: { id: string; name: string; city: string; image?: string | null; price_from?: number | null; units_available?: number | null; payment_plan?: string | null }[] }>("/bigprojects");
-  const featured = useApi<PropertyList>("/search", { featured: true, limit: 10 });
-  const latest = useApi<PropertyList>("/properties", { limit: 6 });
+  const featured = useApi<PropertyList>("/search", { featured: true, limit: 60 });
+  const latest = useApi<PropertyList>("/properties", { limit: 200 });
   const cities = useApi<{ cities: City[] }>("/cities");
   const first = user?.name?.split(" ")[0];
   useNativeBanner();
@@ -214,7 +221,7 @@ export default function Home() {
           <div className="scroll-x no-scrollbar -mx-4 px-4">
             {featured.isLoading
               ? [0, 1].map((i) => <Skeleton key={i} className="h-72 w-72 shrink-0" />)
-              : featured.data?.results.map((p) => (
+              : onePerProject(featured.data?.results, 10).map((p) => (
                   <div key={p.id} className="w-72 shrink-0 snap-start">
                     <PropertyCard p={p} compact />
                   </div>
@@ -306,9 +313,9 @@ export default function Home() {
 
         {/* ---------- latest ---------- */}
         <section className="mt-8">
-          <SectionHead title="Just listed" to="/explore" />
+          <SectionHead title="Top listings" to="/explore" />
           <div className="card divide-y divide-black/5 p-1.5 dark:divide-white/5">
-            {latest.isLoading ? [0, 1, 2].map((i) => <Skeleton key={i} className="m-2 h-16" />) : latest.data?.results.map((p) => <PropertyRow key={p.id} p={p} />)}
+            {latest.isLoading ? [0, 1, 2].map((i) => <Skeleton key={i} className="m-2 h-16" />) : onePerProject(latest.data?.results, 6).map((p) => <PropertyRow key={p.id} p={p} />)}
           </div>
         </section>
         <BannerSpacer />
