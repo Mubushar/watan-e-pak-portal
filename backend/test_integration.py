@@ -1242,10 +1242,13 @@ def run_project_inventory_checks(client: TestClient) -> None:
           str(stats))
     pi.sync()
     check("projects: back in the inventory -> active again", sold.status == "active")
-    towers = [m for m in megaprojects.all_projects() if m["type"] == "tower"]
-    check("mega projects: the three projects are on the layer", len(towers) == 3 and all(m["geometry"]["type"] == "point" for m in towers))
-    r = client.get("/geo/megaprojects", params={"type": "tower"}).json()
-    check("GET /geo/megaprojects?type=tower", r["count"] == 3, str(r)[:120])
+    portal = [m for m in megaprojects.all_projects() if m.get("portal_project")]
+    names = {m["name"] for m in portal}
+    check("mega projects: the inventory projects are on the layer",
+          {"China Center", "Skyra Tower", "Goldcrest Breeze Overseas"} <= names and all(m["geometry"]["type"] == "point" for m in portal)
+          and all(m["type"] in ("tower", "mall") for m in portal))
+    r = client.get("/geo/megaprojects", params={"type": "tower,mall"}).json()
+    check("GET /geo/megaprojects?type=tower,mall", r["count"] == len(portal), str(r)[:120])
     hit = client.post("/ai/knowledge/search", json={"query": "Skyra Tower 1 bed price"}).json()["results"][0]
     check("knowledge: project questions find the project with its prices", hit["type"] == "big_project" and hit["title"] == "Skyra Tower"
           and "66 lakh" in hit["snippet"], str(hit)[:200])

@@ -259,7 +259,7 @@ function ProjectCard({ p, i, onOpen }: { p: BigProject; i: number; onOpen: () =>
         <div className="mt-4">
           <div className="mb-1.5 flex justify-between text-xs">
             <span className="font-semibold text-ink-soft dark:text-slate-300">Occupancy</span>
-            <span className="font-bold tabular-nums text-ink dark:text-white">{occ != null ? pct(occ, 0) : "Not yet open"}</span>
+            <span className="font-bold tabular-nums text-ink dark:text-white">{occ != null ? pct(occ, 0) : p.status === "completed" ? "Not published" : "Not yet open"}</span>
           </div>
           <Progress value={(occ ?? 0) * 100} tone={occ == null ? "blue" : occ >= 0.7 ? "green" : occ >= 0.4 ? "gold" : "red"} />
         </div>
@@ -316,7 +316,7 @@ function ProjectModal({ id, onClose }: { id: string | null; onClose: () => void 
               <span className="inline-flex items-center gap-1 font-semibold text-ink-soft dark:text-slate-300">
                 <Percent className="h-3.5 w-3.5" /> Occupancy
               </span>
-              <span className="font-bold">{occ != null ? pct(occ, 0) : "Not yet open"}</span>
+              <span className="font-bold">{occ != null ? pct(occ, 0) : p.status === "completed" ? "Not published" : "Not yet open"}</span>
             </div>
             <Progress value={(occ ?? 0) * 100} tone={occ == null ? "blue" : occ >= 0.7 ? "green" : occ >= 0.4 ? "gold" : "red"} className="h-3" />
           </div>

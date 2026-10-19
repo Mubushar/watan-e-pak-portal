@@ -10886,6 +10886,998 @@
      "caption": "Type TP"
     }
    ]
+  },
+  {
+   "id": "centaurus-mall",
+   "name": "The Centaurus Mall",
+   "tagline": "Islamabad's landmark mall and towers on Jinnah Avenue, F-8",
+   "developer": "Pak Gulf Construction (Pvt) Ltd (joint venture of Al Tamimi Group, Saudi Arabia, and Sardar Builders)",
+   "marketed_by": null,
+   "project_type": "mixed_use",
+   "status": "completed",
+   "city": "Islamabad",
+   "scheme": null,
+   "address": "Jinnah Avenue, F-8/4, Islamabad",
+   "location": {
+    "lat": 33.70789,
+    "lon": 73.04987,
+    "precision": "exact",
+    "note": "Centroid of OpenStreetMap way 472383520 'The Centaurus Mall'; Wikipedia gives 33.7077, 73.0499"
+   },
+   "floors": "Four-storey shopping mall podium; three 22-storey residential/office towers; 26-storey hotel tower",
+   "floor_count": 4,
+   "description": "The Centaurus is a mixed-use complex in Sector F-8 designed by Atkins: a four-storey shopping mall with more than 250 national and international outlets, three 22-storey towers of apartments and offices, and a hotel tower. The mall opened in phases from 2013; the Mövenpick Hotel Centaurus Islamabad (about 380 rooms) opened in early 2025. The official site also lists The Centaurus Residencies, The Centaurus Suites, Umme Ilyas Hospital and Rhodium Residencia within the complex.",
+   "payment_plan": null,
+   "offer": null,
+   "rates": null,
+   "units": [],
+   "total_units": null,
+   "images": [
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/The_Centaurus_Mall%2C_Islamabad.jpg/1280px-The_Centaurus_Mall%2C_Islamabad.jpg",
+     "caption": "Marrystyles · CC BY-SA 4.0 · Wikimedia Commons"
+    },
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/The_Centaurus_-_panoramio.jpg/1280px-The_Centaurus_-_panoramio.jpg",
+     "caption": "Sunni Person · CC BY-SA 3.0 · Wikimedia Commons"
+    },
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/First_Mega_Mall_of_Islamabad_-_Centaurus.JPG/1280px-First_Mega_Mall_of_Islamabad_-_Centaurus.JPG",
+     "caption": "Obaid747 · CC BY-SA 3.0 · Wikimedia Commons"
+    },
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/The_Centaurus_buildings_in_Islamabad%2C_Pakistan.jpg/1280px-The_Centaurus_buildings_in_Islamabad%2C_Pakistan.jpg",
+     "caption": "ImMuslimandimnotaterrorist · CC BY-SA 4.0 · Wikimedia Commons"
+    }
+   ],
+   "sources": [
+    {
+     "title": "Wikipedia: The Centaurus",
+     "url": "https://en.wikipedia.org/wiki/The_Centaurus"
+    },
+    {
+     "title": "The Centaurus — official website",
+     "url": "https://www.thecentaurus.com/"
+    },
+    {
+     "title": "OpenStreetMap way 472383520",
+     "url": "https://www.openstreetmap.org/way/472383520"
+    }
+   ],
+   "research_note": "Floor counts differ between sources: Wikipedia says a four-storey mall, three 22-storey towers and a 26-storey hotel; older listings (Zameen, EA World) say a five-storey mall, 22/23-storey towers and a 36–37-storey hotel. floor_count refers to the mall podium per Wikipedia. A major fire on 9 October 2022 started on the third floor near the food court; the mall was sealed for a period and later reopened. No units on sale or prices were found on the official site."
+  },
+  {
+   "id": "giga-mall",
+   "name": "Giga Mall (World Trade Center Islamabad)",
+   "tagline": "Mall, offices and hotel on GT Road at DHA Phase II",
+   "developer": "Al Ghurair Giga Pakistan (Giga Group)",
+   "marketed_by": null,
+   "project_type": "mixed_use",
+   "status": "completed",
+   "city": "Islamabad",
+   "scheme": "DHA Phase II",
+   "address": "Main GT Road, DHA Phase II, Islamabad",
+   "location": {
+    "lat": 33.52124,
+    "lon": 73.15823,
+    "precision": "exact",
+    "note": "Centroid of OpenStreetMap way 230432958 'Giga Mall Islamabad' (shop=mall); matches the Commons photo GPS 33.5212, 73.1582"
+   },
+   "floors": "Five-storey shopping mall with a six-storey office tower above; 14 storeys overall",
+   "floor_count": 14,
+   "description": "Giga Mall, also known as World Trade Center Islamabad, is a mixed-use development on GT Road in DHA Phase II with a five-storey shopping mall, a six-storey office tower and a 267-room four-star hotel. It opened on 17 August 2016 and is affiliated with the World Trade Centers Association; the developer says it hosts 200+ brands, with a Carrefour hypermarket as an anchor.",
+   "payment_plan": null,
+   "offer": null,
+   "rates": null,
+   "units": [],
+   "total_units": null,
+   "images": [
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/17/Giga_Mall_Rawat%2C_Islamabad.jpg/1280px-Giga_Mall_Rawat%2C_Islamabad.jpg",
+     "caption": "Mppc2 (photo by Ahsan Khalil) · CC BY-SA 4.0 · Wikimedia Commons"
+    },
+    {
+     "url": "https://www.alghurairgiga.com/static/media/gm-wtc.a5af44e05c05786128df.jpg",
+     "caption": "© Al Ghurair Giga Pakistan (Giga Group) · official website"
+    },
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7f/World_trade_Centre_and_Defence_Housing_Authority_in_Islamabad.jpg/1280px-World_trade_Centre_and_Defence_Housing_Authority_in_Islamabad.jpg",
+     "caption": "Sizzling hnny · CC BY-SA 3.0 · Wikimedia Commons"
+    }
+   ],
+   "sources": [
+    {
+     "title": "Wikipedia: World Trade Center Islamabad",
+     "url": "https://en.wikipedia.org/wiki/World_Trade_Center_Islamabad"
+    },
+    {
+     "title": "World Trade Centers Association — WTC Islamabad",
+     "url": "https://www.wtca.org/world-trade-center-islamabad"
+    },
+    {
+     "title": "Al Ghurair Giga — projects (Giga Mall WTC)",
+     "url": "https://www.alghurairgiga.com/projects"
+    },
+    {
+     "title": "OpenStreetMap way 230432958",
+     "url": "https://www.openstreetmap.org/way/230432958"
+    }
+   ],
+   "research_note": "Address is commonly written 'DHA Phase II, Islamabad', but OpenStreetMap places the site in Rawalpindi district (Rawat area) — DHA Phase II straddles the ICT/Rawalpindi boundary. The 2015 Commons photo shows the building near completion. The developer's site advertises 18-month instalment plans for WTC offices but publishes no prices, so payment_plan/rates are null. A cinema is mentioned by some property guides (Cinepax) but was not confirmed from an official source."
+  },
+  {
+   "id": "giga-mall-extension",
+   "name": "Giga Mall Extension",
+   "tagline": "30-storey extension beside Giga Mall with a rooftop Jamia Masjid",
+   "developer": "Al Ghurair Giga Pakistan (Giga Group)",
+   "marketed_by": null,
+   "project_type": "mixed_use",
+   "status": "under_construction",
+   "city": "Islamabad",
+   "scheme": "DHA Phase II",
+   "address": "Main GT Road, DHA Phase II, Islamabad (adjacent to Giga Mall)",
+   "location": {
+    "lat": 33.52067,
+    "lon": 73.16028,
+    "precision": "exact",
+    "note": "Centroid of OpenStreetMap way 1146010599 'Giga Mall Extensions (Under construction)'"
+   },
+   "floors": "30 storeys; first three floors connect directly to Giga Mall; Jamia Masjid on the top two floors",
+   "floor_count": 30,
+   "description": "Giga Mall Extension is a 30-storey mixed-use tower on a 14.5-kanal plot next to Giga Mall, combining retail (billed as Pakistan's first 'vertical market'), a food court, restaurants, hotel apartments and a Jamia Masjid on the top two floors. Its first three floors link directly into Giga Mall. Groundbreaking was held in January 2021 and the developer's site lists the project as 'In Progress' with construction updates dated July 2026.",
+   "payment_plan": null,
+   "offer": null,
+   "rates": null,
+   "units": [],
+   "total_units": null,
+   "images": [
+    {
+     "url": "https://www.alghurairgiga.com/static/media/gme-m1.59da926c0cdca945ba4f.jpg",
+     "caption": "© Al Ghurair Giga Pakistan (Giga Group) · official website"
+    },
+    {
+     "url": "https://www.alghurairgiga.com/static/media/gme.f5beeb3351a439e381b2.jpg",
+     "caption": "© Al Ghurair Giga Pakistan (Giga Group) · official website"
+    },
+    {
+     "url": "https://www.alghurairgiga.com/static/media/gme-banner.d054dc334d8857db5a65.jpg",
+     "caption": "© Al Ghurair Giga Pakistan (Giga Group) · official website"
+    }
+   ],
+   "sources": [
+    {
+     "title": "Zameen News — Al Ghurair Giga announces Giga Mall Extension project (3 Aug 2020)",
+     "url": "https://www.zameen.com/news/al-ghurair-giga-announces-giga-mall-extension-project.html"
+    },
+    {
+     "title": "Pakistan Observer — Giga Mall Extension groundbreaking (31 Jan 2021)",
+     "url": "https://pakobserver.net/?p=157413"
+    },
+    {
+     "title": "Al Ghurair Giga — projects (Giga Mall Extension)",
+     "url": "https://www.alghurairgiga.com/projects"
+    },
+    {
+     "title": "OpenStreetMap way 1146010599",
+     "url": "https://www.openstreetmap.org/way/1146010599"
+    }
+   ],
+   "research_note": "Image 1 is a real construction photo from the developer's site (concrete frame ~12+ floors, Giga Mall on the left); images 2–3 are developer renders of the finished tower. The payment plan is from the 2020 pre-launch and may no longer apply; no official per-sq-ft rates or unit list were found (classified listings quote PKR 5–50 million per shop, not recorded). The original 2020 target was completion in four years, which has passed; no new completion date was found."
+  },
+  {
+   "id": "emporium-mall",
+   "name": "Nishat Emporium Mall",
+   "tagline": "Lahore's mega mall beside the Expo Centre in Johar Town",
+   "developer": "Nishat Group",
+   "marketed_by": null,
+   "project_type": "mixed_use",
+   "status": "completed",
+   "city": "Lahore",
+   "scheme": "Johar Town",
+   "address": "Abdul Haque Road, adjacent to Lahore International Expo Centre, Johar Town, Lahore",
+   "location": {
+    "lat": 31.46703,
+    "lon": 74.26598,
+    "precision": "exact",
+    "note": "Centroid of OpenStreetMap way 620739083 'Emporium Mall'; Wikipedia gives 31.4678, 74.2664"
+   },
+   "floors": "11 storeys (13 including about three levels of basement parking)",
+   "floor_count": 11,
+   "description": "Emporium Mall is an 11-storey mall of about 2.7 million sq ft in Johar Town, owned by Nishat Group and managed by Nishat Hotels and Properties Limited; it opened on 30 June 2016. It has 200+ stores on five levels of walkways, a Hyperstar (Carrefour) hypermarket, Universal Cinemas (9 screens), a food court seating about 3,000, the Fun Factory play area, banquet halls and the Nishat Hotel Johar Town. Parking for about 2,000 cars is underground.",
+   "payment_plan": null,
+   "offer": null,
+   "rates": null,
+   "units": [],
+   "total_units": null,
+   "images": [
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/Emporium_Mall.jpg/1280px-Emporium_Mall.jpg",
+     "caption": "Tahir mq · CC BY-SA 4.0 · Wikimedia Commons"
+    },
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Food_Court%2C_Emporium_Mall.jpg/1280px-Food_Court%2C_Emporium_Mall.jpg",
+     "caption": "MuhammadUmar · Public domain · Wikimedia Commons"
+    },
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/The_Boulevard%2C_Emporium_Mall%2C_Lahore.jpg/1280px-The_Boulevard%2C_Emporium_Mall%2C_Lahore.jpg",
+     "caption": "MuhammadUmar · Public domain · Wikimedia Commons"
+    },
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Emporium_Mall_During_Construction.jpg/1280px-Emporium_Mall_During_Construction.jpg",
+     "caption": "MuhammadUmar · CC BY 4.0 · Wikimedia Commons"
+    }
+   ],
+   "sources": [
+    {
+     "title": "Wikipedia: Emporium Mall",
+     "url": "https://en.wikipedia.org/wiki/Emporium_Mall"
+    },
+    {
+     "title": "Nishat Emporium — official website",
+     "url": "https://nishatemporium.com/"
+    },
+    {
+     "title": "Zameen Blog — Best shopping malls in Lahore",
+     "url": "https://www.zameen.com/blog/best-shopping-malls-lahore.html"
+    },
+    {
+     "title": "OpenStreetMap way 620739083",
+     "url": "https://www.openstreetmap.org/way/620739083"
+    }
+   ],
+   "research_note": "All four Commons images are interiors (no freely licensed exterior photo found). The 'Emporium Mall.jpg' series by Tahir mq carries camera GPS pointing near Model Town Link Road, which looks like a camera error; the file is the infobox image on Wikipedia and the interior matches Emporium. Size figures vary (2.7 million sq ft per Wikipedia/Graana; Graana FAQ says 1.8 million). Opening date given as 29 or 30 June 2016. Hotel described as 5-star (Wikipedia/Zameen) or 4-star (Graana)."
+  },
+  {
+   "id": "mall-of-lahore",
+   "name": "Mall of Lahore",
+   "tagline": "Bahria Town's mall in Park Lane Tower, Tufail Road, Lahore Cantt",
+   "developer": "Bahria Town (Pvt) Ltd",
+   "marketed_by": null,
+   "project_type": "mixed_use",
+   "status": "completed",
+   "city": "Lahore",
+   "scheme": "Lahore Cantt",
+   "address": "172 Tufail Road, Lahore Cantt, Lahore",
+   "location": {
+    "lat": 31.52939,
+    "lon": 74.37844,
+    "precision": "exact",
+    "note": "OpenStreetMap node 2944220310 'Mall of Lahore' on Tufail Road; Wikipedia gives 31.5292, 74.3783"
+   },
+   "floors": "Mall inside the 13-floor Park Lane Tower (about 130 ft)",
+   "floor_count": 13,
+   "description": "Mall of Lahore occupies Bahria Town's 13-floor Park Lane Tower on Tufail Road in Lahore Cantonment, which also contains corporate offices and about 60 residential apartments. It has more than 70 local and international stores, a food court, a basement supermarket, a kids' play area and a spa and fitness club, with parking for about 400 cars; its area is given as about 650,000 sq ft.",
+   "payment_plan": null,
+   "offer": null,
+   "rates": null,
+   "units": [],
+   "total_units": null,
+   "images": [
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dc/Mall_of_Lahore_1.jpg/1280px-Mall_of_Lahore_1.jpg",
+     "caption": "Tahir mq · CC BY-SA 4.0 · Wikimedia Commons"
+    },
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Mall_of_Lahore_2.jpg/1280px-Mall_of_Lahore_2.jpg",
+     "caption": "Tahir mq · CC BY-SA 4.0 · Wikimedia Commons"
+    }
+   ],
+   "sources": [
+    {
+     "title": "Wikipedia: Mall of Lahore",
+     "url": "https://en.wikipedia.org/wiki/Mall_of_Lahore"
+    },
+    {
+     "title": "Graana — Shopping malls in Lahore",
+     "url": "https://www.graana.com/blog/shopping-malls-in-lahore/"
+    },
+    {
+     "title": "Zameen Blog — Best shopping malls in Lahore",
+     "url": "https://www.zameen.com/blog/best-shopping-malls-lahore.html"
+    },
+    {
+     "title": "Mall of Lahore — official website (Bahria Town)",
+     "url": "http://www.malloflahore.pk/"
+    },
+    {
+     "title": "OpenStreetMap node 2944220310",
+     "url": "https://www.openstreetmap.org/node/2944220310"
+    }
+   ],
+   "research_note": "Both Commons photos are interiors. The Wikipedia infobox address ('76 Adlington Road / 61 Altrincham Road') is clearly vandalised and was ignored; the 172 Tufail Road address is from Graana. Wikipedia's infobox says 3 floors (likely the retail floors), while Zameen/Graana give 13 floors for the whole tower; floor_count is the tower. Store count given as 70+ (Zameen also says 50+ elsewhere). Opening year not confirmed."
+  },
+  {
+   "id": "amanah-mall",
+   "name": "Amanah Mall",
+   "tagline": "Family mall with Cinepax and service apartments on Model Town Link Road",
+   "developer": "Amanah Estates",
+   "marketed_by": null,
+   "project_type": "mixed_use",
+   "status": "completed",
+   "city": "Lahore",
+   "scheme": "Model Town",
+   "address": "Model Town Link Road, Model Town, Lahore",
+   "location": {
+    "lat": 31.467,
+    "lon": 74.31578,
+    "precision": "exact",
+    "note": "Centroid of OpenStreetMap way 544513085 'Amanah Mall'; Commons photo GPS 31.4669, 74.3158"
+   },
+   "floors": "Four basements + 8 floors (6th and 7th floors are service apartments)",
+   "floor_count": 8,
+   "description": "Amanah Mall is an eight-floor mall over four basements on Model Town Link Road, with shops on the lower floors and a food court, Magic Planet amusement park, a trampoline park, VR park, Velocity fitness club and a Cinepax cinema above. The 6th and 7th floors were developed as Amanah Mall Service Apartments (serviced and loft apartments).",
+   "payment_plan": null,
+   "offer": null,
+   "rates": null,
+   "units": [],
+   "total_units": null,
+   "images": [
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/Amanah_Mall%2C_Lahore_3.jpg/1280px-Amanah_Mall%2C_Lahore_3.jpg",
+     "caption": "Tahir mq · CC BY-SA 4.0 · Wikimedia Commons"
+    },
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/Amanah_Mall%2C_Lahore_1.jpg/1280px-Amanah_Mall%2C_Lahore_1.jpg",
+     "caption": "Tahir mq · CC BY-SA 4.0 · Wikimedia Commons"
+    },
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Amanah_Mall%2C_Lahore_2.jpg/1280px-Amanah_Mall%2C_Lahore_2.jpg",
+     "caption": "Tahir mq · CC BY-SA 4.0 · Wikimedia Commons"
+    }
+   ],
+   "sources": [
+    {
+     "title": "Amanah Mall — official website",
+     "url": "https://amanahmall.com.pk/"
+    },
+    {
+     "title": "Graana — Shopping malls in Lahore",
+     "url": "https://www.graana.com/blog/shopping-malls-in-lahore/"
+    },
+    {
+     "title": "Zameen News — Model apartment of Amanah Mall Service Apartments",
+     "url": "https://www.zameen.com/news/model-apartment-amanah-mall-service-2195.html"
+    },
+    {
+     "title": "ProPakistani — Zameen.com launches Amanah Noor Residence (2021)",
+     "url": "https://propakistani.pk/2021/10/27/zameen-com-launches-high-rise-project-amanah-noor-residence/"
+    },
+    {
+     "title": "OpenStreetMap way 544513085",
+     "url": "https://www.openstreetmap.org/way/544513085"
+    }
+   ],
+   "research_note": "All Commons photos are interiors. Graana gives the address as 'Model Town Link Rd, G.E.C.H.S. Phase 2 Mohammadpura' and the area as 6,576 m² (seems low for 8 floors; not recorded). Developer named as Amanah Estates in Zameen/ProPakistani coverage of Amanah Noor Residence. Opening year not confirmed. Service apartments were marketed via Zameen but no current price list was found."
+  },
+  {
+   "id": "gulberg-galleria-mall",
+   "name": "Gulberg Galleria",
+   "tagline": "Spanish-Moorish style designer arcade on Main Boulevard Gulberg, Lahore",
+   "developer": "Niaz Arbaaz (Pvt) Ltd (Niaz Group)",
+   "marketed_by": null,
+   "project_type": "mall",
+   "status": "completed",
+   "city": "Lahore",
+   "scheme": "Gulberg II",
+   "address": "18-Main Boulevard, Gulberg II, Lahore",
+   "location": {
+    "lat": 31.53176,
+    "lon": 74.3514,
+    "precision": "approximate",
+    "note": "OpenStreetMap way 492090698, a building named 'Galleria' on Main Boulevard Gulberg; not tagged with the full name, so treat as approximate"
+   },
+   "floors": "Shop directory covers ground, first and second floors plus a rooftop; management office on the 3rd floor",
+   "floor_count": null,
+   "description": "Gulberg Galleria is a boutique shopping arcade on Main Boulevard Gulberg in Lahore, built in a Spanish-Moorish style by Niaz Arbaaz (Pvt) Ltd and operating since March 2013. It houses exclusive fashion and designer brands, home and lifestyle stores, cafés and restaurants. The developer plans 'The Galleria Residences' as an expansion of the arcade.",
+   "payment_plan": null,
+   "offer": null,
+   "rates": null,
+   "units": [],
+   "total_units": null,
+   "images": [
+    {
+     "url": "https://gulberggalleria.com/img/tgr_duskview.jpg",
+     "caption": "© Niaz Arbaaz (Pvt) Ltd · official website"
+    }
+   ],
+   "sources": [
+    {
+     "title": "Gulberg Galleria — official website",
+     "url": "https://gulberggalleria.com/"
+    },
+    {
+     "title": "Zameen Blog — Living in Gulberg, Lahore",
+     "url": "https://www.zameen.com/blog/living-in-gulberg-lahore.html"
+    },
+    {
+     "title": "Wikipedia: Shopping in Lahore",
+     "url": "https://en.wikipedia.org/wiki/Shopping_in_Lahore"
+    },
+    {
+     "title": "OpenStreetMap way 492090698",
+     "url": "https://www.openstreetmap.org/way/492090698"
+    }
+   ],
+   "research_note": "IMPORTANT: no 'Gulberg Galleria' mall exists in Gulberg Greens / Gulberg Islamabad in any source found (searches only returned Gulberg Mall & Signature Living, Gulberg Arena Mall, Magnus Mall etc. there). The only real 'Gulberg Galleria' is this Lahore arcade (official site gulberggalleria.com), so city is Lahore, not Islamabad. Zameen describes it as a white-marble building opposite the Lahore Gymkhana golf course near the Main Boulevard/Jail Road junction. Exact floor count and store count not published."
+  },
+  {
+   "id": "dolmen-mall-lahore",
+   "name": "Dolmen Mall Lahore",
+   "tagline": "Dolmen's largest mall, in DHA Lahore near the airport",
+   "developer": "Dolmen Group",
+   "marketed_by": null,
+   "project_type": "mall",
+   "status": "completed",
+   "city": "Lahore",
+   "scheme": "DHA Phase 6",
+   "address": "Shabbir Sharif Road, DHA Phase 6, Lahore",
+   "location": {
+    "lat": 31.4669,
+    "lon": 74.43584,
+    "precision": "exact",
+    "note": "Centroid of OpenStreetMap way 1361438542 'Dolmen Mall' (operator Dolmen)"
+   },
+   "floors": "Four levels (three retail levels) over two basement parking levels",
+   "floor_count": 4,
+   "description": "Dolmen Mall Lahore is Dolmen Group's first mall in Punjab and its largest, with about 75,000 m² (roughly 807,000 sq ft) of gross leasable area, designed by Chapman Taylor. It opened with an official launch on 7 December 2024 and offers a hypermarket, Pakistani and international brands, cafés, restaurants, themed food streets and courts, and leisure and entertainment space, with parking for up to 2,000 cars in two basements.",
+   "payment_plan": null,
+   "offer": null,
+   "rates": null,
+   "units": [],
+   "total_units": null,
+   "images": [
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/Dolmen_Mall_Lahore.jpg/1280px-Dolmen_Mall_Lahore.jpg",
+     "caption": "Shahzor01 · CC BY-SA 4.0 · Wikimedia Commons"
+    }
+   ],
+   "sources": [
+    {
+     "title": "Wikipedia: Dolmen Malls",
+     "url": "https://en.wikipedia.org/wiki/Dolmen_Malls"
+    },
+    {
+     "title": "Chapman Taylor — Dolmen Mall Lahore officially opens (16 Dec 2024)",
+     "url": "https://www.chapmantaylor.com/news/dolmen-mall-lahore-officially-opens-redefining-retail-in-pakistan"
+    },
+    {
+     "title": "OpenStreetMap way 1361438542",
+     "url": "https://www.openstreetmap.org/way/1361438542"
+    }
+   ],
+   "research_note": "Chapman Taylor describes the site as 'within DHA, near Lahore Airport and DHA Phase VI'; OSM puts it on Shabbir Sharif Road, DHA Phase 6. Chapman Taylor gave 73,000 m² GLA in an earlier update and 75,000 m² at opening. Only one freely licensed photo found (Chapman Taylor's images return 401 to direct requests, so they were not used)."
+  },
+  {
+   "id": "dolmen-mall-clifton",
+   "name": "Dolmen Mall Clifton",
+   "tagline": "Seafront mall at the base of Dolmen City, Clifton",
+   "developer": "Dolmen Group",
+   "marketed_by": null,
+   "project_type": "mixed_use",
+   "status": "completed",
+   "city": "Karachi",
+   "scheme": "Clifton",
+   "address": "Dolmen City, HC-3, Block 4, Marine Drive, Clifton, Karachi 75600",
+   "location": {
+    "lat": 24.8022,
+    "lon": 67.0297,
+    "precision": "approximate",
+    "note": "Average of OpenStreetMap shop nodes tagged 'Dolmen Mall Clifton' (e.g. nodes 5128225578, 4788568332); Wikipedia gives Dolmen City at 24.8022, 67.0299"
+   },
+   "floors": "3 retail levels plus basement parking (levels B1–B2)",
+   "floor_count": 3,
+   "description": "Dolmen Mall Clifton is a three-level shopping mall of about 600,000 sq ft (542,847–547,924 sq ft leasable) at the base of the Dolmen City complex on Karachi's Clifton waterfront, opened in 2011. It has about 130 stores including Nike, Aldo, Charles & Keith and Khaadi, an award-winning food court, and sits beneath the 40-storey Dolmen Towers A and B, the 19-floor Harbour Front and the 17-floor Executive Tower. The mall and Harbour Front are held by the listed Dolmen City REIT.",
+   "payment_plan": null,
+   "offer": null,
+   "rates": null,
+   "units": [],
+   "total_units": null,
+   "images": [
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cb/Dolmen_Mall_Clifton.jpg/1280px-Dolmen_Mall_Clifton.jpg",
+     "caption": "Shahzor01 · CC BY-SA 4.0 · Wikimedia Commons"
+    },
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/PK_Karachi_asv2020-02_img56_Dolmen_Mall_Clifton.jpg/1280px-PK_Karachi_asv2020-02_img56_Dolmen_Mall_Clifton.jpg",
+     "caption": "A.Savin · FAL · Wikimedia Commons"
+    },
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Dolmen_City_Karachi.jpg/1280px-Dolmen_City_Karachi.jpg",
+     "caption": "A.Savin · FAL · Wikimedia Commons"
+    }
+   ],
+   "sources": [
+    {
+     "title": "Wikipedia: Dolmen Malls",
+     "url": "https://en.wikipedia.org/wiki/Dolmen_Malls"
+    },
+    {
+     "title": "Wikipedia: Dolmen City",
+     "url": "https://en.wikipedia.org/wiki/Dolmen_City"
+    },
+    {
+     "title": "Arif Habib Dolmen REIT — Dolmen Mall",
+     "url": "https://www.arifhabibdolmenreit.com/properties/dolmen-mall/"
+    },
+    {
+     "title": "Dolmen Malls — official website",
+     "url": "https://www.dolmenmalls.com/"
+    }
+   ],
+   "research_note": "The HC-3 Block 4 address is from the Wikipedia infobox/mirror and the coordinator brief; official dolmenmalls.com lists only 'Dolmen City, Clifton Block 4, Karachi' (that site currently carries injected spam links, so its images were not used). Dolmen City is owned by Dolmen Group with Arif Habib Group (20%)."
+  },
+  {
+   "id": "dolmen-mall-tariq-road",
+   "name": "Dolmen Mall Tariq Road",
+   "tagline": "Dolmen's first mall, on Karachi's Tariq Road shopping strip",
+   "developer": "Dolmen Group",
+   "marketed_by": null,
+   "project_type": "mall",
+   "status": "completed",
+   "city": "Karachi",
+   "scheme": "PECHS",
+   "address": "Tariq Road, PECHS Block 3, Karachi",
+   "location": {
+    "lat": 24.87693,
+    "lon": 67.06272,
+    "precision": "exact",
+    "note": "Centroid of OpenStreetMap way 458842849 'Dolmen Mall Tariq Road'; Commons photo GPS 24.8768, 67.0625"
+   },
+   "floors": "8 building levels per OpenStreetMap",
+   "floor_count": null,
+   "description": "Dolmen Mall Tariq Road opened in 2000 as Dolmen Group's first retail mall, on Tariq Road, one of Karachi's main commercial streets. It has retail outlets including Sana Safinaz, Sapphire, Nishat Linen, Ideas and Maria B, plus dining and entertainment spaces.",
+   "payment_plan": null,
+   "offer": null,
+   "rates": null,
+   "units": [],
+   "total_units": null,
+   "images": [
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/Dolmen_Mall_Tariq_Road.jpg/1280px-Dolmen_Mall_Tariq_Road.jpg",
+     "caption": "Shahzor01 · CC BY-SA 4.0 · Wikimedia Commons"
+    },
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/Dolmen_Tariq_Road_1.jpg/1280px-Dolmen_Tariq_Road_1.jpg",
+     "caption": "Sareena Moin · CC BY-SA 4.0 · Wikimedia Commons"
+    },
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/Dolmen_Tariq_Road_2.jpg/1280px-Dolmen_Tariq_Road_2.jpg",
+     "caption": "Sareena Moin · CC BY-SA 4.0 · Wikimedia Commons"
+    },
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/de/Dolmen_Mall%2C_Tariq_Road%2C_Karachi_2.jpg/1280px-Dolmen_Mall%2C_Tariq_Road%2C_Karachi_2.jpg",
+     "caption": "Sareena Moin · CC BY-SA 4.0 · Wikimedia Commons"
+    }
+   ],
+   "sources": [
+    {
+     "title": "Wikipedia: Dolmen Malls",
+     "url": "https://en.wikipedia.org/wiki/Dolmen_Malls"
+    },
+    {
+     "title": "OpenStreetMap way 458842849",
+     "url": "https://www.openstreetmap.org/way/458842849"
+    },
+    {
+     "title": "Dolmen Malls — official website",
+     "url": "https://www.dolmenmalls.com/"
+    }
+   ],
+   "research_note": "Floor count is only from OpenStreetMap (building:levels=8), so floor_count is left null. Store names come from Commons photo titles. No official street number found."
+  },
+  {
+   "id": "dolmen-mall-hyderi",
+   "name": "Dolmen Mall Hyderi",
+   "tagline": "Dolmen's North Nazimabad mall in the Hyderi market district",
+   "developer": "Dolmen Group",
+   "marketed_by": null,
+   "project_type": "mall",
+   "status": "completed",
+   "city": "Karachi",
+   "scheme": "North Nazimabad",
+   "address": "Block C, North Nazimabad, Shahrah-e-Sher Shah Suri (Hyderi), Karachi",
+   "location": {
+    "lat": 24.9355,
+    "lon": 67.0404,
+    "precision": "approximate",
+    "note": "Average of OpenStreetMap shop nodes tagged 'Dolmen Mall Hyderi' (e.g. nodes 4738187734, 5153530760); the mall outline itself is not named in OSM"
+   },
+   "floors": null,
+   "floor_count": null,
+   "description": "Dolmen Mall Hyderi opened in 2008 in North Nazimabad, serving Karachi's Hyderi commercial district and surrounding neighbourhoods. It has retail outlets (e.g. Khaadi), restaurants and a family entertainment area (Sindbad, Timezone).",
+   "payment_plan": null,
+   "offer": null,
+   "rates": null,
+   "units": [],
+   "total_units": null,
+   "images": [
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Dolmen_Mall_Hyderi.jpg/1280px-Dolmen_Mall_Hyderi.jpg",
+     "caption": "Shahzor01 · CC BY-SA 4.0 · Wikimedia Commons"
+    }
+   ],
+   "sources": [
+    {
+     "title": "Wikipedia: Dolmen Malls",
+     "url": "https://en.wikipedia.org/wiki/Dolmen_Malls"
+    },
+    {
+     "title": "Dolmen Malls — official website",
+     "url": "https://www.dolmenmalls.com/"
+    },
+    {
+     "title": "OpenStreetMap node 4738187734",
+     "url": "https://www.openstreetmap.org/node/4738187734"
+    }
+   ],
+   "research_note": "Street address is from a community wiki/OSM rather than an official page. Floor count and size not found. Tenant examples are from OSM shop nodes inside the mall."
+  },
+  {
+   "id": "lucky-one-mall",
+   "name": "LuckyOne Mall",
+   "tagline": "Pakistan's largest shopping mall, on Rashid Minhas Road",
+   "developer": "Lucky Landmark (Pvt) Ltd (Yunus Brothers Group)",
+   "marketed_by": null,
+   "project_type": "mall",
+   "status": "completed",
+   "city": "Karachi",
+   "scheme": "Federal B Area",
+   "address": "Opp. UBL Sports Complex, Main Rashid Minhas Road, Block 21, Federal B Area, Karachi",
+   "location": {
+    "lat": 24.9322928,
+    "lon": 67.0870913,
+    "precision": "exact",
+    "note": "OpenStreetMap mall outline (way 549120622, 'Lucky One Mall', Federal B Area Block 21); matches Wikipedia's 24°55'56\"N 67°05'14\"E"
+   },
+   "floors": "10 floors (Wikipedia infobox); double-storey indoor parking",
+   "floor_count": 10,
+   "description": "LuckyOne Mall opened to the public on 6 May 2017 on the former Fazal Textile Mills site and covers about 3.4 million sq ft, which Wikipedia calls the largest mall in Pakistan. It has more than 200 retail outlets, Pakistan's largest Carrefour hypermarket, the Onederland indoor family entertainment centre, a food court and open-air food street, a wedding galleria, a banking enclave and a health & wellness avenue. Indoor parking holds around 1,500 cars, and the LuckyOne Residential Apartments are part of the same development.",
+   "payment_plan": null,
+   "offer": null,
+   "rates": null,
+   "units": [],
+   "total_units": null,
+   "images": [
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/94/Lucky_One_Mall_1.jpg/1280px-Lucky_One_Mall_1.jpg",
+     "caption": "King Eliot · CC BY-SA 4.0 · Wikimedia Commons"
+    },
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Lucky_One_Mall.jpg/1280px-Lucky_One_Mall.jpg",
+     "caption": "H4MZ1246 · CC BY-SA 4.0 · Wikimedia Commons"
+    }
+   ],
+   "sources": [
+    {
+     "title": "LuckyOne Mall — About Us (official website)",
+     "url": "https://luckyone.com.pk/about-us/"
+    },
+    {
+     "title": "LuckyOne Mall — Wikipedia",
+     "url": "https://en.wikipedia.org/wiki/LuckyOne_Mall"
+    },
+    {
+     "title": "LuckyOne Mall grand opening held in Karachi — Pakistan Today (6 May 2017)",
+     "url": "https://www.pakistantoday.com.pk/2017/05/06/luckyone-mall-grand-opening-held-in-karachi/"
+    },
+    {
+     "title": "How the building of Lucky One Mall became a case study... — Profit by Pakistan Today (2024)",
+     "url": "https://profit.pakistantoday.com.pk/2024/04/22/how-the-building-of-lucky-one-mall-became-a-case-study-in-the-mistreatment-of-minority-shareholders/"
+    },
+    {
+     "title": "OpenStreetMap — Lucky One Mall",
+     "url": "https://www.openstreetmap.org/way/549120622"
+    }
+   ],
+   "research_note": "Floor count (10) comes from the Wikipedia infobox only; a Zameen blog describes the retail as spread over four levels, and the official site does not give a floor count. Parking: official site says around 1,500 cars, Wikipedia infobox says 1,200. Wikipedia lists the architect as Arcop (Pvt.) Ltd. and the manager as Lucky One (Private) Ltd. 'Block 21, Federal B Area' comes from OpenStreetMap and listings, not from the official address. Number of residential apartments not confirmed."
+  },
+  {
+   "id": "ocean-mall",
+   "name": "Ocean Mall & Tower",
+   "tagline": "28-storey glass tower with a mall and Cinepax cinema near Teen Talwar, Clifton",
+   "developer": "Triple Tree Associates",
+   "marketed_by": null,
+   "project_type": "mixed_use",
+   "status": "completed",
+   "city": "Karachi",
+   "scheme": "Clifton",
+   "address": "Khayaban-e-Iqbal, Block 9, Clifton (near Teen Talwar), Karachi",
+   "location": {
+    "lat": 24.8238646,
+    "lon": 67.0353571,
+    "precision": "exact",
+    "note": "OpenStreetMap node 5085538232 'Ocean Mall & Tower'; matches Wikipedia's 24.8239, 67.0356"
+   },
+   "floors": "28 storeys above ground plus 5 basement levels (car parking on basements 1–4)",
+   "floor_count": 28,
+   "description": "Ocean Mall (also called Ocean Tower) is a 393 ft (120 m) skyscraper in Clifton that combines a shopping mall with corporate office floors. At its February 2012 inauguration the project manager described a retail area of around 200 shops on 175,000 sq ft, a high-end dining floor, four cinemas and parking for 600 cars; today the mall has a five-screen Cinepax cinema, a food court and a children's play area. The whole project covers about 850,000 sq ft, has its own 5 MW power plant, and was designed by Arcop.",
+   "payment_plan": null,
+   "offer": null,
+   "rates": null,
+   "units": [],
+   "total_units": null,
+   "images": [
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Ocean_Tower_Karachi.jpg/1280px-Ocean_Tower_Karachi.jpg",
+     "caption": "King Eliot · CC BY-SA 4.0 · Wikimedia Commons"
+    },
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/Ocean_Tower_Clifton_Karachi.jpg/1280px-Ocean_Tower_Clifton_Karachi.jpg",
+     "caption": "King Eliot · CC BY-SA 4.0 · Wikimedia Commons"
+    },
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/OceanTower_Karachi.jpg/1280px-OceanTower_Karachi.jpg",
+     "caption": "Wasif Malik · CC BY 2.0 · Wikimedia Commons"
+    },
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Ocean_Tower_2.jpg/1280px-Ocean_Tower_2.jpg",
+     "caption": "King Eliot · CC BY-SA 4.0 · Wikimedia Commons"
+    }
+   ],
+   "sources": [
+    {
+     "title": "Ocean Mall — official website",
+     "url": "https://oceanmall.pk/"
+    },
+    {
+     "title": "Ocean Mall — About (official website)",
+     "url": "https://oceanmall.pk/about/"
+    },
+    {
+     "title": "Ocean Mall — Wikipedia",
+     "url": "https://en.wikipedia.org/wiki/Ocean_Mall"
+    },
+    {
+     "title": "Country's tallest building inaugurated — Pakistan Today (19 Feb 2012, archived)",
+     "url": "http://web.archive.org/web/20160529222626/http://www.pakistantoday.com.pk/2012/02/19/city/karachi/country%E2%80%99s-tallest-building-inaugurated/"
+    },
+    {
+     "title": "The Ocean Mall, Karachi — AAA Partnership (project manager)",
+     "url": "https://aaapartnership.com/project/the-ocean-mall-karachi/"
+    },
+    {
+     "title": "Out with the old, in with the new — Profit by Pakistan Today (2016)",
+     "url": "https://profit.pakistantoday.com.pk/2016/11/28/out-with-the-old-in-with-the-new/"
+    },
+    {
+     "title": "OpenStreetMap — Ocean Mall & Tower",
+     "url": "https://www.openstreetmap.org/node/5085538232"
+    }
+   ],
+   "research_note": "Developer: AAA Partnership names the client as Triple Tree Associates, and Pakistan Today quotes Triple Tree Associates' Farooq Mehboob at the inauguration; the official website does not name an owner. The building was first planned as a Sofitel hotel and then redesigned as a mall. Dates differ by source: inaugurated Feb 2012 (Pakistan Today), completed 2013 (AAA Partnership), built 2009–2014 (Wikipedia). Cost: Rs 5 billion (AAA, Wikipedia text) or PKR 7 billion (Wikipedia infobox). Wikipedia's infobox gives 30 floors, which it flags as needing a better source. Cinema count was 4 at opening (2012) and is a 5-screen Cinepax now (official site). The 2012 dining-floor and health-club details may be out of date. The OSM address places it in Clifton Block 8/9 along Khayaban-e-Iqbal."
+  },
+  {
+   "id": "millennium-mall",
+   "name": "Millennium Mall",
+   "tagline": "Large Rashid Minhas Road mall with garment, electronics and gaming shops",
+   "developer": null,
+   "marketed_by": null,
+   "project_type": "mall",
+   "status": "completed",
+   "city": "Karachi",
+   "scheme": "Gulshan-e-Jamal",
+   "address": "Main Rashid Minhas Road, near Askari flyover, Gulshan-e-Jamal (Gulshan-e-Iqbal Town), Karachi",
+   "location": {
+    "lat": 24.9015171,
+    "lon": 67.1152148,
+    "precision": "exact",
+    "note": "OpenStreetMap mall outline (way 522052430, 'Millennium Mall', Rashid Minhas Road / Askari Flyover, Block D Gulshan-e-Jamal)"
+   },
+   "floors": "Dawn calls it a three-storey building (ground plus upper floors; reports name shops on the 1st–4th floors)",
+   "floor_count": null,
+   "description": "Millennium Mall is a large, centrally air-conditioned shopping mall on Rashid Minhas Road covering about 350,000 sq ft, with brand outlets, food courts and entertainment. Its floors hold hundreds of shops selling ready-made garments, unstitched fabric, furniture, mobile phones and electronics, plus gaming zones; Dawn reported more than 150 shops on each floor. A fire on 18 June 2025 destroyed the top floor and partly damaged the first and second floors, with 250 to 600 shops reported damaged.",
+   "payment_plan": null,
+   "offer": null,
+   "rates": null,
+   "units": [],
+   "total_units": null,
+   "images": [
+    {
+     "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Millenium_Mall.jpg/1280px-Millenium_Mall.jpg",
+     "caption": "King Eliot · CC BY-SA 4.0 · Wikimedia Commons"
+    }
+   ],
+   "sources": [
+    {
+     "title": "Fire erupts in famous shopping mall in Karachi — ProPakistani (18 Jun 2025)",
+     "url": "https://propakistani.pk/2025/06/18/fire-erupts-in-famous-shopping-mall-in-karachi/amp/"
+    },
+    {
+     "title": "Karachi Millennium Mall fire — Dawn",
+     "url": "https://www.dawn.com/news/amp/1917876"
+    },
+    {
+     "title": "Fire ravages Millennium Mall in Karachi, shopkeepers blame delayed response — Pakistan Today (19 Jun 2025)",
+     "url": "https://www.pakistantoday.com.pk/2025/06/19/fire-ravages-millennium-mall-in-karachi-shopkeepers-blame-delayed-response"
+    },
+    {
+     "title": "Fire at Karachi shopping mall contained — The News",
+     "url": "https://www.thenews.pk/latest/1322397-fire-at-karachi-shopping-mall-contained"
+    },
+    {
+     "title": "List of shopping malls in Pakistan — Wikipedia",
+     "url": "https://en.wikipedia.org/wiki/List_of_shopping_malls_in_Pakistan"
+    },
+    {
+     "title": "OpenStreetMap — Millennium Mall",
+     "url": "https://www.openstreetmap.org/way/522052430"
+    }
+   ],
+   "research_note": "Chosen as the third Karachi mall because it is among the largest (about 350,000 sq ft) and has an address, OSM coordinates and a recent freely licensed photo; Atrium Mall (Saddar) has only a 2007 under-construction photo. Developer is unconfirmed: one travel listing (besttime.app) says Mumtaz Group launched it in 2000, and another says the Millennium Group established it in 2004. Neither is reliable, so the field is null. Floor count is unclear: Dawn says three storeys, while ProPakistani says the fire spread from the roof to the 3rd and 4th floors. The neighbourhood is given as Gulshan-e-Jamal / Gulshan-e-Iqbal Town by OSM and as Gulistan-e-Jauhar by ProPakistani. No source confirms whether the fire-damaged upper floors have reopened since June 2025; status 'completed' refers to the building."
+  },
+  {
+   "id": "lakeshore-towers",
+   "name": "Lakeshore Towers",
+   "tagline": "21-storey lakeside apartment towers in Top City-1, Islamabad",
+   "developer": "Kunwar's Associates",
+   "marketed_by": null,
+   "project_type": "mixed_use",
+   "status": "under_construction",
+   "city": "Rawalpindi",
+   "scheme": "Top City-1",
+   "address": "On the lake in Top City-1, near the M-2 Motorway and New Islamabad International Airport, Islamabad (sales office: Plot No 6, Block C, Top City-1)",
+   "location": {
+    "lat": 33.5763317,
+    "lon": 72.8692628,
+    "precision": "approximate",
+    "note": "Centre of the Top City-1 housing society outline in OpenStreetMap (way 867009416); the tower plot itself is not mapped in OSM and no published coordinates were found"
+   },
+   "floors": "21 storeys, including 3 parking floors (official website)",
+   "floor_count": 21,
+   "description": "Lakeshore Towers is a 21-storey residential project by Kunwar's Associates on about 16.5 kanal facing a 142-kanal natural lake in Top City-1. The official site lists around 400 apartments, ranging from 1-bed (from 656 sq ft), 2-bed (from 1,300 sq ft), 3-bed (from 1,730 sq ft) and 4-bed (from 2,203 sq ft) units to 2-bed penthouses (from 1,327 sq ft) and 4-bed triplexes (from 4,817 sq ft). It also has in-house commercial space, a banquet hall, gym, yoga studio, salt-therapy chamber, day-care, business centre, guest rooms and rooftop gardens.",
+   "payment_plan": {
+    "summary": "30% down payment; balance in 42 monthly or 14 quarterly instalments (official FAQ)",
+    "down_payment_percent": 30,
+    "installments": "42 monthly or 14 quarterly",
+    "extra_charges": "Per a 2022 third-party listing (Manahil Estate): lake view +10%, M-2/roof-garden view +5%, car parking PKR 1,700,000; 10% discount for lump-sum payment, 5% for half payment"
+   },
+   "offer": null,
+   "rates": null,
+   "units": [],
+   "total_units": 400,
+   "images": [
+    {
+     "url": "https://kunwarsassociates.com/wp-content/uploads/2024/05/2-1-1.png",
+     "caption": "© Kunwar's Associates · official website (architectural render)"
+    },
+    {
+     "url": "https://kunwarsassociates.com/wp-content/uploads/2024/05/1-1-1.png",
+     "caption": "© Kunwar's Associates · official website (architectural render)"
+    }
+   ],
+   "sources": [
+    {
+     "title": "Lakeshore Towers — official website (Kunwar's Associates)",
+     "url": "https://kunwarsassociates.com/"
+    },
+    {
+     "title": "Lakeshore Towers — FAQ (official website)",
+     "url": "https://kunwarsassociates.com/faq/"
+    },
+    {
+     "title": "Lakeshore Towers — About (official website)",
+     "url": "https://kunwarsassociates.com/about/"
+    },
+    {
+     "title": "Lakeshore Towers Top City-1 Islamabad — Manahil Estate (Feb 2022)",
+     "url": "https://manahilestate.com/lakeshore-towers/"
+    },
+    {
+     "title": "Briefing on Kunwar's Associates' under-construction Lakeshore Towers — APP",
+     "url": "https://www.app.com.pk/?p=1147540"
+    },
+    {
+     "title": "OpenStreetMap — Top City-1",
+     "url": "https://www.openstreetmap.org/way/867009416"
+    }
+   ],
+   "research_note": "Identification: no Pakistani project actually named 'Lakefront Towers' (or 'Lake Front Tower(s)') was found. Lakeshore Towers is the closest match by name and is literally a lakefront tower project, so it is most likely the one meant (moderate confidence, about 60–70%). Other lakeside candidates: Crescent Lake Tower and Grand Millennium (both Bahria Town Phase 8, lake view) and Lake Vista Heights (Bahria Town Phase 8, ZEM Builders). Facts: land area is 16.7 kanal on the official counter, 16.5 kanal in the official FAQ and about 16.16 kanal (9,779 sq yd) per Manahil Estate. In-house commercial area is over 100,000 sq ft in the official FAQ but about 50,000 sq ft per Manahil Estate. Unit sizes differ between the official site ('from' sizes used here) and Manahil Estate (e.g. Twin Loft 5,584 sq ft). The renders show several tower blocks on a shared podium, but the number of towers is not stated. Approvals: NOCs from RDA, CAA, EPA and Punjab Emergency Service (1122); registered under the PM's construction amnesty scheme. The official site posts video progress updates, the latest dated 06-11-25; APP described it as under construction (article dated 17 Jan, year not shown, probably 2026). Completion date and prices are not published. Top City-1 is marketed as Islamabad, but OSM places it in Rawalpindi tehsil near the M-2 toll plaza. Both images are official renders; no real construction photo with a clear licence was found. City set to Rawalpindi to match the portal's Top City-1 record and OpenStreetMap; the developer markets it as Islamabad."
+  },
+  {
+   "id": "16-sina",
+   "name": "16 Sina",
+   "tagline": "Planned ~30-storey mixed-use tower with PC Residences on Ibn-e-Sina Road, opposite F-9 Park",
+   "developer": "Mujahid Properties (Pvt.) Limited, in joint venture with Hashoo Group Real Estate Division",
+   "marketed_by": "Amanah.pk",
+   "project_type": "mixed_use",
+   "status": "planned",
+   "city": "Islamabad",
+   "scheme": "New Blue Area",
+   "address": "Plot No. 16, Main Ibn-e-Sina Road (between Jinnah Avenue and Ibn-e-Sina Road), New Blue Area G-9/F-9, Islamabad",
+   "location": {
+    "lat": 33.6944,
+    "lon": 73.0295,
+    "precision": "approximate",
+    "note": "Estimated from the marketer's (Amanah.pk) location map, which pins the plot between Jinnah Avenue and Ibn-e-Sina Road just west of the Nallah Lai crossing; scaled against OpenStreetMap positions of Aiwan-e-Quaid, Lai Nadi and Ibn-e-Sina Road (Nominatim). Not an OSM-mapped building."
+   },
+   "floors": "Up to 30 storeys (Hashoo/Mujahid JV announcement, May 2026); marketer brochure: 32 floors incl. 5 basements, ground, 22 standard floors, 5 S.F. floors and rooftop",
+   "floor_count": null,
+   "description": "16 Sina is a planned mixed-use high-rise on Plot 16 in New Blue Area, opposite F-9 Park, developed by Mujahid Properties with Hashoo Group's real estate division leading construction management, sales and operations. The May 2026 joint-venture announcement describes up to thirty storeys with parking, retail floors, serviced offices, luxury serviced apartments (PC Residences) and six penthouses, plus Hashoo Group food outlets. The marketer quotes a 28,000 sq ft footprint, architect Najmi Bilgrami Collaborative and structural engineer Arif Hussain Associates.",
+   "payment_plan": null,
+   "offer": null,
+   "rates": null,
+   "units": [],
+   "total_units": null,
+   "images": [
+    {
+     "url": "https://16sina.com/wp-content/uploads/2026/06/16-Sina-Islamabad-New-Blue-Area-Islamabad-1024x576-1.jpg",
+     "caption": "© 16 Sina (Mujahid Properties / Hashoo Group) · official website"
+    },
+    {
+     "url": "https://amanah.pk/wp-content/uploads/2023/08/16-sina-Finalbrochure-_page-0007-scaled.jpg",
+     "caption": "© Mujahid Properties / Amanah.pk · project brochure on amanah.pk (exclusive marketing partner)"
+    }
+   ],
+   "sources": [
+    {
+     "title": "ProPakistani: Hashoo Group Real Estate Division and Mujahid Properties sign MoU for 16 Sina project in Islamabad's New Blue Area (24 May 2026)",
+     "url": "https://propakistani.pk/2026/05/24/hashoo-group-real-estate-division-and-mujahid-properties-sign-mou-for-16-sina-project-in-islamabads-new-blue-area/amp/"
+    },
+    {
+     "title": "Amanah.pk: 16 Sina New Blue Area Islamabad",
+     "url": "https://amanah.pk/16-sina-islamabad/"
+    },
+    {
+     "title": "16 Sina official website (holding page)",
+     "url": "https://16sina.com/"
+    },
+    {
+     "title": "NewBlueArea.com: 16 Sina Islamabad",
+     "url": "https://newbluearea.com/16-sina-islamabad/"
+    }
+   ],
+   "research_note": "Both images are renders (the tower is not built); the second is a brochure page with text below the render. Height conflicts: 'up to thirty storeys' (May 2026 JV press release) vs '32 floors' (Amanah.pk page/brochure and July 2025 coverage), so floor_count is null. Status 'planned': Amanah.pk's older page claims construction is 'in full swing', but the May 2026 JV announcement says work would begin after the MoU signing with delivery targeted within three years; no independent groundbreaking report found. Marketer mentions 2-bed apartments of about 2,000 sq ft but no published price list or rates. 16sina.com was a maintenance page when checked."
+  },
+  {
+   "id": "tower-12",
+   "name": "Tower 12",
+   "tagline": "Glass-fronted office and retail tower opposite F-9 Park's Mehran Gate",
+   "developer": "Nouman Builders (Pvt) Ltd and Pioneer Developers (joint venture)",
+   "marketed_by": null,
+   "project_type": "tower",
+   "status": "under_construction",
+   "city": "Islamabad",
+   "scheme": "New Blue Area",
+   "address": "Plot No. 12, Main Jinnah Avenue, opposite Mehran Gate of F-9 Park, New Blue Area (G-9), Islamabad",
+   "location": {
+    "lat": 33.6941,
+    "lon": 73.0272,
+    "precision": "approximate",
+    "note": "Estimated from the Amanah.pk location map (Tower 12 pinned south of Jinnah Avenue, below Aiwan-e-Quaid in F-9 Park) scaled against OpenStreetMap positions of Aiwan-e-Quaid and Jinnah Avenue; a Milkiyat construction photo also shows Aiwan-e-Quaid directly across the road. Not an OSM-mapped building."
+   },
+   "floors": "Lower ground + ground + 11 upper floors (Milkiyat/iReal Projects); Amanah.pk describes it as 11 storeys",
+   "floor_count": 13,
+   "description": "Tower 12 is a CDA-approved commercial tower on Plot 12, Jinnah Avenue, opposite the Mehran Gate of F-9 Park, with about 60,747 sq ft of covered area. Marketers list shops on the lower ground, ground and first floors, corporate offices on floors 2 to 4 and 6 to 11, and restaurant space on the 5th floor, behind a glass facade with a water-feature wall.",
+   "payment_plan": null,
+   "offer": null,
+   "rates": null,
+   "units": [],
+   "total_units": null,
+   "images": [
+    {
+     "url": "https://irealprojects.com/wp-content/uploads/2024/07/Tower-12-New-Blue-Area-Islamabad-Shops-and-Offices-opp.-F-9-Park.jpg",
+     "caption": "© iReal Projects · irealprojects.com (project render)"
+    }
+   ],
+   "sources": [
+    {
+     "title": "Milkiyat.com: Tower 12 Islamabad",
+     "url": "https://milkiyat.com/projects/islamabad/tower-12-islamabad-16-67"
+    },
+    {
+     "title": "iReal Projects: Tower 12 Islamabad, Shops & Offices opp. F-9 Park, New Blue Area",
+     "url": "https://irealprojects.com/project/tower-12-islamabad/"
+    },
+    {
+     "title": "Amanah.pk: New Blue Area Islamabad (Tower 12 section)",
+     "url": "https://amanah.pk/new-blue-area-islamabad/"
+    },
+    {
+     "title": "iReal Projects: 5 Most Promising Projects in New Blue Area",
+     "url": "https://irealprojects.com/5-most-promising-projects-in-new-blue-area/"
+    }
+   ],
+   "research_note": "All sources are property marketers/portals; no developer website or news coverage was found. Images: two renders and two construction photos (watermarked 'Milkiyat'). Status: Milkiyat and iReal say under construction (grey structure complete, facade/finishing under way); one iReal article says 'structure completed'. floor_count 13 = lower ground + ground + 11 upper floors; Amanah.pk says '11 storeys' (upper floors). Developer spelled 'Nauman Builders and Pioneer Group' on Amanah.pk. Marketers mention shops/offices on 2.5-year instalments and a listing price range of PKR 2.1 to 16.0 crore, but no developer-published payment schedule or per-sq-ft rates were found, so payment_plan and rates are null."
   }
  ]
 }

@@ -542,12 +542,16 @@ function MegaProjects() {
                 <span className="inline-flex items-center gap-1">
                   <MapPin className="h-3.5 w-3.5" /> {p.city}
                 </span>
-                <span className="inline-flex items-center gap-1">
-                  <Building className="h-3.5 w-3.5" /> {p.floor_count} floors
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <Ruler className="h-3.5 w-3.5" /> {compact(p.total_area)} sqft
-                </span>
+                {!!p.floor_count && (
+                  <span className="inline-flex items-center gap-1">
+                    <Building className="h-3.5 w-3.5" /> {p.floor_count} floors
+                  </span>
+                )}
+                {!!p.total_area && (
+                  <span className="inline-flex items-center gap-1">
+                    <Ruler className="h-3.5 w-3.5" /> {compact(p.total_area)} sqft
+                  </span>
+                )}
               </div>
               {p.occupancy_rate !== null && (
                 <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/20">
