@@ -471,8 +471,8 @@ export function EditBar({ edit, className }: { edit: { rights: EditRights; mode:
   const item = (active: boolean) =>
     cn("flex h-10 items-center gap-1.5 px-3 text-xs font-bold transition first:rounded-s-xl last:rounded-e-xl", active ? "bg-brand-700 text-white" : "text-brand-800 hover:bg-brand-50 dark:text-white dark:hover:bg-white/10");
   return (
-    <div ref={ref} className={cn("absolute z-[450] flex items-center gap-2", className)}>
-      <span className="rounded-full bg-white/90 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-ink-mute shadow-sm dark:bg-brand-950/90">Edit</span>
+    <div ref={ref} className={cn("absolute z-[450] flex flex-col items-start gap-1", className)}>
+      <span className="rounded-full bg-white/90 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-ink-mute shadow-sm dark:bg-brand-950/90">Edit Listing</span>
       <div className="flex divide-x divide-black/5 rounded-xl bg-white shadow-soft ring-1 ring-black/5 dark:divide-white/10 dark:bg-brand-950">
         <button
           type="button"
