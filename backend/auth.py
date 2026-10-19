@@ -38,6 +38,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from pydantic import BaseModel, Field
 
 import delivery
+import portal_env
 
 
 # ============================================================
@@ -64,10 +65,16 @@ AUTH_CONFIG: Dict[str, Any] = {
     "session_ttl_hours": 24,
     # Passwords
     "password_min_length": 8,
-    "pbkdf2_iterations": 120_000,
-    # Dev convenience: keep the plaintext OTP and return it in responses. When the
-    # variable is unset, codes are exposed only for channels with no real provider.
-    "expose_otp": _env_bool("PORTAL_AUTH_EXPOSE_OTP", True),
+    # New hashes use this many PBKDF2-SHA256 rounds (OWASP 2023: 600k); older hashes keep the
+    # count they were made with (stored with the salt) and still verify.
+    "pbkdf2_iterations": int(os.environ.get("PORTAL_PBKDF2_ITERATIONS") or 600_000),
+    # Dev convenience: keep the plaintext OTP and return it in responses. Off in production; in
+    # development, codes are exposed only for channels with no real provider.
+    "expose_otp": _env_bool("PORTAL_AUTH_EXPOSE_OTP", not portal_env.PRODUCTION),
+    # Brute-force protection: this many failed sign-ins for one account within the window locks
+    # password sign-in for that account for the window.
+    "login_max_failures": int(os.environ.get("PORTAL_LOGIN_MAX_FAILURES") or 5),
+    "login_lock_minutes": int(os.environ.get("PORTAL_LOGIN_LOCK_MINUTES") or 15),
     # Channels
     "channels": ["sms", "email"],
     "default_country_code": "+92",
@@ -81,8 +88,10 @@ USER_ROLES = [
 USER_STATUSES = ["pending", "active", "suspended"]
 
 # Roles a member of the public may pick when self-registering. Everything else is
-# granted by an administrator.
+# granted by an administrator. Staff roles can be *requested* at sign-up: the account starts as
+# a plain user with ``requested_role`` set, and an administrator grants it.
 SIGNUP_ROLES = ["user", "buyer", "tenant", "seller", "landlord", "investor", "agent", "developer"]
+REQUEST_ONLY_ROLES = ["agent", "developer"]
 
 # Portal areas a role belongs to: the public site, client (self-service), staff
 # (back-office) and admin (super-user) tiers.
@@ -261,6 +270,7 @@ class User(BaseModel):
     verified: bool = False
     customer_id: Optional[str] = None   # linked CRM customer
     agent_id: Optional[str] = None      # linked CRM agent
+    requested_role: Optional[str] = None  # a staff role asked for at sign-up, granted by an admin
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
     last_login_at: Optional[datetime] = None
@@ -394,11 +404,19 @@ def channel_for(value: str) -> str:
     return "email" if normalize_email(value) else "sms"
 
 
+def _iterations_of(salt: str) -> int:
+    """Salts made since Oct 2026 carry their round count ("i600000$…"); older ones used 120k."""
+    if salt.startswith("i") and "$" in salt:
+        try:
+            return int(salt[1:salt.index("$")])
+        except ValueError:
+            pass
+    return 120_000
+
+
 def hash_password(password: str, salt: Optional[str] = None) -> Tuple[str, str]:
-    salt = salt or secrets.token_hex(16)
-    dk = hashlib.pbkdf2_hmac(
-        "sha256", password.encode("utf-8"), salt.encode("utf-8"), int(AUTH_CONFIG["pbkdf2_iterations"])
-    )
+    salt = salt or f"i{int(AUTH_CONFIG['pbkdf2_iterations'])}${secrets.token_hex(16)}"
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), _iterations_of(salt))
     return dk.hex(), salt
 
 
@@ -722,6 +740,10 @@ def signup(email: Optional[str] = None, mobile: Optional[str] = None, password: 
         return {"error": "An account with this mobile number already exists", "code": "mobile_taken"}
     if role not in SIGNUP_ROLES:
         return {"error": f"role must be one of {SIGNUP_ROLES}", "code": "invalid_role"}
+    requested = None
+    if role in REQUEST_ONLY_ROLES:
+        # Staff roles carry CRM / catalogue rights: start as a plain user until an admin grants it.
+        requested, role = role, "user"
 
     password_hash = password_salt = None
     if password:
@@ -730,10 +752,10 @@ def signup(email: Optional[str] = None, mobile: Optional[str] = None, password: 
     user = User(
         name=name, email=email_n, mobile=mobile_n,
         password_hash=password_hash, password_salt=password_salt,
-        role=role, roles=[role], status="pending", verified=False,
+        role=role, roles=[role], status="pending", verified=False, requested_role=requested,
     )
     users_db.append(user)
-    log_event("signup", email_n or mobile_n, user.id, f"role={role}")
+    log_event("signup", email_n or mobile_n, user.id, f"role={role}" + (f", requested={requested}" if requested else ""))
 
     sent: List[Dict[str, Any]] = []
     failures: List[Dict[str, Any]] = []
@@ -762,18 +784,42 @@ def signup(email: Optional[str] = None, mobile: Optional[str] = None, password: 
     }
 
 
+_login_failures: Dict[str, List[datetime]] = {}
+_DUMMY_SALT = f"i{int(AUTH_CONFIG['pbkdf2_iterations'])}$" + "0" * 32
+
+
+def _locked(ident: str) -> Optional[int]:
+    """Minutes left on a sign-in lock for this account, or None."""
+    window = timedelta(minutes=int(AUTH_CONFIG["login_lock_minutes"]))
+    now = datetime.now()
+    recent = [t for t in _login_failures.get(ident, []) if now - t < window]
+    _login_failures[ident] = recent
+    if len(recent) >= int(AUTH_CONFIG["login_max_failures"]):
+        return max(1, int((window - (now - recent[-1])).total_seconds() // 60) + 1)
+    return None
+
+
 def login(identifier: str, password: Optional[str] = None) -> Dict[str, Any]:
     ident = normalize_identifier(identifier) or normalize_username(identifier)
     user = find_user(ident) if ident else None
+    if ident and (mins := _locked(ident)):
+        log_event("login_blocked", ident, user.id if user else None, "too many failed attempts")
+        return {"error": f"Too many failed sign-ins — try again in {mins} minute{'s' if mins != 1 else ''}, or reset your password",
+                "code": "locked"}
     if user is None:
+        verify_password(password or "", "0" * 64, _DUMMY_SALT)  # same work as a real check: no account probing by timing
+        if ident:
+            _login_failures.setdefault(ident, []).append(datetime.now())
         log_event("login_failed", ident, None, "unknown identifier")
         return {"error": "Invalid credentials", "code": "invalid_credentials"}
     if user.status == "suspended":
         log_event("login_blocked", ident, user.id, "suspended")
         return {"error": "This account is suspended", "code": "suspended"}
     if not verify_password(password or "", user.password_hash, user.password_salt):
+        _login_failures.setdefault(ident, []).append(datetime.now())
         log_event("login_failed", ident, user.id, "bad password")
         return {"error": "Invalid credentials", "code": "invalid_credentials"}
+    _login_failures.pop(ident, None)
     if not user.verified:
         issued = create_otp(ident, purpose="signup", user=user)
         result: Dict[str, Any] = {
@@ -866,6 +912,8 @@ def set_password(token: Optional[str], new_password: str, current_password: Opti
         return {"error": "Current password is incorrect", "code": "bad_password"}
     user.password_hash, user.password_salt = hash_password(new_password)
     user.updated_at = datetime.now()
+    # Sign the account out everywhere else (a changed password must lock out an attacker).
+    sessions_db[:] = [x for x in sessions_db if x.user_id != user.id or x.token == token]
     log_event("password_set", None, user.id)
     return {"updated": True, "user": public_user(user)}
 
@@ -970,6 +1018,10 @@ def get_config() -> Dict[str, Any]:
     cfg["active_sessions"] = sum(1 for s in sessions_db if s.is_valid())
     cfg["pending_otps"] = sum(1 for o in otps_db if not o.consumed_at and not o.is_expired())
     cfg["delivery"] = delivery.summary()
+    cfg["demo_accounts"] = portal_env.SEED_DEMO and any(u.email == "admin@portal.pk" for u in users_db)
+    cfg["environment"] = portal_env.ENV
+    for k in ("users", "active_sessions", "pending_otps"):  # operational counts are not public
+        cfg.pop(k, None)
     return cfg
 
 
@@ -1234,9 +1286,10 @@ def seed_roles() -> None:
 
 
 def seed_users() -> None:
-    """Idempotent demo accounts covering every portal role (documented in the README)."""
+    """Idempotent demo accounts covering every portal role (documented in the README).
+    Only with PORTAL_SEED_DEMO (on in development, off in production): their passwords are public."""
     seed_roles()
-    if users_db:
+    if users_db or not portal_env.SEED_DEMO:
         return
 
     seeded = [

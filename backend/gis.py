@@ -418,6 +418,17 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
 }
 
 
+
+def _js(obj: Any) -> str:
+    """JSON for inlining inside <script>: a value containing "</script>" can't end the tag."""
+    return json.dumps(obj).replace("</", "<\\/").replace("<!--", "<\\!--")
+
+
+def safe_url(url: Any) -> str:
+    """Only http(s) links (no javascript: / data: URLs) end up in an href."""
+    u = str(url or "").strip()
+    return u if u.lower().startswith(("http://", "https://")) else ""
+
 def get_language(code: Optional[str]) -> Dict[str, str]:
     """Resolve a language code (``ur-PK`` -> ``ur``); unknown codes fall back to English."""
     c = (code or DEFAULT_LANGUAGE).split("-")[0].split("_")[0].strip().lower()
@@ -827,6 +838,9 @@ class GeoLayer(BaseModel):
     opacity: float = 1.0
     source_url: Optional[str] = None  # link to original master plan PDF/image
     image_url: Optional[str] = None  # rectified raster master plan
+    # Geometry rebuilt from source files at start (e.g. "masterplan-labels:<key>:<cats>"): the
+    # database keeps the layer's settings but not this copy of the geometry.
+    geojson_ref: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
@@ -1012,6 +1026,7 @@ __THEME_JS__
   const overlayLayers = {};
   const bounds = L.latLngBounds([]);
 
+  const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   OVERLAYS.forEach((ov, i) => {
     const styleFn = (feature) => {
       if (ov.choropleth && feature.properties && feature.properties._style) return feature.properties._style;
@@ -1023,15 +1038,15 @@ __THEME_JS__
       onEachFeature: (f, lyr) => {
         const p = f.properties || {};
         const lines = [];
-        if (p.name) lines.push('<b>' + p.name + '</b>');
+        if (p.name) lines.push('<b>' + esc(p.name) + '</b>');
         if (ov.valueProp && p[ov.valueProp] !== undefined && p[ov.valueProp] !== null) {
-          lines.push((ov.valueLabel || ov.valueProp) + ': ' + p[ov.valueProp]);
+          lines.push(esc(ov.valueLabel || ov.valueProp) + ': ' + esc(p[ov.valueProp]));
         }
-        if (p.description) lines.push(p.description);
+        if (p.description) lines.push(esc(p.description));
         if (lines.length) lyr.bindPopup(lines.join('<br>'));
       }
     });
-    if (!ov.choropleth && ov.name) layer.bindPopup(ov.name);
+    if (!ov.choropleth && ov.name) layer.bindPopup(esc(ov.name));
     layer.addTo(map);
     overlayLayers[ov.name || ('Layer ' + (i + 1))] = layer;
     try { const b = layer.getBounds(); if (b.isValid()) bounds.extend(b); } catch (e) {}
@@ -1039,7 +1054,7 @@ __THEME_JS__
 
   MARKERS.forEach(m => {
     const mk = L.marker([m.lat, m.lon]).addTo(map);
-    if (m.title || m.description) mk.bindPopup('<b>' + (m.title || '') + '</b><br>' + (m.description || ''));
+    if (m.title || m.description) mk.bindPopup('<b>' + esc(m.title || '') + '</b><br>' + esc(m.description || ''));
     bounds.extend([m.lat, m.lon]);
   });
 
@@ -1149,15 +1164,15 @@ def build_map_html(
         .replace("__BODY_CLASS__", body_class)
         .replace("__TITLE__", html.escape(str(title)))
         .replace("__TICKER__", ticker_html or "")
-        .replace("__TITLE_JSON__", json.dumps(str(title)))
-        .replace("__LEGEND_LABEL__", json.dumps(translate("Legend", language["code"])))
-        .replace("__UI_JSON__", json.dumps(ui))
+        .replace("__TITLE_JSON__", _js(str(title)))
+        .replace("__LEGEND_LABEL__", _js(translate("Legend", language["code"])))
+        .replace("__UI_JSON__", _js(ui))
         .replace("__LEAFLET_CSS__", _LEAFLET_CSS)
         .replace("__LEAFLET_JS__", _LEAFLET_JS)
-        .replace("__BASE_MAPS_JSON__", json.dumps(base_maps_js))
-        .replace("__OVERLAYS_JSON__", json.dumps(overlays))
-        .replace("__MARKERS_JSON__", json.dumps(markers))
-        .replace("__DEFAULT_BASE__", json.dumps(base_map_id))
+        .replace("__BASE_MAPS_JSON__", _js(base_maps_js))
+        .replace("__OVERLAYS_JSON__", _js(overlays))
+        .replace("__MARKERS_JSON__", _js(markers))
+        .replace("__DEFAULT_BASE__", _js(base_map_id))
         .replace("__CENTER_LAT__", repr(float(center_lat)))
         .replace("__CENTER_LON__", repr(float(center_lon)))
         .replace("__ZOOM__", str(int(zoom)))
@@ -2037,7 +2052,7 @@ def render_section(section: Dict[str, Any], lang: str = DEFAULT_LANGUAGE) -> str
             cls = {"positive": "pos", "negative": "neg"}.get(sent, "neu")
             title = html.escape(str(item.get("title", "")))
             if item.get("url"):
-                title = f'<a href="{html.escape(str(item["url"]), quote=True)}" target="_blank" rel="noopener">{title}</a>'
+                title = f'<a href="{html.escape(safe_url(item["url"]), quote=True)}" target="_blank" rel="noopener">{title}</a>'
             src = html.escape(str(item.get("source", "")))
             when = html.escape(str(item.get("published_at", ""))[:16].replace("T", " "))
             impact = item.get("impact_score", 0)
@@ -2195,7 +2210,7 @@ def _ad_card_html(ad: Dict[str, Any], lang: str = DEFAULT_LANGUAGE) -> str:
     meta = " · ".join(html.escape(str(b)) for b in meta_bits)
     ad_id = html.escape(str(ad.get("id") or ""))
     cta_label = html.escape(str(ad.get("cta_label") or translate("Learn more", code)))
-    cta_url = ad.get("cta_url")
+    cta_url = safe_url(ad.get("cta_url"))
     if cta_url:
         cta = (f'<a class="ad-cta" data-ad-id="{ad_id}" data-ad-event="click" '
                f'href="{html.escape(str(cta_url), quote=True)}" target="_blank" rel="noopener">'

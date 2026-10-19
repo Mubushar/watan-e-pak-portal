@@ -1,7 +1,9 @@
 """
-Access control for the CRM family of routes — /crm, /marketing, /broker, /agents, /messaging.
+Access control for every HTTP route (and the MCP endpoint).
 
-One ASGI middleware decides, from the method and path, what a request needs:
+One ASGI middleware decides, from the method and path, what a request needs — see the rule table
+below (``_RULES``). Reads are public unless a rule says otherwise; any write that no rule names
+needs an administrator (deny by default). Highlights:
 
 * **public**      the portal's own visitor features: an enquiry or viewing request from a
                   property page (``POST /crm/leads``, ``POST /crm/appointments``, rate-limited per
@@ -19,6 +21,7 @@ The signed-in user is kept in a context variable for the routes: ``current()``, 
 
 from __future__ import annotations
 
+import hmac
 import json
 import re
 import time
@@ -26,6 +29,8 @@ from collections import defaultdict, deque
 from contextvars import ContextVar
 from typing import Any, Callable, Deque, Dict, Optional, Tuple
 from urllib.parse import parse_qs
+
+import portal_env
 
 _user: ContextVar[Optional[Dict[str, Any]]] = ContextVar("portal_user", default=None)
 
@@ -72,41 +77,151 @@ def agent_scope(user: Optional[Dict[str, Any]] = None) -> Optional[str]:
 
 # ------------------------------------------------------------------ rules
 
-Rule = str  # "public" | "user" | "crm.view" | "crm.manage" | "none"
+Rule = str
+# Rules:  "public"   anyone
+#         "user"     any signed-in user
+#         "<perm>"   a permission from auth.PERMISSIONS (e.g. "crm.view"; super_admin has all)
+#         "admin"    super_admin / admin only
+#         "mcp"      the MCP endpoint (PORTAL_MCP_TOKEN, a super_admin token, or a local client)
+#         "docs"     API docs (public in development; hidden in production unless enabled)
+#         "none"     not covered here (only GET routes fall through to it — they are public)
+# Any write (POST / PUT / PATCH / DELETE) that no rule names needs an admin: deny by default.
 
-_PUBLIC_AGENT_READS = re.compile(r"^/agents/(catalog|products|overview|portal|[a-z0-9_-]+)$")
-_CRM_AGENT_TOOLS = re.compile(r"^/agents/(smart-actions|move-likelihood(/.*)?|seller-intent)$")
-_AGENT_RUNS = re.compile(r"^/agents/(run|plan|orchestrate|runs(/.*)?)$")
+_R = Tuple[str, "re.Pattern[str]", Rule]
+W = "W"  # any write method
+_RULES: list = []
+
+
+def _add(methods: str, pattern: str, rule: Rule) -> None:
+    _RULES.append((methods, re.compile(pattern), rule))
+
+
+# ---- protocol endpoints
+_add("*", r"^/mcp(/|$)", "mcp")
+_add("*", r"^/(docs|redoc|openapi\.json)(/|$)", "docs")
+
+# ---- authentication & accounts
+_add("GET", r"^/auth/(otps|notifications)$", "settings.manage")
+_add("GET", r"^/auth/events$", "audit.view")
+_add("GET", r"^/auth/users$", "users.view")
+_add("*", r"^/auth/", "public")
+_add("GET", r"^/roles/[^/]+/users$", "users.view")
+_add("GET", r"^/roles(/|$)", "public")            # the role / permission catalogue
+_add("*", r"^/roles(/|$)", "roles.manage")
+_add("GET", r"^/users/", "users.view")
+_add("*", r"^/users/", "roles.manage")
+_add("*", r"^/me(/|$)", "user")
+
+# ---- portal administration
+_add("GET", r"^/portal/audit$", "audit.view")
+_add("*", r"^/portal/settings$", "settings.manage")
+_add("*", r"^/portal/storage(/flush)?$", "settings.manage")
+_add("*", r"^/memory(/|$)", "settings.manage")
+_add(W, r"^/masterplans/knowledge/refresh$", "settings.manage")
+_add("*", r"^/admin/basedata(/|$)", "basedata.manage")
+_add(W, r"^/(cities|schemes|blocks)(/|$)", "basedata.manage")
+
+# ---- CRM family
+_add("*", r"^/crm/webhooks/", "public")
+_add("POST", r"^/crm/(leads|appointments)$", "public")      # enquiry / viewing request from a listing
+_add("GET", r"^/crm/agents$", "public")                     # agent contact card (trimmed for visitors)
+_add("GET", r"^/broker/listing-draft/", "public")
+_add("GET", r"^/(crm|marketing|broker)(/|$)", "crm.view")
+_add(W, r"^/(crm|marketing|broker)(/|$)", "crm.manage")
+_add("*", r"^/agents/(smart-actions|move-likelihood(/.*)?|seller-intent)$", "crm.view")
+_add("POST", r"^/agents/runs/[^/]+/approve$", "crm.manage")
+_add("*", r"^/agents/(run|plan|orchestrate|runs(/.*)?)$", "user")
+_add("GET", r"^/agents/(catalog|products|overview|portal|[a-z0-9_-]+)$", "public")
+_add("*", r"^/agents(/|$)", "user")
+_add("*", r"^/transactions/terms/extract$", "public")      # a document tool
+_add("GET", r"^/transactions(/|$)", "crm.view")
+_add(W, r"^/transactions(/|$)", "crm.manage")
+_add("POST", r"^/leasing/(apply|inquiries)$", "public")
+_add("GET", r"^/leasing/(inquiries|renewals|collection|funnel)$", "crm.view")
+_add(W, r"^/leasing(/|$)", "listings.manage")
+
+# ---- messaging
+_add("POST", r"^/messaging/telegram/update$", "public")    # bot webhook (secret-token checked)
+_add("*", r"^/messaging/(audit|outbox|retention|statistics|telegram/links)$", "audit.view")
+_add("POST", r"^/messaging/(purge|dispatch|telegram/alert)$", "settings.manage")
+_add("POST", r"^/messaging/reports/[^/]+/moderate$", "settings.manage")
+_add("*", r"^/messaging(/|$)", "user")
+
+# ---- money
+_add("GET", r"^/accounting(/|$)", "accounting.view")
+_add(W, r"^/accounting/(payments|rent-invoices)$", "payments.manage")
+_add(W, r"^/accounting(/|$)", "accounting.manage")
+_add("GET", r"^/commercial/(plans|pricing|products|gtm|portal)(/|\.html|$)", "public")
+_add("POST", r"^/commercial/recommend$", "public")
+_add("POST", r"^/commercial/subscribe$", "user")
+_add("GET", r"^/commercial(/|$)", "finance.view")
+_add(W, r"^/commercial(/|$)", "finance.manage")
+
+# ---- delivery
+_add("GET", r"^/pmo(/|$)", "projects.view")
+_add(W, r"^/pmo(/|$)", "projects.manage")
+_add("POST", r"^/maintenance/report$", "user")
+_add("GET", r"^/maintenance/(work-orders|plans)(/|$)", "user")
+_add(W, r"^/maintenance(/|$)", "listings.manage")
+_add("POST", r"^/construction/estimate$", "public")       # calculator
+_add(W, r"^/construction(/|$)", "user")                   # saved estimates / reports
+
+# ---- catalogue & content
+_add(W, r"^/properties(/|$)", "properties.manage")
+_add(W, r"^/images(/|$)", "listings.manage")
+_add(W, r"^/bigprojects(/|$)", "projects.manage")
+_add("POST", r"^/content/contacts$", "public")            # the site's contact form
+_add(W, r"^/content(/|$)", "content.manage")
+_add(W, r"^/news(/|$)", "news.manage")
+_add("POST", r"^/ads/[^/]+/(event|track)$", "public")
+_add("GET", r"^/ads/(active|config|section)(/|$)", "public")
+_add("GET", r"^/ads(/|$)", "ads.view")
+_add(W, r"^/ads(/|$)", "ads.manage")
+
+# ---- GIS
+_add("POST", r"^/gis/(buffer|buffers|polygon-analysis|properties-in-polygon|route/matrix)$", "public")
+_add(W, r"^/gis(/|$)", "gis.manage")
+_add("POST", r"^/poi/within-polygon$", "public")
+_add(W, r"^/poi(/|$)", "poi.manage")
+_add("POST", r"^/aoi/compare$", "public")
+_add(W, r"^/aoi(/|$)", "aoi.manage")
+_add("POST", r"^/geo/study-area$", "public")
+
+# ---- compute-only tools, calculators, AI (rate-limited by ai_guard)
+_add("*", r"^/tools/projects(/|$)", "user")
+_add("POST", r"^/tools/", "public")
+_add("POST", r"^/(intelligence|finance|rag|ai)/", "public")
+_add("POST", r"^/v1/", "public")
 
 
 def rule_for(method: str, path: str) -> Rule:
-    if path.startswith("/crm/webhooks/"):
-        return "public"
-    if path in ("/crm/leads", "/crm/appointments") and method == "POST":
-        return "public"
-    if path == "/crm/agents" and method == "GET":
-        return "public"
-    if path.startswith("/broker/listing-draft/") and method == "GET":
-        return "public"
-    if path == "/messaging/telegram/update":
-        return "public"
-    if path.startswith("/agents/"):
-        if _CRM_AGENT_TOOLS.match(path):
-            return "crm.view" if method == "GET" else "crm.manage"
-        if _AGENT_RUNS.match(path):
-            return "user"
-        if method == "GET" and _PUBLIC_AGENT_READS.match(path):
-            return "public"
-        return "user"
-    if path.startswith("/admin/basedata"):
-        return "basedata.manage"
-    if path.split("/")[1:2] in (["cities"], ["schemes"], ["blocks"]) and method in ("POST", "PUT", "PATCH", "DELETE"):
-        return "basedata.manage"
-    if path.startswith(("/crm/", "/marketing/", "/broker/")) or path in ("/crm", "/marketing", "/broker"):
-        return "crm.view" if method in ("GET", "HEAD") else "crm.manage"
-    if path.startswith("/messaging/") or path == "/messaging":
-        return "user"
-    return "none"
+    write = method in ("POST", "PUT", "PATCH", "DELETE")
+    for methods, rx, rule in _RULES:
+        if methods == "*" or methods == method or (methods == W and write):
+            if rx.match(path):
+                return rule
+    return "admin" if write else "none"
+
+
+def client_ip(scope: Dict[str, Any], headers: Dict[str, str]) -> str:
+    """The caller's address; X-Forwarded-For only when PORTAL_TRUST_PROXY says a proxy sets it."""
+    if portal_env.TRUST_PROXY and headers.get("x-forwarded-for"):
+        return headers["x-forwarded-for"].split(",")[0].strip()
+    return (scope.get("client") or ("?",))[0]
+
+
+def mcp_allowed(user: Optional[Dict[str, Any]], token: Optional[str], scope: Dict[str, Any], headers: Dict[str, str]) -> bool:
+    """MCP exposes every portal tool, so it needs: the static PORTAL_MCP_TOKEN, or a super_admin /
+    admin session token — or, in development with no token configured, a local client (loopback
+    address and no browser Origin header, so a web page can't reach it)."""
+    if portal_env.MCP_TOKEN and token and hmac.compare_digest(token, portal_env.MCP_TOKEN):
+        return True
+    if user and set(user.get("roles") or [user.get("role")]) & ADMIN_ROLES:
+        return True
+    if not portal_env.MCP_TOKEN and portal_env.MCP_LOCAL and not portal_env.PRODUCTION:
+        ip = (scope.get("client") or ("",))[0]
+        return ip in ("127.0.0.1", "::1", "localhost") and not headers.get("origin")
+    return False
 
 
 def _limited(ip: str) -> bool:
@@ -161,19 +276,37 @@ class AccessGuard:
         reset = _user.set(user)
         try:
             rule = rule_for(method, path)
+            if int(headers.get("content-length") or 0) > portal_env.MAX_BODY_BYTES:
+                await _deny(send, 413, "Request body too large")
+                return
             if method == "OPTIONS" or rule in ("none",):
                 await self.app(scope, receive, send)
                 return
+            if rule == "docs":
+                if portal_env.EXPOSE_DOCS or is_admin(user):
+                    await self.app(scope, receive, send)
+                else:
+                    await _deny(send, 404, "Not Found")
+                return
+            if rule == "mcp":
+                if mcp_allowed(user, token, scope, headers):
+                    await self.app(scope, receive, send)
+                else:
+                    await _deny(send, 401, "MCP needs PORTAL_MCP_TOKEN or an administrator's token (Authorization: Bearer …)",
+                                {"WWW-Authenticate": "Bearer"})
+                return
             if rule == "public":
                 if method == "POST" and path in ("/crm/leads", "/crm/appointments") and not user:
-                    ip = (headers.get("x-forwarded-for", "").split(",")[0].strip() or (scope.get("client") or ("?",))[0])
-                    if _limited(ip):
+                    if _limited(client_ip(scope, headers)):
                         await _deny(send, 429, "Too many requests — please try again in a minute")
                         return
                 await self.app(scope, receive, send)
                 return
             if not user:
                 await _deny(send, 401, "Please sign in to use this feature", {"WWW-Authenticate": "Bearer"})
+                return
+            if rule == "admin" and not (set(user.get("roles") or [user.get("role")]) & ADMIN_ROLES):
+                await _deny(send, 403, "Only an administrator can do this")
                 return
             if rule.endswith((".view", ".manage")) and not can(user, rule):
                 await _deny(send, 403, f"Your role doesn't include {rule.replace('.', ' ')} access")

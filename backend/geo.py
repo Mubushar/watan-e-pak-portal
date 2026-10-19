@@ -183,10 +183,10 @@ class Shape:
 
     def __init__(self, rings: Sequence[Sequence[Sequence[float]]] = (), center: Optional[Tuple[float, float]] = None,
                  radius_km: Optional[float] = None, circles: Sequence[Tuple[float, float, float]] = ()):
-        self.rings = [r for r in rings if len(r) >= 3]
-        self.circles = [c for c in circles if c[2] > 0]
-        if center and radius_km:
-            self.circles.append((center[0], center[1], radius_km))
+        self.rings = [r for r in rings if len(r) >= 3 and all(_finite(*p[:2]) for p in r)]
+        self.circles = [c for c in circles if _finite(*c[:3]) and c[2] > 0]
+        if center and radius_km and _finite(center[0], center[1], radius_km) and radius_km > 0:
+            self.circles.append((center[0], center[1], min(float(radius_km), MAX_RADIUS_KM)))
         self.center = center or (self.circles[0][:2] if self.circles else None)
         self.radius_km = radius_km
         boxes = []
@@ -233,6 +233,16 @@ class _Data:
 
 _data: Optional[_Data] = None
 _load_lock = threading.Lock()
+
+
+MAX_RADIUS_KM = 100.0  # the widest circle any search may draw
+
+
+def _finite(*values: Any) -> bool:
+    try:
+        return all(math.isfinite(float(v)) for v in values)
+    except (TypeError, ValueError):
+        return False
 
 
 def _key(lat: float, lon: float) -> Tuple[int, int]:
@@ -355,8 +365,15 @@ def suggest_local(text: str, limit: int = 8) -> List[Dict[str, Any]]:
 
 
 def _scan(grid: Dict[Tuple[int, int], List[int]], box: Tuple[float, float, float, float]) -> Iterable[int]:
+    if not _finite(*box):
+        return
     i0, j0 = _key(box[0], box[1])
     i1, j1 = _key(box[2], box[3])
+    if (i1 - i0 + 1) * (j1 - j0 + 1) > len(grid):  # a huge box: walk the occupied cells instead
+        for (i, j), rows in grid.items():
+            if i0 <= i <= i1 and j0 <= j <= j1:
+                yield from rows
+        return
     for i in range(i0, i1 + 1):
         for j in range(j0, j1 + 1):
             yield from grid.get((i, j), ())

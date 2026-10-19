@@ -824,7 +824,7 @@ def delete_project(project_id: str) -> Dict[str, Any]:
     for store in (phases_db, milestones_db, tasks_db, cost_entries_db, progress_updates_db,
                   risks_db, site_logs_db, change_requests_db, inspections_db, actions_db):
         store[:] = [row for row in store if getattr(row, "project_id", None) != pid]
-    allocations_db[:] = [a for a in allocations_db if not find_task(a.task_id)]
+    allocations_db[:] = [a for a in allocations_db if find_task(a.task_id)]
     return {"deleted": True, "id": pid}
 
 

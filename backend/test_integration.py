@@ -17,12 +17,16 @@ import base64
 import json
 import logging
 import os
+import time
 from typing import Any, Dict, List, Tuple
+
+os.environ.setdefault("PORTAL_PERSIST", "0")  # the suite runs on the seed data only
 
 from mcp import Client
 from fastapi.testclient import TestClient
 
 import server as core
+import geo
 from api import app
 
 # Keep the console output focused on the report.
@@ -231,7 +235,7 @@ async def run_mcp_checks() -> str | None:
 
         # --- authentication over MCP: OTP signup -> verify -> token ---
         r = json.loads(text_of(await client.call_tool("auth_config", {})))
-        check("tool: auth_config", r.get("otp_length") == 6 and r.get("users", 0) >= 3, str(r.get("users")))
+        check("tool: auth_config", r.get("otp_length") == 6 and "users" not in r and r.get("environment"), str(r)[:120])
 
         r = json.loads(text_of(await client.call_tool("auth_signup", {
             "email": "mcp@portal.test", "mobile": "0346 666 0101",
@@ -876,7 +880,9 @@ async def run_wing_checks() -> None:
 # ============================================================
 
 
-_GUARDED = ("/crm", "/marketing", "/broker", "/agents", "/messaging", "/cities", "/schemes", "/blocks", "/admin/basedata")
+# Everything except the sign-in flows runs as the seeded admin unless a check passes its own
+# Authorization header (negative checks pass an empty one).
+_UNSIGNED = ("/auth/", "/me/", "http")
 
 
 def _sign_in_guarded(client: TestClient) -> str:
@@ -886,7 +892,8 @@ def _sign_in_guarded(client: TestClient) -> str:
     plain = client.request
 
     def request(method: str, url: Any, *args: Any, **kwargs: Any) -> Any:
-        if str(url).startswith(_GUARDED):
+        path = str(url)
+        if not path.startswith(_UNSIGNED) and path != "/me":
             headers = dict(kwargs.get("headers") or {})
             headers.setdefault("Authorization", f"Bearer {token}")
             kwargs["headers"] = headers
@@ -931,6 +938,32 @@ def run_access_checks(client: TestClient) -> None:
     check("access: agent can't brief another agent's lead", other is not None and client.post(f"/crm/ai/lead-brief/{other.id}", headers=agent).status_code == 403)
     ins = client.get("/crm/insights", headers=agent).json()
     check("access: agent insights cover own book", ins["kpis"]["leads_total"] == len(leads), str(ins["kpis"]["leads_total"]))
+    # --- deny-by-default: anonymous writes and sensitive reads are refused
+    for method, path in [("POST", "/roles"), ("PUT", "/users/x/roles"), ("POST", "/users/x/permissions"),
+                         ("PUT", "/portal/settings"), ("DELETE", "/properties/x"), ("POST", "/news"),
+                         ("DELETE", "/memory"), ("POST", "/accounting/journal"), ("POST", "/pmo/projects"),
+                         ("POST", "/gis/layers"), ("POST", "/content/pages"), ("POST", "/ads"), ("POST", "/mcp")]:
+        rr = client.request(method, path, headers=anon, json={})
+        check(f"security: anonymous {method} {path} -> 401", rr.status_code == 401, str(rr.status_code))
+    for path in ("/auth/events", "/portal/audit", "/memory", "/accounting/accounts", "/roles/admin/users"):
+        check(f"security: anonymous GET {path} -> 401", client.get(path, headers=anon).status_code == 401)
+    check("security: buyer can't grant roles", client.post(f"/users/{me}/roles", headers=buyer, json={"role": "super_admin"}).status_code == 403)
+    check("security: public calculators stay open", client.post("/tools/calculators/rental-yield", headers=anon, json={}).status_code != 401)
+    r = client.get("/health", headers=anon)
+    check("security: hardening headers", r.headers.get("x-content-type-options") == "nosniff" and r.headers.get("x-frame-options") == "SAMEORIGIN")
+    # brute force: the 5th wrong password locks the account for a while
+    for _ in range(5):
+        client.post("/auth/login", json={"identifier": "valuer@portal.pk", "password": "wrong-password"})
+    r = client.post("/auth/login", json={"identifier": "valuer@portal.pk", "password": "Valuer@12345"})
+    check("security: sign-in locks after repeated failures", r.status_code != 200 and "Too many" in r.text, f"{r.status_code} {r.text[:80]}")
+    core.auth._login_failures.clear()
+    # self-signup can't grant a staff role
+    r = client.post("/auth/signup", json={"email": "wannabe.agent@example.com", "password": "Strong@12345", "role": "agent"})
+    u = core.auth.find_user("wannabe.agent@example.com")
+    check("security: agent sign-up starts as a plain user", r.status_code == 201 and u is not None and u.roles == ["user"]
+          and u.requested_role == "agent", f"{r.status_code} {u and u.roles}")
+    check("security: new password hashes are versioned (600k rounds)", (u.password_salt or "").startswith("i600000$") if u else False)
+
     # --- base data admin (basedata.manage)
     admin = login("admin@portal.pk", "Admin@12345")
     check("basedata: signed out -> 401", client.get("/admin/basedata", headers=anon).status_code == 401)
@@ -963,11 +996,114 @@ def run_access_checks(client: TestClient) -> None:
     check("access: customer support sees the whole CRM", client.get("/crm/leads", headers=support).json()["count"] >= len(leads))
 
 
+def run_hardening_checks(client: TestClient) -> None:
+    """Search privacy, webhook signatures, saved study areas and input validation."""
+    import hashlib
+    import hmac
+
+    anon = {"Authorization": ""}
+    r = client.get("/portal/search", params={"query": "a", "limit": 5}, headers=anon).json()
+    private = {"leads", "customers", "deals", "transactions", "pmo_projects", "pmo_tasks", "msg_messages"}
+    check("search: guests get no CRM / project / message groups", not (private & set(r["results"])), str(list(r["results"]))[:160])
+    check("search: total matches the visible groups", r["total"] == sum(len(v) for v in r["results"].values()))
+    r = client.get("/portal/search", params={"query": "a", "limit": 5}).json()
+    check("search: admin still sees CRM groups", "leads" in r["results"], str(list(r["results"]))[:120])
+
+    os.environ["PORTAL_WHATSAPP_APP_SECRET"] = "wa-test-secret"
+    body = json.dumps({"entry": []}).encode()
+    good = "sha256=" + hmac.new(b"wa-test-secret", body, hashlib.sha256).hexdigest()
+    r = client.post("/crm/webhooks/whatsapp", content=body, headers={**anon, "Content-Type": "application/json", "X-Hub-Signature-256": "sha256=bad"})
+    check("webhook: WhatsApp with a bad signature -> 401", r.status_code == 401, str(r.status_code))
+    r = client.post("/crm/webhooks/whatsapp", content=body, headers={**anon, "Content-Type": "application/json", "X-Hub-Signature-256": good})
+    check("webhook: WhatsApp with the right signature is accepted", r.status_code == 200, f"{r.status_code} {r.text[:120]}")
+    del os.environ["PORTAL_WHATSAPP_APP_SECRET"]
+
+    os.environ["PORTAL_TELEGRAM_WEBHOOK_SECRET"] = "tg-test-secret"
+    r = client.post("/messaging/telegram/update", json={"update": {}}, headers={**anon, "X-Telegram-Bot-Api-Secret-Token": "wrong"})
+    check("webhook: Telegram without the secret token -> 401", r.status_code == 401, str(r.status_code))
+    del os.environ["PORTAL_TELEGRAM_WEBHOOK_SECRET"]
+
+    os.environ["PORTAL_CRM_WEBHOOK_SECRET"] = "lead-test-secret"
+    r = client.post("/crm/webhooks/lead", json={"name": "Hook", "phone": "03001234567"}, headers={**anon, "X-Webhook-Secret": "nope"})
+    check("webhook: lead webhook with a wrong secret -> 401", r.status_code == 401, str(r.status_code))
+    del os.environ["PORTAL_CRM_WEBHOOK_SECRET"]
+
+    area = {"kind": "circle", "center": [33.6844, 73.0479], "radius_m": 800, "save": True}
+    r = client.post("/geo/study-area", json=area, headers=anon)
+    check("study area: guests can't save an area of interest -> 403", r.status_code == 403, str(r.status_code))
+    r = client.post("/geo/study-area", json={**area, "save": False}, headers=anon)
+    check("study area: guests can still study one", r.status_code == 200, str(r.status_code))
+
+    r = client.get("/gis/ring-analysis", params={"lat": 33.68, "lon": 73.04, "radii_km": "1,abc"})
+    check("validation: ring analysis with bad radii -> 400", r.status_code == 400, str(r.status_code))
+    r = client.get("/gis/buffer/point", params={"latitude": 33.68, "longitude": 73.04, "radius_m": -5})
+    check("validation: negative buffer radius -> 400", r.status_code == 400, str(r.status_code))
+    r = client.get("/geo/places", params={"south": "nan", "west": 73.0, "north": 33.7, "east": 73.1})
+    check("validation: NaN map box -> 400", r.status_code == 400, str(r.status_code))
+    t0 = time.time()
+    places = geo.places_in(geo.Shape(center=(30.0, 70.0), radius_km=10_000))
+    check("geo: a huge search circle is capped and quick", time.time() - t0 < 5 and isinstance(places, list), f"{time.time() - t0:.1f}s")
+    check("geo: NaN coordinates are ignored", geo.places_in(geo.Shape(center=(float("nan"), 70.0), radius_km=2)) == [])
+
+    r = client.get("/portal/storage", headers=anon)
+    check("storage: status needs settings.manage -> 401", r.status_code == 401, str(r.status_code))
+    r = client.get("/portal/storage")
+    check("storage: admin sees the status (off in tests)", r.status_code == 200 and r.json().get("enabled") is False, r.text[:120])
+
+
+def run_storage_checks() -> None:
+    """Durable storage: seed, incremental save, restart, delete, broken row."""
+    import tempfile
+
+    import gis
+    import storage
+
+    print("\n=== Durable storage ===")
+    folder = tempfile.mkdtemp(prefix="portal-db-")
+    path = os.path.join(folder, "portal.sqlite3")
+    first = storage.Storage(path)
+    r = first.load()
+    check("storage: first start saves the seed", r.get("seeded") and r.get("written", 0) > 100, str(r)[:160])
+    check("storage: nothing to write when nothing changed", first.flush() == {"written": 0, "removed": 0})
+    prop = core.properties_db[0]
+    old_title = prop.title
+    prop.title = "Saved across restarts"
+    check("storage: one edit writes one row", first.flush()["written"] == 1)
+    layer = next((l for l in gis.GIS_LAYERS if l.geojson_ref), None)
+    size = os.path.getsize(path)
+    check("storage: derived plan geometry isn't copied into the database", size < 8_000_000, f"{size / 1e6:.1f} MB")
+    first.db.close()
+
+    prop.title = "changed in memory only"
+    features = len(layer.geojson.get("features", [])) if layer else 0
+    second = storage.Storage(path)
+    r = second.load()
+    restored = core.find_property(prop.id)
+    check("storage: restart restores the saved edit", r.get("loaded") and restored is not None and restored.title == "Saved across restarts", str(r)[:160])
+    if layer:
+        again = gis.find_layer(layer.id)
+        check("storage: plan geometry is rebuilt on load", again is not None and len(again.geojson.get("features", [])) == features > 0)
+    restored.title = old_title
+    second.flush()
+    second.db.close()
+
+    third = storage.Storage(path)
+    third.db.execute("UPDATE portal_rows SET data = ? WHERE store = 'server.properties_db' AND key = ?",
+                     ('{"t": "server.Property", "v": {"broken": true}}', prop.id))
+    before = len(core.properties_db)
+    r = third.load()
+    check("storage: a broken row keeps the store's data and freezes it", "server.properties_db" in r.get("frozen", {})
+          and len(core.properties_db) == before, str(r)[:200])
+    check("storage: a frozen store is never overwritten", third.flush()["written"] == 0)
+    third.db.close()
+
+
 def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> None:
     print("\n=== FastAPI / REST ===")
     with TestClient(app) as client:
         _sign_in_guarded(client)
         run_access_checks(client)
+        run_hardening_checks(client)
         r = client.get("/health")
         check("GET /health", r.status_code == 200 and r.json().get("status") == "ok", str(r.status_code))
 
@@ -1311,8 +1447,9 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         r = client.get("/auth/config")
         check("GET /auth/config", r.status_code == 200 and r.json().get("otp_length") == 6, str(r.status_code))
 
-        r = client.get("/auth/notifications")
-        check("GET /auth/notifications", r.status_code == 200
+        check("GET /auth/notifications anonymous -> 401", client.get("/auth/notifications").status_code == 401)
+        r = client.get("/auth/notifications", headers={"Authorization": f"Bearer {STATE['admin_token']}"})
+        check("GET /auth/notifications (admin)", r.status_code == 200
               and len(r.json().get("notifications", [])) > 0, str(r.status_code))
 
         r = client.post("/auth/login", json={"identifier": "admin@portal.pk", "password": "Admin@12345"})
@@ -1713,7 +1850,8 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         check("POST /crm/ai/note (typed) -> analysis, interaction and task",
               r.status_code == 200 and note["analysis"].get("budget_pkr") == 25_000_000 and len(core.tasks_db) == tasks_before + 1, r.text[:200])
         r = client.post("/crm/ai/note", json={"audio_base64": "AAAA", "entity_id": mcp_lead_id})
-        check("POST /crm/ai/note (voice without OpenAI -> 501)", r.status_code == 501, str(r.status_code))
+        voice_ok = (501,) if not os.getenv("OPENAI_API_KEY") else (501, 502)  # with a key, OpenAI rejects the fake audio
+        check("POST /crm/ai/note (voice without OpenAI -> 501)", r.status_code in voice_ok, str(r.status_code))
         r = client.post("/crm/messages/send", json={"channel": "whatsapp", "body": "Test", "to": "0300 1234567", "entity_id": mcp_lead_id})
         check("POST /crm/messages/send (simulated, logged)", r.status_code == 200 and r.json().get("status") == "simulated" and r.json().get("interaction"), r.text[:160])
         r = client.post("/crm/messages/send", json={"channel": "email", "body": "Test", "to": "not-an-email"})
@@ -1744,8 +1882,9 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         r = client.put(f"/crm/leads/{mcp_lead_id}", json={"status": "contacted"})
         check("PUT /crm/leads/{id}", r.status_code == 200, str(r.status_code))
 
-        r = client.get("/auth/otps")
-        check("GET /auth/otps (shared tool)", r.status_code == 200 and "otps" in r.json(), str(r.status_code))
+        check("GET /auth/otps anonymous -> 401", client.get("/auth/otps").status_code == 401)
+        r = client.get("/auth/otps", headers={"Authorization": f"Bearer {STATE['admin_token']}"})
+        check("GET /auth/otps (admin)", r.status_code == 200 and "otps" in r.json(), str(r.status_code))
 
         # --- portal content over REST ---
         r = client.get("/content/overview")
@@ -4185,14 +4324,14 @@ def run_messaging_rest_checks(client: TestClient) -> None:
 
         r = client.post("/messaging/direct", json={"user_a": "rest_u1", "user_b": "rest_u2"})
         check("POST /messaging/direct", r.status_code == 200
-              and r.json()["conversation"]["kind"] == "direct", str(r.status_code))
-        dm_id = r.json()["conversation"]["id"]
+              and r.json().get("conversation", {}).get("kind") == "direct", f"{r.status_code} {r.text[:160]}")
+        dm_id = (r.json().get("conversation") or {}).get("id", "missing")
 
         r = client.post("/messaging/conversations", json={
             "kind": "group", "title": "REST group", "created_by": "rest_u1",
             "participants": ["rest_u1", "rest_u2"]})
         check("POST /messaging/conversations", r.status_code == 201
-              and r.json()["conversation"]["member_count"] == 2, str(r.status_code))
+              and r.json().get("conversation", {}).get("member_count") == 2, f"{r.status_code} {r.text[:200]}")
         group_id = r.json()["conversation"]["id"]
 
         r = client.get("/messaging/conversations", params={"user_id": "rest_u1"})
@@ -4426,6 +4565,7 @@ async def main() -> int:
     await run_pmo_checks()
     await run_messaging_checks()
     run_fastapi_checks(mcp_lead_id, mcp_layer_id)
+    run_storage_checks()
 
     print("\n=== Summary ===")
     passed = sum(1 for _, ok, _ in RESULTS if ok)

@@ -5,3 +5,5 @@ fastapi
 uvicorn[standard]
 httpx
 pillow>=11
+# Optional: durable storage on PostgreSQL (DATABASE_URL=postgresql://...)
+# psycopg[binary]>=3.2

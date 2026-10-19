@@ -75,6 +75,9 @@ else:
 
 # Default reply cap for OpenAI chat (a client can still ask for less or more).
 MAX_OUTPUT_TOKENS = int(os.getenv("OPENAI_MAX_OUTPUT_TOKENS", "800") or 0)
+# Models a caller may pick explicitly (comma-separated); everything else becomes UPSTREAM_MODEL.
+ALLOWED_MODELS = {UPSTREAM_MODEL, *[m.strip() for m in os.getenv("AI_ALLOWED_MODELS", "").split(",") if m.strip()]}
+EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
 
 # OpenAI-only request fields that other servers may reject.
 _OPENAI_ONLY_FIELDS = ("reasoning_effort", "verbosity", "store", "safety_identifier", "prompt_cache_key")
@@ -108,12 +111,23 @@ MAX_MESSAGES = 60
 MAX_REQUEST_CHARS = 200_000
 
 
+_CLIENT: Optional[httpx.AsyncClient] = None
+
+
+def upstream_client() -> httpx.AsyncClient:
+    """One pooled client for every upstream call: keep-alive saves a TLS handshake per request."""
+    global _CLIENT
+    if _CLIENT is None or _CLIENT.is_closed:
+        _CLIENT = httpx.AsyncClient(timeout=httpx.Timeout(120, connect=15),
+                                    limits=httpx.Limits(max_connections=50, max_keepalive_connections=20))
+    return _CLIENT
+
+
 async def _forward(url: str, request: Request, body: Dict[str, Any]) -> JSONResponse:
     """POST to the upstream and return its JSON as-is. Network failures and non-JSON
     error pages (gateways, proxies) become OpenAI-style 502 errors."""
     try:
-        async with httpx.AsyncClient(timeout=120) as client:
-            upstream = await client.post(url, json=body, headers=_upstream_headers(request))
+        upstream = await upstream_client().post(url, json=body, headers=_upstream_headers(request))
     except httpx.HTTPError as exc:
         return _error(f"Could not reach the AI service ({type(exc).__name__})", status=502, err_type="upstream_error")
     try:
@@ -270,15 +284,18 @@ async def chat_completions(request: Request) -> Any:
         ai_guard.check(request, "chat")
         if len(messages) > MAX_MESSAGES or len(json.dumps(messages)) > MAX_REQUEST_CHARS:
             return _error("Conversation too long — start a new conversation.", status=413)
-        # Clients written for the local fallback (e.g. the web portal) ask for the local
-        # model id; send those to the configured upstream model instead.
-        if body.get("model") in (None, "", _LOCAL_MODEL) or (LLM_BASE_URL and body.get("model") != UPSTREAM_MODEL):
+        # The server pays, so the server decides: always the configured model (plus any extra
+        # models allowed in AI_ALLOWED_MODELS), one completion, and output capped.
+        if body.get("model") not in ALLOWED_MODELS:
             body["model"] = UPSTREAM_MODEL
+        body.pop("n", None)
         if LLM_BASE_URL:
             for field in _OPENAI_ONLY_FIELDS:
                 body.pop(field, None)
-        elif MAX_OUTPUT_TOKENS > 0 and "max_tokens" not in body and "max_completion_tokens" not in body:
-            body["max_completion_tokens"] = MAX_OUTPUT_TOKENS
+        elif MAX_OUTPUT_TOKENS > 0:
+            asked = body.pop("max_tokens", None) or body.get("max_completion_tokens")
+            cap = MAX_OUTPUT_TOKENS * 2
+            body["max_completion_tokens"] = min(int(asked), cap) if isinstance(asked, (int, float)) and asked > 0 else MAX_OUTPUT_TOKENS
         url = f"{UPSTREAM_BASE_URL}/chat/completions"
         if stream:
             return StreamingResponse(
@@ -297,10 +314,20 @@ async def chat_completions(request: Request) -> Any:
 
 
 async def _stream_upstream(url: str, headers: Dict[str, str], body: Dict[str, Any]) -> AsyncIterator[bytes]:
-    async with httpx.AsyncClient(timeout=None) as client:
-        async with client.stream("POST", url, json=body, headers=headers) as resp:
+    try:
+        async with upstream_client().stream("POST", url, json=body, headers=headers) as resp:
+            if resp.status_code >= 400:
+                detail = (await resp.aread())[:500].decode("utf-8", "replace")
+                yield _sse({"error": {"message": f"AI service error {resp.status_code}", "detail": detail}})
+                return
             async for chunk in resp.aiter_raw():
                 yield chunk
+    except httpx.HTTPError as exc:
+        yield _sse({"error": {"message": f"Could not reach the AI service ({type(exc).__name__})"}})
+
+
+def _sse(payload: Dict[str, Any]) -> bytes:
+    return ("data: " + json.dumps(payload) + "\n\n").encode()
 
 
 # ------------------------------------------------------------------
@@ -324,7 +351,26 @@ async def completions(request: Request) -> Any:
         ai_guard.check(request, "chat")
         if len(json.dumps(body)) > MAX_REQUEST_CHARS:
             return _error("Prompt too long", status=413)
-        return await _forward(f"{UPSTREAM_BASE_URL}/completions", request, body)
+        # Current models only speak chat: answer the legacy call through /chat/completions on
+        # the server's model and hand it back in the text_completion shape.
+        chat: Dict[str, Any] = {"model": UPSTREAM_MODEL, "messages": [{"role": "user", "content": str(prompt)}]}
+        if MAX_OUTPUT_TOKENS > 0 and not LLM_BASE_URL:
+            asked = body.get("max_tokens")
+            chat["max_completion_tokens"] = min(int(asked), MAX_OUTPUT_TOKENS * 2) if isinstance(asked, (int, float)) and asked > 0 else MAX_OUTPUT_TOKENS
+        upstream = await _forward(f"{UPSTREAM_BASE_URL}/chat/completions", request, chat)
+        if upstream.status_code != 200:
+            return upstream
+        data = json.loads(upstream.body)
+        choice = (data.get("choices") or [{}])[0]
+        return {
+            "id": data.get("id") or f"cmpl-{uuid.uuid4().hex}",
+            "object": "text_completion",
+            "created": data.get("created") or int(time.time()),
+            "model": data.get("model") or UPSTREAM_MODEL,
+            "choices": [{"index": 0, "text": (choice.get("message") or {}).get("content") or "",
+                         "logprobs": None, "finish_reason": choice.get("finish_reason") or "stop"}],
+            "usage": data.get("usage") or {},
+        }
 
     content = _local_answer(str(prompt))
     return {
@@ -369,6 +415,11 @@ async def embeddings(request: Request) -> Any:
     model = body.get("model") or (UPSTREAM_MODEL if _proxying() else _LOCAL_MODEL)
 
     if _proxying():
+        ai_guard.check(request, "chat")
+        raw = body.get("input")
+        if raw is None or len(json.dumps(raw)) > MAX_REQUEST_CHARS or (isinstance(raw, list) and len(raw) > 256):
+            return _error("'input' is required (at most 256 items / 200k characters)", status=413)
+        body["model"] = EMBEDDING_MODEL
         return await _forward(f"{UPSTREAM_BASE_URL}/embeddings", request, body)
 
     raw_input = body.get("input")

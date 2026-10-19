@@ -35,6 +35,7 @@ Run the combined FastAPI + MCP HTTP app:
     uv run python main.py
 """
 
+import html as _html
 import json
 import math
 import os
@@ -55,6 +56,7 @@ import commercial
 import construction
 import content
 import geo
+import storage
 import masterplan
 import gis
 import intelligence
@@ -1300,6 +1302,7 @@ def map_view(listing_id: Optional[str] = None, place: Optional[str] = None, kind
         return dump({"error": "Give a listing_id or a place."})
     lat, lon = focus["latitude"], focus["longitude"]
     per_kind = max(1, min(per_kind, 10))
+    radius_km = max(0.2, min(float(radius_km or 2.0), 25.0))
     markers = geo.map_markers(lat, lon, kinds, radius_km=radius_km, per_kind=per_kind)
     while len(markers) < 3 and radius_km < 6:  # outskirts: look a little further
         radius_km = min(6.0, radius_km * 2)
@@ -2633,7 +2636,9 @@ def gis_analysis_assumptions() -> str:
 @mcp.tool()
 def gis_buffer_geometry(geometry: Dict[str, Any], distance_m: float, segments: int = 48) -> str:
     """Buffer any GeoJSON geometry (Point/Line/Polygon) by ``distance_m`` metres."""
-    buffered = gis.buffer_geometry(geometry, distance_m, segments=segments)
+    if not geo._finite(distance_m) or not 0 < distance_m <= 100_000:
+        return dump({"error": "distance_m must be between 0 and 100000 metres"})
+    buffered = gis.buffer_geometry(geometry, distance_m, segments=max(8, min(int(segments or 48), 128)))
     if not buffered:
         return dump({"error": "Could not buffer geometry (need a valid geometry and distance_m > 0)"})
     area_sqm = gis.polygon_area_sqm(buffered["coordinates"][0])
@@ -2651,7 +2656,9 @@ def gis_buffer_geometry(geometry: Dict[str, Any], distance_m: float, segments: i
 @mcp.tool()
 def gis_buffer_point(latitude: float, longitude: float, radius_m: float, segments: int = 72) -> str:
     """Create a circular buffer polygon around a point."""
-    geom = gis.circle_polygon(latitude, longitude, radius_m, segments)
+    if not geo._finite(latitude, longitude, radius_m) or not 0 < radius_m <= 100_000:
+        return dump({"error": "Give a valid point and radius_m between 0 and 100000 metres"})
+    geom = gis.circle_polygon(latitude, longitude, radius_m, max(8, min(int(segments or 72), 256)))
     return dump(
         {
             "geometry": geom,
@@ -2725,7 +2732,9 @@ def gis_ring_analysis(latitude: float, longitude: float, radii_km: List[float], 
 
     For each ring returns the annulus geometry plus property / value / population stats.
     """
-    radii_m = sorted(r * 1000.0 for r in radii_km if r > 0)
+    radii_m = sorted({r * 1000.0 for r in radii_km if geo._finite(r) and 0 < r <= 100})[:10]
+    if not geo._finite(latitude, longitude):
+        return dump({"error": "Give a valid point"})
     if not radii_m:
         return dump({"error": "Provide at least one positive radius in km"})
     rings = gis.multi_ring_buffer(latitude, longitude, radii_m)
@@ -5833,7 +5842,7 @@ def auth_set_role(user_id: str, role: str) -> str:
 def auth_get_otp(identifier: str, purpose: str = "signup") -> str:
     """Dev helper: return the newest unconsumed OTP for an identifier.
 
-    Codes are only exposed when ``PORTAL_AUTH_EXPOSE_OTP`` is on (default).
+    Codes are only exposed when ``PORTAL_AUTH_EXPOSE_OTP`` is on (default outside production).
     """
     rows = auth.list_otps(identifier=identifier, purpose=purpose, limit=1)
     if not rows:
@@ -8975,11 +8984,11 @@ def _pmo_bar_svg(rows: List[Dict[str, Any]]) -> str:
         filled = bar_w * max(0.0, min(100.0, pct)) / 100.0
         out.append(
             "<div style='display:flex;align-items:center;gap:10px;font-size:13px'>"
-            f"<div style='width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>{r.get('name','')}</div>"
+            f"<div style='width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>{_html.escape(str(r.get('name','')))}</div>"
             f"<svg width='{bar_w}' height='14'><rect width='{bar_w}' height='14' rx='3' fill='#e5e7eb'/>"
             f"<rect width='{filled:.1f}' height='14' rx='3' fill='{color}'/></svg>"
             f"<span style='width:44px;text-align:right'>{pct:.0f}%</span>"
-            f"<span style='width:120px;color:var(--muted)'>{health.upper()} · {r.get('status','')}</span>"
+            f"<span style='width:120px;color:var(--muted)'>{_html.escape(str(health).upper())} · {_html.escape(str(r.get('status','')))}</span>"
             "</div>")
     out.append("</div>")
     return "".join(out)
@@ -10039,11 +10048,11 @@ def _messaging_activity_svg(rows: List[Dict[str, Any]]) -> str:
         out.append(
             "<div style='display:flex;align-items:center;gap:10px;font-size:13px'>"
             f"<div style='width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>"
-            f"{r.get('title','')}</div>"
+            f"{_html.escape(str(r.get('title','')))}</div>"
             f"<svg width='260' height='14'><rect width='260' height='14' rx='3' fill='#e5e7eb'/>"
             f"<rect width='{260 * pct / 100.0:.1f}' height='14' rx='3' fill='#2563eb'/></svg>"
             f"<span style='width:60px;text-align:right'>{r.get('messages',0)}</span>"
-            f"<span style='width:110px;color:var(--muted)'>{r.get('kind','')}</span>"
+            f"<span style='width:110px;color:var(--muted)'>{_html.escape(str(r.get('kind','')))}</span>"
             "</div>")
     out.append("</div>")
     return "".join(out)
@@ -14520,6 +14529,29 @@ def _seed_accounting() -> None:
     )
 
 
+def _layer_geojson_from_ref(ref: str) -> Dict[str, Any]:
+    """Rebuild a layer's geometry from the source files it was made from."""
+    kind, _, rest = ref.partition(":")
+    if kind == "masterplan-labels":
+        key, _, cats = rest.partition(":")
+        try:
+            return masterplan.geojson_labels(key, [c for c in cats.split(",") if c])
+        except Exception:
+            return {"type": "FeatureCollection", "features": []}
+    return {"type": "FeatureCollection", "features": []}
+
+
+def _slim_layer(layer: Any) -> Optional[set]:
+    return {"geojson"} if getattr(layer, "geojson_ref", None) else None
+
+
+def _restore_layer(row: Dict[str, Any]) -> Dict[str, Any]:
+    return {**row, "geojson": _layer_geojson_from_ref(row["geojson_ref"])} if row.get("geojson_ref") else row
+
+
+storage.register_codec("gis.GIS_LAYERS", _slim_layer, _restore_layer)
+
+
 def _seed_master_plans() -> None:
     """Register each built DHA master plan as a housing scheme with GIS layers: its outline,
     the georeferenced plan (map tiles) and the PDF's text as annotation layers."""
@@ -14549,6 +14581,7 @@ def _seed_master_plans() -> None:
             gis.add_layer(gis.GeoLayer(name=f"{meta['name']} — plan labels: {title}", layer_type="annotation",
                                        entity_type="scheme", entity_id=scheme.id, visible=visible, z_index=2,
                                        geojson=masterplan.geojson_labels(meta["key"], cats),
+                                       geojson_ref=f"masterplan-labels:{meta['key']}:{','.join(cats)}",
                                        description=f"Text from the master plan PDF, placed on the ground. {about}",
                                        source_url=meta.get("pdf"),
                                        style={"color": "#1d4ed8", "fillColor": "#1d4ed8", "fillOpacity": 0.8, "weight": 1, "opacity": 0.9}))

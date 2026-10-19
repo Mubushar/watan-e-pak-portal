@@ -20,9 +20,13 @@ the result. That keeps MCP and REST perfectly in sync — no duplicated logic.
 import asyncio
 import base64
 import gzip
+import hashlib
+import hmac
 import json
+import logging
 import os
 import re
+import uuid
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -30,7 +34,9 @@ import httpx
 from fastapi import (Depends, FastAPI, Header, HTTPException, Query, Request, WebSocket,
                      WebSocketDisconnect)
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
+from fastapi.middleware.gzip import GZipMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, Response
 from pydantic import ValidationError, BaseModel, Field
 
 import server as core
@@ -43,6 +49,8 @@ import directions as routing
 import megaprojects
 import roads
 import access
+import portal_env
+import storage
 import basedata
 import crm_ai
 import crm_channels
@@ -71,8 +79,15 @@ mcp_http_app = core.mcp.streamable_http_app(streamable_http_path="/mcp", statele
 async def lifespan(app: FastAPI):
     # A mounted sub-app's lifespan is NOT executed by Starlette, so we run the
     # MCP session manager here ourselves.
-    async with core.mcp.session_manager.run():
-        yield
+    # Durable storage: load the database over the seeded sample data (or save the seed on the
+    # first run) and keep writing changes in the background; flush once more on shutdown.
+    storage_state = storage.start()
+    logging.getLogger("portal").info("storage: %s", storage_state)
+    try:
+        async with core.mcp.session_manager.run():
+            yield
+    finally:
+        storage.stop()
 
 
 app = FastAPI(
@@ -184,7 +199,73 @@ def basedata_delete(table: str, record_id: str) -> Any:
         raise HTTPException(status_code=409, detail=f"Still in use by {parts} — move or delete those first")
     return res
 
-_cors_origins = [o.strip() for o in os.getenv("PORTAL_CORS_ORIGINS", "*").split(",") if o.strip()]
+# Compress JSON / GeoJSON / HTML over 1 KB (map layers and lists are large).
+app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)
+
+
+class SecurityHeaders:
+    """Standard browser hardening headers on every response (HSTS in production)."""
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Dict[str, Any], receive: Any, send: Any) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_headers(message: Dict[str, Any]) -> None:
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                names = {k.lower() for k, _ in headers}
+                extra = [
+                    (b"x-content-type-options", b"nosniff"),
+                    (b"referrer-policy", b"strict-origin-when-cross-origin"),
+                    (b"x-frame-options", b"SAMEORIGIN"),
+                    (b"permissions-policy", b"camera=(), payment=(), geolocation=(self), microphone=(self)"),
+                    (b"cross-origin-opener-policy", b"same-origin"),
+                ]
+                ctype = dict(headers).get(b"content-type", b"")
+                if ctype.startswith(b"text/html"):
+                    extra.append((b"content-security-policy",
+                                  b"default-src 'self' https: data: blob: 'unsafe-inline'; object-src 'none'; "
+                                  b"base-uri 'self'; frame-ancestors 'self'; form-action 'self'"))
+                if portal_env.PRODUCTION:
+                    extra.append((b"strict-transport-security", b"max-age=31536000; includeSubDomains"))
+                headers += [(k, v) for k, v in extra if k not in names]
+                message = {**message, "headers": headers}
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
+
+
+app.add_middleware(SecurityHeaders)
+
+
+class PersistOnWrite:
+    """Tell the storage writer that a request may have changed data (it saves a few seconds later)."""
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Dict[str, Any], receive: Any, send: Any) -> None:
+        if scope["type"] != "http" or scope.get("method") in ("GET", "HEAD", "OPTIONS"):
+            await self.app(scope, receive, send)
+            return
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            storage.mark_dirty()
+
+
+app.add_middleware(PersistOnWrite)
+
+# CORS: bearer tokens, no cookies — a wildcard is safe in development. In production list the
+# portal's own origins (web, Capacitor, Electron) in PORTAL_CORS_ORIGINS; "*" is refused there.
+_cors_origins = [o.strip() for o in os.getenv("PORTAL_CORS_ORIGINS", "*" if not portal_env.PRODUCTION else "").split(",") if o.strip()]
+if portal_env.PRODUCTION and "*" in _cors_origins:
+    _cors_origins = [o for o in _cors_origins if o != "*"]
+    logging.getLogger("portal").warning("PORTAL_CORS_ORIGINS='*' ignored in production — list your origins explicitly")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
@@ -192,6 +273,17 @@ app.add_middleware(
     allow_headers=["*"],
     allow_credentials=False,
 )
+# Production: only answer for the portal's own host names (blocks Host-header / DNS-rebinding tricks).
+if portal_env.ALLOWED_HOSTS:
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=portal_env.ALLOWED_HOSTS + ["localhost", "127.0.0.1"])
+
+
+@app.exception_handler(Exception)
+async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
+    """Never leak a traceback: log it with an id, return that id."""
+    error_id = uuid.uuid4().hex[:10]
+    logging.getLogger("portal").exception("Unhandled error %s on %s %s", error_id, request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error", "error_id": error_id})
 
 # OpenAI-compatible facade (/v1/models, /v1/chat/completions, ...)
 app.include_router(openai_router)
@@ -614,6 +706,8 @@ def geo_places(south: float, west: float, north: float, east: float, categories:
     """Points of interest (schools, mosques, hospitals, markets, parks, banks …) inside a map's
     visible box, from the portal's OpenStreetMap place data. ``categories`` is comma-separated
     (education, worship, health, shopping, park, bank, restaurant, transport, fuel, government)."""
+    if not geo._finite(south, west, north, east) or north < south or east < west:
+        raise HTTPException(status_code=400, detail="Give a valid box: south < north, west < east")
     if north - south > 1.5 or east - west > 1.5:
         return {"count": 0, "total": 0, "places": [], "note": "Zoom in to see places."}
     cats = [c.strip() for c in (categories or "").split(",") if c.strip()] or None
@@ -693,6 +787,8 @@ def geo_study_area(payload: StudyAreaRequest) -> Any:
     recommendation, population & development, every facility inside and the nearest of each
     kind, neighbourhoods, listings & price per marla, schemes, DHA master plan, valuation,
     development cost, economic impact, 5-year forecast and news."""
+    if payload.save and not access.can(access.current(), "aoi.manage"):
+        raise HTTPException(status_code=403, detail="Saving areas of interest needs the aoi.manage permission")
     result = study_area.study(
         payload.kind, name=payload.name, center=tuple(payload.center) if payload.center else None,  # type: ignore[arg-type]
         radius_m=payload.radius_m, bounds=payload.bounds, coordinates=payload.coordinates, save=payload.save)
@@ -1452,7 +1548,10 @@ def gis_buffer(payload: BufferGeometryQuery) -> Any:
 
 @app.get("/gis/buffer/point", tags=["gis-analysis"])
 def gis_buffer_point(latitude: float, longitude: float, radius_m: float, segments: int = 72) -> Any:
-    return j(core.gis_buffer_point(latitude, longitude, radius_m, segments))
+    result = j(core.gis_buffer_point(latitude, longitude, radius_m, segments))
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
 
 
 @app.post("/gis/buffers", tags=["gis-analysis"], status_code=201)
@@ -1471,8 +1570,14 @@ def gis_ring_analysis(
     use_type: Optional[str] = None,
 ) -> Any:
     """Concentric-ring accessibility analysis. `radii_km` is comma-separated."""
-    radii = [float(r) for r in radii_km.split(",") if r.strip()]
-    return j(core.gis_ring_analysis(lat, lon, radii, use_type=use_type))
+    try:
+        radii = [float(r) for r in radii_km.split(",") if r.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="radii_km must be comma-separated numbers, e.g. 1,3,5")
+    result = j(core.gis_ring_analysis(lat, lon, radii, use_type=use_type))
+    if isinstance(result, dict) and "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
 
 
 @app.post("/gis/polygon-analysis", tags=["gis-analysis"])
@@ -2390,7 +2495,7 @@ def crm_webhook_lead(payload: Dict[str, Any], source: str = "website",
     De-duplicates by phone or e-mail and routes new leads to an agent. When
     ``PORTAL_CRM_WEBHOOK_SECRET`` is set, send it in the ``X-Webhook-Secret`` header."""
     secret = os.getenv("PORTAL_CRM_WEBHOOK_SECRET", "").strip()
-    if secret and x_webhook_secret != secret:
+    if secret and not hmac.compare_digest((x_webhook_secret or "").encode(), secret.encode()):
         raise HTTPException(status_code=401, detail="Bad webhook secret")
     return crm_ai.ingest_lead(payload, source)
 
@@ -2406,10 +2511,22 @@ def crm_webhook_whatsapp_verify(request: Request) -> Any:
 
 
 @app.post("/crm/webhooks/whatsapp", tags=["crm"])
-def crm_webhook_whatsapp(payload: Dict[str, Any]) -> Any:
+async def crm_webhook_whatsapp(request: Request) -> Any:
     """Incoming WhatsApp messages (Meta Cloud API webhook) land on the sender's lead timeline; a
-    new number becomes a new lead routed to an agent."""
-    return crm_ai.whatsapp_inbound(payload)
+    new number becomes a new lead routed to an agent. When ``PORTAL_WHATSAPP_APP_SECRET`` (the Meta
+    app secret) is set, the ``X-Hub-Signature-256`` signature must match."""
+    raw = await request.body()
+    app_secret = os.getenv("PORTAL_WHATSAPP_APP_SECRET", "").strip()
+    if app_secret:
+        sent = request.headers.get("x-hub-signature-256", "")
+        expected = "sha256=" + hmac.new(app_secret.encode(), raw, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sent.encode(), expected.encode()):
+            raise HTTPException(status_code=401, detail="Bad signature")
+    try:
+        payload = json.loads(raw or b"{}")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+    return crm_ai.whatsapp_inbound(payload if isinstance(payload, dict) else {})
 
 
 @app.get("/crm/agents/{agent_id}", tags=["crm"])
@@ -3152,6 +3269,25 @@ def portal_schema(model: Optional[str] = None) -> Any:
     return j(core.portal_schema(model))
 
 
+@app.get("/portal/storage", tags=["portal"])
+def portal_storage_status() -> Any:
+    """Where the portal's data is saved (PostgreSQL or SQLite), when it last saved and how many
+    rows each store holds."""
+    st = storage.instance()
+    if st is None:
+        return {"enabled": False, "note": "Persistence is off (PORTAL_PERSIST=0): data lives in memory only."}
+    return {"enabled": True, **st.status()}
+
+
+@app.post("/portal/storage/flush", tags=["portal"])
+def portal_storage_flush() -> Any:
+    """Save every pending change now."""
+    st = storage.instance()
+    if st is None:
+        raise HTTPException(status_code=409, detail="Persistence is off (PORTAL_PERSIST=0)")
+    return {"saved": True, **st.flush()}
+
+
 @app.get("/portal/settings", tags=["portal"])
 def portal_settings_get() -> Any:
     """Read runtime settings."""
@@ -3170,10 +3306,25 @@ def portal_audit_log(limit: int = 50) -> Any:
     return j(core.portal_audit_log(limit=limit))
 
 
+_SEARCH_GROUP_PERMISSION = {
+    "leads": "crm.view", "customers": "crm.view", "deals": "crm.view", "transactions": "crm.view",
+    "pmo_projects": "projects.view", "pmo_tasks": "projects.view", "pmo_risks": "projects.view",
+    "msg_conversations": "audit.view", "msg_messages": "audit.view", "msg_actions": "audit.view",
+}
+
+
 @app.get("/portal/search", tags=["portal"])
 def global_search(query: str, limit: int = 10) -> Any:
-    """Federated search across the whole portal."""
-    return j(core.global_search(query, limit=limit))
+    """Federated search across the whole portal. Private groups (CRM, projects, team messages) are
+    only included for users whose role may see them."""
+    data = j(core.global_search(query, limit=max(1, min(limit, 50))))
+    me = access.current()
+    results = data.get("results") or {}
+    for group, perm in _SEARCH_GROUP_PERMISSION.items():
+        if group in results and not access.can(me, perm):
+            results.pop(group)
+    data["total"] = sum(len(v) for v in results.values() if isinstance(v, list))
+    return data
 
 
 @app.get("/portal/statistics", tags=["portal"])
@@ -6947,8 +7098,13 @@ def messaging_telegram_status(user_id: str) -> Any:
 
 
 @app.post("/messaging/telegram/update", tags=["messaging"])
-def messaging_telegram_update(payload: MsgTelegramUpdateRequest) -> Any:
-    """Process one inbound Telegram bot update."""
+def messaging_telegram_update(payload: MsgTelegramUpdateRequest,
+                              x_telegram_bot_api_secret_token: Optional[str] = Header(default=None)) -> Any:
+    """Process one inbound Telegram bot update. When ``PORTAL_TELEGRAM_WEBHOOK_SECRET`` is set (the
+    ``secret_token`` given to Telegram's setWebhook), Telegram's header must carry it."""
+    secret = os.getenv("PORTAL_TELEGRAM_WEBHOOK_SECRET", "").strip()
+    if secret and not hmac.compare_digest((x_telegram_bot_api_secret_token or "").encode(), secret.encode()):
+        raise HTTPException(status_code=401, detail="Bad secret token")
     return j(core.msg_telegram_update(payload.update))
 
 
