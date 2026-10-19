@@ -688,7 +688,9 @@ def changes_for(project_id: str) -> List[PmChangeRequest]:
 
 
 def _next_code() -> str:
-    return f"PRJ-{len(projects_db) + 1:04d}"
+    # max + 1, not count + 1: codes stay unique after a project is deleted
+    nums = [int(p.code[4:]) for p in projects_db if (p.code or "").startswith("PRJ-") and p.code[4:].isdigit()]
+    return f"PRJ-{max(nums, default=0) + 1:04d}"
 
 
 # ============================================================

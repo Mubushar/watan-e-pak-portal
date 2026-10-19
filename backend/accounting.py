@@ -472,7 +472,8 @@ def account_with_balance(acct: Account) -> Dict[str, Any]:
 
 
 def _next_entry_no() -> int:
-    return len(journal_db) + 1
+    # max + 1, not count + 1: numbers stay unique after an entry is removed
+    return max((getattr(e, "entry_no", 0) or 0 for e in journal_db), default=0) + 1
 
 
 def post_journal_entry(

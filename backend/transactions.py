@@ -230,7 +230,9 @@ def build_milestones(transaction_type: str, start_date: Any = None) -> List[Mile
 
 
 def _next_code() -> str:
-    return f"TXN-{len(transactions_db) + 1001}"
+    # max + 1, not count + 1: codes stay unique after a transaction is removed
+    nums = [int(t.code[4:]) for t in transactions_db if (t.code or "").startswith("TXN-") and t.code[4:].isdigit()]
+    return f"TXN-{max(nums, default=1000) + 1}"
 
 
 # ============================================================

@@ -523,6 +523,9 @@ def geocode_online(text: str) -> Optional[Dict[str, Any]]:
             ring = [[c[1], c[0]] for c in max(g["coordinates"], key=lambda p: len(p[0]))[0]]
         hit = {"name": h.get("name") or text, "label": h.get("display_name", "")[:160], "lat": float(h["lat"]),
                "lon": float(h["lon"]), "ring": ring[:400], "type": h.get("type"), "source": "nominatim"}
+    if len(_geocode_cache) > 2000:  # bounded: drop the oldest half
+        for old in list(_geocode_cache)[:1000]:
+            _geocode_cache.pop(old, None)
     _geocode_cache[key] = hit
     return hit
 
