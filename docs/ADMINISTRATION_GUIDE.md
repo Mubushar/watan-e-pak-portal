@@ -647,6 +647,25 @@ configuration.
 
 ---
 
+### 4.11 Project inventories (China Center, Skyra Tower, Goldcrest Breeze …)
+
+New towers and mixed-use projects that sell units off-plan live in `backend/geodata/pk_project_inventory.json`, built from each project's official website by `backend/build_project_inventory.py` (raw inventories in `geodata/project_sources/`). At every start `project_inventory.sync()` makes the portal match the file:
+
+- each project is a **Big project** with developer, address, unit types, price range, payment plan, offer, units available, the date the inventory was checked and its sources, shown on `/projects?project=<id>`;
+- every **available unit is a listing** linked to its project (`project_id`, `project_unit`), with its own size, price, floor, payment schedule and the project's real photos and plan; `/properties?project=<id>` lists them;
+- a unit that leaves the developer's inventory is marked **sold** (never deleted);
+- the projects also appear on the map's mega-projects layer as "High-rise & mixed-use projects".
+
+To refresh: update the inventories, run `uv run python build_project_inventory.py`, restart. Prices and availability always say "confirm at booking".
+
+### 4.12 Real, credited photos for reference data
+
+Cities, housing societies and infrastructure projects show real photos from Wikimedia Commons, taken from each record's Wikipedia article (checked against its coordinates) with author and licence; `backend/geodata/pk_seed_media.json` is built by `uv run python build_seed_media.py` and attached at start (`seed_media.apply()`), never replacing images an admin added. Records without a matching article keep no image rather than a made-up one. Credits appear on the cards (CC BY-SA requires them). The landing page uses Islamabad photos (Faisal Mosque with the Margalla Hills, Pakistan Monument, Daman-e-Koh), credited in `frontend/src/pages/public/home/Landing.tsx`. New seed data must use real images from its own source.
+
+### 4.13 Portal order (Islamabad first)
+
+`backend/priority.py` sets the order every list uses — cities: Islamabad, Rawalpindi, Lahore, Karachi, then by population; housing societies: DHA Islamabad-Rawalpindi phases V, III, 4, VI, II, I, then Bahria Town phases 8, 7, 1-6, then other DHA, then Islamabad's other popular societies, then the rest of the country by city and popularity. `/cities`, `/schemes`, `/hierarchy`, base data, admin forms and the default listing order follow it; change it in that one file.
+
 ## 5. Data, storage & backups
 
 ### 5.1 Durable storage — read this first
