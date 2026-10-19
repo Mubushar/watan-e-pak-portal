@@ -402,6 +402,46 @@ export default function MapExplorer() {
     [mode],
   );
 
+  // -------------------------------------------------------------- view history ("Last view")
+  const viewHistory = useRef<{ c: [number, number]; z: number }[]>([]);
+  const goingBack = useRef(false);
+  const [canGoBack, setCanGoBack] = useState(false);
+  const sameView = (a: { c: [number, number]; z: number }, b: { c: [number, number]; z: number }) =>
+    a.z === b.z && Math.abs(a.c[0] - b.c[0]) < 1e-6 && Math.abs(a.c[1] - b.c[1]) < 1e-6;
+  useEffect(() => {
+    if (!map) return;
+    const record = () => {
+      const c = map.getCenter();
+      const v = { c: [c.lat, c.lng] as [number, number], z: map.getZoom() };
+      const h = viewHistory.current;
+      if (goingBack.current) {
+        goingBack.current = false; // arriving at the view we went back to: don't record it again
+        return;
+      }
+      if (h.length && sameView(h[h.length - 1]!, v)) return;
+      h.push(v);
+      if (h.length > 30) h.shift();
+      setCanGoBack(h.length > 1);
+    };
+    record();
+    map.on("moveend", record);
+    return () => {
+      map.off("moveend", record);
+    };
+  }, [map]);
+  const lastView = () => {
+    const h = viewHistory.current;
+    if (!map || h.length < 2) return;
+    h.pop();
+    const prev = h[h.length - 1]!;
+    const c = map.getCenter();
+    if (!sameView(prev, { c: [c.lat, c.lng], z: map.getZoom() })) {
+      goingBack.current = true;
+      map.flyTo(prev.c, prev.z, { duration: 0.6 });
+    }
+    setCanGoBack(h.length > 1);
+  };
+
   // -------------------------------------------------------------- map helpers
   const onReady = useCallback((m: L.Map) => {
     setMap(m);
@@ -668,6 +708,8 @@ export default function MapExplorer() {
         drawMode={drawMode}
         onDraw={startDraw}
         onFit={properties.length ? () => fitTo(map, filtered.map((p) => [p.latitude!, p.longitude!]), 13, sidePad()) : undefined}
+        onLastView={lastView}
+        lastViewReady={canGoBack}
         lang={mapLang}
         onLang={setMapLang}
         groups={gateGroups([

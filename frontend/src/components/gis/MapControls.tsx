@@ -1,7 +1,8 @@
 /**
  * The map explorer's control column, grouped like a GIS toolbar:
  *   Map    base map · layers (one panel with an on/off switch for every layer) · label language
- *   View   pan (hand: normal map dragging) · fit to listings (full) · box zoom in / out
+ *   View   pan (hand: normal map dragging) · fit to listings (full) · last view (back to where the
+ *          map was before the last move or zoom) · box zoom in / out
  *          (each box tool stays on until clicked again or another tool is picked)
  *   Study  draw a case-study area (circle / rectangle / polygon)
  *
@@ -10,7 +11,7 @@
  * and shows how many of its layers are on; items can have sub-layers (e.g. a plan's labels).
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Check, ChevronDown, Circle, Globe, Hand, Hexagon, Languages, Layers, Layers3, PencilRuler, RectangleHorizontal, Search, X, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, Circle, Globe, Hand, Undo2, Hexagon, Languages, Layers, Layers3, PencilRuler, RectangleHorizontal, Search, X, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
 import type { DrawMode } from "./AreaDraw";
 import type { MapLang } from "./PakistanLayers";
 import { BASE_MAPS, type BaseMapKey } from "@/components/map/PortalMap";
@@ -66,10 +67,12 @@ function Btn({
   badge,
   text,
   iconClass,
+  disabled,
 }: {
   icon: LucideIcon;
   title: string;
   active?: boolean;
+  disabled?: boolean;
   onClick: () => void;
   badge?: number;
   /** A short caption under the icon. */
@@ -81,11 +84,12 @@ function Btn({
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       title={title}
       aria-label={title}
       aria-pressed={active}
       className={cn(
-        "relative flex w-10 flex-col items-center justify-center transition first:rounded-t-xl last:rounded-b-xl",
+        "relative flex w-10 flex-col items-center justify-center transition first:rounded-t-xl last:rounded-b-xl disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent",
         text ? "h-12 gap-0.5" : "h-10",
         active ? "bg-brand-700 text-white" : "text-brand-800 hover:bg-brand-50 dark:text-white dark:hover:bg-white/10",
       )}
@@ -222,6 +226,8 @@ export function MapControls({
   base,
   onBase,
   onFit,
+  onLastView,
+  lastViewReady,
   zoomMode,
   onZoomMode,
   panActive,
@@ -239,6 +245,9 @@ export function MapControls({
   base: BaseMapKey;
   onBase: (b: BaseMapKey) => void;
   onFit?: () => void;
+  /** Back to the previous map view (centre + zoom); `lastViewReady` is false until there is one. */
+  onLastView?: () => void;
+  lastViewReady?: boolean;
   /** Box zoom tool: "in", "out", or off (null). */
   zoomMode: "in" | "out" | null;
   onZoomMode: (m: "in" | "out" | null) => void;
@@ -294,6 +303,9 @@ export function MapControls({
       <ToolGroup label="View">
         <Btn icon={Hand} text="Pan" title="Pan: drag the map (turns every tool off)" active={panActive} onClick={onPan} />
         {onFit && <Btn icon={Globe} text="Full" title="Fit to listings" onClick={other(onFit)} />}
+        {onLastView && (
+          <Btn icon={Undo2} text="Last" title={lastViewReady ? "Last view: back to where the map was before" : "Last view: nothing to go back to yet"} disabled={!lastViewReady} onClick={other(onLastView)} />
+        )}
         <Btn
           icon={ZoomIn}
           text="Zoom +"
