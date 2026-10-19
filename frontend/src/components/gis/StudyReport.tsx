@@ -9,13 +9,16 @@ import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { AlertTriangle, Bot, Building2, CheckCircle2, Coins, Construction, Download, FileText, Landmark, LineChart, Map as MapIcon, MapPin, Newspaper, Printer, Save, Users, X } from "lucide-react";
 import { toast } from "sonner";
-import { post } from "@/lib/api";
+import { API_BASE, get, post } from "@/lib/api";
+import { useApi } from "@/hooks/useApi";
 import { compact, num, pkrShort } from "@/lib/format";
 import { cn, safeHref } from "@/lib/utils";
 import { BarList, Button, Input, ScoreRing, Skeleton } from "@/components/ui";
 import type { StudyShape } from "./AreaDraw";
 import { megaColor, StatusPill, type MegaProject } from "./MegaProjects";
-import { studyMapImage, type StudyMapBase } from "./studyMapImage";
+import { shapeBounds, studyMapImage, type StudyMapBase, type StudyOverlay } from "./studyMapImage";
+import { useMasterPlans } from "./MasterPlans";
+import type { GisLayer, GisLayerDetail } from "./types";
 
 const AreaTrend = lazy(() => import("@/components/ui/charts").then((m) => ({ default: m.AreaTrend })));
 
@@ -103,6 +106,41 @@ export function StudyReport({
   const [mapBase, setMapBase] = useState<StudyMapBase>("streets");
   const [mapImg, setMapImg] = useState<string | null>(null);
   const [mapBusy, setMapBusy] = useState(false);
+
+  // Custom layers the map can carry: published DHA master plans that overlap the area, and the
+  // portal's own published GIS layers. Plans start on; GIS layers are switched on by the user.
+  const plansQ = useMasterPlans();
+  const layersQ = useApi<{ layers: GisLayer[] }>("/gis/layers");
+  const overlayOptions = useMemo(() => {
+    if (!shape) return [];
+    const [s0, w0, n0, e0] = shapeBounds(shape);
+    const layers = (layersQ.data?.layers ?? []).filter((l) => l.published !== false && !l.builtin);
+    const planNames = new Set(layers.filter((l) => l.layer_type === "master_plan").map((l) => l.name.split(" — ")[0]!.toLowerCase()));
+    const plans = (plansQ.data?.plans ?? [])
+      .filter((pl) => pl.tile_url && planNames.has(pl.name.toLowerCase()))
+      .filter((pl) => pl.bounds[0] <= n0 && pl.bounds[2] >= s0 && pl.bounds[1] <= e0 && pl.bounds[3] >= w0)
+      .map((pl) => ({ key: `plan:${pl.key}`, label: `${pl.name} master plan`, plan: pl, layer: null as GisLayer | null }));
+    // the plans' own derived layers (outline, text) are covered by the plan tiles
+    const custom = layers
+      .filter((l) => !(l.entity_type === "scheme" && planNames.has(l.name.split(" — ")[0]!.toLowerCase())))
+      .map((l) => ({ key: `layer:${l.id}`, label: l.name, plan: null, layer: l }));
+    return [...plans, ...custom];
+  }, [shape, layersQ.data, plansQ.data]);
+  const [overlaysOff, setOverlaysOff] = useState<Set<string>>(new Set());
+  const [overlaysOn, setOverlaysOn] = useState<Set<string>>(new Set());
+  const isOn = (key: string) => (key.startsWith("plan:") ? !overlaysOff.has(key) : overlaysOn.has(key));
+  const toggleOverlay = (key: string) => {
+    const flip = (set: Set<string>) => {
+      const n = new Set(set);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    };
+    if (key.startsWith("plan:")) setOverlaysOff(flip);
+    else setOverlaysOn(flip);
+  };
+  const activeOverlayKey = overlayOptions.filter((o) => isOn(o.key)).map((o) => o.key).join("|");
+
   useEffect(() => {
     if (!shape || !data) return;
     let live = true;
@@ -110,14 +148,36 @@ export function StudyReport({
     const points = ((data.market?.listings_sample ?? []) as { latitude?: number; longitude?: number }[])
       .filter((p) => p.latitude != null && p.longitude != null)
       .map((p) => [p.latitude!, p.longitude!] as [number, number]);
-    studyMapImage(shape, { base: mapBase, points, title: data.name ?? "Study area" })
+    (async () => {
+      const overlays: StudyOverlay[] = [];
+      for (const o of overlayOptions.filter((x) => isOn(x.key))) {
+        if (o.plan) {
+          const pl = o.plan;
+          overlays.push({
+            kind: "tiles",
+            url: (z, x, y) => `${API_BASE}/masterplans/${pl.key}/tiles/${z}/${x}/${y}.png`,
+            minZoom: pl.zoom?.[0] ?? 12,
+            maxZoom: pl.zoom?.[1] ?? 17,
+            opacity: 0.8,
+            bounds: pl.bounds,
+            attribution: "Master plan © DHA Islamabad-Rawalpindi",
+          });
+        } else if (o.layer) {
+          const d = await get<GisLayerDetail>(`/gis/layers/${o.layer.id}`).catch(() => null);
+          if (d?.geojson) overlays.push({ kind: "geojson", data: d.geojson, color: d.style?.color ?? "#2563eb", fillColor: d.style?.fillColor, fillOpacity: d.style?.fillOpacity ?? 0.15 });
+        }
+      }
+      return studyMapImage(shape, { base: mapBase, points, title: data.name ?? "Study area", overlays });
+    })()
       .then((url) => live && setMapImg(url))
       .catch(() => live && setMapImg(null))
       .finally(() => live && setMapBusy(false));
     return () => {
       live = false;
     };
-  }, [shape, data, mapBase]);
+    // activeOverlayKey stands for the chosen layers
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shape, data, mapBase, activeOverlayKey]);
   const fc = data?.forecast ?? {};
   const trend = useMemo(() => {
     const sc = fc.scenarios as
@@ -219,7 +279,7 @@ export function StudyReport({
 
               {/* ---- map of the study area */}
               <Section icon={MapIcon} title="Location map">
-                <div className="mb-2 flex items-center gap-1.5 print:hidden">
+                <div className="mb-2 flex flex-wrap items-center gap-1.5 print:hidden">
                   {(["streets", "satellite"] as StudyMapBase[]).map((b) => (
                     <button
                       key={b}
@@ -228,6 +288,22 @@ export function StudyReport({
                       className={cn("rounded-full px-3 py-1 text-xs font-semibold", mapBase === b ? "bg-brand-700 text-white" : "bg-black/5 hover:bg-black/10 dark:bg-white/10")}
                     >
                       {b === "streets" ? "Streets" : "Satellite"}
+                    </button>
+                  ))}
+                  {overlayOptions.length > 0 && <span className="mx-1 h-4 w-px bg-black/10 dark:bg-white/15" />}
+                  {overlayOptions.map((o) => (
+                    <button
+                      key={o.key}
+                      type="button"
+                      onClick={() => toggleOverlay(o.key)}
+                      title={isOn(o.key) ? "Hide this layer on the map" : "Show this layer on the map"}
+                      className={cn(
+                        "max-w-[16rem] truncate rounded-full px-3 py-1 text-xs font-semibold ring-1 transition",
+                        isOn(o.key) ? "bg-gold-100 text-gold-900 ring-gold-400 dark:bg-gold-500/20 dark:text-gold-100" : "bg-transparent text-ink-mute ring-black/10 hover:ring-gold-300 dark:ring-white/15",
+                      )}
+                    >
+                      {isOn(o.key) ? "✓ " : "+ "}
+                      {o.label}
                     </button>
                   ))}
                   {mapImg && (
@@ -242,7 +318,8 @@ export function StudyReport({
                   <Skeleton className="aspect-[880/500] w-full" />
                 )}
                 <p className="mt-1.5 text-[11px] text-ink-mute">
-                  Purple: the study area · gold: its centre{d.market?.listings_sample?.length ? " · green: listings inside" : ""}. The area outside is dimmed.
+                  Purple: the study area · gold: its centre{d.market?.listings_sample?.length ? " · green: listings inside" : ""}
+                  {overlayOptions.some((o) => isOn(o.key)) ? ` · layers: ${overlayOptions.filter((o) => isOn(o.key)).map((o) => o.label).join(", ")}` : ""}. The area outside is dimmed.
                 </p>
               </Section>
 

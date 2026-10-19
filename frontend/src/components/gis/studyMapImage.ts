@@ -1,15 +1,30 @@
 /**
  * A static map image of a study area for the case-study report: base-map tiles fitted to the
  * drawn shape, the shape itself, its centre, listings inside, a scale bar, a north arrow and the
- * attribution — drawn on a canvas (2× for print) and returned as a JPEG data URL.
+ * attribution — drawn on a canvas (2× for print) and returned as a JPEG data URL. Custom layers
+ * (DHA master plan tiles, the portal's GIS layers) can be drawn over the base map.
  */
+import type { Feature, FeatureCollection, Geometry } from "geojson";
 import type { StudyShape } from "./AreaDraw";
 
 export type StudyMapBase = "streets" | "satellite";
 
 const TILE = 256;
 // Keyless tile sources that allow canvas use (CORS). CARTO's basemaps now need an API key.
-type TileUrl = (z: number, x: number, y: number) => string;
+export type TileUrl = (z: number, x: number, y: number) => string;
+
+/** A custom layer drawn over the base map: map tiles (e.g. a master plan) or GeoJSON shapes. */
+export type StudyOverlay =
+  | { kind: "tiles"; url: TileUrl; minZoom: number; maxZoom: number; opacity?: number; bounds?: [number, number, number, number]; attribution?: string }
+  | { kind: "geojson"; data: FeatureCollection | Feature | Geometry; color: string; fillColor?: string; fillOpacity?: number; attribution?: string };
+
+/** [south, west, north, east] of the drawn shape. */
+export function shapeBounds(shape: StudyShape): [number, number, number, number] {
+  const ring = ringOf(shape);
+  const lats = ring.map((p) => p[0]);
+  const lons = ring.map((p) => p[1]);
+  return [Math.min(...lats), Math.min(...lons), Math.max(...lats), Math.max(...lons)];
+}
 const BASES: Record<StudyMapBase, { url: TileUrl; fallback?: TileUrl; attribution: string; maxZoom: number }> = {
   streets: {
     url: (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`,
@@ -59,7 +74,7 @@ function niceDistance(m: number): number {
 
 export async function studyMapImage(
   shape: StudyShape,
-  opts: { base?: StudyMapBase; width?: number; height?: number; points?: [number, number][]; title?: string } = {},
+  opts: { base?: StudyMapBase; width?: number; height?: number; points?: [number, number][]; title?: string; overlays?: StudyOverlay[] } = {},
 ): Promise<string> {
   const base = BASES[opts.base ?? "streets"];
   const W = opts.width ?? 880;
@@ -121,6 +136,12 @@ export async function studyMapImage(
     const [x, y] = project(lat, lon, zr);
     return [x - left, y - top];
   };
+
+  // Custom layers, in order, over the base map.
+  for (const o of opts.overlays ?? []) {
+    if (o.kind === "tiles") await drawTileOverlay(ctx, o, zr, left, top, cw, ch);
+    else drawGeoJson(ctx, o, px, SCALE * k);
+  }
 
   // Dim everything outside the shape so the study area stands out.
   ctx.save();
@@ -210,7 +231,7 @@ export async function studyMapImage(
     ctx.fillText(opts.title, 18, 27);
   }
   ctx.font = "500 9px system-ui, sans-serif";
-  const at = base.attribution;
+  const at = [base.attribution, ...new Set((opts.overlays ?? []).map((o) => o.attribution).filter(Boolean))].join(" · ");
   const aw = ctx.measureText(at).width;
   ctx.fillStyle = "rgba(255,255,255,0.85)";
   ctx.fillRect(W - aw - 14, H - 16, aw + 14, 16);
@@ -219,4 +240,103 @@ export async function studyMapImage(
 
   // JPEG keeps a 2x map image around half a megabyte (a PNG runs to 4-5 MB).
   return canvas.toDataURL("image/jpeg", opts.base === "satellite" ? 0.86 : 0.9);
+}
+
+/** Tiles of an overlay that exist only for some zooms (master plans: 12–17) are scaled to fit. */
+async function drawTileOverlay(
+  ctx: CanvasRenderingContext2D,
+  o: Extract<StudyOverlay, { kind: "tiles" }>,
+  zr: number,
+  left: number,
+  top: number,
+  cw: number,
+  ch: number,
+) {
+  const nz = Math.max(o.minZoom, Math.min(o.maxZoom, zr));
+  const f = 2 ** (zr - nz); // canvas tile px per overlay tile px
+  const max = 2 ** nz;
+  let x0 = Math.floor(left / f / TILE);
+  let x1 = Math.floor((left + cw) / f / TILE);
+  let y0 = Math.floor(top / f / TILE);
+  let y1 = Math.floor((top + ch) / f / TILE);
+  if (o.bounds) {
+    const [s, w, n, e] = o.bounds;
+    const [bx0, by0] = project(n, w, nz);
+    const [bx1, by1] = project(s, e, nz);
+    x0 = Math.max(x0, Math.floor(bx0 / TILE));
+    x1 = Math.min(x1, Math.floor(bx1 / TILE));
+    y0 = Math.max(y0, Math.floor(by0 / TILE));
+    y1 = Math.min(y1, Math.floor(by1 / TILE));
+  }
+  if (x1 < x0 || y1 < y0 || (x1 - x0 + 1) * (y1 - y0 + 1) > 160) return; // nothing here, or far too many tiles
+  const jobs: Promise<void>[] = [];
+  ctx.save();
+  ctx.globalAlpha = o.opacity ?? 0.8;
+  for (let ty = Math.max(0, y0); ty <= Math.min(max - 1, y1); ty++) {
+    for (let tx = x0; tx <= x1; tx++) {
+      jobs.push(
+        loadTile(o.url(nz, ((tx % max) + max) % max, ty)).then((img) => {
+          if (img) ctx.drawImage(img, tx * TILE * f - left, ty * TILE * f - top, TILE * f, TILE * f);
+        }),
+      );
+    }
+  }
+  await Promise.all(jobs);
+  ctx.restore();
+}
+
+function drawGeoJson(
+  ctx: CanvasRenderingContext2D,
+  o: Extract<StudyOverlay, { kind: "geojson" }>,
+  px: (lat: number, lon: number) => [number, number],
+  u: number,
+) {
+  const geoms: Geometry[] = [];
+  const add = (g: FeatureCollection | Feature | Geometry | null | undefined) => {
+    if (!g) return;
+    if (g.type === "FeatureCollection") g.features.forEach(add);
+    else if (g.type === "Feature") add(g.geometry);
+    else if (g.type === "GeometryCollection") g.geometries.forEach(add);
+    else geoms.push(g);
+  };
+  add(o.data);
+  const path = (ring: number[][]) => ring.forEach((c, i) => (i ? ctx.lineTo(...px(c[1]!, c[0]!)) : ctx.moveTo(...px(c[1]!, c[0]!))));
+  ctx.save();
+  ctx.strokeStyle = o.color;
+  ctx.fillStyle = o.fillColor ?? o.color;
+  ctx.lineWidth = 2 * u;
+  for (const g of geoms) {
+    if (g.type === "Polygon" || g.type === "MultiPolygon") {
+      const polys = g.type === "Polygon" ? [g.coordinates] : g.coordinates;
+      for (const poly of polys) {
+        ctx.beginPath();
+        poly.forEach((ring) => {
+          path(ring);
+          ctx.closePath();
+        });
+        ctx.globalAlpha = o.fillOpacity ?? 0.15;
+        ctx.fill("evenodd");
+        ctx.globalAlpha = 0.95;
+        ctx.stroke();
+      }
+    } else if (g.type === "LineString" || g.type === "MultiLineString") {
+      const lines = g.type === "LineString" ? [g.coordinates] : g.coordinates;
+      ctx.globalAlpha = 0.95;
+      for (const line of lines) {
+        ctx.beginPath();
+        path(line);
+        ctx.stroke();
+      }
+    } else if (g.type === "Point" || g.type === "MultiPoint") {
+      const pts = g.type === "Point" ? [g.coordinates] : g.coordinates;
+      ctx.globalAlpha = 0.95;
+      for (const c of pts) {
+        const [x, y] = px(c[1]!, c[0]!);
+        ctx.beginPath();
+        ctx.arc(x, y, 3.5 * u, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+    }
+  }
+  ctx.restore();
 }
