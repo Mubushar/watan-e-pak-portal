@@ -25,6 +25,9 @@ export interface Property {
   latitude?: number | null;
   longitude?: number | null;
   image_urls?: string[];
+  /** Set on units of a new project (China Center, Skyra Tower …): the big project's id and unit code. */
+  project_id?: string | null;
+  project_unit?: string | null;
   amenities?: string[];
   /** Set by /search?near=…: the closest matching place. */
   nearby?: NearbyPlace;
@@ -86,6 +89,7 @@ export interface City {
   longitude: number;
   schemes: number;
   properties: number;
+  population?: number | null;
 }
 
 export interface Scheme {

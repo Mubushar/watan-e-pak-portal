@@ -58,6 +58,7 @@ import content
 import access
 import geo
 import gis_import
+import project_inventory
 import knowledge
 import memory as user_memory
 import storage
@@ -213,6 +214,10 @@ class Property(MediaMixin):
     agent_id: Optional[str] = None
     owner_user_id: Optional[str] = None  # portal account that published the listing
     available_from: Optional[datetime] = None
+    # Units of a new project (project_inventory.py): the big project and the developer's unit code
+    project_id: Optional[str] = None
+    project_unit: Optional[str] = None
+    source_url: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
@@ -252,6 +257,22 @@ class BigProject(MediaMixin):
     total_retail_space: Optional[float] = None
     total_office_space: Optional[float] = None
     total_residential_units: Optional[int] = None
+
+    # Sales information for projects selling units (project_inventory.py keeps it current)
+    address: Optional[str] = None
+    website: Optional[str] = None
+    marketed_by: Optional[str] = None
+    floors_label: Optional[str] = None
+    location_precision: Optional[str] = None  # exact | approximate
+    payment_plan: Optional[Dict[str, Any]] = None
+    offer: Optional[str] = None
+    unit_types: List[Dict[str, Any]] = Field(default_factory=list)
+    price_from: Optional[float] = None
+    price_to: Optional[float] = None
+    units_available: Optional[int] = None
+    inventory_checked: Optional[str] = None
+    inventory_source: Optional[str] = None
+    sources: List[Dict[str, Any]] = Field(default_factory=list)
 
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
@@ -4145,6 +4166,16 @@ def list_big_projects(city: Optional[str] = None, project_type: Optional[str] = 
                 "floor_count": b.floor_count,
                 "total_area": b.total_area,
                 "occupancy_rate": b.occupancy_rate,
+                "developer": b.developer,
+                "latitude": b.latitude,
+                "longitude": b.longitude,
+                "price_from": b.price_from,
+                "price_to": b.price_to,
+                "units_available": b.units_available,
+                "inventory_checked": b.inventory_checked,
+                "payment_plan": (b.payment_plan or {}).get("summary") if b.payment_plan else None,
+                "website": b.website,
+                "image": (b.image_urls or [None])[0],
             }
         )
     return dump({"count": len(out), "projects": out})
@@ -16681,6 +16712,9 @@ def init_sample_data() -> None:
 
     # ---- DHA master plans (if built): schemes + GIS layers ----
     _seed_master_plans()
+
+    # ---- New projects with live unit inventories (China Center, Skyra Tower, Goldcrest Breeze …) ----
+    project_inventory.sync()
 
     # ---- Every map layer (except base maps) waits for an admin to publish it ----
     for layer in gis.GIS_LAYERS:

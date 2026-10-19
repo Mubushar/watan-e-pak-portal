@@ -79,6 +79,7 @@ export const MEGA_TYPES: {
   },
   { key: "airport", label: "Airports", color: "#0891b2", icon: Plane },
   { key: "cbd", label: "Business districts", color: "#ca8a04", icon: Building },
+  { key: "tower", label: "High-rise & mixed-use projects", color: "#0f766e", icon: Building },
 ];
 export const megaColor = (t: string) => MEGA_TYPES.find((x) => x.key === t)?.color ?? "#64748b";
 export const megaIcon = (t: string) => MEGA_TYPES.find((x) => x.key === t)?.icon ?? Construction;

@@ -256,6 +256,8 @@ def _docs() -> List[Dict[str, Any]]:
                            f"Plot sizes: {', '.join(map(str, s.plot_sizes))}." if s.plot_sizes else "", s.description),
         })
     for p in core.properties_db:
+        if getattr(p, "project_id", None):
+            continue  # a project's units are summarised by its project entry (unit types, prices, plan)
         cname = city[p.city_id].name if p.city_id in city else ""
         sname = scheme[p.scheme_id].name if p.scheme_id in scheme else ""
         size = f"{p.marla_area:g} marla" if p.marla_area else ""
@@ -270,17 +272,31 @@ def _docs() -> List[Dict[str, Any]]:
         })
     for b in core.big_projects_db:
         cname = city[b.city_id].name if b.city_id in city else ""
+        refs = list(getattr(b, "sources", None) or [])
+        plan = (getattr(b, "payment_plan", None) or {}).get("summary")
+        types = "; ".join(f"{t.get('label')}: {t.get('available')} available, {_price_words(t.get('price_min'))}"
+                          f"–{_price_words(t.get('price_max'))}, {t.get('sqft_min'):g}–{t.get('sqft_max'):g} sq ft"
+                          for t in (getattr(b, "unit_types", None) or []))
         docs.append({
-            "type": "big_project", "id": b.id, "title": b.name, "url": "/projects", "tier": "unverified",
-            "city": cname,
-            "text": _join(b.name, b.description, b.project_type, b.status, b.developer, cname),
-            "facts": _join(f"{b.name} ({b.project_type}, {b.status}).", f"Developer: {b.developer}." if b.developer else "",
-                           b.description),
+            "type": "big_project", "id": b.id, "title": b.name, "url": f"/projects?project={b.id}",
+            # a developer's own website: the developer's claims, like a listing
+            "tier": "listing" if refs else "unverified", "sources": refs, "city": cname,
+            "text": _join(b.name, b.name, b.description, b.project_type, b.status, b.developer, getattr(b, "marketed_by", None),
+                          getattr(b, "address", None), cname, types, plan, getattr(b, "offer", None)),
+            "facts": _join(f"{b.name} ({b.project_type.replace('_', ' ')}, {b.status.replace('_', ' ')}).",
+                           f"Developer: {b.developer}." if b.developer else "",
+                           f"Address: {b.address}." if getattr(b, "address", None) else "",
+                           f"{b.units_available} units available, {_price_words(b.price_from)} to {_price_words(b.price_to)}"
+                           f" (inventory checked {b.inventory_checked})." if getattr(b, "units_available", None) else "",
+                           f"Unit types: {types}." if types else "", f"Payment plan: {plan}." if plan else "",
+                           getattr(b, "offer", None), b.description),
         })
     try:
         import megaprojects
 
         for m in megaprojects.all_projects():
+            if m.get("portal_project"):
+                continue  # already in the knowledge base as a project with its units
             refs = m.get("sources") or []
             docs.append({
                 "type": "mega_project", "id": m["id"], "title": m["name"], "url": "/infrastructure",

@@ -536,13 +536,54 @@ function MarketPulse() {
   );
 }
 
+/** Columns of the cities grid at the current width (1 / sm: 2 / lg: 4), to page it two rows at a time. */
+function useGridColumns(): number {
+  const read = () => (typeof window === "undefined" ? 4 : window.matchMedia("(min-width: 1024px)").matches ? 4 : window.matchMedia("(min-width: 640px)").matches ? 2 : 1);
+  const [cols, setCols] = useState(read);
+  useEffect(() => {
+    const on = () => setCols(read());
+    window.addEventListener("resize", on);
+    return () => window.removeEventListener("resize", on);
+  }, []);
+  return cols;
+}
+
 function Cities() {
   const q = useApi<{ cities: City[] }>("/cities");
+  // Most listings first, then the biggest cities; two rows per page.
+  const cities = useMemo(
+    () => [...(q.data?.cities ?? [])].sort((a, b) => (b.properties ?? 0) - (a.properties ?? 0) || (b.population ?? 0) - (a.population ?? 0) || a.name.localeCompare(b.name)),
+    [q.data],
+  );
+  const perPage = useGridColumns() * 2;
+  const pages = Math.max(1, Math.ceil(cities.length / perPage));
+  const [page, setPage] = useState(0);
+  useEffect(() => setPage((p) => Math.min(p, pages - 1)), [pages]);
+  const shown = cities.slice(page * perPage, page * perPage + perPage);
   return (
-    <Section eyebrow="Explore Pakistan" title="Top cities" subtitle="From Lahore’s heritage to Karachi’s coastline — dive into every city’s schemes, prices and growth.">
+    <Section
+      eyebrow="Explore Pakistan"
+      title="Top cities"
+      subtitle="From Lahore’s heritage to Karachi’s coastline — dive into every city’s schemes, prices and growth."
+      action={
+        pages > 1 ? (
+          <div className="flex items-center gap-2">
+            <span className="text-sm tabular-nums text-ink-mute">
+              {page * perPage + 1}–{Math.min(cities.length, page * perPage + perPage)} of {cities.length}
+            </span>
+            <button type="button" className="btn btn-outline btn-icon h-10 w-10" aria-label="Previous cities" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
+              <ArrowRight className="h-4 w-4 rotate-180 rtl:rotate-0" />
+            </button>
+            <button type="button" className="btn btn-outline btn-icon h-10 w-10" aria-label="More cities" disabled={page >= pages - 1} onClick={() => setPage((p) => Math.min(pages - 1, p + 1))}>
+              <ArrowRight className="h-4 w-4 rtl:rotate-180" />
+            </button>
+          </div>
+        ) : undefined
+      }
+    >
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {(q.data?.cities ?? []).map((c, i) => (
-          <motion.div key={c.id} initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.06 }}>
+        {shown.map((c, i) => (
+          <motion.div key={c.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
             <Link to={`/cities/${encodeURIComponent(c.name)}`} className="group relative block aspect-[4/5] overflow-hidden rounded-3xl shadow-card">
               <img src={cityImage(c.name)} alt={c.name} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
               <div className="absolute inset-0 bg-gradient-to-t from-brand-950/90 via-brand-950/20 to-transparent" />
@@ -561,8 +602,23 @@ function Cities() {
             </Link>
           </motion.div>
         ))}
-        {q.isLoading && Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="aspect-[4/5] rounded-3xl" />)}
+        {q.isLoading && Array.from({ length: perPage }).map((_, i) => <Skeleton key={i} className="aspect-[4/5] rounded-3xl" />)}
       </div>
+      {pages > 1 && (
+        <div className="mt-6 flex justify-center gap-1.5" role="tablist" aria-label="City pages">
+          {Array.from({ length: pages }).map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              role="tab"
+              aria-selected={i === page}
+              aria-label={`Page ${i + 1}`}
+              onClick={() => setPage(i)}
+              className={`h-2 rounded-full transition-all ${i === page ? "w-6 bg-brand-700 dark:bg-gold-400" : "w-2 bg-black/15 hover:bg-black/30 dark:bg-white/20"}`}
+            />
+          ))}
+        </div>
+      )}
     </Section>
   );
 }

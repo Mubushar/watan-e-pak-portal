@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Marker } from "react-leaflet";
 import {
@@ -27,14 +27,15 @@ import {
   Video,
 } from "lucide-react";
 import { useApi } from "@/hooks/useApi";
-import { compact, date, num, pct, titleCase } from "@/lib/format";
+import { compact, date, num, pct, pkrShort, titleCase } from "@/lib/format";
 import { HERO, themedImage } from "@/lib/images";
 import { cn } from "@/lib/utils";
 import { Badge, ButtonLink, EmptyState, ErrorState, Modal, PageHeader, Progress, Skeleton, StatCard, StatusBadge, toneFor } from "@/components/ui";
 import { PortalMap, pin } from "@/components/map/PortalMap";
 import { AdSlot } from "@/components/ads/AdSlot";
 import { ChipRow, FilterChip, MiniStat, fmtArea } from "@/components/gis/kit";
-import type { BigProject, BigProjectDetail } from "@/components/gis/types";
+import type { BigProject, BigProjectDetail, ProjectUnit } from "@/components/gis/types";
+import { safeHref } from "@/lib/utils";
 
 const TYPE_ICON: Record<string, typeof Building> = {
   mall: ShoppingBag,
@@ -52,7 +53,15 @@ export default function Projects() {
   const [type, setType] = useState("");
   const [status, setStatus] = useState("");
   const [city, setCity] = useState("");
-  const [openId, setOpenId] = useState<string | null>(null);
+  // /projects?project=<id> opens that project (links from the assistant's sources and the map)
+  const [sp, setSp] = useSearchParams();
+  const openId = sp.get("project");
+  const setOpenId = (id: string | null) => {
+    const next = new URLSearchParams(sp);
+    if (id) next.set("project", id);
+    else next.delete("project");
+    setSp(next, { replace: !id });
+  };
 
   const facets = useMemo(() => {
     const count = (k: keyof BigProject) => {
@@ -196,7 +205,7 @@ function ProjectCard({ p, i, onOpen }: { p: BigProject; i: number; onOpen: () =>
       className="card card-hover group flex flex-col overflow-hidden text-start"
     >
       <div className="relative aspect-[4/3] overflow-hidden">
-        <img src={themedImage(p.id, p.project_type)} alt={p.name} loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+        <img src={p.image ?? themedImage(p.id, p.project_type)} alt={p.name} loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
         <div className="absolute inset-0 bg-gradient-to-t from-brand-950/90 via-brand-950/20 to-transparent" />
         <div className="absolute start-3 top-3 flex flex-wrap gap-1.5">
           <span className="chip bg-white/90 text-brand-800 shadow dark:bg-black/50 dark:text-white">
@@ -236,6 +245,15 @@ function ProjectCard({ p, i, onOpen }: { p: BigProject; i: number; onOpen: () =>
             </span>
           </div>
         </div>
+        {p.units_available != null ? (
+          <div className="mt-4 rounded-xl bg-brand-50/70 p-3 text-sm dark:bg-white/5">
+            <p className="font-display text-base font-bold text-ink dark:text-white">{p.price_from ? `From ${pkrShort(p.price_from)}` : "Price on request"}</p>
+            <p className="text-xs text-ink-mute">
+              {num(p.units_available)} units available{p.inventory_checked ? ` · checked ${p.inventory_checked}` : ""}
+            </p>
+            {p.payment_plan && <p className="mt-1 text-[11px] text-ink-soft dark:text-slate-300">{p.payment_plan}</p>}
+          </div>
+        ) : (
         <div className="mt-4">
           <div className="mb-1.5 flex justify-between text-xs">
             <span className="font-semibold text-ink-soft dark:text-slate-300">Occupancy</span>
@@ -243,6 +261,7 @@ function ProjectCard({ p, i, onOpen }: { p: BigProject; i: number; onOpen: () =>
           </div>
           <Progress value={(occ ?? 0) * 100} tone={occ == null ? "blue" : occ >= 0.7 ? "green" : occ >= 0.4 ? "gold" : "red"} />
         </div>
+        )}
         <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-brand-700 dark:text-brand-300">
           View project details <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" />
         </span>
@@ -277,6 +296,7 @@ function ProjectModal({ id, onClose }: { id: string | null; onClose: () => void 
           </div>
 
           {p.description && <p className="text-sm text-ink-soft dark:text-slate-300">{p.description}</p>}
+          {!!p.unit_types?.length && <SalesInfo p={p} onClose={onClose} />}
 
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <MiniStat label="Floors" value={p.floor_count ?? "—"} />
@@ -361,5 +381,132 @@ function ProjectModal({ id, onClose }: { id: string | null; onClose: () => void 
         </div>
       ) : null}
     </Modal>
+  );
+}
+
+/** Units for sale, payment plan, offer, gallery and sources of a project that sells units. */
+function SalesInfo({ p, onClose }: { p: BigProjectDetail; onClose: () => void }) {
+  const units = useApi<{ count: number; units: ProjectUnit[] }>(`/bigprojects/${p.id}/units`, { limit: 8 });
+  const captions = (p.multimedia?.captions ?? {}) as Record<string, string>;
+  const credit = p.multimedia?.media_credit as string | undefined;
+  const range = (a: number, b: number, f: (n: number) => string, sep = "–") => (a === b ? f(a) : `${f(a)}${sep}${f(b)}`);
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <MiniStat label="Available" value={num(p.units_available ?? 0)} hint="units" />
+        <MiniStat label="From" value={p.price_from ? pkrShort(p.price_from) : "—"} />
+        <MiniStat label="Up to" value={p.price_to ? pkrShort(p.price_to) : "—"} />
+        <MiniStat label="Down payment" value={p.payment_plan?.down_pct != null ? `${p.payment_plan.down_pct}%` : "—"} hint={p.payment_plan?.on_possession_pct != null ? `${p.payment_plan.on_possession_pct}% on possession` : undefined} />
+      </div>
+      {p.address && (
+        <p className="flex items-start gap-1.5 text-sm text-ink-soft dark:text-slate-300">
+          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gold-600" />
+          <span>
+            {p.address}
+            {p.location_precision === "approximate" && <span className="ms-1 text-[11px] text-ink-mute">(map position approximate)</span>}
+          </span>
+        </p>
+      )}
+      <div className="overflow-x-auto rounded-xl border border-black/5 dark:border-white/10">
+        <table className="w-full text-sm">
+          <thead className="bg-brand-50/60 text-[11px] uppercase tracking-wider text-ink-mute dark:bg-white/5">
+            <tr>
+              <th className="px-3 py-2 text-start">Unit type</th>
+              <th className="px-3 py-2 text-end">Available</th>
+              <th className="px-3 py-2 text-end">Size (sq ft)</th>
+              <th className="px-3 py-2 text-end">Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {p.unit_types!.map((t) => (
+              <tr key={t.label + t.kind} className="border-t border-black/5 dark:border-white/10">
+                <td className="px-3 py-2 font-semibold">
+                  {t.label}
+                  {t.layouts?.length ? <span className="ms-1 text-[11px] font-normal text-ink-mute">({t.layouts.slice(0, 6).join(", ")})</span> : null}
+                </td>
+                <td className="px-3 py-2 text-end tabular-nums">{t.available}</td>
+                <td className="px-3 py-2 text-end tabular-nums">{range(t.sqft_min, t.sqft_max, (n) => num(Math.round(n)))}</td>
+                <td className="px-3 py-2 text-end tabular-nums">{range(t.price_min, t.price_max, pkrShort, " – ")}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {(p.payment_plan?.summary || p.offer) && (
+        <div className="space-y-1 rounded-xl bg-gold-50 p-3 text-sm dark:bg-gold-500/10">
+          {p.payment_plan?.summary && (
+            <p>
+              <b>Payment plan:</b> {p.payment_plan.summary}
+            </p>
+          )}
+          {p.payment_plan?.alternative && <p className="text-ink-soft dark:text-slate-300">Or: {p.payment_plan.alternative}</p>}
+          {p.offer && (
+            <p>
+              <b>Offer:</b> {p.offer}
+            </p>
+          )}
+        </div>
+      )}
+      <div>
+        <p className="label">Cheapest available units</p>
+        <div className="space-y-1">
+          {(units.data?.units ?? []).map((u) => (
+            <Link key={u.id} to={`/properties/${u.id}`} onClick={onClose} className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-sm hover:bg-brand-50 dark:hover:bg-white/5">
+              <span className="min-w-0 truncate">{u.title.split(" — ")[1] ?? u.title}</span>
+              <span className="shrink-0 tabular-nums text-ink-soft">
+                {num(Math.round(u.sqft))} sq ft · <b className="text-ink dark:text-white">{pkrShort(u.price)}</b>
+              </span>
+            </Link>
+          ))}
+        </div>
+        <ButtonLink to={`/properties?project=${p.id}`} variant="soft" size="sm" className="mt-2" icon={<Building2 className="h-3.5 w-3.5" />} onClick={onClose}>
+          All {num(p.units_available ?? 0)} available units
+        </ButtonLink>
+      </div>
+      {!!p.image_library?.length && (
+        <div>
+          <p className="label">Gallery</p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {p.image_library.slice(0, 9).map((src) => (
+              <a key={src} href={safeHref(src) ?? undefined} target="_blank" rel="noopener noreferrer" className="group overflow-hidden rounded-lg bg-black/5">
+                <img src={src} alt={captions[src] ?? p.name} loading="lazy" className="aspect-[4/3] w-full object-cover transition group-hover:scale-105" />
+                {captions[src] && <span className="block truncate px-1.5 py-1 text-[11px] text-ink-mute">{captions[src]}</span>}
+              </a>
+            ))}
+          </div>
+          {credit && <p className="mt-1 text-[11px] text-ink-mute">{credit}</p>}
+        </div>
+      )}
+      {!!p.floor_plans?.length && (
+        <div>
+          <p className="label">Floor plans</p>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {(p.floor_plans as string[]).map((src) => (
+              <a key={src} href={safeHref(src) ?? undefined} target="_blank" rel="noopener noreferrer" className="w-36 shrink-0 overflow-hidden rounded-lg border border-black/5 bg-white dark:border-white/10">
+                <img src={src} alt={captions[src] ?? "Floor plan"} loading="lazy" className="aspect-square w-full object-contain" />
+                <span className="block truncate px-1.5 py-1 text-[11px] text-ink-mute">{captions[src] ?? "Floor plan"}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+      <p className="text-[11px] text-ink-mute">
+        {p.inventory_source ?? "Developer's inventory"}
+        {p.inventory_checked ? `, checked ${p.inventory_checked}` : ""}. Prices and availability change; confirm at booking.
+        {p.marketed_by ? ` Marketed by ${p.marketed_by}.` : ""}
+      </p>
+      {!!p.sources?.length && (
+        <div className="flex flex-wrap gap-2">
+          {p.sources.map((s) => {
+            const href = safeHref(s.url ?? "");
+            return href ? (
+              <a key={href} href={href} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm">
+                {s.title ?? href}
+              </a>
+            ) : null;
+          })}
+        </div>
+      )}
+    </div>
   );
 }

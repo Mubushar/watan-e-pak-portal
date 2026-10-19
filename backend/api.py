@@ -55,6 +55,7 @@ import access
 import knowledge
 import memory as user_memory
 import portal_env
+import project_inventory
 import prompts
 import property_admin
 import storage
@@ -90,6 +91,7 @@ async def lifespan(app: FastAPI):
     # first run) and keep writing changes in the background; flush once more on shutdown.
     storage_state = storage.start()
     core.ensure_builtin_layers()  # overlays added in a newer version join the saved ones (unpublished)
+    project_inventory.sync()      # project inventories from the data file: new units in, sold ones marked
     logging.getLogger("portal").info("storage: %s", storage_state)
     try:
         async with core.mcp.session_manager.run():
@@ -1004,6 +1006,17 @@ def bigproject(project_id: str) -> Any:
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return result
+
+
+@app.get("/bigprojects/{project_id}/units", tags=["big-projects"])
+def bigproject_units(project_id: str, kind: Optional[str] = None, bedrooms: Optional[int] = None,
+                     max_price: Optional[float] = None, status: str = "active", limit: int = 500) -> Any:
+    """A project's units for sale (its listings), cheapest first: unit code, floor, size, price,
+    payment plan. ``status=all`` includes units the developer no longer lists as available."""
+    if not core.find_project(project_id):
+        raise HTTPException(status_code=404, detail=f"Big project not found: {project_id}")
+    return project_inventory.units(project_id, kind=kind, bedrooms=bedrooms, max_price=max_price,
+                                   status=status, limit=max(1, min(limit, 1000)))
 
 
 # ------------------------------------------------------------------

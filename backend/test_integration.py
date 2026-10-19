@@ -1207,6 +1207,50 @@ def run_admin_crud_checks(client: TestClient) -> None:
     check("DELETE /gis/layers/{id}", client.delete(f"/gis/layers/{lid}").status_code == 200 and client.delete(f"/gis/layers/{lid}").status_code == 404)
 
 
+def run_project_inventory_checks(client: TestClient) -> None:
+    """China Center, Skyra Tower, Goldcrest Breeze: projects, unit listings, mega layer, knowledge."""
+    import megaprojects
+    import project_inventory as pi
+
+    data = pi.load()
+    names = {p["name"] for p in data["projects"]}
+    check("projects: inventory file has the three projects", {"China Center", "Skyra Tower", "Goldcrest Breeze Overseas"} <= names)
+    r = client.get("/bigprojects").json()["projects"]
+    sky = next((x for x in r if x["name"] == "Skyra Tower"), None)
+    check("GET /bigprojects lists Skyra Tower with price and availability", sky and sky["units_available"] == 34
+          and sky["price_from"] == 6_600_000 and sky["image"], str(sky)[:200])
+    detail = client.get(f"/bigprojects/{sky['id']}").json()
+    check("project detail: unit types, payment plan, sources, real images", detail["unit_types"] and detail["payment_plan"]["down_pct"] == 30
+          and detail["sources"][0]["url"].startswith("https://skyratower.com") and all(u.startswith("https://skyratower.com/media/")
+                                                                                        for u in detail["image_urls"]), str(detail)[:200])
+    units = client.get(f"/bigprojects/{sky['id']}/units").json()
+    check("GET /bigprojects/{id}/units: one listing per available unit, cheapest first", units["count"] == 34
+          and units["units"][0]["price"] == 6_600_000, str(units)[:160])
+    listing = core.find_property(units["units"][0]["id"])
+    check("unit listing links back to its project with its plan image", listing.project_id == sky["id"] and listing.project_unit
+          and any("/plans/" in u for u in listing.image_urls) and "Payment plan" in listing.description)
+    before = len(core.properties_db)
+    stats = pi.sync()
+    check("projects: sync is idempotent", stats["created"] == 0 and len(core.properties_db) == before, str(stats))
+    import copy
+    fewer = copy.deepcopy(data)
+    gb = next(x for x in fewer["projects"] if x["name"] == "Goldcrest Breeze Overseas")
+    removed = gb["units"].pop()
+    stats = pi.sync(fewer)
+    sold = next((x for x in core.properties_db if x.project_unit == removed["unit"] and x.title.startswith("Goldcrest")), None)
+    check("projects: a unit that leaves the inventory is marked sold, not deleted", stats and stats["sold"] == 1 and sold and sold.status == "sold",
+          str(stats))
+    pi.sync()
+    check("projects: back in the inventory -> active again", sold.status == "active")
+    towers = [m for m in megaprojects.all_projects() if m["type"] == "tower"]
+    check("mega projects: the three projects are on the layer", len(towers) == 3 and all(m["geometry"]["type"] == "point" for m in towers))
+    r = client.get("/geo/megaprojects", params={"type": "tower"}).json()
+    check("GET /geo/megaprojects?type=tower", r["count"] == 3, str(r)[:120])
+    hit = client.post("/ai/knowledge/search", json={"query": "Skyra Tower 1 bed price"}).json()["results"][0]
+    check("knowledge: project questions find the project with its prices", hit["type"] == "big_project" and hit["title"] == "Skyra Tower"
+          and "66 lakh" in hit["snippet"], str(hit)[:200])
+
+
 def run_storage_checks() -> None:
     """Durable storage: seed, incremental save, restart, delete, broken row."""
     import tempfile
@@ -1262,6 +1306,7 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         run_hardening_checks(client)
         run_ai_checks(client)
         run_admin_crud_checks(client)
+        run_project_inventory_checks(client)
         r = client.get("/health")
         check("GET /health", r.status_code == 200 and r.json().get("status") == "ok", str(r.status_code))
 

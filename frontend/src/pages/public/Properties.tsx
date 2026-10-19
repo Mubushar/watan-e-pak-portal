@@ -79,6 +79,7 @@ function useFilters() {
     featured: sp.get("featured") === "1",
     sort: sp.get("sort") ?? "relevance",
     view: (sp.get("view") ?? "grid") as "grid" | "list" | "map",
+    project: sp.get("project") ?? "",
   };
   const set = (patch: Partial<Record<keyof typeof f, string | number | boolean>>) => {
     const next = new URLSearchParams(sp);
@@ -104,6 +105,7 @@ function matches(p: Property, f: ReturnType<typeof useFilters>["f"]) {
   if (f.beds && (p.bedrooms ?? 0) < f.beds) return false;
   if (f.baths && (p.bathrooms ?? 0) < f.baths) return false;
   if (f.featured && !p.featured) return false;
+  if (f.project && p.project_id !== f.project) return false;
   if (f.q) {
     const hay = [p.title, p.description, p.scheme_name, p.block_name, p.city_name, p.category, p.use_type, p.street_address].join(" ").toLowerCase();
     const words = f.q.toLowerCase().split(/\s+/).filter((w) => w.length > 2 && !["for", "the", "and", "with", "under", "in"].includes(w));
@@ -129,16 +131,7 @@ function FilterPanel({ f, set, reset, cities, counts }: { f: ReturnType<typeof u
           <RotateCcw className="h-3 w-3" /> Reset
         </button>
       </div>
-      <div>
-        <p className="label">City</p>
-        <div className="flex flex-wrap gap-1.5">
-          {["", ...cities.map((c) => c.name)].map((c) => (
-            <button key={c || "all"} onClick={() => set({ city: c })} className={cn("chip ring-1 transition", f.city === c ? "bg-brand-700 text-white ring-brand-700" : "bg-white text-ink-soft ring-black/10 hover:ring-brand-300 dark:bg-white/5 dark:text-slate-300 dark:ring-white/10")}>
-              {c || "All"}
-            </button>
-          ))}
-        </div>
-      </div>
+      <CityFilter cities={cities} value={f.city} onChange={(city) => set({ city })} />
       <div>
         <p className="label">Property type</p>
         <div className="grid grid-cols-2 gap-1.5">
@@ -320,7 +313,7 @@ export default function Properties() {
   const serverSearch = !!(f.near || f.nearPlace || f.feature);
   const q = useApi<PropertyList>(
     serverSearch ? "/search" : "/properties",
-    serverSearch ? { near: f.near, near_place: f.nearPlace, near_km: f.near || f.nearPlace ? f.nearKm : undefined, feature: f.feature, limit: 500 } : { limit: 500 },
+    serverSearch ? { near: f.near, near_place: f.nearPlace, near_km: f.near || f.nearPlace ? f.nearKm : undefined, feature: f.feature, limit: 1000 } : { limit: 1000 },
   );
   const cities = useApi<{ cities: City[] }>("/cities");
   const [text, setText] = useState(f.q);
@@ -367,6 +360,7 @@ export default function Properties() {
 
   const activeChips = [
     f.q && { k: "q", label: `“${f.q}”` },
+    f.project && { k: "project", label: "One project’s units" },
     f.city && { k: "city", label: f.city },
     f.category && { k: "category", label: titleCase(f.category) },
     f.use_type && { k: "use_type", label: titleCase(f.use_type) },
@@ -586,6 +580,99 @@ export default function Properties() {
           </Button>
         </div>
       </Drawer>
+    </div>
+  );
+}
+
+/**
+ * City filter: the main cities as chips (most listings first, then the largest), the chosen city
+ * always visible, and every city one tap away in a searchable list grouped by province.
+ */
+const TOP_CITIES = 6;
+function CityFilter({ cities, value, onChange }: { cities: City[]; value: string; onChange: (city: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ranked = useMemo(
+    () => [...cities].sort((a, b) => (b.properties ?? 0) - (a.properties ?? 0) || (b.population ?? 0) - (a.population ?? 0) || a.name.localeCompare(b.name)),
+    [cities],
+  );
+  const top = ranked.slice(0, TOP_CITIES);
+  const chosen = value && !top.some((c) => c.name.toLowerCase() === value.toLowerCase()) ? ranked.find((c) => c.name.toLowerCase() === value.toLowerCase()) : undefined;
+  const chips = chosen ? [...top, chosen] : top;
+  const groups = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const m = new Map<string, City[]>();
+    for (const c of [...cities].sort((a, b) => a.name.localeCompare(b.name))) {
+      if (q && !c.name.toLowerCase().includes(q) && !(c.state ?? "").toLowerCase().includes(q)) continue;
+      const k = c.state || "Other";
+      m.set(k, [...(m.get(k) ?? []), c]);
+    }
+    return [...m.entries()].sort((a, b) => b[1].length - a[1].length);
+  }, [cities, query]);
+  const chip = (active: boolean) =>
+    cn("chip ring-1 transition", active ? "bg-brand-700 text-white ring-brand-700" : "bg-white text-ink-soft ring-black/10 hover:ring-brand-300 dark:bg-white/5 dark:text-slate-300 dark:ring-white/10");
+  const pick = (name: string) => {
+    onChange(value.toLowerCase() === name.toLowerCase() ? "" : name);
+    setOpen(false);
+    setQuery("");
+  };
+  return (
+    <div>
+      <div className="flex items-baseline justify-between">
+        <p className="label">City</p>
+        {cities.length > TOP_CITIES && (
+          <button type="button" onClick={() => setOpen((o) => !o)} className="text-xs font-semibold text-brand-700 hover:underline dark:text-brand-300" aria-expanded={open}>
+            {open ? "Show fewer" : `All ${cities.length} cities`}
+          </button>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        <button type="button" onClick={() => onChange("")} className={chip(!value)}>
+          All
+        </button>
+        {chips.map((c) => (
+          <button key={c.id} type="button" onClick={() => pick(c.name)} className={chip(value.toLowerCase() === c.name.toLowerCase())}>
+            {c.name}
+            {!!c.properties && <span className="ms-1 text-[10px] opacity-70">{c.properties}</span>}
+          </button>
+        ))}
+      </div>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+            <div className="mt-3 rounded-2xl border border-black/5 bg-white p-2 dark:border-white/10 dark:bg-white/5">
+              <label className="flex items-center gap-2 rounded-xl bg-black/5 px-2.5 dark:bg-white/10">
+                <Search className="h-3.5 w-3.5 text-ink-mute" />
+                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find a city or province" aria-label="Find a city" className="h-8 w-full bg-transparent text-sm outline-none" autoFocus />
+              </label>
+              <div className="mt-2 max-h-72 space-y-3 overflow-y-auto pe-1">
+                {groups.map(([province, list]) => (
+                  <div key={province}>
+                    <p className="px-1 text-[10px] font-bold uppercase tracking-wider text-ink-mute">{province}</p>
+                    <div className="mt-1 grid grid-cols-2 gap-1">
+                      {list.map((c) => {
+                        const active = value.toLowerCase() === c.name.toLowerCase();
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => pick(c.name)}
+                            className={cn("flex items-center justify-between gap-1 rounded-lg px-2 py-1.5 text-start text-[13px] transition", active ? "bg-brand-700 text-white" : "hover:bg-brand-50 dark:hover:bg-white/10")}
+                          >
+                            <span className="truncate">{c.name}</span>
+                            {!!c.properties && <span className={cn("text-[10px] tabular-nums", active ? "text-white/80" : "text-ink-mute")}>{c.properties}</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+                {!groups.length && <p className="px-1 py-3 text-sm text-ink-mute">No city matches “{query}”.</p>}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

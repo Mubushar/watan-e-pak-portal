@@ -23,6 +23,7 @@ TYPE_LABELS = {
     "ring_road": "Ring road", "motorway": "Motorway", "expressway": "Expressway / avenue",
     "transit": "Mass transit", "railway": "Railway", "subdivision": "New sector / city",
     "industrial": "Industrial / economic zone", "airport": "Airport", "cbd": "Business district",
+    "tower": "High-rise & mixed-use project",
 }
 STATUS_LABELS = {"planned": "Planned", "approved": "Approved", "under_construction": "Under construction", "completed": "Recently completed"}
 # How much a project's status counts towards price effect today (0-1).
@@ -41,7 +42,15 @@ def note() -> str:
 
 
 def all_projects() -> List[Dict[str, Any]]:
-    return _load()["projects"]
+    """Infrastructure projects from the data file, plus the new high-rise / mixed-use projects whose
+    unit inventories the portal tracks (geodata/pk_project_inventory.json)."""
+    try:
+        import project_inventory
+
+        extra = project_inventory.as_megaprojects()
+    except Exception:
+        extra = []
+    return _load()["projects"] + extra
 
 
 def get(project_id: str) -> Optional[Dict[str, Any]]:

@@ -153,9 +153,41 @@ export interface BigProject {
   floor_count?: number | null;
   total_area?: number | null;
   occupancy_rate?: number | null;
+  developer?: string | null;
+  price_from?: number | null;
+  price_to?: number | null;
+  units_available?: number | null;
+  inventory_checked?: string | null;
+  payment_plan?: string | null;
+  website?: string | null;
+  image?: string | null;
 }
 
-export interface BigProjectDetail extends Omit<BigProject, "city"> {
+/** A group of a project's available units (BigProjectDetail.unit_types). */
+export interface ProjectUnitType {
+  kind: string;
+  bedrooms?: number | null;
+  label: string;
+  available: number;
+  sqft_min: number;
+  sqft_max: number;
+  price_min: number;
+  price_max: number;
+  layouts?: string[];
+}
+export interface ProjectUnit {
+  id: string;
+  unit: string;
+  title: string;
+  category: string;
+  bedrooms?: number | null;
+  sqft: number;
+  price: number;
+  status: string;
+  floor?: string | null;
+}
+
+export interface BigProjectDetail extends Omit<BigProject, "city" | "payment_plan"> {
   description?: string | null;
   city_name?: string | null;
   city_id?: string | null;
@@ -177,6 +209,20 @@ export interface BigProjectDetail extends Omit<BigProject, "city"> {
   multimedia?: Record<string, unknown>;
   image_library?: string[];
   image_urls?: string[];
+  address?: string | null;
+  website?: string | null;
+  marketed_by?: string | null;
+  floors_label?: string | null;
+  location_precision?: string | null;
+  payment_plan?: { summary?: string; alternative?: string; down_pct?: number; on_possession_pct?: number } | null;
+  offer?: string | null;
+  unit_types?: ProjectUnitType[];
+  price_from?: number | null;
+  price_to?: number | null;
+  units_available?: number | null;
+  inventory_checked?: string | null;
+  inventory_source?: string | null;
+  sources?: { title?: string; url?: string }[];
 }
 
 export interface HierarchyBlock {
