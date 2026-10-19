@@ -330,6 +330,7 @@ function BrowseAll({
                 <div className="relative aspect-[16/10] overflow-hidden">
                   <img src={s.image ? sized(s.image, 500) : themedImage(s.id, s.name)} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
                   <div className="absolute inset-0 bg-gradient-to-t from-brand-950/80 via-brand-950/10 to-transparent" />
+                  {!s.image && <span className="pointer-events-none absolute end-3 top-3 rounded-md bg-black/40 px-1.5 py-0.5 text-[10px] font-medium text-white/90 backdrop-blur-sm">Representative photo</span>}
                   <span className="chip absolute start-3 top-3 bg-white/90 text-brand-800 shadow dark:bg-black/50 dark:text-white">
                     <MapPin className="h-3 w-3 text-gold-600" /> {s.city}
                   </span>

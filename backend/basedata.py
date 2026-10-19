@@ -178,6 +178,36 @@ def _city_by_name(name: str) -> Optional[Any]:
     return next((c for c in core.cities_db if _norm(c.name) in (n, CITY_ALIASES.get(n, n))), None)
 
 
+def add_missing_schemes() -> int:
+    """After the database is loaded: add researched societies it doesn't have yet (a newer data file).
+    Only adds — never changes a society an admin may have edited."""
+    if not SCHEMES_FILE.exists():
+        return 0
+    added = 0
+    for row in json.loads(SCHEMES_FILE.read_text(encoding="utf-8")):
+        city = _city_by_name(row.get("city") or "")
+        if city is None:
+            continue
+        names = {_norm(row["name"])} | {_norm(a) for a in row.get("aliases", [])}
+        if any(_norm(s.name) in names for s in core.housing_schemes_db):
+            continue
+        data = {
+            "name": row["name"], "name_ur": row.get("name_ur"), "city_id": city.id, "developer": row.get("developer"),
+            "approval_authority": row.get("approval_authority"), "approval_status": row.get("approval_status"),
+            "approval_note": row.get("approval_note"), "established_year": row.get("established_year"),
+            "area_acres": row.get("area_acres"), "total_units": row.get("total_units"), "plot_sizes": row.get("plot_sizes") or [],
+            "development_status": row.get("development_status"), "possession_status": row.get("possession_status"),
+            "utilities": row.get("utilities") or [], "latitude": row.get("latitude"), "longitude": row.get("longitude"),
+            "website": row.get("website"), "description": row.get("description"), "sources": row.get("sources") or [],
+        }
+        data = {k: v for k, v in data.items() if v not in (None, "", [])}
+        if data.get("approval_status") not in APPROVAL_STATUSES:
+            data.pop("approval_status", None)
+        core.housing_schemes_db.append(core.HousingScheme(**data))
+        added += 1
+    return added
+
+
 def load_seed() -> Dict[str, int]:
     """Merge the researched cities and schemes into the tables (idempotent)."""
     stats = {"cities_added": 0, "cities_updated": 0, "schemes_added": 0, "schemes_updated": 0}

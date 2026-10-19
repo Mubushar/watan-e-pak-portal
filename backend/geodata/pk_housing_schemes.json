@@ -3559,5 +3559,763 @@
     "url": "https://www.dawn.com/news/1773038/38-housing-schemes-declared-illegal"
    }
   ]
+ },
+ {
+  "name": "F-6",
+  "name_ur": "ایف-6",
+  "city": "Islamabad",
+  "developer": "Capital Development Authority (CDA)",
+  "approval_authority": "CDA",
+  "approval_status": null,
+  "approval_note": "CDA-planned sector of Islamabad (public-sector master plan), not a private housing scheme, so it is not on CDA's approved/unapproved private-scheme lists.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.72862,
+  "longitude": 73.07352,
+  "website": "https://www.cda.gov.pk",
+  "description": "One of Islamabad's original CDA sectors at the foot of the Margalla Hills; its markaz is Super Market. Sub-sectors F-6/1 to F-6/4.",
+  "sources": [
+   {
+    "title": "Wikipedia – F-6, Islamabad",
+    "url": "https://en.wikipedia.org/wiki/F-6,_Islamabad"
+   },
+   {
+    "title": "Wikipedia – Sectors of Islamabad",
+    "url": "https://en.wikipedia.org/wiki/Sectors_of_Islamabad"
+   },
+   {
+    "title": "OpenStreetMap – F-6",
+    "url": "https://www.openstreetmap.org/node/66348680"
+   }
+  ],
+  "aliases": [
+   "F-6 Islamabad",
+   "Sector F-6"
+  ]
+ },
+ {
+  "name": "F-7",
+  "name_ur": "ایف-7",
+  "city": "Islamabad",
+  "developer": "Capital Development Authority (CDA)",
+  "approval_authority": "CDA",
+  "approval_status": null,
+  "approval_note": "CDA-planned sector of Islamabad (public-sector master plan), not a private housing scheme, so it is not on CDA's approved/unapproved private-scheme lists.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.72043,
+  "longitude": 73.05612,
+  "website": "https://www.cda.gov.pk",
+  "description": "Central CDA sector of Islamabad between F-6 and F-8; its markaz, Jinnah Super Market, is one of the city's main shopping areas.",
+  "sources": [
+   {
+    "title": "Wikipedia – Sectors of Islamabad",
+    "url": "https://en.wikipedia.org/wiki/Sectors_of_Islamabad"
+   },
+   {
+    "title": "OpenStreetMap – F-7",
+    "url": "https://www.openstreetmap.org/node/66348263"
+   }
+  ],
+  "aliases": [
+   "F-7 Islamabad",
+   "Sector F-7"
+  ]
+ },
+ {
+  "name": "F-8",
+  "name_ur": "ایف-8",
+  "city": "Islamabad",
+  "developer": "Capital Development Authority (CDA)",
+  "approval_authority": "CDA",
+  "approval_status": null,
+  "approval_note": "CDA-planned sector of Islamabad (public-sector master plan), not a private housing scheme, so it is not on CDA's approved/unapproved private-scheme lists.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.7115,
+  "longitude": 73.0396,
+  "website": "https://www.cda.gov.pk",
+  "description": "CDA sector bounded by Margalla Avenue/E-8 (north), Faisal Avenue/F-7 (east), Jinnah Avenue/G-8 (south) and Ninth Avenue/F-9 park (west); five sub-sectors.",
+  "sources": [
+   {
+    "title": "Wikipedia – F-8, Islamabad",
+    "url": "https://en.wikipedia.org/wiki/F-8,_Islamabad"
+   },
+   {
+    "title": "OpenStreetMap – F-8",
+    "url": "https://www.openstreetmap.org/node/8319457715"
+   }
+  ],
+  "aliases": [
+   "F-8 Islamabad",
+   "Sector F-8"
+  ]
+ },
+ {
+  "name": "F-11",
+  "name_ur": "ایف-11",
+  "city": "Islamabad",
+  "developer": "Capital Development Authority (CDA)",
+  "approval_authority": "CDA",
+  "approval_status": null,
+  "approval_note": "CDA-planned sector of Islamabad (public-sector master plan), not a private housing scheme, so it is not on CDA's approved/unapproved private-scheme lists.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.68439,
+  "longitude": 72.98954,
+  "website": "https://www.cda.gov.pk",
+  "description": "Western CDA sector of Islamabad's F series below the Margalla Hills, with its own markaz and sub-sectors F-11/1 to F-11/4.",
+  "sources": [
+   {
+    "title": "Wikipedia – Sectors of Islamabad",
+    "url": "https://en.wikipedia.org/wiki/Sectors_of_Islamabad"
+   },
+   {
+    "title": "OpenStreetMap – F-11",
+    "url": "https://www.openstreetmap.org/node/66346679"
+   }
+  ],
+  "aliases": [
+   "F-11 Islamabad",
+   "Sector F-11"
+  ]
+ },
+ {
+  "name": "G-13",
+  "name_ur": "جی-13",
+  "city": "Islamabad",
+  "developer": "Capital Development Authority (CDA)",
+  "approval_authority": "CDA",
+  "approval_status": null,
+  "approval_note": "CDA-planned sector of Islamabad (public-sector master plan), not a private housing scheme, so it is not on CDA's approved/unapproved private-scheme lists.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.65145,
+  "longitude": 72.96207,
+  "website": "https://www.cda.gov.pk",
+  "description": "CDA sector in Islamabad's western G series near Golra Sharif, with sub-sectors G-13/1 to G-13/4.",
+  "sources": [
+   {
+    "title": "Wikipedia – Sectors of Islamabad",
+    "url": "https://en.wikipedia.org/wiki/Sectors_of_Islamabad"
+   },
+   {
+    "title": "OpenStreetMap – G-13",
+    "url": "https://www.openstreetmap.org/node/260280998"
+   }
+  ],
+  "aliases": [
+   "G-13 Islamabad",
+   "Sector G-13"
+  ]
+ },
+ {
+  "name": "I-8",
+  "name_ur": "آئی-8",
+  "city": "Islamabad",
+  "developer": "Capital Development Authority (CDA)",
+  "approval_authority": "CDA",
+  "approval_status": null,
+  "approval_note": "CDA-planned sector of Islamabad (public-sector master plan), not a private housing scheme, so it is not on CDA's approved/unapproved private-scheme lists.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.66886,
+  "longitude": 73.07296,
+  "website": "https://www.cda.gov.pk",
+  "description": "CDA sector in Islamabad's I series near the Faizabad interchange, with a central markaz and sub-sectors I-8/1 to I-8/4. Coordinates are the I-8 Markaz node in OSM.",
+  "sources": [
+   {
+    "title": "Wikipedia – Sectors of Islamabad",
+    "url": "https://en.wikipedia.org/wiki/Sectors_of_Islamabad"
+   },
+   {
+    "title": "OpenStreetMap – I-8 Markaz",
+    "url": "https://www.openstreetmap.org/node/255914091"
+   }
+  ],
+  "aliases": [
+   "I-8 Islamabad",
+   "Sector I-8"
+  ]
+ },
+ {
+  "name": "Satellite Town",
+  "name_ur": "سیٹلائٹ ٹاؤن",
+  "city": "Rawalpindi",
+  "developer": null,
+  "approval_authority": null,
+  "approval_status": null,
+  "approval_note": "Older planned neighbourhood and union council of Rawalpindi city; not on RDA's private-scheme lists, so no list status assigned.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.6384,
+  "longitude": 73.06969,
+  "website": null,
+  "description": "Planned neighbourhood and union council of Rawalpindi close to Islamabad, home to Rawalpindi Women University, Barani Institute of IT and a Rawalpindi Medical College campus.",
+  "sources": [
+   {
+    "title": "Wikipedia – Satellite Town, Rawalpindi",
+    "url": "https://en.wikipedia.org/wiki/Satellite_Town,_Rawalpindi"
+   },
+   {
+    "title": "OpenStreetMap – Satellite Town",
+    "url": "https://www.openstreetmap.org/node/104592878"
+   }
+  ],
+  "aliases": [
+   "Satellite Town Rawalpindi"
+  ]
+ },
+ {
+  "name": "Westridge",
+  "name_ur": "ویسٹریج",
+  "city": "Rawalpindi",
+  "developer": "Army Housing Directorate (renamed DHA in 1979)",
+  "approval_authority": "Rawalpindi Cantonment Board",
+  "approval_status": null,
+  "approval_note": "Per Wikipedia, the Cantonment Board allowed three schemes (Westridge 1, 2 and 3) in 1960, launched by the Army Housing Directorate. Not on RDA's private-scheme lists; no status assigned.",
+  "established_year": 1960,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.61013,
+  "longitude": 73.02195,
+  "website": null,
+  "description": "Cantonment residential area of Rawalpindi made up of Westridge 1, 2 and 3, laid out from 1960 for army and civilian personnel; among the city's pricier neighbourhoods.",
+  "sources": [
+   {
+    "title": "Wikipedia – Westridge, Rawalpindi",
+    "url": "https://en.wikipedia.org/wiki/Westridge,_Rawalpindi"
+   },
+   {
+    "title": "OpenStreetMap – Westridge",
+    "url": "https://www.openstreetmap.org/relation/8210737"
+   }
+  ],
+  "aliases": [
+   "Westridge 1",
+   "Westridge 2",
+   "Westridge 3"
+  ]
+ },
+ {
+  "name": "Chaklala Scheme III",
+  "name_ur": "چکلالہ اسکیم 3",
+  "city": "Rawalpindi",
+  "developer": null,
+  "approval_authority": "Chaklala Cantonment Board",
+  "approval_status": null,
+  "approval_note": "Residential scheme inside Chaklala Cantonment (per OSM); no public approval-list entry found, so no status assigned.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.58786,
+  "longitude": 73.08724,
+  "website": null,
+  "description": "Residential scheme in Chaklala Cantonment near the old Rawalpindi airport, known for its large commercial market with restaurants, shops and a cinema.",
+  "sources": [
+   {
+    "title": "Wikipedia – Chaklala",
+    "url": "https://en.wikipedia.org/wiki/Chaklala"
+   },
+   {
+    "title": "OpenStreetMap – Chaklala Scheme 3",
+    "url": "https://www.openstreetmap.org/node/2944485967"
+   }
+  ],
+  "aliases": [
+   "Chaklala Scheme 3"
+  ]
+ },
+ {
+  "name": "Askari 14",
+  "name_ur": "عسکری 14",
+  "city": "Rawalpindi",
+  "developer": "Army Welfare Trust (Askari housing)",
+  "approval_authority": null,
+  "approval_status": null,
+  "approval_note": "Askari-branded scheme; developer attribution rests on the Askari name and AWT's listed 'Askari Housing Schemes', not an authority list. No status assigned.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.54216,
+  "longitude": 73.06609,
+  "website": null,
+  "description": "Gated Askari housing scheme in Rawalpindi beside Gulshanabad, off Adyala Road.",
+  "sources": [
+   {
+    "title": "OpenStreetMap – Askari 14",
+    "url": "https://www.openstreetmap.org/way/717832505"
+   },
+   {
+    "title": "Wikipedia – Army Welfare Trust",
+    "url": "https://en.wikipedia.org/wiki/Army_Welfare_Trust"
+   }
+  ],
+  "aliases": []
+ },
+ {
+  "name": "Airport Housing Society",
+  "name_ur": "ایئرپورٹ ہاؤسنگ سوسائٹی",
+  "city": "Rawalpindi",
+  "developer": null,
+  "approval_authority": null,
+  "approval_status": null,
+  "approval_note": "No public approval-list entry found; no status assigned.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 33.5941,
+  "longitude": 73.13074,
+  "website": null,
+  "description": "Residential society in Rawalpindi near Koral Chowk and the Islamabad Expressway, east of the old Benazir Bhutto airport.",
+  "sources": [
+   {
+    "title": "OpenStreetMap – Airport Housing Society",
+    "url": "https://www.openstreetmap.org/node/2642083734"
+   }
+  ],
+  "aliases": []
+ },
+ {
+  "name": "Gulberg",
+  "name_ur": "گلبرگ",
+  "city": "Lahore",
+  "developer": null,
+  "approval_authority": null,
+  "approval_status": null,
+  "approval_note": "Long-established Lahore neighbourhood (Gulberg I–V), not a private scheme on LDA's lists; no status assigned.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.512,
+  "longitude": 74.34302,
+  "website": null,
+  "description": "Upscale residential and business district of central Lahore (Gulberg I–V) around Main Boulevard, MM Alam Road and Liberty Market; Lahore's main business district.",
+  "sources": [
+   {
+    "title": "Wikipedia – Gulberg, Lahore",
+    "url": "https://en.wikipedia.org/wiki/Gulberg,_Lahore"
+   },
+   {
+    "title": "OpenStreetMap – Gulberg",
+    "url": "https://www.openstreetmap.org/node/2948760205"
+   }
+  ],
+  "aliases": [
+   "Gulberg Lahore",
+   "Gulberg III"
+  ]
+ },
+ {
+  "name": "Lahore Cantt",
+  "name_ur": "لاہور کینٹ",
+  "city": "Lahore",
+  "developer": "Military Lands & Cantonments Department",
+  "approval_authority": "Lahore Cantonment Board (Military Lands & Cantonments Department)",
+  "approval_status": null,
+  "approval_note": "Independent cantonment municipality, not an LDA scheme; no list status assigned.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.5221,
+  "longitude": 74.37904,
+  "website": null,
+  "description": "Lahore's garrison cantonment, an independent municipality under the Military Lands & Cantonments Department, made up largely of upscale housing schemes and markets.",
+  "sources": [
+   {
+    "title": "Wikipedia – Lahore Cantonment",
+    "url": "https://en.wikipedia.org/wiki/Lahore_Cantonment"
+   },
+   {
+    "title": "OpenStreetMap – Lahore Cant",
+    "url": "https://www.openstreetmap.org/node/7116188320"
+   }
+  ],
+  "aliases": [
+   "Lahore Cantonment",
+   "Cantt"
+  ]
+ },
+ {
+  "name": "Allama Iqbal Town",
+  "name_ur": "علامہ اقبال ٹاؤن",
+  "city": "Lahore",
+  "developer": null,
+  "approval_authority": null,
+  "approval_status": null,
+  "approval_note": "Opened to the public in April 1982 (Wikipedia, which credits Hassan Zaman Pvt Ltd with its development). Not on LDA's private-scheme lists; no status assigned.",
+  "established_year": 1982,
+  "area_acres": 1600.0,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.51079,
+  "longitude": 74.28801,
+  "website": null,
+  "description": "Large planned scheme in Lahore's Iqbal zone, once called 'Sola Sau Acre' after its 1,600 acres; 22 named blocks off Multan Road, with Karim Block Market and Moon Market.",
+  "sources": [
+   {
+    "title": "Wikipedia – Allama Iqbal Town",
+    "url": "https://en.wikipedia.org/wiki/Allama_Iqbal_Town"
+   },
+   {
+    "title": "OpenStreetMap – Allama Iqbal Town",
+    "url": "https://www.openstreetmap.org/way/1009521435"
+   }
+  ],
+  "aliases": [
+   "Iqbal Town"
+  ]
+ },
+ {
+  "name": "Township",
+  "name_ur": "ٹاؤن شپ",
+  "city": "Lahore",
+  "developer": null,
+  "approval_authority": null,
+  "approval_status": null,
+  "approval_note": "Township planned in the Ayub Khan era; not on LDA's private-scheme lists; no status assigned.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.45651,
+  "longitude": 74.32008,
+  "website": null,
+  "description": "One of Lahore's largest residential neighbourhoods (UC 132–133), planned under the Ayub Khan administration, with sectors such as C-1 and C-II and Model Bazar.",
+  "sources": [
+   {
+    "title": "Wikipedia – Township, Lahore",
+    "url": "https://en.wikipedia.org/wiki/Township,_Lahore"
+   },
+   {
+    "title": "OpenStreetMap – Township",
+    "url": "https://www.openstreetmap.org/node/304962104"
+   }
+  ],
+  "aliases": [
+   "Quaid-e-Azam Township",
+   "Township Lahore"
+  ]
+ },
+ {
+  "name": "Cavalry Ground",
+  "name_ur": "کیولری گراؤنڈ",
+  "city": "Lahore",
+  "developer": null,
+  "approval_authority": "Lahore Cantonment Board",
+  "approval_status": null,
+  "approval_note": "Governed directly by the Lahore Cantonment Board (Walton Cantonment); no list status assigned.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.5024,
+  "longitude": 74.36919,
+  "website": null,
+  "description": "Cantonment neighbourhood linking DHA and Gulberg, with residential streets and a commercial strip along Masood Anwari Road.",
+  "sources": [
+   {
+    "title": "Wikipedia – Cavalry Ground",
+    "url": "https://en.wikipedia.org/wiki/Cavalry_Ground"
+   },
+   {
+    "title": "OpenStreetMap – Cavalry Ground",
+    "url": "https://www.openstreetmap.org/way/618618210"
+   }
+  ],
+  "aliases": []
+ },
+ {
+  "name": "Gulshan-e-Ravi",
+  "name_ur": "گلشن راوی",
+  "city": "Lahore",
+  "developer": null,
+  "approval_authority": null,
+  "approval_status": null,
+  "approval_note": "Established residential neighbourhood; not on LDA's private-scheme lists; no status assigned.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 31.54939,
+  "longitude": 74.28108,
+  "website": null,
+  "description": "Residential neighbourhood in Lahore's Samanabad zone on the old course of the River Ravi, divided into blocks A–H.",
+  "sources": [
+   {
+    "title": "Wikipedia – Gulshan-e-Ravi",
+    "url": "https://en.wikipedia.org/wiki/Gulshan-e-Ravi"
+   },
+   {
+    "title": "OpenStreetMap – Gulshan-e-Ravi",
+    "url": "https://www.openstreetmap.org/way/611974784"
+   }
+  ],
+  "aliases": []
+ },
+ {
+  "name": "Federal B Area",
+  "name_ur": "فیڈرل بی ایریا",
+  "city": "Karachi",
+  "developer": "Federal government housing scheme for government employees",
+  "approval_authority": null,
+  "approval_status": null,
+  "approval_note": "Housing scheme for federal employees initiated in 1953 under PM Muhammad Ali Bogra (Wikipedia); no SBCA/KDA list status assigned.",
+  "established_year": 1953,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 24.93257,
+  "longitude": 67.07039,
+  "website": null,
+  "description": "Large residential area of central Karachi begun in 1953 to house federal employees; 22 blocks with local names such as Azizabad, Dastagir, Naseerabad and Ancholi.",
+  "sources": [
+   {
+    "title": "Wikipedia – Federal B. Area",
+    "url": "https://en.wikipedia.org/wiki/Federal_B._Area"
+   },
+   {
+    "title": "OpenStreetMap – FB Area",
+    "url": "https://www.openstreetmap.org/way/529891234"
+   }
+  ],
+  "aliases": [
+   "F.B. Area",
+   "FB Area",
+   "Federal B. Area"
+  ]
+ },
+ {
+  "name": "Malir Cantonment",
+  "name_ur": "ملیر کینٹ",
+  "city": "Karachi",
+  "developer": "Military Lands & Cantonments Department",
+  "approval_authority": "Malir Cantonment Board (Cantonments Act 1924)",
+  "approval_status": null,
+  "approval_note": "Cantonment governed under the Cantonments Act 1924; not a KDA/SBCA scheme; no list status assigned.",
+  "established_year": 1941,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 24.94192,
+  "longitude": 67.21143,
+  "website": null,
+  "description": "Military cantonment and residential area in east Karachi, declared in 1941 and taken over by the Pakistan Army in 1947; it contains Askari 5 and other service housing.",
+  "sources": [
+   {
+    "title": "Wikipedia – Malir Cantonment",
+    "url": "https://en.wikipedia.org/wiki/Malir_Cantonment"
+   },
+   {
+    "title": "OpenStreetMap – Malir Cantonment",
+    "url": "https://www.openstreetmap.org/way/521848188"
+   }
+  ],
+  "aliases": [
+   "Malir Cantt"
+  ]
+ },
+ {
+  "name": "North Karachi",
+  "name_ur": "نارتھ کراچی",
+  "city": "Karachi",
+  "developer": null,
+  "approval_authority": null,
+  "approval_status": null,
+  "approval_note": "Large planned township (New Karachi Town); no KDA/SBCA list status assigned.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 24.99485,
+  "longitude": 67.0643,
+  "website": null,
+  "description": "Large township (New Karachi) between the Lyari River, the Manghopir hills, Surjani Road and Shahrah-e-Zahid Hussain, organised in numbered sectors.",
+  "sources": [
+   {
+    "title": "Wikipedia – North Karachi",
+    "url": "https://en.wikipedia.org/wiki/North_Karachi"
+   },
+   {
+    "title": "OpenStreetMap – New Karachi Town",
+    "url": "https://www.openstreetmap.org/way/521867561"
+   }
+  ],
+  "aliases": [
+   "New Karachi"
+  ]
+ },
+ {
+  "name": "Bahadurabad",
+  "name_ur": "بہادر آباد",
+  "city": "Karachi",
+  "developer": null,
+  "approval_authority": null,
+  "approval_status": null,
+  "approval_note": "Long-established neighbourhood of Gulshan Town; no list status assigned.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 24.88234,
+  "longitude": 67.0674,
+  "website": null,
+  "description": "Central Karachi neighbourhood named after Bahadur Yar Jung, settled after 1947 largely by migrants from Hyderabad Deccan; known for its Charminar replica roundabout (2007).",
+  "sources": [
+   {
+    "title": "Wikipedia – Bahadurabad",
+    "url": "https://en.wikipedia.org/wiki/Bahadurabad"
+   },
+   {
+    "title": "OpenStreetMap – Bahadurabad",
+    "url": "https://www.openstreetmap.org/node/6773410421"
+   }
+  ],
+  "aliases": []
+ },
+ {
+  "name": "Gulshan-e-Maymar",
+  "name_ur": "گلشن معمار",
+  "city": "Karachi",
+  "developer": "Maymar (private township developer)",
+  "approval_authority": null,
+  "approval_status": null,
+  "approval_note": "Private township launched in 1980, in MDA Scheme 45 and partly Scheme 33 (Wikipedia); no SBCA/MDA list status found.",
+  "established_year": 1980,
+  "area_acres": 1023.0,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 25.02089,
+  "longitude": 67.13228,
+  "website": null,
+  "description": "Master-planned private township off the M-9 Super Highway, launched in 1980 and grown through 13 phases to 1,023 acres, planned for about 100,000 residents.",
+  "sources": [
+   {
+    "title": "Wikipedia – Gulshan-e-Maymar",
+    "url": "https://en.wikipedia.org/wiki/Gulshan-e-Maymar"
+   },
+   {
+    "title": "OpenStreetMap – Gulshan e Maymar",
+    "url": "https://www.openstreetmap.org/way/521470589"
+   }
+  ],
+  "aliases": []
+ },
+ {
+  "name": "Defence View",
+  "name_ur": "ڈیفنس ویو",
+  "city": "Karachi",
+  "developer": null,
+  "approval_authority": null,
+  "approval_status": null,
+  "approval_note": "Neighbourhood adjoining DHA, not a DHA phase; no list status assigned.",
+  "established_year": null,
+  "area_acres": null,
+  "total_units": null,
+  "plot_sizes": [],
+  "development_status": "developed",
+  "possession_status": null,
+  "utilities": [],
+  "latitude": 24.83971,
+  "longitude": 67.08032,
+  "website": null,
+  "description": "Neighbourhood beside DHA in Karachi (Phases 1–3), home to Iqra University's main campus and near the start of the Malir Expressway. Coordinates are Defence View Phase 2 (OSM).",
+  "sources": [
+   {
+    "title": "Wikipedia – Defence View",
+    "url": "https://en.wikipedia.org/wiki/Defence_View"
+   },
+   {
+    "title": "OpenStreetMap – Defence View Phase 2",
+    "url": "https://www.openstreetmap.org/way/481460642"
+   }
+  ],
+  "aliases": []
  }
 ]

@@ -6,7 +6,7 @@ import { ArrowRight, Banknote, Building2, CalendarDays, Compass, Gauge, Home, La
 import type { City, PropertyList } from "@/types";
 import { useApi } from "@/hooks/useApi";
 import { compact, num, pct, pkrShort, titleCase } from "@/lib/format";
-import { cityImage, themedImage } from "@/lib/images";
+import { cityImage, sized, themedImage } from "@/lib/images";
 import { ButtonLink, Badge, Card, CardBody, CardHeader, Carousel, EmptyState, ErrorState, PageHeader, ScoreRing, Skeleton, StatCard } from "@/components/ui";
 import { Donut, Legendish } from "@/components/ui/charts";
 import { PropertyCard } from "@/components/property/PropertyCard";
@@ -173,8 +173,9 @@ export default function CityPage() {
                 <motion.div key={s.id} initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.06 }}>
                   <Link to={`/schemes?scheme=${s.id}`} className="card card-hover group block overflow-hidden">
                     <div className="relative aspect-[16/10] overflow-hidden">
-                      <img src={themedImage(s.id, s.name)} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                      <img src={"image" in s && s.image ? sized(String(s.image), 500) : themedImage(s.id, s.name)} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
                       <div className="absolute inset-0 bg-gradient-to-t from-brand-950/80 to-transparent" />
+                      {!("image" in s && s.image) && <span className="pointer-events-none absolute end-3 top-3 rounded-md bg-black/40 px-1.5 py-0.5 text-[10px] font-medium text-white/90 backdrop-blur-sm">Representative photo</span>}
                       <p className="absolute bottom-3 start-3 end-3 font-display text-lg font-bold leading-tight text-white">{s.name}</p>
                     </div>
                     <div className="flex items-center justify-between gap-2 p-3 text-xs text-ink-mute">
