@@ -841,6 +841,10 @@ class GeoLayer(BaseModel):
     # Geometry rebuilt from source files at start (e.g. "masterplan-labels:<key>:<cats>"): the
     # database keeps the layer's settings but not this copy of the geometry.
     geojson_ref: Optional[str] = None
+    # Unpublished layers are hidden from the public map (admins with gis.manage still see them).
+    published: bool = True
+    source_file: Optional[str] = None  # the uploaded file it came from
+    created_by: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 

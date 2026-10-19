@@ -1132,6 +1132,81 @@ def run_ai_checks(client: TestClient) -> None:
           or after.get("status") == "awaiting_approval")
 
 
+def run_admin_crud_checks(client: TestClient) -> None:
+    """Administration: property database CRUD and GIS layers (upload, publish, built-in overlays)."""
+    import gis
+
+    anon = {"Authorization": ""}
+    check("admin properties: needs properties.manage", client.get("/admin/properties", headers=anon).status_code == 401)
+    r = client.get("/admin/properties", params={"page_size": 5, "sort": "price", "order": "desc"}).json()
+    prices = [x["price"] for x in r["rows"]]
+    check("GET /admin/properties pages, sorts and counts", r["total"] == len(core.properties_db) and prices == sorted(prices, reverse=True)
+          and r["pages"] >= 1 and "status" in r["facets"], str(r)[:160])
+    meta = client.get("/admin/properties/meta").json()
+    city = meta["cities"][0]["id"]
+    other = next(x for x in meta["schemes"] if x["city_id"] != city)
+    r = client.post("/admin/properties", json={"title": "Bad scheme", "price": 1e6, "city_id": city, "scheme_id": other["id"]})
+    check("admin properties: scheme must be in the city", r.status_code == 400 and "not in" in r.json()["detail"], r.text[:120])
+    r = client.post("/admin/properties", json={"title": "X", "price": 1e6, "city_id": city, "latitude": 10, "longitude": 10})
+    check("admin properties: location must be in Pakistan", r.status_code == 400)
+    r = client.post("/admin/properties", json={"title": "Admin CRUD house", "price": 25_000_000, "city_id": city, "marla_area": 10,
+                                               "latitude": 33.6, "longitude": 73.0, "bedrooms": 4, "sector": "F-7"})
+    created = r.json().get("property", {})
+    check("POST /admin/properties creates with every field", r.status_code == 201 and created.get("kanal_area") == 0.5
+          and created.get("sector") == "F-7", r.text[:160])
+    pid = created.get("id")
+    r = client.put(f"/admin/properties/{pid}", json={"kanal_area": 1, "status": "sold", "plot_number": "12-A"}).json()
+    check("PUT /admin/properties: the typed size wins, other units follow", r["property"]["marla_area"] == 20
+          and r["property"]["status"] == "sold" and set(r["changed"]) == {"kanal_area", "status", "plot_number"}, str(r)[:160])
+    check("admin properties: bulk feature", client.post("/admin/properties/bulk", json={"ids": [pid], "action": "feature"}).json()["affected"] == 1
+          and core.find_property(pid).featured)
+    csv_text = client.get("/admin/properties/export.csv").text
+    check("GET /admin/properties/export.csv", csv_text.startswith("id,title,price") and "Admin CRUD house" in csv_text)
+    r = client.post("/admin/properties/import", json={"csv": csv_text, "dry_run": True}).json()
+    check("admin properties: CSV re-import dry run is clean", r["errors"] == [] and r["would_update"] == len(core.properties_db), str(r)[:200])
+    bad = "title,price,city\nNo city,100,Atlantis\n"
+    r = client.post("/admin/properties/import", json={"csv": bad, "dry_run": False}).json()
+    check("admin properties: a bad row blocks the whole import", r["saved"] is False and r["errors"], str(r)[:160])
+    check("DELETE /admin/properties/{id}", client.delete(f"/admin/properties/{pid}").status_code == 200 and not core.find_property(pid))
+
+    # ---- GIS layers
+    builtin = [l for l in gis.GIS_LAYERS if str(l.geojson_ref or "").startswith("builtin:")]
+    check("GIS: every built-in overlay has a layer record", len(builtin) == len(core.BUILTIN_LAYERS), str(len(builtin)))
+    roads = core.builtin_layer("builtin:roads")
+    was = roads.published
+    roads.published = False
+    r = client.get("/geo/roads", params={"south": 33.5, "west": 72.9, "north": 33.8, "east": 73.2, "zoom": 10}, headers=anon).json()
+    check("GIS: unpublished overlay -> public gets an empty layer", r.get("unpublished") is True and r["roads"] == [], str(r)[:120])
+    r = client.get("/geo/provinces", headers=anon).json()
+    provinces_open = core.builtin_layer("builtin:provinces").published
+    check("GIS: provinces follow their publish switch", (len(r["features"]) > 0) == provinces_open)
+    pub = client.get("/gis/layers", headers=anon).json()["layers"]
+    check("GIS: guests list only published layers", all(l["published"] for l in pub))
+    r = client.post("/gis/layers/publish", json={"published": True, "ids": [roads.id]}).json()
+    check("POST /gis/layers/publish", r["changed"] == 1 and roads.published)
+    r = client.get("/geo/roads", params={"south": 33.5, "west": 72.9, "north": 33.8, "east": 73.2, "zoom": 10}, headers=anon).json()
+    check("GIS: published overlay serves its data", not r.get("unpublished"), str(r)[:80])
+    roads.published = was
+    check("GIS: built-in overlays can't be deleted", client.delete(f"/gis/layers/{roads.id}").status_code == 409)
+    kml = ('<kml xmlns="http://www.opengis.net/kml/2.2"><Document><Placemark><name>Zone A</name><Polygon><outerBoundaryIs>'
+           '<LinearRing><coordinates>73.0,33.6 73.1,33.6 73.1,33.7 73.0,33.6</coordinates></LinearRing></outerBoundaryIs>'
+           '</Polygon></Placemark></Document></kml>')
+    r = client.post("/gis/layers/upload", json={"filename": "zone.kml", "content": kml, "dry_run": True})
+    check("POST /gis/layers/upload (dry run reads KML)", r.json()["import"]["geometry_types"] == {"Polygon": 1}, r.text[:160])
+    r = client.post("/gis/layers/upload", json={"filename": "parks.csv", "content": "name,lat,lon\nF-9 Park,33.70,73.02\n",
+                                                 "published": False, "name": "Test parks"})
+    lid = r.json().get("id")
+    check("POST /gis/layers/upload (CSV -> unpublished layer)", r.status_code == 201 and r.json()["published"] is False)
+    check("GIS: unpublished upload hidden from guests", client.get(f"/gis/layers/{lid}", headers=anon).status_code == 404)
+    swapped = {"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {}, "geometry": {"type": "Point", "coordinates": [33.7, 73.0]}}]}
+    r = client.put(f"/gis/layers/{lid}", json={"geojson": swapped}).json()
+    check("GIS: [lat, lon] for Pakistan is flipped", r["geojson"]["features"][0]["geometry"]["coordinates"] == [73.0, 33.7])
+    r = client.post("/gis/layers/upload", json={"filename": "plan.shp", "content": "x"})
+    check("GIS: shapefile -> clear 'export to GeoJSON' message", r.status_code == 400 and "GeoJSON" in r.json()["detail"])
+    check("GIS: uploads need gis.manage", client.post("/gis/layers/upload", json={"filename": "a.csv", "content": "a"}, headers=anon).status_code == 401)
+    check("DELETE /gis/layers/{id}", client.delete(f"/gis/layers/{lid}").status_code == 200 and client.delete(f"/gis/layers/{lid}").status_code == 404)
+
+
 def run_storage_checks() -> None:
     """Durable storage: seed, incremental save, restart, delete, broken row."""
     import tempfile
@@ -1186,6 +1261,7 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         run_access_checks(client)
         run_hardening_checks(client)
         run_ai_checks(client)
+        run_admin_crud_checks(client)
         r = client.get("/health")
         check("GET /health", r.status_code == 200 and r.json().get("status") == "ok", str(r.status_code))
 

@@ -27,6 +27,7 @@ import logging
 import os
 import re
 import uuid
+from datetime import datetime
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -42,6 +43,8 @@ from pydantic import ValidationError, BaseModel, Field
 import server as core
 import ads_network
 import geo
+import gis
+import gis_import
 import masterplan
 import web_lookup
 import ai_guard
@@ -53,6 +56,7 @@ import knowledge
 import memory as user_memory
 import portal_env
 import prompts
+import property_admin
 import storage
 import basedata
 import crm_ai
@@ -85,6 +89,7 @@ async def lifespan(app: FastAPI):
     # Durable storage: load the database over the seeded sample data (or save the seed on the
     # first run) and keep writing changes in the background; flush once more on shutdown.
     storage_state = storage.start()
+    core.ensure_builtin_layers()  # overlays added in a newer version join the saved ones (unpublished)
     logging.getLogger("portal").info("storage: %s", storage_state)
     try:
         async with core.mcp.session_manager.run():
@@ -663,9 +668,21 @@ def _in_geometry(lat: float, lon: float, geom: Dict[str, Any]) -> bool:
     return False
 
 
+def _unpublished(ref: str, empty: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """An empty answer while an admin hasn't published this map overlay (GIS managers still get the data)."""
+    if core.layer_open(ref):
+        return None
+    return {**empty, "unpublished": True, "note": "This map layer is not published yet."}
+
+
+_EMPTY_FC: Dict[str, Any] = {"type": "FeatureCollection", "features": []}
+
+
 @app.get("/geo/provinces", tags=["places"])
 def geo_provinces() -> Any:
     """Pakistan's provinces and territories as GeoJSON, each with the number of portal listings in it."""
+    if (hidden := _unpublished("builtin:provinces", _EMPTY_FC)) is not None:
+        return hidden
     data = _pk_file("pk_provinces.geojson")
     points = [(p.latitude, p.longitude) for p in core.properties_db if p.latitude is not None and p.longitude is not None]
     features = []
@@ -684,6 +701,8 @@ def geo_districts(request: Request) -> Any:
     """Pakistan's districts as GeoJSON (OpenStreetMap admin_level 6, built by ``build_districts.py``)
     with English / Urdu name, province, area, a label point and the number of portal listings in each.
     Islamabad Capital Territory, which has no districts, is included as one."""
+    if (hidden := _unpublished("builtin:districts", {**_EMPTY_FC, "count": 0})) is not None:
+        return hidden
     if not os.path.exists(_DISTRICTS_FILE):
         return {"type": "FeatureCollection", "features": [], "missing": True,
                 "hint": "District data not built yet: run build_districts.py (see backend/README.md)."}
@@ -711,6 +730,8 @@ def geo_places(south: float, west: float, north: float, east: float, categories:
     (education, worship, health, shopping, park, bank, restaurant, transport, fuel, government)."""
     if not geo._finite(south, west, north, east) or north < south or east < west:
         raise HTTPException(status_code=400, detail="Give a valid box: south < north, west < east")
+    if (hidden := _unpublished("builtin:osm_pois", {"count": 0, "total": 0, "places": []})) is not None:
+        return hidden
     if north - south > 1.5 or east - west > 1.5:
         return {"count": 0, "total": 0, "places": [], "note": "Zoom in to see places."}
     cats = [c.strip() for c in (categories or "").split(",") if c.strip()] or None
@@ -817,6 +838,8 @@ def geo_roads(request: Request, south: float, west: float, north: float, east: f
     Urdu name, lanes, speed limit and surface. Detail and classes follow the zoom. Compact rows:
     ``c`` class, ``s`` status, ``r`` number, ``n`` / ``u`` name, ``l`` lanes, ``v`` max speed,
     ``f`` surface, ``p`` [[lat, lon], ...]."""
+    if (hidden := _unpublished("builtin:roads", {"count": 0, "roads": []})) is not None:
+        return hidden
     data = roads.in_view(south, west, north, east, zoom, classes.split(",") if classes else None)
     return _json_maybe_gzip(request, data)
 
@@ -827,6 +850,8 @@ def geo_water(request: Request, south: float, west: float, north: float, east: f
     """Pakistan's water bodies in a map view, from OpenStreetMap: rivers, canals (lines) and lakes,
     reservoirs, river beds, ponds (areas, with ``a`` = km²), thinned by zoom. Compact rows: ``c``
     class, ``n`` / ``u`` name, ``p`` [[lat, lon], ...]."""
+    if (hidden := _unpublished("builtin:water", {"count": 0, "water": []})) is not None:
+        return hidden
     data = water.in_view(south, west, north, east, zoom, classes.split(",") if classes else None)
     return _json_maybe_gzip(request, data)
 
@@ -847,6 +872,8 @@ def geo_megaprojects(type: Optional[str] = None, status: Optional[str] = None, p
     ``format=geojson`` returns a FeatureCollection for maps."""
     rows = megaprojects.search(type=type, status=status, province=province, city=city, q=q)
     if format == "geojson":
+        if (hidden := _unpublished("builtin:mega_projects", _EMPTY_FC)) is not None:
+            return hidden
         return megaprojects.geojson(rows)
     return {"count": len(rows), "note": megaprojects.note(), "types": megaprojects.TYPE_LABELS,
             "statuses": megaprojects.STATUS_LABELS, "projects": rows}
@@ -870,6 +897,8 @@ def geo_megaproject(project_id: str) -> Any:
 @app.get("/geo/cities", tags=["places"])
 def geo_cities(min_population: int = 0) -> Any:
     """Pakistan's main cities (name, province, population, position); ``portal`` marks cities with a portal page."""
+    if (hidden := _unpublished("builtin:city_names", {"count": 0, "cities": []})) is not None:
+        return hidden
     data = _pk_file("pk_cities.json")
     portal = {c.name.lower() for c in core.cities_db}
     rows = [{**c, "portal": c["name"].lower() in portal} for c in data["cities"] if c["population"] >= min_population]
@@ -1408,6 +1437,9 @@ class GeoLayerCreate(BaseModel):
     z_index: int = 0
     image_url: Optional[str] = None
     source_url: Optional[str] = None
+    visible: bool = True
+    published: bool = True
+    opacity: float = 1.0
 
 
 class GeoLayerUpdate(BaseModel):
@@ -1419,6 +1451,29 @@ class GeoLayerUpdate(BaseModel):
     z_index: Optional[int] = None
     style: Optional[Dict[str, Any]] = None
     geojson: Optional[Dict[str, Any]] = None
+    layer_type: Optional[str] = None
+    entity_type: Optional[str] = None
+    entity_id: Optional[str] = None
+    published: Optional[bool] = None
+    source_url: Optional[str] = None
+
+
+class GeoLayerUpload(BaseModel):
+    """An uploaded GIS file (GeoJSON, KML, GPX or CSV) to become a layer, or to replace one's geometry."""
+    filename: str = Field(..., max_length=200)
+    content: Optional[str] = None          # text files
+    content_base64: Optional[str] = None   # or the raw file, base64
+    name: Optional[str] = Field(default=None, max_length=200)
+    layer_type: str = "zone"
+    entity_type: str = "city"
+    entity_id: str = "pakistan"
+    description: Optional[str] = Field(default=None, max_length=2000)
+    style: Optional[Dict[str, Any]] = None
+    visible: bool = True
+    published: bool = True
+    source_url: Optional[str] = None
+    replace_layer_id: Optional[str] = None  # replace this layer's geometry instead of adding a layer
+    dry_run: bool = False                   # read and check the file, save nothing
 
 
 class MasterPlanCreate(BaseModel):
@@ -1461,7 +1516,8 @@ def gis_layers(
     entity_id: Optional[str] = None,
     layer_type: Optional[str] = None,
 ) -> Any:
-    return j(core.gis_list_layers(entity_type=entity_type, entity_id=entity_id, layer_type=layer_type))
+    return j(core.gis_list_layers(entity_type=entity_type, entity_id=entity_id, layer_type=layer_type,
+                                  include_unpublished=access.can(access.current(), "gis.manage")))
 
 
 @app.post("/gis/layers", tags=["gis"], status_code=201)
@@ -1475,22 +1531,83 @@ def gis_add_layer(payload: GeoLayerCreate) -> Any:
 @app.get("/gis/layers/{layer_id}", tags=["gis"])
 def gis_get_layer(layer_id: str) -> Any:
     result = j(core.gis_get_layer(layer_id))
-    if "error" in result:
-        raise HTTPException(status_code=404, detail=result["error"])
+    if "error" in result or (result.get("published") is False and not access.can(access.current(), "gis.manage")):
+        raise HTTPException(status_code=404, detail=result.get("error") or f"Layer not found: {layer_id}")
     return result
+
+
+@app.post("/gis/layers/upload", tags=["gis"], status_code=201)
+def gis_upload_layer(payload: GeoLayerUpload) -> Any:
+    """Upload a GeoJSON / KML / GPX / CSV file as a new layer (or as the new geometry of
+    ``replace_layer_id``). ``dry_run`` only reads and checks the file and returns what it found."""
+    try:
+        collection, stats = gis_import.read(payload.filename, payload.content, payload.content_base64)
+    except gis_import.ImportError_ as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if payload.dry_run:
+        return {"dry_run": True, "import": stats}
+    if payload.replace_layer_id:
+        result = j(core.gis_update_layer(payload.replace_layer_id, geojson=collection))
+        if "error" in result:
+            raise HTTPException(status_code=404, detail=result["error"])
+        layer = gis.find_layer(payload.replace_layer_id)
+        if layer:
+            layer.source_file = payload.filename
+        return {**result, "import": stats, "replaced": True}
+    name = payload.name or os.path.splitext(os.path.basename(payload.filename))[0].replace("_", " ").strip() or "Uploaded layer"
+    result = j(core.gis_add_layer(
+        entity_type=payload.entity_type, entity_id=payload.entity_id, name=name, geojson=collection,
+        layer_type=payload.layer_type, description=payload.description, style=payload.style,
+        source_url=payload.source_url, visible=payload.visible, published=payload.published, source_file=payload.filename))
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return {**result, "import": stats}
 
 
 @app.put("/gis/layers/{layer_id}", tags=["gis"])
 def gis_update_layer(layer_id: str, payload: GeoLayerUpdate) -> Any:
     result = j(core.gis_update_layer(layer_id, **payload.model_dump(exclude_none=True)))
     if "error" in result:
-        raise HTTPException(status_code=404, detail=result["error"])
+        raise HTTPException(status_code=404 if "not found" in result["error"].lower() else 400, detail=result["error"])
     return result
 
 
 @app.delete("/gis/layers/{layer_id}", tags=["gis"])
 def gis_delete_layer(layer_id: str) -> Any:
-    return j(core.gis_delete_layer(layer_id))
+    result = j(core.gis_delete_layer(layer_id))
+    if result.get("error"):
+        raise HTTPException(status_code=409, detail=result["error"])
+    if not result.get("deleted"):
+        raise HTTPException(status_code=404, detail=f"Layer not found: {layer_id}")
+    return result
+
+
+class LayerPublish(BaseModel):
+    published: bool = True
+    ids: Optional[List[str]] = None  # omit for every layer
+    scope: str = "all"               # all | builtin | uploaded | master_plans (when ids is omitted)
+
+
+@app.post("/gis/layers/publish", tags=["gis"])
+def gis_publish_layers(payload: LayerPublish) -> Any:
+    """Publish (or hide) many map layers at once — e.g. everything on a fresh install."""
+    wanted = set(payload.ids or [])
+
+    def in_scope(l: Any) -> bool:
+        ref = str(getattr(l, "geojson_ref", "") or "")
+        if wanted:
+            return l.id in wanted
+        return {"builtin": ref.startswith("builtin:"), "master_plans": ref.startswith("masterplan") or
+                (l.image_url or "").startswith("/masterplans/") or l.layer_type in ("boundary", "master_plan") and l.entity_type == "scheme",
+                "uploaded": not ref}.get(payload.scope, True)
+
+    changed = 0
+    for l in gis.GIS_LAYERS:
+        if in_scope(l) and l.published != payload.published:
+            l.published, l.updated_at = payload.published, datetime.now()
+            changed += 1
+    return {"changed": changed, "published": payload.published,
+            "now_published": sum(1 for l in gis.GIS_LAYERS if l.published), "layers": len(gis.GIS_LAYERS)}
 
 
 @app.get("/gis/master-plans", tags=["gis"])
@@ -3382,6 +3499,108 @@ def portal_catalog(include_parameters: bool = False, group: Optional[str] = None
 def portal_schema(model: Optional[str] = None) -> Any:
     """JSON schema for a portal model (or the model list)."""
     return j(core.portal_schema(model))
+
+
+# ------------------------------------------------------------------
+# Administration › Property database (properties.manage)
+# ------------------------------------------------------------------
+
+
+class PropertyBulk(BaseModel):
+    ids: List[str] = Field(..., min_length=1, max_length=1000)
+    action: str  # feature | unfeature | status | assign_agent | delete
+    value: Optional[str] = None
+
+
+class PropertyImport(BaseModel):
+    csv: str = Field(..., min_length=5, max_length=20_000_000)
+    dry_run: bool = True
+
+
+@app.get("/admin/properties", tags=["admin"])
+def admin_properties(q: str = "", city_id: str = "", scheme_id: str = "", status: str = "", category: str = "",
+                     use_type: str = "", featured: Optional[bool] = None, agent_id: str = "", located: Optional[bool] = None,
+                     min_price: Optional[float] = None, max_price: Optional[float] = None, sort: str = "updated",
+                     order: str = "desc", page: int = 1, page_size: int = 25) -> Any:
+    """Every listing with every field: search, filters, sorting, paging and facet counts."""
+    return property_admin.query(q, city_id, scheme_id, status, category, use_type, featured, agent_id, located,
+                                min_price, max_price, sort, order, page, page_size)
+
+
+@app.get("/admin/properties/meta", tags=["admin"])
+def admin_properties_meta() -> Any:
+    """Choices for the property form: statuses, categories, cities, schemes, blocks and agents."""
+    return {
+        "statuses": property_admin.STATUSES, "categories": property_admin.CATEGORIES, "use_types": property_admin.USE_TYPES,
+        "cities": [{"id": c.id, "name": c.name} for c in sorted(core.cities_db, key=lambda c: c.name)],
+        "schemes": [{"id": s.id, "name": s.name, "city_id": s.city_id} for s in sorted(core.housing_schemes_db, key=lambda s: s.name)],
+        "blocks": [{"id": b.id, "name": b.name, "scheme_id": b.scheme_id} for b in sorted(core.block_zone_areas_db, key=lambda b: b.name)],
+        "agents": [{"id": a.id, "name": a.name} for a in sorted(core.agents_db, key=lambda a: a.name)],
+    }
+
+
+@app.get("/admin/properties/export.csv", tags=["admin"])
+def admin_properties_export(q: str = "", city_id: str = "", status: str = "", category: str = "") -> Any:
+    """The (filtered) catalogue as a spreadsheet; re-import it after editing."""
+    rows = property_admin.query(q, city_id, "", status, category, page_size=200, page=1)
+    everything: List[Dict[str, Any]] = list(rows["rows"])
+    for page in range(2, rows["pages"] + 1):
+        everything += property_admin.query(q, city_id, "", status, category, page_size=200, page=page)["rows"]
+    stamp = datetime.now().strftime("%Y%m%d-%H%M")
+    return Response(content=property_admin.export_csv(everything), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="arzepak-properties-{stamp}.csv"'})
+
+
+@app.post("/admin/properties/import", tags=["admin"])
+def admin_properties_import(payload: PropertyImport) -> Any:
+    """Create / update listings from a CSV (same columns as the export). Checks every row first;
+    nothing is saved if any row is invalid, or while ``dry_run`` is on."""
+    try:
+        return property_admin.import_csv(payload.csv, dry_run=payload.dry_run)
+    except property_admin.Invalid as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/admin/properties/bulk", tags=["admin"])
+def admin_properties_bulk(payload: PropertyBulk) -> Any:
+    try:
+        return property_admin.bulk(payload.ids, payload.action, payload.value)
+    except property_admin.Invalid as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.get("/admin/properties/{property_id}", tags=["admin"])
+def admin_property(property_id: str) -> Any:
+    r = property_admin.get(property_id)
+    if not r:
+        raise HTTPException(status_code=404, detail=f"Property not found: {property_id}")
+    return r
+
+
+@app.post("/admin/properties", tags=["admin"], status_code=201)
+def admin_property_create(payload: Dict[str, Any]) -> Any:
+    try:
+        return property_admin.save(payload)
+    except property_admin.Invalid as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.put("/admin/properties/{property_id}", tags=["admin"])
+def admin_property_update(property_id: str, payload: Dict[str, Any]) -> Any:
+    try:
+        return property_admin.save(payload, property_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Property not found: {property_id}")
+    except property_admin.Invalid as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.delete("/admin/properties/{property_id}", tags=["admin"])
+def admin_property_delete(property_id: str) -> Any:
+    result = j(core.delete_property(property_id))
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
 
 
 @app.get("/portal/storage", tags=["portal"])

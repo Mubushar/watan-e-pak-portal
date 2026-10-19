@@ -35,6 +35,10 @@ export interface GisLayer {
   visible: boolean;
   features: number;
   image_url?: string | null;
+  /** false while an admin hasn't published it (only GIS managers see such layers). */
+  published?: boolean;
+  /** Set on the portal's built-in overlays: roads, water, provinces … */
+  builtin?: string | null;
 }
 
 export interface GisLayerDetail extends GisLayer {

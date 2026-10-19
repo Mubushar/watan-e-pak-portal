@@ -59,7 +59,7 @@ import { PortalMap, PIN_STYLES, pin, type BaseMapKey } from "@/components/map/Po
 import { Badge, BarList, Button, EmptyState, ErrorState, Input, ScoreRing, Select, Segmented, Skeleton, Slider, Tabs, Toggle } from "@/components/ui";
 import { ChipRow, FilterChip, MapClick, MiniStat, ReportButton, ReportModal, fitTo, type ReportRef } from "@/components/gis/kit";
 import { ZoomArea } from "@/components/gis/ZoomArea";
-import { MapControls } from "@/components/gis/MapControls";
+import { MapControls, type LayerGroup } from "@/components/gis/MapControls";
 import { CityLabels, ProvinceLayer, type MapLang } from "@/components/gis/PakistanLayers";
 import { NavigatorLayer, NavigatorPanel, useNavigator } from "@/components/gis/Navigator";
 import { POI_CATEGORIES, POI_MIN_ZOOM, PoiLayer } from "@/components/gis/PoiLayer";
@@ -147,8 +147,26 @@ export default function MapExplorer() {
     () => new Set(layers.filter((l) => l.layer_type === "master_plan" && l.image_url?.startsWith("/masterplans/")).map((l) => l.entity_id)),
     [layers],
   );
-  const gisLayers = useMemo(() => layers.filter((l) => !planSchemeIds.has(l.entity_id)), [layers, planSchemeIds]);
-  const labelLayers = useMemo(() => layers.filter((l) => planSchemeIds.has(l.entity_id) && l.layer_type === "annotation"), [layers, planSchemeIds]);
+  // Every overlay (except base maps) is a layer record an admin publishes in Administration › GIS
+  // layers; the map shows only what is published (built-in overlays carry a `builtin` key).
+  const published = useMemo(() => new Set(layers.filter((l) => l.published !== false && l.builtin).map((l) => l.builtin as string)), [layers]);
+  const on = (key: string) => published.has(key);
+  const gisLayers = useMemo(() => layers.filter((l) => !l.builtin && l.published !== false && !planSchemeIds.has(l.entity_id)), [layers, planSchemeIds]);
+  const labelLayers = useMemo(() => layers.filter((l) => l.published !== false && planSchemeIds.has(l.entity_id) && l.layer_type === "annotation"), [layers, planSchemeIds]);
+  const publishedPlans = useMemo(() => new Set(layers.filter((l) => l.published !== false && l.layer_type === "master_plan").map((l) => l.name.split(" — ")[0].toLowerCase())), [layers]);
+  const plansQ = useMasterPlans();
+  const visiblePlans = useMemo(() => (plansQ.data?.plans ?? []).filter((pl) => publishedPlans.has(pl.name.toLowerCase())), [plansQ.data, publishedPlans]);
+  /** The Layers panel offers only published overlays (a group disappears when nothing in it is). */
+  const gateGroups = (groups: LayerGroup[]): LayerGroup[] => {
+    const itemLayer: Record<string, string> = { props: "listings", pois: "featured_places", aois: "aois", provinces: "provinces", districts: "districts", cities: "city_names", "road-live": "roads_live" };
+    const groupLayer: Record<string, string> = { poi: "osm_pois", terrain: "terrain", water: "water", roads: "roads", mega: "mega_projects" };
+    return groups
+      .map((g) => ({ ...g, items: g.items.filter((it) => {
+        const key = itemLayer[it.key] ?? groupLayer[g.key];
+        return !key || on(key);
+      }) }))
+      .filter((g) => g.items.length > 0);
+  };
 
   // -------------------------------------------------------------- property filters
   const [useType, setUseType] = useState("all");
@@ -209,7 +227,6 @@ export default function MapExplorer() {
       map.off("zoomend", on);
     };
   }, [map]);
-  const plansQ = useMasterPlans();
   // Master plans start switched on until the user chooses (null = no saved choice yet).
   const [planChoice, setPlanChoice] = useSavedState<Set<string> | null>("map.plans", null);
   const allPlans = useMemo(() => new Set((plansQ.data?.plans ?? []).map((p) => p.key)), [plansQ.data]);
@@ -442,21 +459,21 @@ export default function MapExplorer() {
     <div className={cn("relative h-[calc(100dvh-110px)] min-h-[540px] w-full overflow-hidden bg-brand-950", analysing && "[&_.leaflet-container]:cursor-crosshair")}>
       <PortalMap height="100%" className="rounded-none" scrollWheelZoom onReady={onReady} zoom={5} switcher={false} baseKey={baseMap}>
         {/* ----------------------------------------------------- Pakistan reference layers */}
-        {vis.provinces && <ProvinceLayer map={map} lang={mapLang} zoom={zoom} />}
-        <TerrainLayer colour={terrainColour} shade={terrainShade} opacity={terrainColour ? 0.6 : 0.8} onElevation={(m) => setElevation(m)} />
-        {waterClasses.size > 0 && <WaterLayer classes={waterClasses} labels={waterLabels} lang={mapLang} onStatus={setWaterStatus} />}
-        {roadLive && <LiveRoadOverlay />}
-        {roadClasses.size > 0 && <RoadLayer classes={roadClasses} construction={roadBuilding} shields={roadShields} lang={mapLang} onStatus={setRoadStatus} />}
-        {megaTypes.size > 0 && <MegaProjectLayer projects={megaQ.data?.projects ?? []} types={megaTypes} lang={mapLang} zoom={zoom} labelZoom={11} annotate={megaAnnot} />}
-        {vis.districts && <DistrictLayer lang={mapLang} zoom={zoom} labels={vis.districtNames} />}
-        {vis.cities && <CityLabels zoom={zoom} lang={mapLang} />}
-        {osmCats.size > 0 && <PoiLayer categories={osmCats} lang={mapLang} onStatus={setPoiStatus} />}
+        {vis.provinces && on("provinces") && <ProvinceLayer map={map} lang={mapLang} zoom={zoom} />}
+        <TerrainLayer colour={terrainColour && on("terrain")} shade={terrainShade && on("terrain")} opacity={terrainColour ? 0.6 : 0.8} onElevation={(m) => setElevation(m)} />
+        {waterClasses.size > 0 && on("water") && <WaterLayer classes={waterClasses} labels={waterLabels} lang={mapLang} onStatus={setWaterStatus} />}
+        {roadLive && on("roads_live") && <LiveRoadOverlay />}
+        {roadClasses.size > 0 && on("roads") && <RoadLayer classes={roadClasses} construction={roadBuilding} shields={roadShields} lang={mapLang} onStatus={setRoadStatus} />}
+        {megaTypes.size > 0 && on("mega_projects") && <MegaProjectLayer projects={megaQ.data?.projects ?? []} types={megaTypes} lang={mapLang} zoom={zoom} labelZoom={11} annotate={megaAnnot} />}
+        {vis.districts && on("districts") && <DistrictLayer lang={mapLang} zoom={zoom} labels={vis.districtNames} />}
+        {vis.cities && on("city_names") && <CityLabels zoom={zoom} lang={mapLang} />}
+        {osmCats.size > 0 && on("osm_pois") && <PoiLayer categories={osmCats} lang={mapLang} onStatus={setPoiStatus} />}
         <NavigatorLayer nav={nav} />
 
         {/* ----------------------------------------------------- DHA master plans */}
         {vis.layers && (
           <MasterPlanLayers
-            plans={plansQ.data?.plans ?? []}
+            plans={visiblePlans}
             shown={planShown}
             opacity={layerOpacity / 100}
             hit={planHit}
@@ -513,6 +530,7 @@ export default function MapExplorer() {
 
         {/* ----------------------------------------------------- AOIs */}
         {vis.aois &&
+          on("aois") &&
           (aoiQ.data?.areas ?? []).map((a) =>
             a.geometry ? (
               <GeoJSON
@@ -534,6 +552,7 @@ export default function MapExplorer() {
 
         {/* ----------------------------------------------------- properties */}
         {vis.props &&
+          on("listings") &&
           filtered.map((p) => (
             <Marker
               key={p.id}
@@ -551,6 +570,7 @@ export default function MapExplorer() {
 
         {/* ----------------------------------------------------- POIs */}
         {vis.pois &&
+          on("featured_places") &&
           pois.map((p) => (
             <Marker key={p.id} position={[p.latitude, p.longitude]} icon={pin(PIN_STYLES[p.category] ? p.category : "other", { size: 28 })}>
               <Popup>
@@ -651,7 +671,7 @@ export default function MapExplorer() {
         onFit={properties.length ? () => fitTo(map, filtered.map((p) => [p.latitude!, p.longitude!]), 13, sidePad()) : undefined}
         lang={mapLang}
         onLang={setMapLang}
-        groups={[
+        groups={gateGroups([
           {
             key: "portal",
             title: "Portal data",
@@ -790,7 +810,7 @@ export default function MapExplorer() {
             key: "plans",
             title: "DHA master plans",
             icon: LandPlot,
-            items: (plansQ.data?.plans ?? []).map((pl) => ({
+            items: visiblePlans.map((pl) => ({
               key: `plan-${pl.key}`,
               label: pl.name,
               hint: pl.city,
@@ -816,7 +836,7 @@ export default function MapExplorer() {
               onChange: (v: boolean) => setLayerHidden(l.id, v),
             })),
           },
-        ]}
+        ])}
       />
 
       {/* ------------------------------------------------------- search bar / route finder */}

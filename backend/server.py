@@ -57,6 +57,7 @@ import construction
 import content
 import access
 import geo
+import gis_import
 import knowledge
 import memory as user_memory
 import storage
@@ -1592,9 +1593,21 @@ def gis_add_layer(
     z_index: int = 0,
     image_url: Optional[str] = None,
     source_url: Optional[str] = None,
+    visible: bool = True,
+    published: bool = True,
+    opacity: float = 1.0,
+    source_file: Optional[str] = None,
 ) -> str:
-    """Add a GeoJSON layer (master plan / boundary / zone / plot layout / road) to an entity."""
+    """Add a GeoJSON layer (master plan / boundary / zone / plot layout / road) to an entity.
+    The geometry is validated (coordinates, geometry types; [lat, lon] for Pakistan is flipped)."""
+    try:
+        geojson, stats = gis_import.from_payload(geojson)
+    except gis_import.ImportError_ as exc:
+        return dump({"error": str(exc)})
+    me = access.current()
     layer = gis.GeoLayer(
+        visible=visible, published=published, opacity=max(0.0, min(float(opacity), 1.0)), source_file=source_file,
+        created_by=(me.get("name") or me.get("email")) if me else None,
         name=name,
         layer_type=layer_type,
         entity_type=entity_type,
@@ -1608,7 +1621,20 @@ def gis_add_layer(
         **({"style": style} if style else {}),
     )
     gis.add_layer(layer)
-    return dump_model(layer)
+    return dump({**model_dict(layer), "import": stats})
+
+
+def _layer_summary(l: Any) -> Dict[str, Any]:
+    return {
+        "id": l.id, "name": l.name, "layer_type": l.layer_type, "entity_type": l.entity_type, "entity_id": l.entity_id,
+        "base_map": l.base_map, "visible": l.visible, "published": getattr(l, "published", True),
+        "features": len(l.geojson.get("features", [])), "image_url": l.image_url, "description": l.description,
+        "z_index": l.z_index, "opacity": l.opacity, "style": l.style, "source_url": l.source_url,
+        "source_file": getattr(l, "source_file", None), "created_by": getattr(l, "created_by", None),
+        "derived": str(getattr(l, "geojson_ref", "") or "").startswith("masterplan"),
+        "builtin": (l.geojson_ref[len("builtin:"):] if str(getattr(l, "geojson_ref", "") or "").startswith("builtin:") else None),
+        "updated_at": l.updated_at.isoformat(timespec="seconds"),
+    }
 
 
 @mcp.tool()
@@ -1625,23 +1651,12 @@ def gis_list_layers(
     entity_type: Optional[str] = None,
     entity_id: Optional[str] = None,
     layer_type: Optional[str] = None,
+    include_unpublished: bool = True,
 ) -> str:
-    """List GIS layers, optionally filtered by entity and/or layer type."""
+    """List GIS layers, optionally filtered by entity and/or layer type. ``published`` says whether
+    the public map shows a layer (the REST API lists unpublished ones only to GIS managers)."""
     layers = gis.list_layers(entity_type=entity_type, entity_id=entity_id, layer_type=layer_type)
-    out = [
-        {
-            "id": l.id,
-            "name": l.name,
-            "layer_type": l.layer_type,
-            "entity_type": l.entity_type,
-            "entity_id": l.entity_id,
-            "base_map": l.base_map,
-            "visible": l.visible,
-            "features": len(l.geojson.get("features", [])),
-            "image_url": l.image_url,
-        }
-        for l in layers
-    ]
+    out = [_layer_summary(l) for l in layers if include_unpublished or getattr(l, "published", True)]
     return dump({"count": len(out), "layers": out})
 
 
@@ -1656,12 +1671,30 @@ def gis_update_layer(
     z_index: Optional[int] = None,
     style: Optional[Dict[str, Any]] = None,
     geojson: Optional[Dict[str, Any]] = None,
+    layer_type: Optional[str] = None,
+    entity_type: Optional[str] = None,
+    entity_id: Optional[str] = None,
+    published: Optional[bool] = None,
+    source_url: Optional[str] = None,
 ) -> str:
-    """Update a GIS layer (visibility, style, base map, geometry, ...)."""
+    """Update a GIS layer (visibility, publishing, style, base map, geometry, ...)."""
     l = gis.find_layer(layer_id)
     if not l:
         return dump({"error": f"Layer not found: {layer_id}"})
+    if geojson is not None:
+        try:
+            geojson, _stats = gis_import.from_payload(geojson)
+        except gis_import.ImportError_ as exc:
+            return dump({"error": str(exc)})
+        l.geojson_ref = None  # replaced by hand: keep this geometry in the database
+    if opacity is not None:
+        opacity = max(0.0, min(float(opacity), 1.0))
     for key, value in {
+        "layer_type": layer_type,
+        "entity_type": entity_type,
+        "entity_id": entity_id,
+        "published": published,
+        "source_url": source_url,
         "name": name,
         "description": description,
         "base_map": base_map,
@@ -1679,7 +1712,10 @@ def gis_update_layer(
 
 @mcp.tool()
 def gis_delete_layer(layer_id: str) -> str:
-    """Delete a GIS layer."""
+    """Delete a GIS layer. Built-in overlays can't be deleted — unpublish them instead."""
+    l = gis.find_layer(layer_id)
+    if l and str(getattr(l, "geojson_ref", "") or "").startswith("builtin:"):
+        return dump({"deleted": False, "error": "Built-in map overlays can't be deleted; unpublish it instead"})
     ok = gis.delete_layer(layer_id)
     return dump({"deleted": ok, "layer_id": layer_id, "remaining": len(gis.GIS_LAYERS)})
 
@@ -14559,7 +14595,7 @@ def _layer_geojson_from_ref(ref: str) -> Dict[str, Any]:
     return {"type": "FeatureCollection", "features": []}
 
 
-def _slim_layer(layer: Any) -> Optional[set]:
+def _slim_layer(layer: Any) -> Optional[set]:  # builtin:* overlays have no geometry of their own
     return {"geojson"} if getattr(layer, "geojson_ref", None) else None
 
 
@@ -16645,6 +16681,64 @@ def init_sample_data() -> None:
 
     # ---- DHA master plans (if built): schemes + GIS layers ----
     _seed_master_plans()
+
+    # ---- Every map layer (except base maps) waits for an admin to publish it ----
+    for layer in gis.GIS_LAYERS:
+        layer.published = False
+    ensure_builtin_layers()
+
+
+# ---------- the portal's built-in map overlays, registered as layers ----------
+
+# (ref, name, layer_type, on by default, description, source)
+BUILTIN_LAYERS = [
+    ("builtin:listings", "Listings", "listings", True, "Properties for sale and rent from the portal's catalogue.", None),
+    ("builtin:featured_places", "Featured places", "poi", False, "Curated places with ratings.", None),
+    ("builtin:aois", "Areas of interest", "aoi", False, "Saved study areas.", None),
+    ("builtin:osm_pois", "Points of interest", "poi", False,
+     "Schools, mosques, hospitals, markets, parks, banks … from OpenStreetMap (Islamabad / Rawalpindi, Lahore, Karachi).",
+     "https://www.openstreetmap.org/copyright"),
+    ("builtin:provinces", "Province boundaries", "boundary", True, "Provinces and territories with listing counts.", None),
+    ("builtin:districts", "District boundaries", "boundary", False, "All districts (OpenStreetMap admin level 6).",
+     "https://www.openstreetmap.org/copyright"),
+    ("builtin:city_names", "City names", "annotation", True, "Main cities; gold dots have a city page.", None),
+    ("builtin:terrain", "Terrain (DTM)", "terrain", False, "Elevation colours and hillshade (SRTM 30 m via AWS Terrain Tiles).",
+     "https://registry.opendata.aws/terrain-tiles/"),
+    ("builtin:water", "Water bodies", "water", True, "Rivers, canals, lakes, reservoirs and river beds from OpenStreetMap.",
+     "https://www.openstreetmap.org/copyright"),
+    ("builtin:roads", "Road network", "road", True, "Motorways, national highways, primary and secondary roads from OpenStreetMap.",
+     "https://www.openstreetmap.org/copyright"),
+    ("builtin:roads_live", "Live road overlay", "road", False, "Esri World Transportation reference tiles.",
+     "https://www.arcgis.com/home/item.html?id=94f838a535334cf1aa061846514b77c7"),
+    ("builtin:mega_projects", "Infrastructure mega projects", "mega_project", True,
+     "Ring roads, motorways, new sectors, industrial and economic zones that move land prices.", None),
+]
+
+
+def ensure_builtin_layers() -> int:
+    """Make sure each built-in overlay has its layer record (new ones start unpublished)."""
+    have = {getattr(l, "geojson_ref", None) for l in gis.GIS_LAYERS}
+    added = 0
+    for z, (ref, name, kind, on, about, source) in enumerate(BUILTIN_LAYERS):
+        if ref in have:
+            continue
+        gis.GIS_LAYERS.append(gis.GeoLayer(name=name, layer_type=kind, entity_type="city", entity_id="pakistan",
+                                           description=about, source_url=source, geojson_ref=ref, visible=on,
+                                           published=False, z_index=-100 + z, created_by="system"))
+        added += 1
+    return added
+
+
+def builtin_layer(ref: str) -> Optional[Any]:
+    return next((l for l in gis.GIS_LAYERS if getattr(l, "geojson_ref", None) == ref), None)
+
+
+def layer_open(ref: str) -> bool:
+    """May the current user see this built-in overlay? (published, or a GIS manager previewing it)"""
+    if access.can(access.current(), "gis.manage"):
+        return True
+    l = builtin_layer(ref)
+    return bool(l and l.published)
 
 
 init_sample_data()

@@ -119,6 +119,7 @@ _add("*", r"^/portal/storage(/flush)?$", "settings.manage")
 _add("*", r"^/memory(/|$)", "settings.manage")
 _add(W, r"^/masterplans/knowledge/refresh$", "settings.manage")
 _add("*", r"^/admin/basedata(/|$)", "basedata.manage")
+_add("*", r"^/admin/properties(/|$)", "properties.manage")
 _add(W, r"^/(cities|schemes|blocks)(/|$)", "basedata.manage")
 
 # ---- CRM family

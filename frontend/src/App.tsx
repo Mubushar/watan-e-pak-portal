@@ -44,6 +44,8 @@ const P: Record<string, ComponentType> = {
   Crm: lazy(() => import("@/pages/app/Crm")),
   CrmDashboard: lazy(() => import("@/pages/app/CrmDashboard")),
   BaseData: lazy(() => import("@/pages/app/BaseData")),
+  GisLayersAdmin: lazy(() => import("@/pages/app/GisLayersAdmin")),
+  PropertiesAdmin: lazy(() => import("@/pages/app/PropertiesAdmin")),
   Accounting: lazy(() => import("@/pages/app/Accounting")),
   Transactions: lazy(() => import("@/pages/app/Transactions")),
   Leasing: lazy(() => import("@/pages/app/Leasing")),
@@ -142,6 +144,8 @@ export default function App() {
             <Route path="construction" element={<P.Construction />} />
             <Route path="admin" element={<RequirePermission perm={ADMIN_PERMS} area="Users & roles"><P.Admin /></RequirePermission>} />
             <Route path="admin/base-data" element={<RequirePermission perm="basedata.manage" area="base data"><P.BaseData /></RequirePermission>} />
+            <Route path="admin/properties" element={<RequirePermission perm="properties.manage" area="the property database"><P.PropertiesAdmin /></RequirePermission>} />
+            <Route path="admin/gis-layers" element={<RequirePermission perm="gis.manage" area="GIS layers"><P.GisLayersAdmin /></RequirePermission>} />
             <Route path="profile" element={<P.Profile />} />
             <Route path="listings" element={<P.MyListings />} />
             <Route path="listings/new" element={<P.ListingNew />} />

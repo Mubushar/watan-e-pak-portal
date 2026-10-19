@@ -5,6 +5,7 @@ import {
   Bot,
   BriefcaseBusiness,
   Building,
+  Layers,
   Building2,
   Calculator,
   ChevronsLeft,
@@ -94,6 +95,8 @@ export function useDashboardNav(unread: number): { title: string; items: NavItem
       items: [
         { to: "/app/admin", label: "Users & roles", icon: ShieldCheck, end: true, perm: ADMIN_PERMS },
         { to: "/app/admin/base-data", label: "Base data", icon: Database, perm: "basedata.manage" },
+        { to: "/app/admin/properties", label: "Property database", icon: Building, perm: "properties.manage" },
+        { to: "/app/admin/gis-layers", label: "GIS layers", icon: Layers, perm: "gis.manage" },
         { to: "/app/profile", label: "Profile", icon: UserRound },
       ],
     },
