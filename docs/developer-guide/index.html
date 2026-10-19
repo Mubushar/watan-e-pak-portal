@@ -1,0 +1,801 @@
+<title>Arz-e-Pak Developer Guide</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="A visual guide to the Arz-e-Pak AI real-estate portal for developers new to AI: architecture, MCP, RAG, memory, authentication, PostgreSQL storage, REST API, GIS, CRM, administration and how to extend it.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a field manual — sticky contents rail on the left, one reading column, wide figures that break out of it. */
+:root {
+  --bg: #f6f7f2;          /* paper with a faint green bias */
+  --surface: #ffffff;
+  --ink: #142218;
+  --ink-soft: #3d4f43;
+  --mute: #6b7b70;
+  --line: #dde3da;
+  --brand: #0f5a3a;       /* Arz-e-Pak green */
+  --brand-ink: #0b4a2f;
+  --brand-wash: #e7f1ea;
+  --gold: #b9871a;        /* Arz-e-Pak gold */
+  --gold-wash: #fbf2dc;
+  --code-bg: #10241a;
+  --code-ink: #dcefe2;
+  --ok: #1d7a4a; --warn: #a46a00; --bad: #b3261e; --info: #1f5f9e;
+  --diagram-fill: #ffffff;
+  --diagram-alt: #eef4ee;
+  --shadow: 0 1px 2px rgba(15, 50, 30, .06), 0 8px 24px rgba(15, 50, 30, .07);
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c1611; --surface: #12211a; --ink: #e6efe8; --ink-soft: #b9c9bd; --mute: #8aa093; --line: #24382d;
+    --brand: #4fbf87; --brand-ink: #7fd8a8; --brand-wash: #163326; --gold: #e2b54a; --gold-wash: #2e2610;
+    --code-bg: #08110c; --code-ink: #cfe7d6; --ok: #5fcf8f; --warn: #e2b54a; --bad: #ff8a80; --info: #7db6ef;
+    --diagram-fill: #12211a; --diagram-alt: #183024; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c1611; --surface: #12211a; --ink: #e6efe8; --ink-soft: #b9c9bd; --mute: #8aa093; --line: #24382d;
+  --brand: #4fbf87; --brand-ink: #7fd8a8; --brand-wash: #163326; --gold: #e2b54a; --gold-wash: #2e2610;
+  --code-bg: #08110c; --code-ink: #cfe7d6; --ok: #5fcf8f; --warn: #e2b54a; --bad: #ff8a80; --info: #7db6ef;
+  --diagram-fill: #12211a; --diagram-alt: #183024; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { background: var(--bg); color: var(--ink); font: 17px/1.62 var(--f-body); margin: 0; }
+a { color: var(--brand); text-underline-offset: 2px; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 4px; }
+h1, h2, h3, h4 { font-family: var(--f-display); line-height: 1.15; text-wrap: balance; color: var(--ink); margin: 0; }
+h2 { font-size: clamp(1.6rem, 1.2rem + 1.6vw, 2.2rem); font-weight: 800; letter-spacing: -.01em; }
+h3 { font-size: 1.22rem; font-weight: 700; margin-top: .4rem; }
+p { margin: 0; }
+code { font-family: var(--f-mono); font-size: .86em; background: var(--brand-wash); color: var(--brand-ink); padding: .08em .35em; border-radius: 4px; overflow-wrap: anywhere; }
+pre { margin: 0; background: var(--code-bg); color: var(--code-ink); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font: 13.5px/1.55 var(--f-mono); }
+pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
+.eyebrow { font: 600 .74rem/1 var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
+
+/* page shell */
+.shell { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 48px; max-width: 1280px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0 80px; }
+.rail { position: sticky; top: env(safe-area-inset-top, 0px); align-self: start; max-height: 100vh; overflow-y: auto; padding-block: 28px; }
+.rail .brand { display: flex; flex-direction: column; gap: 4px; margin-bottom: 22px; }
+.rail .brand b { font: 800 1.25rem/1 var(--f-display); color: var(--brand); }
+.rail .brand b span { color: var(--gold); }
+.rail .brand small { font: 600 .66rem/1 var(--f-mono); letter-spacing: .16em; color: var(--mute); text-transform: uppercase; }
+.rail nav { display: flex; flex-direction: column; gap: 2px; }
+.rail nav a { display: grid; grid-template-columns: 26px 1fr; gap: 6px; text-decoration: none; color: var(--ink-soft); font-size: .93rem; padding: 5px 8px; border-radius: 7px; }
+.rail nav a span { font: 600 .72rem/1.7 var(--f-mono); color: var(--mute); }
+.rail nav a:hover { background: var(--brand-wash); color: var(--brand-ink); }
+main { min-width: 0; padding-block: 28px; display: flex; flex-direction: column; gap: 72px; }
+
+/* hero */
+.hero { display: grid; gap: 22px; padding-block: 36px 8px; border-bottom: 1px solid var(--line); padding-bottom: 40px; }
+.hero h1 { font-size: clamp(2.2rem, 1.4rem + 3.4vw, 3.6rem); font-weight: 800; letter-spacing: -.02em; max-width: 18ch; }
+.hero h1 em { font-style: normal; color: var(--gold); }
+.hero .lede { font-size: 1.15rem; color: var(--ink-soft); max-width: 62ch; }
+.facts { display: flex; flex-wrap: wrap; gap: 10px 26px; font: 600 .86rem/1.3 var(--f-mono); color: var(--ink-soft); }
+.facts b { display: block; font: 800 1.5rem/1.1 var(--f-display); color: var(--brand); font-variant-numeric: tabular-nums; }
+
+/* sections */
+section { display: flex; flex-direction: column; gap: 18px; scroll-margin-top: 16px; }
+.prose { display: flex; flex-direction: column; gap: 14px; max-width: 70ch; }
+.prose ul, .prose ol { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; }
+.sec-head { display: flex; flex-direction: column; gap: 8px; }
+.sec-head p { color: var(--ink-soft); max-width: 66ch; font-size: 1.05rem; }
+
+/* figures */
+figure { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+figcaption { font-size: .9rem; color: var(--mute); max-width: 75ch; }
+figcaption b { color: var(--ink-soft); }
+.shot { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface); box-shadow: var(--shadow); }
+.shot .bar { display: flex; align-items: center; gap: 6px; padding: 7px 12px; border-bottom: 1px solid var(--line); font: 12px/1 var(--f-mono); color: var(--mute); }
+.shot .bar i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); display: inline-block; }
+.shot .bar span { margin-left: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shot img { display: block; width: 100%; height: auto; }
+.phones { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 18px; }
+.phone { border: 1px solid var(--line); border-radius: 26px; padding: 8px; background: var(--surface); box-shadow: var(--shadow); }
+.phone img { display: block; width: 100%; border-radius: 19px; }
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 22px; align-items: start; }
+.diagram { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; overflow-x: auto; }
+.diagram svg { display: block; min-width: 640px; width: 100%; height: auto; }
+.diagram svg text { font-family: var(--f-body); fill: var(--ink); }
+.diagram svg .t-mono { font-family: var(--f-mono); fill: var(--mute); }
+.diagram svg .t-head { font-family: var(--f-display); font-weight: 700; }
+.diagram svg .box { fill: var(--diagram-fill); stroke: var(--line); stroke-width: 1.5; }
+.diagram svg .box-brand { fill: var(--brand-wash); stroke: var(--brand); stroke-width: 1.5; }
+.diagram svg .box-gold { fill: var(--gold-wash); stroke: var(--gold); stroke-width: 1.5; }
+.diagram svg .box-alt { fill: var(--diagram-alt); stroke: var(--line); stroke-width: 1.5; }
+.diagram svg .arrow { stroke: var(--mute); stroke-width: 1.6; fill: none; marker-end: url(#ah); }
+.diagram svg .arrow-brand { stroke: var(--brand); stroke-width: 1.8; fill: none; marker-end: url(#ahb); }
+.diagram svg .dash { stroke-dasharray: 5 4; }
+.diagram svg .ah { fill: var(--mute); }
+.diagram svg .ahb { fill: var(--brand); }
+
+/* tables, callouts, chips */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 600 .72rem/1.2 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--mute); background: var(--diagram-alt); }
+tr:last-child td { border-bottom: 0; }
+td code { white-space: nowrap; }
+.note { border-left: 3px solid var(--gold); background: var(--gold-wash); padding: 12px 16px; border-radius: 0 10px 10px 0; color: var(--ink); max-width: 75ch; }
+.note b { font-family: var(--f-display); }
+.note.green { border-color: var(--brand); background: var(--brand-wash); }
+.chip { display: inline-block; font: 600 .74rem/1 var(--f-mono); padding: 4px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft); }
+.tier { font: 600 .74rem/1 var(--f-mono); padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
+.tier.official { background: var(--brand-wash); color: var(--ok); }
+.tier.verified { background: var(--brand-wash); color: var(--brand-ink); }
+.tier.reference { background: var(--diagram-alt); color: var(--info); }
+.tier.listing { background: var(--gold-wash); color: var(--warn); }
+.tier.unverified { background: var(--diagram-alt); color: var(--mute); }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.card h4 { font-size: 1.02rem; }
+.card p { color: var(--ink-soft); font-size: .95rem; }
+.steps { counter-reset: s; display: flex; flex-direction: column; gap: 10px; padding: 0; margin: 0; list-style: none; max-width: 75ch; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 30px 1fr; gap: 10px; }
+.steps li::before { content: counter(s); font: 700 .85rem/30px var(--f-mono); width: 30px; height: 30px; text-align: center; border-radius: 50%; background: var(--brand); color: var(--surface); }
+.glossary { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 26px; margin: 0; }
+.glossary div { display: flex; flex-direction: column; gap: 2px; }
+.glossary dt { font: 700 1rem/1.3 var(--f-display); color: var(--brand-ink); }
+.glossary dd { margin: 0; color: var(--ink-soft); font-size: .95rem; }
+footer { color: var(--mute); font-size: .9rem; border-top: 1px solid var(--line); padding-top: 22px; }
+
+@media (max-width: 960px) {
+  .shell { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .rail { position: static; max-height: none; border-bottom: 1px solid var(--line); padding-block: 18px; }
+  .rail nav { flex-direction: row; flex-wrap: wrap; gap: 4px; }
+  .rail nav a { grid-template-columns: auto auto; padding: 4px 8px; border: 1px solid var(--line); }
+  main { gap: 56px; }
+}
+</style>
+
+<div class="shell">
+  <aside class="rail">
+    <div class="brand"><b>Arz-e-<span>Pak</span></b><small>Developer guide · Oct 2026</small></div>
+    <nav aria-label="Contents">
+      <a href="#overview"><span>01</span>The system at a glance</a>
+      <a href="#ai-primer"><span>02</span>AI in five ideas</a>
+      <a href="#architecture"><span>03</span>Architecture</a>
+      <a href="#request"><span>04</span>Life of a request</a>
+      <a href="#auth"><span>05</span>Authentication &amp; roles</a>
+      <a href="#api"><span>06</span>REST API</a>
+      <a href="#mcp"><span>07</span>MCP server</a>
+      <a href="#rag"><span>08</span>Knowledge &amp; RAG</a>
+      <a href="#memory"><span>09</span>Memory</a>
+      <a href="#agents"><span>10</span>Agents &amp; approvals</a>
+      <a href="#gis"><span>11</span>GIS &amp; maps</a>
+      <a href="#crm"><span>12</span>CRM</a>
+      <a href="#database"><span>13</span>PostgreSQL storage</a>
+      <a href="#admin"><span>14</span>Administration</a>
+      <a href="#portable"><span>15</span>Portable app</a>
+      <a href="#security"><span>16</span>Security checklist</a>
+      <a href="#extend"><span>17</span>Extending the system</a>
+      <a href="#glossary"><span>18</span>Glossary</a>
+    </nav>
+  </aside>
+
+  <main>
+    <header class="hero" id="top">
+      <span class="eyebrow">Developer guide · for engineers new to AI</span>
+      <h1>How the Arz-e-Pak portal <em>thinks</em>, stores and serves</h1>
+      <p class="lede">A visual tour of the AI real-estate portal for Pakistan: the web portal, the portable app, the FastAPI backend with its MCP server, the cited knowledge base, assistant memory, PostgreSQL storage, the GIS stack and the CRM. Read it top to bottom once; afterwards use the contents rail as a map when you change something.</p>
+      <div class="facts" aria-label="System in numbers">
+        <div><b>700</b>REST routes</div>
+        <div><b>609</b>MCP tools</div>
+        <div><b>36</b>MCP prompts</div>
+        <div><b>19</b>roles · 31 permissions</div>
+        <div><b>59</b>map layers</div>
+        <div><b>1,243</b>integration checks</div>
+      </div>
+    </header>
+
+    <!-- ===================================================== 01 -->
+    <section id="overview">
+      <div class="sec-head">
+        <span class="eyebrow">01 · The system at a glance</span>
+        <h2>One backend, three faces</h2>
+        <p>Buyers, agents and staff use the <b>web portal</b> or the <b>portable app</b> (Android, iOS, desktop). AI clients such as Claude Desktop use the same backend through <b>MCP</b>. Everything goes through one FastAPI process that owns the data, the security rules and the AI.</p>
+      </div>
+      <figure>
+        <div class="shot"><div class="bar"><i></i><i></i><i></i><span>localhost:5174 — public portal</span></div><img src="img/01-home.png" alt="Portal home page: search for property, Buy/Rent/Plot/Commercial tabs and the AI Powered panel" loading="lazy"></div>
+        <figcaption><b>Public portal.</b> Search listings, schemes and areas; the gold <i>Ask AI</i> button opens the assistant on every page.</figcaption>
+      </figure>
+      <div class="pair">
+        <figure>
+          <div class="shot"><div class="bar"><i></i><i></i><i></i><span>/app — staff dashboard</span></div><img src="img/03-dashboard-overview.png" alt="Signed-in dashboard overview with the staff sidebar" loading="lazy"></div>
+          <figcaption><b>Staff workspace</b> (<code>/app</code>): CRM, transactions, leasing, accounting, PMO, messages and Administration. What appears depends on the signed-in role.</figcaption>
+        </figure>
+        <figure>
+          <div class="shot"><div class="bar"><i></i><i></i><i></i><span>/ai/mcp — MCP console</span></div><img src="img/12-mcp-console.png" alt="MCP console listing 609 tools, 112 resources and 36 prompts" loading="lazy"></div>
+          <figcaption><b>MCP console</b> (admins only): browse and call every tool the AI can use, exactly as an external AI client sees them.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- ===================================================== 02 -->
+    <section id="ai-primer">
+      <div class="sec-head">
+        <span class="eyebrow">02 · AI in five ideas</span>
+        <h2>What you need to know before touching the AI code</h2>
+        <p>Large language models (LLMs) predict text. Everything "smart" in this portal is plumbing around that one ability, and five ideas cover it.</p>
+      </div>
+      <div class="cards">
+        <div class="card"><h4>1 · The prompt is the program</h4><p>The model only knows what is in its context: the <b>system prompt</b> (rules and persona), the conversation, and whatever we paste in. Ours lives in one place, <code>backend/prompts.py</code>, so web, app and voice behave alike.</p></div>
+        <div class="card"><h4>2 · Tools let it act</h4><p>With <b>function calling</b> the model answers "call <code>search_listings</code> with city=Lahore" instead of guessing. Our code runs the tool and hands back the result. The model never touches the database itself.</p></div>
+        <div class="card"><h4>3 · RAG gives it facts</h4><p><b>Retrieval-augmented generation</b>: before the model answers, we search our own data and paste the best matches, each numbered [1], [2]…, into the prompt. The model cites them; the UI shows the sources.</p></div>
+        <div class="card"><h4>4 · Memory is just more context</h4><p>The model forgets everything between calls. "Memory" means we store facts (budget, preferred areas) per user and paste the relevant ones back in. Users can see and delete it.</p></div>
+        <div class="card"><h4>5 · MCP is a plug standard</h4><p>The <b>Model Context Protocol</b> describes tools, resources and prompts in a format any AI client understands. Our 609 tools are written once and reach Claude Desktop, Cursor, LM Studio and our own agents.</p></div>
+        <div class="card"><h4>…and the golden rule</h4><p>A model can sound sure and be wrong ("hallucination"). We counter that with facts from tools and RAG, trust tiers on every source, a prompt that forbids guessing, and human approval before an agent changes anything.</p></div>
+      </div>
+      <figure>
+        <div class="diagram">
+          <svg viewBox="0 0 960 300" role="img" aria-label="One chat turn: question, context call, model with tools, cited answer">
+            <defs>
+              <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+              <marker id="ahb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahb" d="M0,0 L10,5 L0,10 z"/></marker>
+            </defs>
+            <rect class="box-gold" x="10" y="110" width="150" height="80" rx="10"/>
+            <text class="t-head" x="85" y="142" text-anchor="middle" font-size="15">User asks</text>
+            <text x="85" y="165" text-anchor="middle" font-size="12">"5 marla in Bahria</text>
+            <text x="85" y="180" text-anchor="middle" font-size="12">under 2 crore?"</text>
+            <rect class="box-brand" x="210" y="40" width="200" height="220" rx="10"/>
+            <text class="t-head" x="310" y="66" text-anchor="middle" font-size="15">POST /ai/context</text>
+            <text class="t-mono" x="310" y="86" text-anchor="middle" font-size="11">one call, ~5 ms</text>
+            <rect class="box" x="226" y="100" width="168" height="40" rx="7"/><text x="310" y="125" text-anchor="middle" font-size="12.5">system prompt</text>
+            <rect class="box" x="226" y="148" width="168" height="40" rx="7"/><text x="310" y="173" text-anchor="middle" font-size="12.5">knowledge [1]…[5]</text>
+            <rect class="box" x="226" y="196" width="168" height="40" rx="7"/><text x="310" y="221" text-anchor="middle" font-size="12.5">user memory</text>
+            <rect class="box-alt" x="460" y="80" width="200" height="140" rx="10"/>
+            <text class="t-head" x="560" y="110" text-anchor="middle" font-size="15">LLM (OpenAI)</text>
+            <text x="560" y="134" text-anchor="middle" font-size="12">via /v1/chat/completions</text>
+            <text x="560" y="152" text-anchor="middle" font-size="12">model + output capped</text>
+            <text x="560" y="170" text-anchor="middle" font-size="12">by the server</text>
+            <rect class="box" x="460" y="242" width="200" height="46" rx="8"/>
+            <text x="560" y="263" text-anchor="middle" font-size="12.5">tools, run in parallel</text>
+            <text class="t-mono" x="560" y="280" text-anchor="middle" font-size="11">search_listings · knowledge_search</text>
+            <rect class="box-gold" x="710" y="100" width="240" height="100" rx="10"/>
+            <text class="t-head" x="830" y="130" text-anchor="middle" font-size="15">Cited answer</text>
+            <text x="830" y="152" text-anchor="middle" font-size="12">"Bahria Phase 8 is approved [2]"</text>
+            <text x="830" y="172" text-anchor="middle" font-size="12">+ listing cards + Sources list</text>
+            <text class="t-mono" x="830" y="190" text-anchor="middle" font-size="11">reply saved via /ai/turn</text>
+            <path class="arrow-brand" d="M160 150 H206"/>
+            <path class="arrow-brand" d="M410 150 H456"/>
+            <path class="arrow dash" d="M540 220 V238"/><path class="arrow dash" d="M580 242 V224"/>
+            <path class="arrow-brand" d="M660 150 H706"/>
+          </svg>
+        </div>
+        <figcaption><b>One chat turn.</b> The app asks the backend for context, sends it with the conversation to the model, runs any tools the model requests (several at once), and shows the answer with its sources.</figcaption>
+      </figure>
+    </section>
+
+    <!-- ===================================================== 03 -->
+    <section id="architecture">
+      <div class="sec-head">
+        <span class="eyebrow">03 · Architecture</span>
+        <h2>Where every piece lives</h2>
+        <p>The backend is one Python process. <code>api.py</code> exposes REST, <code>server.py</code> holds the business logic as MCP tools, and topic modules (GIS, CRM AI, accounting, PMO, messaging…) sit beside it. Data lives in memory for speed and is mirrored to PostgreSQL or SQLite.</p>
+      </div>
+      <figure>
+        <div class="diagram">
+          <svg viewBox="0 0 960 470" role="img" aria-label="Architecture: clients, FastAPI with middleware, core modules, AI providers and storage">
+            <defs>
+              <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+            </defs>
+            <text class="t-mono" x="10" y="22" font-size="11">CLIENTS</text>
+            <rect class="box-gold" x="10" y="34" width="210" height="64" rx="10"/><text class="t-head" x="115" y="60" text-anchor="middle" font-size="14">Web portal</text><text class="t-mono" x="115" y="80" text-anchor="middle" font-size="11">frontend/ · React + Vite</text>
+            <rect class="box-gold" x="250" y="34" width="210" height="64" rx="10"/><text class="t-head" x="355" y="60" text-anchor="middle" font-size="14">Portable app</text><text class="t-mono" x="355" y="80" text-anchor="middle" font-size="11">portable/ · Capacitor, Electron</text>
+            <rect class="box-gold" x="490" y="34" width="210" height="64" rx="10"/><text class="t-head" x="595" y="60" text-anchor="middle" font-size="14">AI clients</text><text class="t-mono" x="595" y="80" text-anchor="middle" font-size="11">Claude Desktop · Cursor</text>
+            <rect class="box-gold" x="730" y="34" width="220" height="64" rx="10"/><text class="t-head" x="840" y="60" text-anchor="middle" font-size="14">Webhooks</text><text class="t-mono" x="840" y="80" text-anchor="middle" font-size="11">WhatsApp · Telegram · leads</text>
+            <rect class="box-brand" x="10" y="130" width="940" height="74" rx="10"/>
+            <text class="t-head" x="30" y="156" font-size="14">FastAPI app · api.py</text>
+            <text x="30" y="178" font-size="12.5">Middleware (outer → inner): TrustedHost · CORS · gzip · SecurityHeaders · PersistOnWrite · AccessGuard (deny by default)</text>
+            <text class="t-mono" x="30" y="196" font-size="11">REST /…  ·  MCP /mcp  ·  OpenAI-compatible /v1/*  ·  WebSockets /ws/*</text>
+            <rect class="box" x="10" y="236" width="300" height="118" rx="10"/>
+            <text class="t-head" x="26" y="260" font-size="14">server.py · core</text>
+            <text x="26" y="282" font-size="12.5">609 @mcp.tool functions</text>
+            <text x="26" y="300" font-size="12.5">stores: properties_db, leads_db …</text>
+            <text x="26" y="318" font-size="12.5">seed data, prompts, annotations</text>
+            <text class="t-mono" x="26" y="338" font-size="11">REST handlers call these tools</text>
+            <rect class="box" x="330" y="236" width="300" height="118" rx="10"/>
+            <text class="t-head" x="346" y="260" font-size="14">AI layer</text>
+            <text x="346" y="282" font-size="12.5">knowledge.py · sources.py (RAG)</text>
+            <text x="346" y="300" font-size="12.5">memory.py · prompts.py · agents.py</text>
+            <text x="346" y="318" font-size="12.5">openai_facade.py · web_lookup.py</text>
+            <text class="t-mono" x="346" y="338" font-size="11">openai_voice.py (Realtime voice)</text>
+            <rect class="box" x="650" y="236" width="300" height="118" rx="10"/>
+            <text class="t-head" x="666" y="260" font-size="14">Domain modules</text>
+            <text x="666" y="282" font-size="12.5">gis · geo · roads · water · masterplan</text>
+            <text x="666" y="300" font-size="12.5">crm_ai · transactions · accounting</text>
+            <text x="666" y="318" font-size="12.5">pmo · leasing · messaging · auth</text>
+            <text class="t-mono" x="666" y="338" font-size="11">property_admin · gis_import · basedata</text>
+            <rect class="box-alt" x="10" y="388" width="300" height="70" rx="10"/>
+            <text class="t-head" x="26" y="414" font-size="14">storage.py</text>
+            <text x="26" y="436" font-size="12.5">PostgreSQL (DATABASE_URL) or SQLite</text>
+            <rect class="box-alt" x="330" y="388" width="300" height="70" rx="10"/>
+            <text class="t-head" x="346" y="414" font-size="14">OpenAI</text>
+            <text x="346" y="436" font-size="12.5">chat · Realtime voice · web search</text>
+            <rect class="box-alt" x="650" y="388" width="300" height="70" rx="10"/>
+            <text class="t-head" x="666" y="414" font-size="14">GIS files</text>
+            <text x="666" y="436" font-size="12.5">geodata/ · media/ (roads, water, plans)</text>
+            <path class="arrow" marker-end="url(#ah2)" d="M115 98 V126"/><path class="arrow" marker-end="url(#ah2)" d="M355 98 V126"/><path class="arrow" marker-end="url(#ah2)" d="M595 98 V126"/><path class="arrow" marker-end="url(#ah2)" d="M840 98 V126"/>
+            <path class="arrow" marker-end="url(#ah2)" d="M160 204 V232"/><path class="arrow" marker-end="url(#ah2)" d="M480 204 V232"/><path class="arrow" marker-end="url(#ah2)" d="M800 204 V232"/>
+            <path class="arrow" marker-end="url(#ah2)" d="M160 354 V384"/><path class="arrow" marker-end="url(#ah2)" d="M480 354 V384"/><path class="arrow" marker-end="url(#ah2)" d="M800 354 V384"/>
+          </svg>
+        </div>
+        <figcaption><b>Request path.</b> Every client goes through the same middleware stack; the access guard decides before any handler runs.</figcaption>
+      </figure>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Folder</th><th>What it is</th><th>Run it</th></tr></thead>
+          <tbody>
+            <tr><td><code>backend/</code></td><td>FastAPI + MCP server, all business logic, AI, storage, tests</td><td><code>uv run python main.py</code> (port 8000)</td></tr>
+            <tr><td><code>frontend/</code></td><td>Web portal: React 18, Vite, TypeScript, Tailwind, react-query, Leaflet</td><td><code>npm run dev</code> (port 5173, proxies <code>/api</code>)</td></tr>
+            <tr><td><code>portable/</code></td><td>Mobile and desktop app (Capacitor for Android/iOS, Electron for desktop), same API</td><td><code>npm run dev</code>; <code>npx cap run android</code></td></tr>
+            <tr><td><code>db/</code></td><td>Generated PostgreSQL schema export (<code>migrate_to_postgres.py</code>)</td><td><code>uv run python migrate_to_postgres.py all</code></td></tr>
+            <tr><td><code>docs/</code></td><td>Guides: administration, API, MCP, agentic AI, messaging, testing, security, this page</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===================================================== 04 -->
+    <section id="request">
+      <div class="sec-head">
+        <span class="eyebrow">04 · Life of a request</span>
+        <h2>From click to database in six hops</h2>
+      </div>
+      <ol class="steps">
+        <li><span>The app sends <code>PUT /admin/properties/{id}</code> with <code>Authorization: Bearer &lt;session token&gt;</code>. The portal never uses cookies, so CSRF does not apply.</span></li>
+        <li><span><b>AccessGuard</b> (<code>access.py</code>) finds the first matching rule for the method and path: <code>properties.manage</code>. It loads the user from the token, checks the permission and returns 401/403 if needed. Paths with no rule are denied for writes.</span></li>
+        <li><span>The handler in <code>api.py</code> validates the body with Pydantic and calls the module (<code>property_admin.save</code>), which checks business rules: the scheme belongs to the city, the coordinates are inside Pakistan, sizes stay in sync.</span></li>
+        <li><span>The change is made in memory (<code>properties_db</code>), so the next read is instant.</span></li>
+        <li><span><b>PersistOnWrite</b> marks the store dirty; a few seconds later <code>storage.py</code> writes only the changed rows to PostgreSQL / SQLite.</span></li>
+        <li><span>The JSON response goes back through gzip and the security headers. react-query refreshes the affected lists in the UI.</span></li>
+      </ol>
+      <div class="note green"><b>Errors.</b> Validation problems are 400 with a readable <code>detail</code>; missing sign-in is 401, missing permission 403. An unexpected crash returns 500 with an <code>error_id</code> that matches the server log line, and never leaks a stack trace.</div>
+    </section>
+
+    <!-- ===================================================== 05 -->
+    <section id="auth">
+      <div class="sec-head">
+        <span class="eyebrow">05 · Authentication &amp; roles</span>
+        <h2>Who may do what</h2>
+        <p>Accounts sign in with e-mail, username or mobile plus a password, or with a one-time code. Passwords are hashed with PBKDF2-SHA256 at 600,000 rounds; the round count is stored with each hash so it can be raised later without breaking old logins.</p>
+      </div>
+      <div class="pair">
+        <figure>
+          <div class="shot"><div class="bar"><i></i><i></i><i></i><span>/login</span></div><img src="img/02-login-demo-accounts.png" alt="Login page with demo account buttons shown in development" loading="lazy"></div>
+          <figcaption><b>Sign-in.</b> Demo accounts appear only in development (<code>PORTAL_SEED_DEMO</code>); production hides them and does not create them.</figcaption>
+        </figure>
+        <figure>
+          <div class="shot"><div class="bar"><i></i><i></i><i></i><span>/app/admin — Users &amp; roles</span></div><img src="img/13-admin-users-roles.png" alt="Users and roles administration" loading="lazy"></div>
+          <figcaption><b>Users &amp; roles.</b> 19 roles bundle 31 permissions. Agent and developer sign-ups start as plain users with a <i>requested role</i> for an admin to approve.</figcaption>
+        </figure>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Protection</th><th>How it works</th><th>Where</th></tr></thead>
+          <tbody>
+            <tr><td>Login lockout</td><td>5 failed attempts in 15 minutes lock the account for 15 minutes; unknown users cost the same time (no account probing)</td><td><code>auth.login</code></td></tr>
+            <tr><td>Sessions</td><td>Random 256-bit bearer tokens with an expiry; changing a password ends every other session</td><td><code>auth.set_password</code></td></tr>
+            <tr><td>One-time codes</td><td>Shown in API responses only outside production (<code>PORTAL_AUTH_EXPOSE_OTP</code>)</td><td><code>auth.AUTH_CONFIG</code></td></tr>
+            <tr><td>Deny by default</td><td>An ordered rule table: public, user, a named permission, admin, mcp or docs. A write with no rule is refused</td><td><code>access.py</code></td></tr>
+            <tr><td>Own records</td><td>Agents see only their own CRM book; messaging checks the user is the member</td><td><code>access.agent_scope</code></td></tr>
+            <tr><td>Front end</td><td>Routes and menu items hidden without permission; expired sessions sign out with a "Sign in" prompt</td><td><code>RequirePermission</code>, <code>store/auth.ts</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===================================================== 06 -->
+    <section id="api">
+      <div class="sec-head">
+        <span class="eyebrow">06 · REST API</span>
+        <h2>700 routes, one convention</h2>
+        <p>REST handlers in <code>api.py</code> are thin: they validate input, call the matching tool in <code>server.py</code> (which returns JSON text) and turn <code>{"error": …}</code> into a proper HTTP status. The interactive docs are at <code>/docs</code> in development only (<code>PORTAL_EXPOSE_DOCS</code>).</p>
+      </div>
+      <figure>
+        <div class="shot"><div class="bar"><i></i><i></i><i></i><span>localhost:8001/docs — Swagger UI</span></div><img src="img/20-api-swagger-docs.png" alt="Swagger UI of the Real Estate Portal API" loading="lazy"></div>
+        <figcaption><b>Swagger UI.</b> Try any endpoint with your session token (Authorize button). Hidden in production unless an admin is signed in.</figcaption>
+      </figure>
+      <h3>Adding an endpoint</h3>
+      <pre><code># 1. business logic as an MCP tool (server.py) — AI clients get it for free
+@mcp.tool()
+def scheme_summary(scheme_id: str) -> str:
+    """One-paragraph summary of a housing scheme with its approval status."""
+    s = find_scheme(scheme_id)
+    return dump({"error": "Unknown scheme"} if not s else {"name": s.name, "approval": s.approval_status})
+
+# 2. REST wrapper (api.py)
+@app.get("/schemes/{scheme_id}/summary", tags=["schemes"])
+def scheme_summary(scheme_id: str) -&gt; Any:
+    result = j(core.scheme_summary(scheme_id))
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+# 3. access rule (access.py) — GETs are public unless a rule says otherwise
+_add("GET", r"^/schemes/[^/]+/summary$", "public")
+
+# 4. a check in test_integration.py, then: uv run python test_integration.py</code></pre>
+    </section>
+
+    <!-- ===================================================== 07 -->
+    <section id="mcp">
+      <div class="sec-head">
+        <span class="eyebrow">07 · MCP server</span>
+        <h2>609 tools any AI client can use</h2>
+        <p>MCP runs at <code>/mcp</code> (streamable HTTP). Every tool carries hints so clients can auto-approve safe reads and ask before deletes: <span class="chip">readOnlyHint</span> <span class="chip">destructiveHint</span> <span class="chip">openWorldHint</span>. Prompts are ready-made expert tasks.</p>
+      </div>
+      <div class="cards">
+        <div class="card"><h4>Who may connect</h4><p>A static <code>PORTAL_MCP_TOKEN</code> as a bearer token, a signed-in admin session, or (development only) a local client on the same machine.</p></div>
+        <div class="card"><h4>Expert prompts</h4><p><code>scheme_legality_check</code>, <code>property_due_diligence</code>, <code>comparative_market_analysis</code>, <code>mega_project_impact</code>, <code>urdu_assistant_reply</code>, plus 31 earlier ones.</p></div>
+        <div class="card"><h4>AI-specific tools</h4><p><code>knowledge_search</code> (cited facts), <code>my_memory_recall</code> / <code>remember</code> / <code>forget</code>, <code>rag_search</code>, <code>agent_run</code> / <code>agent_approve</code>.</p></div>
+      </div>
+      <pre><code>// claude_desktop_config.json
+{
+  "mcpServers": {
+    "arzepak": {
+      "type": "http",
+      "url": "https://api.your-domain.pk/mcp",
+      "headers": { "Authorization": "Bearer &lt;PORTAL_MCP_TOKEN&gt;" }
+    }
+  }
+}</code></pre>
+    </section>
+
+    <!-- ===================================================== 08 -->
+    <section id="rag">
+      <div class="sec-head">
+        <span class="eyebrow">08 · Knowledge &amp; RAG</span>
+        <h2>Answers that show their sources</h2>
+        <p><code>knowledge.py</code> indexes listings, cities, housing schemes (with approval status and sources), infrastructure mega projects, news and guide pages, and ranks them with BM25, a classic and fast search formula, in about 2 ms per question. It understands how people in Pakistan ask.</p>
+      </div>
+      <figure>
+        <div class="diagram">
+          <svg viewBox="0 0 960 220" role="img" aria-label="Knowledge pipeline: parse, search, boost by trust, cite">
+            <defs><marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahb" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <rect class="box-gold" x="10" y="60" width="170" height="100" rx="10"/>
+            <text class="t-head" x="95" y="90" text-anchor="middle" font-size="14">Question</text>
+            <text x="95" y="112" text-anchor="middle" font-size="11.5">"اسلام آباد میں 3 کمرے</text>
+            <text x="95" y="128" text-anchor="middle" font-size="11.5">کا گھر 1.5 کروڑ تک"</text>
+            <rect class="box" x="210" y="40" width="170" height="140" rx="10"/>
+            <text class="t-head" x="295" y="66" text-anchor="middle" font-size="14">Understand</text>
+            <text x="295" y="90" text-anchor="middle" font-size="11.5">Urdu / Roman Urdu folding</text>
+            <text x="295" y="108" text-anchor="middle" font-size="11.5">crore · lakh · arab</text>
+            <text x="295" y="126" text-anchor="middle" font-size="11.5">marla · kanal · sq ft</text>
+            <text x="295" y="144" text-anchor="middle" font-size="11.5">bedrooms · type · rent/buy</text>
+            <text x="295" y="162" text-anchor="middle" font-size="11.5">"Phase II" = "phase 2"</text>
+            <rect class="box" x="410" y="40" width="170" height="140" rx="10"/>
+            <text class="t-head" x="495" y="66" text-anchor="middle" font-size="14">Search</text>
+            <text x="495" y="92" text-anchor="middle" font-size="11.5">BM25 over ~235 docs</text>
+            <text x="495" y="110" text-anchor="middle" font-size="11.5">hard filters on listings</text>
+            <text x="495" y="128" text-anchor="middle" font-size="11.5">(price, size, bedrooms)</text>
+            <text x="495" y="146" text-anchor="middle" font-size="11.5">index rebuilt when data</text>
+            <text x="495" y="162" text-anchor="middle" font-size="11.5">changes</text>
+            <rect class="box" x="610" y="40" width="160" height="140" rx="10"/>
+            <text class="t-head" x="690" y="66" text-anchor="middle" font-size="14">Trust boost</text>
+            <text x="690" y="92" text-anchor="middle" font-size="11.5">official × 1.15</text>
+            <text x="690" y="110" text-anchor="middle" font-size="11.5">verified × 1.10</text>
+            <text x="690" y="128" text-anchor="middle" font-size="11.5">reference × 1.05</text>
+            <text x="690" y="146" text-anchor="middle" font-size="11.5">unverified × 0.90</text>
+            <rect class="box-brand" x="800" y="60" width="150" height="100" rx="10"/>
+            <text class="t-head" x="875" y="90" text-anchor="middle" font-size="14">Context</text>
+            <text x="875" y="112" text-anchor="middle" font-size="11.5">[1] Islamabad (city;</text>
+            <text x="875" y="128" text-anchor="middle" font-size="11.5">official; PBS 2023) …</text>
+            <path class="arrow-brand" marker-end="url(#ah3)" d="M180 110 H206"/><path class="arrow-brand" marker-end="url(#ah3)" d="M380 110 H406"/>
+            <path class="arrow-brand" marker-end="url(#ah3)" d="M580 110 H606"/><path class="arrow-brand" marker-end="url(#ah3)" d="M770 110 H796"/>
+          </svg>
+        </div>
+        <figcaption><b>Knowledge pipeline</b> (<code>knowledge.search</code>). The context block goes into the system prompt; the model quotes the <code>[n]</code> markers and the web chat lists the cited sources under the reply.</figcaption>
+      </figure>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Trust tier</th><th>Means</th><th>Examples</th></tr></thead>
+          <tbody>
+            <tr><td><span class="tier official">Official</span></td><td>Government, regulator or development authority</td><td>.gov.pk, .gop.pk, .gos.pk sites, SBP, RDA illegal-societies list, DHA's own sites</td></tr>
+            <tr><td><span class="tier verified">Verified</span></td><td>Checked by a portal administrator, or the portal's own guides</td><td>guide pages, admin-verified news</td></tr>
+            <tr><td><span class="tier reference">Reference</span></td><td>Established reference or major news outlet</td><td>Wikipedia, Dawn, Business Recorder, The News, OpenStreetMap</td></tr>
+            <tr><td><span class="tier listing">Listing</span></td><td>Submitted by an owner or agent; not independently checked</td><td>every property listing</td></tr>
+            <tr><td><span class="tier unverified">Unverified</span></td><td>Anything else, including sample data</td><td>seed news linking only to a homepage</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <figure>
+        <div class="shot"><div class="bar"><i></i><i></i><i></i><span>Ask AI — portal assistant</span></div><img src="img/19-ai-assistant-chat.png" alt="The AI assistant answering a question about Blue World City with matching schemes and mega projects" loading="lazy"></div>
+        <figcaption><b>Assistant.</b> This preview runs without an OpenAI key, so the answer comes straight from the knowledge base. With a key, the model writes the reply, cites <code>[n]</code> and the sources list appears under it. <code>web_lookup</code> fills gaps from the web, preferring official sites and caching answers for 6 hours.</figcaption>
+      </figure>
+    </section>
+
+    <!-- ===================================================== 09 -->
+    <section id="memory">
+      <div class="sec-head">
+        <span class="eyebrow">09 · Memory</span>
+        <h2>Near memory and long-term memory</h2>
+        <p><code>memory.py</code> keeps two kinds of memory for signed-in users. Guests get none. Nothing here is visible to other users or to admins.</p>
+      </div>
+      <div class="pair">
+        <div class="card"><h4>Near (short-term)</h4><p>The last turns of each conversation, so "and in Lahore?" makes sense after a page reload or on another device. 14 days, at most 200 turns per user. Saved by <code>/ai/context</code> (questions) and <code>/ai/turn</code> (replies).</p></div>
+        <div class="card"><h4>Long-term</h4><p>Facts learned from what users ask: budget, size, type, renting or buying, cities and schemes, language; plus notes they ask to keep ("remember I work in Blue Area"). A newer budget replaces the old one. CNIC, card numbers and passwords are refused.</p></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Endpoint</th><th>Does</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET /me/memory</code></td><td>What the assistant remembers about me</td></tr>
+            <tr><td><code>POST /me/memory</code></td><td>Remember a note</td></tr>
+            <tr><td><code>DELETE /me/memory/{id}</code> · <code>DELETE /me/memory</code></td><td>Forget one item · forget everything (turns included)</td></tr>
+            <tr><td><code>PUT /me/memory/settings</code></td><td>Switch memory on or off</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===================================================== 10 -->
+    <section id="agents">
+      <div class="sec-head">
+        <span class="eyebrow">10 · Agents &amp; approvals</span>
+        <h2>Look first, act after a human says yes</h2>
+        <p>An agent run (<code>agents.py</code>) is a planned list of tool steps with an audit trail. Tools that only read run first; tools that create, send or change something wait behind the review gate until a person approves. The approval is recorded under the signed-in user's name.</p>
+      </div>
+      <figure>
+        <div class="diagram">
+          <svg viewBox="0 0 960 150" role="img" aria-label="Agent run: intake, read tools, human review gate, write tools, deliver">
+            <defs><marker id="ah4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <rect class="box" x="10" y="45" width="130" height="60" rx="10"/><text class="t-head" x="75" y="81" text-anchor="middle" font-size="14">Intake</text>
+            <rect class="box" x="175" y="45" width="210" height="60" rx="10"/><text class="t-head" x="280" y="71" text-anchor="middle" font-size="14">Read tools</text><text class="t-mono" x="280" y="91" text-anchor="middle" font-size="11">extract terms · deadlines</text>
+            <rect class="box-gold" x="420" y="30" width="170" height="90" rx="10"/><text class="t-head" x="505" y="66" text-anchor="middle" font-size="14">Human review</text><text x="505" y="86" text-anchor="middle" font-size="12">status: awaiting_approval</text><text class="t-mono" x="505" y="104" text-anchor="middle" font-size="11">POST …/approve</text>
+            <rect class="box-brand" x="625" y="45" width="190" height="60" rx="10"/><text class="t-head" x="720" y="71" text-anchor="middle" font-size="14">Write tools</text><text class="t-mono" x="720" y="91" text-anchor="middle" font-size="11">transaction_create</text>
+            <rect class="box" x="850" y="45" width="100" height="60" rx="10"/><text class="t-head" x="900" y="81" text-anchor="middle" font-size="14">Deliver</text>
+            <path class="arrow" marker-end="url(#ah4)" d="M140 75 H171"/><path class="arrow" marker-end="url(#ah4)" d="M385 75 H416"/><path class="arrow" marker-end="url(#ah4)" d="M590 75 H621"/><path class="arrow" marker-end="url(#ah4)" d="M815 75 H846"/>
+          </svg>
+        </div>
+        <figcaption><b>Approval gate.</b> <code>approve</code> defaults to false everywhere; only the portal's own scheduled jobs pre-approve.</figcaption>
+      </figure>
+      <figure>
+        <div class="shot"><div class="bar"><i></i><i></i><i></i><span>/ai — AI Hub</span></div><img src="img/11-ai-hub.png" alt="AI Hub with the catalogue of agents" loading="lazy"></div>
+        <figcaption><b>AI Hub.</b> 24 agents (CRM, transactions, CMA, leasing, marketing, compliance…) with their runs and approvals.</figcaption>
+      </figure>
+    </section>
+
+    <!-- ===================================================== 11 -->
+    <section id="gis">
+      <div class="sec-head">
+        <span class="eyebrow">11 · GIS &amp; maps</span>
+        <h2>Every map layer is a database record</h2>
+        <p>Base maps (streets, satellite, light, dark) are tile sources. Every other layer is a <code>GeoLayer</code> record: the built-in overlays (listings, places, provinces, districts, city names, DTM terrain, water, roads, live roads, mega projects), the DHA master plans and anything an admin uploads. A layer appears on the public map only when an admin has <b>published</b> it; on a fresh install they all start unpublished.</p>
+      </div>
+      <figure>
+        <div class="shot"><div class="bar"><i></i><i></i><i></i><span>/map — GIS explorer</span></div><img src="img/04-map-gis-explorer.png" alt="GIS explorer showing Pakistan with roads, water, provinces, mega projects and listings" loading="lazy"></div>
+        <figcaption><b>GIS explorer.</b> Roads and water from OpenStreetMap, province boundaries from geoBoundaries, mega projects with their price-impact zones, and listings.</figcaption>
+      </figure>
+      <div class="pair">
+        <figure>
+          <div class="shot"><div class="bar"><i></i><i></i><i></i><span>/map — Layers tab</span></div><img src="img/05-map-layers-panel.png" alt="Map layers tab listing DHA master plans with zoom and toggles" loading="lazy"></div>
+          <figcaption><b>Layers panel.</b> Visitors switch published layers on and off; their choice is remembered per browser.</figcaption>
+        </figure>
+        <figure>
+          <div class="shot"><div class="bar"><i></i><i></i><i></i><span>/infrastructure</span></div><img src="img/06-infrastructure-mega-projects.png" alt="Infrastructure mega projects page" loading="lazy"></div>
+          <figcaption><b>Mega projects.</b> Ring roads, motorways, new sectors and economic zones with status, authority and typical uplift.</figcaption>
+        </figure>
+      </div>
+      <figure>
+        <div class="shot"><div class="bar"><i></i><i></i><i></i><span>/map — dark theme</span></div><img src="img/21b-map-dark.png" alt="GIS explorer in the dark theme" loading="lazy"></div>
+        <figcaption><b>Dark theme.</b> The whole portal follows the visitor's light or dark choice.</figcaption>
+      </figure>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Data</th><th>Source</th><th>Served by</th></tr></thead>
+          <tbody>
+            <tr><td>Roads, water bodies, districts, points of interest</td><td>OpenStreetMap extracts (<code>build_roads.py</code>, <code>build_water.py</code>, <code>build_districts.py</code>)</td><td><code>/geo/roads</code>, <code>/geo/water</code>, <code>/geo/districts</code>, <code>/geo/places</code></td></tr>
+            <tr><td>Provinces, cities</td><td>geoBoundaries (gbOpen PAK), PBS Census 2023</td><td><code>/geo/provinces</code>, <code>/geo/cities</code></td></tr>
+            <tr><td>Terrain (DTM)</td><td>SRTM 30 m via AWS Terrain Tiles</td><td>tiles, drawn in the browser</td></tr>
+            <tr><td>DHA master plans</td><td>Georeferenced plan PDFs (<code>build_masterplans.py</code>)</td><td><code>/masterplans/…</code> tiles + label layers</td></tr>
+            <tr><td>Uploaded layers</td><td>GeoJSON, KML, GPX, CSV from Administration</td><td><code>/gis/layers/{id}</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><b>Unpublished means unpublished.</b> While a built-in overlay is unpublished, its data endpoint returns an empty layer marked <code>"unpublished": true</code> to everyone without <code>gis.manage</code>, so hiding a layer also hides its data, not just its toggle.</div>
+    </section>
+
+    <!-- ===================================================== 12 -->
+    <section id="crm">
+      <div class="sec-head">
+        <span class="eyebrow">12 · CRM</span>
+        <h2>Leads to deals, with an AI copilot</h2>
+        <p>Leads, customers, deals, tasks and appointments, plus transactions with deadlines and e-signatures. The CRM copilot answers questions from live CRM data ("who should I call first?"); WhatsApp and Telegram messages land on the lead's timeline through signed webhooks.</p>
+      </div>
+      <figure>
+        <div class="shot"><div class="bar"><i></i><i></i><i></i><span>/app/crm-dashboard</span></div><img src="img/08-crm-dashboard.png" alt="CRM dashboard with KPI tiles, activity chart and lead funnel" loading="lazy"></div>
+        <figcaption><b>CRM dashboard.</b> Pipeline health, first-response time, overdue tasks and the funnel; the purple bar asks the copilot.</figcaption>
+      </figure>
+      <div class="pair">
+        <figure>
+          <div class="shot"><div class="bar"><i></i><i></i><i></i><span>/app/crm</span></div><img src="img/09-crm-pipeline.png" alt="CRM records" loading="lazy"></div>
+          <figcaption><b>CRM records.</b> Agents see only their own book; managers see the team.</figcaption>
+        </figure>
+        <figure>
+          <div class="shot"><div class="bar"><i></i><i></i><i></i><span>/app/crm-dashboard — dark</span></div><img src="img/21-crm-dashboard-dark.png" alt="CRM dashboard in the dark theme" loading="lazy"></div>
+          <figcaption><b>Same dashboard, dark theme.</b></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- ===================================================== 13 -->
+    <section id="database">
+      <div class="sec-head">
+        <span class="eyebrow">13 · PostgreSQL storage</span>
+        <h2>Fast in memory, safe on disk</h2>
+        <p>The portal works on in-memory stores for speed. <code>storage.py</code> mirrors every store into one table, <code>portal_rows(store, key, ord, data)</code>, with the data as JSONB on PostgreSQL. Each flush hashes every row and writes only what changed, so a busy portal writes a handful of rows every few seconds.</p>
+      </div>
+      <figure>
+        <div class="diagram">
+          <svg viewBox="0 0 960 190" role="img" aria-label="Storage: start loads database, writes mark dirty, background flush writes changed rows">
+            <defs><marker id="ah5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <rect class="box" x="10" y="30" width="200" height="130" rx="10"/>
+            <text class="t-head" x="110" y="58" text-anchor="middle" font-size="14">Start-up</text>
+            <text x="110" y="82" text-anchor="middle" font-size="12">first run: save the seed</text>
+            <text x="110" y="102" text-anchor="middle" font-size="12">later: load every store</text>
+            <text x="110" y="122" text-anchor="middle" font-size="12">rebuild plan geometry</text>
+            <text class="t-mono" x="110" y="144" text-anchor="middle" font-size="11">storage.start()</text>
+            <rect class="box-brand" x="250" y="30" width="220" height="130" rx="10"/>
+            <text class="t-head" x="360" y="58" text-anchor="middle" font-size="14">In-memory stores</text>
+            <text x="360" y="82" text-anchor="middle" font-size="12">properties_db · leads_db</text>
+            <text x="360" y="102" text-anchor="middle" font-size="12">GIS_LAYERS · memories_db</text>
+            <text x="360" y="122" text-anchor="middle" font-size="12">80 stores in all</text>
+            <text class="t-mono" x="360" y="144" text-anchor="middle" font-size="11">reads never touch disk</text>
+            <rect class="box" x="510" y="30" width="200" height="130" rx="10"/>
+            <text class="t-head" x="610" y="58" text-anchor="middle" font-size="14">Background writer</text>
+            <text x="610" y="82" text-anchor="middle" font-size="12">3 s after a write</text>
+            <text x="610" y="102" text-anchor="middle" font-size="12">every 60 s anyway</text>
+            <text x="610" y="122" text-anchor="middle" font-size="12">and at shutdown</text>
+            <text class="t-mono" x="610" y="144" text-anchor="middle" font-size="11">~10 ms per flush</text>
+            <rect class="box-alt" x="750" y="30" width="200" height="130" rx="10"/>
+            <text class="t-head" x="850" y="58" text-anchor="middle" font-size="14">Database</text>
+            <text x="850" y="82" text-anchor="middle" font-size="12">PostgreSQL (JSONB)</text>
+            <text x="850" y="102" text-anchor="middle" font-size="12">or SQLite fallback</text>
+            <text x="850" y="122" text-anchor="middle" font-size="12">portal_rows · portal_kv</text>
+            <text class="t-mono" x="850" y="144" text-anchor="middle" font-size="11">~0.7 MB for the seed</text>
+            <path class="arrow" marker-end="url(#ah5)" d="M210 95 H246"/><path class="arrow" marker-end="url(#ah5)" d="M470 95 H506"/><path class="arrow" marker-end="url(#ah5)" d="M710 95 H746"/>
+          </svg>
+        </div>
+        <figcaption><b>Storage loop.</b> A row that fails to load "freezes" its store: the seed data stays in memory and the database copy is never overwritten, so a bug can't wipe data.</figcaption>
+      </figure>
+      <h3>Switching to PostgreSQL</h3>
+      <pre><code># backend/.env
+DATABASE_URL=postgresql://arzepak:&lt;password&gt;@localhost:5432/arzepak
+
+# install the driver once
+uv pip install "psycopg[binary]"
+
+# check: signed in as an admin
+GET /portal/storage        → backend, rows per store, last flush
+POST /portal/storage/flush → save now
+
+# backups
+pg_dump -Fc arzepak &gt; arzepak-$(date +%F).dump</code></pre>
+      <div class="note green"><b>Relational export.</b> <code>migrate_to_postgres.py</code> still generates a fully normalised schema (one table per store, foreign keys) for reporting and BI tools; the live portal uses the document table above.</div>
+    </section>
+
+    <!-- ===================================================== 14 -->
+    <section id="admin">
+      <div class="sec-head">
+        <span class="eyebrow">14 · Administration</span>
+        <h2>Four data tools for staff</h2>
+        <p>Under <b>Administration</b> in the staff sidebar. Each needs its own permission, so a GIS technician can manage layers without touching users.</p>
+      </div>
+      <div class="pair">
+        <figure>
+          <div class="shot"><div class="bar"><i></i><i></i><i></i><span>/app/admin/properties</span></div><img src="img/15-admin-property-database.png" alt="Property database table with filters, status tiles and sortable columns" loading="lazy"></div>
+          <figcaption><b>Property database</b> (<code>properties.manage</code>). Search, filter, sort and page every listing; bulk feature, change status, assign an agent or delete; CSV export and a checked CSV import.</figcaption>
+        </figure>
+        <figure>
+          <div class="shot"><div class="bar"><i></i><i></i><i></i><span>/app/admin/properties — Add listing</span></div><img src="img/16-admin-property-form.png" alt="Add listing form with listing, location, size and ownership sections" loading="lazy"></div>
+          <figcaption><b>Listing form.</b> City → scheme → block must belong together; coordinates must be inside Pakistan; type a size in marla, kanal or sq ft and the others follow.</figcaption>
+        </figure>
+      </div>
+      <div class="pair">
+        <figure>
+          <div class="shot"><div class="bar"><i></i><i></i><i></i><span>/app/admin/gis-layers</span></div><img src="img/17-admin-gis-layers.png" alt="GIS layers administration with publish toggles" loading="lazy"></div>
+          <figcaption><b>GIS layers</b> (<code>gis.manage</code>). Published and on-by-default switches per layer, "Publish all" on a fresh install, edit style, replace geometry, download GeoJSON, delete. Built-in overlays can't be deleted.</figcaption>
+        </figure>
+        <figure>
+          <div class="shot"><div class="bar"><i></i><i></i><i></i><span>/app/admin/gis-layers — Upload</span></div><img src="img/18-admin-gis-upload.png" alt="Upload a GIS layer drawer with file drop zone and options" loading="lazy"></div>
+          <figcaption><b>Upload.</b> GeoJSON, KML, GPX or CSV. A dry run shows the features, geometry types, bounding box and warnings (for example swapped latitude and longitude) before anything is saved.</figcaption>
+        </figure>
+      </div>
+      <figure>
+        <div class="shot"><div class="bar"><i></i><i></i><i></i><span>/app/admin/base-data</span></div><img src="img/14-admin-base-data.png" alt="Base data administration for cities, schemes and blocks" loading="lazy"></div>
+        <figcaption><b>Base data</b> (<code>basedata.manage</code>). 44 cities and 110 housing schemes with approval status and their sources. These records feed the knowledge base, so a source added here becomes a citation in the assistant's answers.</figcaption>
+      </figure>
+    </section>
+
+    <!-- ===================================================== 15 -->
+    <section id="portable">
+      <div class="sec-head">
+        <span class="eyebrow">15 · Portable app</span>
+        <h2>Same backend in a pocket</h2>
+        <p>The portable app (<code>portable/</code>) is React + Capacitor for Android and iOS, and Electron for desktop. It shares the API, the session model and the assistant's memory and knowledge; its own prompt adds voice and language rules. Voice runs on OpenAI Realtime; tool calls from one voice response run together and get one follow-up reply.</p>
+      </div>
+      <div class="phones">
+        <figure><div class="phone"><img src="img/22-portable-welcome.png" alt="Portable app welcome screen" loading="lazy"></div><figcaption>Welcome</figcaption></figure>
+        <figure><div class="phone"><img src="img/23-portable-home.png" alt="Portable app home with featured listings" loading="lazy"></div><figcaption>Home</figcaption></figure>
+        <figure><div class="phone"><img src="img/24-portable-explore.png" alt="Portable app explore screen" loading="lazy"></div><figcaption>Explore</figcaption></figure>
+        <figure><div class="phone"><img src="img/25-portable-assistant.png" alt="Portable app assistant screen" loading="lazy"></div><figcaption>Assistant</figcaption></figure>
+      </div>
+    </section>
+
+    <!-- ===================================================== 16 -->
+    <section id="security">
+      <div class="sec-head">
+        <span class="eyebrow">16 · Security checklist</span>
+        <h2>Before you go live</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Set</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td><code>PORTAL_ENV=production</code></td><td>Turns on the safe defaults: no demo accounts, no codes in responses, docs hidden, HSTS, strict CORS</td></tr>
+            <tr><td><code>PORTAL_MCP_TOKEN</code></td><td>A long random token for AI clients; without it only admin sessions reach <code>/mcp</code></td></tr>
+            <tr><td><code>PORTAL_CORS_ORIGINS</code>, <code>PORTAL_ALLOWED_HOSTS</code></td><td>Only your own web, app and API hosts</td></tr>
+            <tr><td><code>DATABASE_URL</code></td><td>PostgreSQL with backups; SQLite is fine for a single small server</td></tr>
+            <tr><td><code>PORTAL_WHATSAPP_APP_SECRET</code>, <code>PORTAL_TELEGRAM_WEBHOOK_SECRET</code>, <code>PORTAL_CRM_WEBHOOK_SECRET</code></td><td>Webhooks reject unsigned calls</td></tr>
+            <tr><td><code>PORTAL_TRUST_PROXY=1</code></td><td>Only behind your own HTTPS reverse proxy, so rate limits see the real client address</td></tr>
+            <tr><td>API keys</td><td>Keep them only in <code>backend/.env</code> (git-ignored); rotate any key that was ever pasted elsewhere</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="prose">Built in: escaped map popups and inlined JSON (no script injection from data), http(s)-only links in AI answers, request size limit, security headers (CSP for HTML, nosniff, frame and referrer policy), server-chosen AI model and capped output, and an error id instead of a stack trace. Full list: <code>docs/SECURITY_AND_OPERATIONS.md</code>.</p>
+    </section>
+
+    <!-- ===================================================== 17 -->
+    <section id="extend">
+      <div class="sec-head">
+        <span class="eyebrow">17 · Extending the system</span>
+        <h2>Where the next features plug in</h2>
+      </div>
+      <div class="cards">
+        <div class="card"><h4>Semantic search</h4><p>Add embeddings (<code>/v1/embeddings</code> is already proxied) and store vectors with pgvector; blend them with BM25 in <code>knowledge.search</code>. Keep the citation format so the UI needs no change.</p></div>
+        <div class="card"><h4>New knowledge sources</h4><p>Add a block to <code>knowledge._docs()</code> with a <code>tier</code> from <code>sources.py</code>. Prefer records that carry their <code>sources</code>; add new official domains to <code>sources.OFFICIAL_DOMAINS</code>.</p></div>
+        <div class="card"><h4>A new agent</h4><p>Describe it in <code>agents.AGENTS</code> with its tools; the engine orders reads before the human gate and writes after it. Add a dispatch case in <code>_agent_tool_dispatch</code>.</p></div>
+        <div class="card"><h4>A new map overlay</h4><p>Serve it from a <code>/geo/…</code> endpoint guarded by <code>_unpublished("builtin:key")</code>, add the key to <code>BUILTIN_LAYERS</code>, and gate the toggle with <code>on("key")</code> in <code>MapExplorer.tsx</code>.</p></div>
+        <div class="card"><h4>Scaling out</h4><p>One process today. For several API servers, move sessions and rate limits to Redis and make PostgreSQL the source of truth per request (the <code>db/</code> schema is the starting point).</p></div>
+        <div class="card"><h4>Single sign-on</h4><p>Add an OIDC login that issues the same session token; <code>access.py</code> and every permission check keep working unchanged.</p></div>
+      </div>
+      <h3>Testing</h3>
+      <pre><code>cd backend
+uv run python test_integration.py      # 1,243 checks: MCP, REST, security, AI, admin, storage (PORTAL_PERSIST=0)
+cd ../frontend &amp;&amp; npx tsc -b --noEmit   # web types
+cd ../portable &amp;&amp; npx tsc -b --noEmit   # app types</code></pre>
+    </section>
+
+    <!-- ===================================================== 18 -->
+    <section id="glossary">
+      <div class="sec-head">
+        <span class="eyebrow">18 · Glossary</span>
+        <h2>Words you will meet in the code</h2>
+      </div>
+      <dl class="glossary">
+        <div><dt>LLM</dt><dd>Large language model: predicts text; ours is reached through OpenAI's API.</dd></div>
+        <div><dt>System prompt</dt><dd>The standing instructions sent before the conversation (<code>prompts.py</code>).</dd></div>
+        <div><dt>Function calling</dt><dd>The model asks us to run a named tool with JSON arguments.</dd></div>
+        <div><dt>RAG</dt><dd>Retrieval-augmented generation: search first, then answer from what was found.</dd></div>
+        <div><dt>BM25</dt><dd>A ranking formula that rewards rare matching words and penalises long documents.</dd></div>
+        <div><dt>Embedding</dt><dd>A list of numbers representing meaning; similar texts get nearby vectors.</dd></div>
+        <div><dt>MCP</dt><dd>Model Context Protocol: a standard way to offer tools, resources and prompts to AI clients.</dd></div>
+        <div><dt>Hallucination</dt><dd>A confident answer that is not supported by facts.</dd></div>
+        <div><dt>Marla / kanal</dt><dd>Land units: 1 kanal = 20 marla; the portal counts 225 sq ft per marla.</dd></div>
+        <div><dt>Crore / lakh</dt><dd>1 crore = 10,000,000 PKR; 1 lakh = 100,000 PKR.</dd></div>
+        <div><dt>NOC</dt><dd>No-objection certificate from a development authority (RDA, CDA, LDA…); a key legality check for a housing scheme.</dd></div>
+        <div><dt>GeoJSON</dt><dd>The JSON format for map features; coordinates are [longitude, latitude].</dd></div>
+      </dl>
+    </section>
+
+    <footer>Arz-e-Pak AI Real Estate Portal · developer guide, October 2026 · screenshots from a development build with sample data · source: <code>docs/developer-guide/</code></footer>
+  </main>
+</div>

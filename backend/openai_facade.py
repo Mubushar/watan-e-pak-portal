@@ -197,7 +197,9 @@ def _local_answer(user_text: str) -> str:
                     f"{hit.get('category')}, use: {hit.get('use_type')})"
                 )
             else:
-                lines.append(f"- {hit.get('name')} ({hit.get('city')})")
+                kind = str(hit.get("type") or "").replace("_", " ")
+                where = ", ".join(x for x in (kind, hit.get("city")) if x)
+                lines.append(f"- {hit.get('name') or hit.get('title')}" + (f" ({where})" if where else ""))
         lines.append(
             "\nYou can refine by city, price range, bedrooms or category, "
             "e.g. 'apartments in Karachi under 50,000,000'."

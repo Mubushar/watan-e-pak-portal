@@ -11,7 +11,8 @@ import { buildArgs, initialValues, SchemaForm, type FormValues } from "@/compone
 import { useMcpAdmin, useMcpTools } from "@/components/tools/MiscTools";
 
 const MCP_URL = "http://127.0.0.1:8000/mcp";
-const CONFIG = JSON.stringify({ mcpServers: { arzepak: { type: "http", url: MCP_URL } } }, null, 2);
+// MCP needs PORTAL_MCP_TOKEN (backend/.env) as a bearer token; local dev clients may skip it.
+const CONFIG = JSON.stringify({ mcpServers: { arzepak: { type: "http", url: MCP_URL, headers: { Authorization: "Bearer <PORTAL_MCP_TOKEN>" } } } }, null, 2);
 
 const prefixOf = (n: string) => n.split("_")[0] ?? n;
 const tryParse = (t?: string): unknown => {
