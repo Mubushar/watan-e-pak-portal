@@ -33,6 +33,7 @@ import type { City, NewsItem, Property, PropertyList, Story } from "@/types";
 import { useApi } from "@/hooks/useApi";
 import { compact, pkrShort, timeAgo, titleCase } from "@/lib/format";
 import { cityImage, HERO, themedImage } from "@/lib/images";
+import { PHOTO_LIBRARY } from "@/lib/photoLibrary";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { usePrefs } from "@/store/prefs";
@@ -493,6 +494,24 @@ function Cities() {
   );
 }
 
+/** A real photo from the library (lib/photoLibrary.ts) behind the category and tool cards. */
+const toolPhoto = (cat: string, i: number) => {
+  const ph = PHOTO_LIBRARY[cat]?.[i] ?? PHOTO_LIBRARY[cat]?.[0];
+  return ph ? { src: `/${ph.src}`, credit: ph.credit } : null;
+};
+
+/** A matching real photo (photo library) behind each category card. */
+const CATEGORY_PHOTO: Record<string, { src: string; credit: string } | null> = {
+  house: toolPhoto("house", 0),
+  apartment: toolPhoto("apartment", 1),
+  plot: toolPhoto("plot", 2),
+  shop: toolPhoto("shop", 0),
+  office: toolPhoto("office", 0),
+  building: toolPhoto("building", 0),
+  floor: toolPhoto("interior", 0),
+  farmhouse: toolPhoto("farmhouse", 0),
+};
+
 function Categories() {
   const s = useApi<{ portfolio: { by_category: Record<string, number> } }>("/portal/statistics");
   const counts = s.data?.portfolio.by_category ?? {};
@@ -500,12 +519,19 @@ function Categories() {
     <section className="container">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
         {CATEGORIES.map((c) => (
-          <Link key={c.key} to={c.key === "farmhouse" ? "/properties?q=farmhouse" : `/properties?category=${c.key}`} className="group card flex flex-col items-center gap-2 p-4 text-center transition hover:-translate-y-1 hover:border-gold-300 hover:shadow-glow">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-50 to-gold-50 text-brand-700 transition group-hover:from-brand-700 group-hover:to-brand-600 group-hover:text-white dark:from-white/5 dark:to-white/10 dark:text-gold-300">
-              <c.icon className="h-6 w-6" />
+          <Link
+            key={c.key}
+            to={c.key === "farmhouse" ? "/properties?q=farmhouse" : `/properties?category=${c.key}`}
+            title={CATEGORY_PHOTO[c.key] ? `Photo: ${CATEGORY_PHOTO[c.key]!.credit}` : undefined}
+            className="group relative flex min-h-36 flex-col items-center justify-end gap-1 overflow-hidden rounded-2xl bg-brand-900 p-3 text-center text-white shadow-soft transition hover:-translate-y-1"
+          >
+            {CATEGORY_PHOTO[c.key] && <img src={CATEGORY_PHOTO[c.key]!.src} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />}
+            <div className="absolute inset-0 bg-gradient-to-t from-brand-950/95 via-brand-950/50 to-brand-950/5" />
+            <span className="relative mb-auto flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-gold-300 ring-1 ring-white/20 backdrop-blur">
+              <c.icon className="h-5 w-5" />
             </span>
-            <span className="text-sm font-semibold">{c.label}</span>
-            <span className="text-xs text-ink-mute">{counts[c.key] ?? 0} listings</span>
+            <span className="relative text-sm font-semibold">{c.label}</span>
+            <span className="relative text-[11px] text-white/75">{counts[c.key] ?? 0} listings</span>
           </Link>
         ))}
       </div>
@@ -605,22 +631,31 @@ function AgentsShowcase() {
 
 function ToolsStrip() {
   const tools = [
-    { key: "mortgage", label: "Mortgage", icon: Landmark },
-    { key: "area", label: "Area converter", icon: Ruler },
-    { key: "construction", label: "Construction cost", icon: Building2 },
-    { key: "rental_yield", label: "Rental yield", icon: TrendingUp },
-    { key: "transfer", label: "Transfer & stamp duty", icon: BadgeCheck },
-    { key: "installment", label: "Installments", icon: Calculator },
+    { key: "mortgage", label: "Mortgage", hint: "Monthly payments", icon: Landmark, photo: toolPhoto("villa", 0) },
+    { key: "area", label: "Area converter", hint: "Marla · kanal · sq ft", icon: Ruler, photo: toolPhoto("plot", 0) },
+    { key: "construction", label: "Construction cost", hint: "Grey + finishing", icon: Building2, photo: toolPhoto("plot", 5) },
+    { key: "rental_yield", label: "Rental yield", hint: "Returns on rent", icon: TrendingUp, photo: toolPhoto("apartment", 0) },
+    { key: "transfer", label: "Transfer & stamp duty", hint: "Taxes and fees", icon: BadgeCheck, photo: toolPhoto("office", 1) },
+    { key: "installment", label: "Installments", hint: "Payment plans", icon: Calculator, photo: toolPhoto("tower", 0) },
   ];
   return (
     <Section eyebrow="Tools center" title="Calculators & utilities" subtitle="Plan every rupee — financing, taxes, construction and returns, computed by the portal’s engines.">
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
         {tools.map((t) => (
-          <Link key={t.key} to={`/tools/${t.key}`} className="group card relative overflow-hidden p-5 transition hover:-translate-y-1 hover:shadow-soft">
-            <div className="absolute -end-6 -top-6 h-20 w-20 rounded-full bg-gold-100 transition group-hover:scale-150 dark:bg-gold-500/10" />
-            <t.icon className="relative h-7 w-7 text-brand-700 dark:text-gold-300" />
-            <p className="relative mt-4 text-sm font-semibold">{t.label}</p>
-            <ArrowRight className="relative mt-2 h-4 w-4 text-ink-mute transition group-hover:translate-x-1 group-hover:text-brand-700 rtl:rotate-180" />
+          <Link
+            key={t.key}
+            to={`/tools/${t.key}`}
+            title={t.photo ? `Photo: ${t.photo.credit}` : undefined}
+            className="group relative flex min-h-44 flex-col justify-end overflow-hidden rounded-2xl bg-brand-900 p-4 text-white shadow-soft transition hover:-translate-y-1"
+          >
+            {t.photo && <img src={t.photo.src} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />}
+            <div className="absolute inset-0 bg-gradient-to-t from-brand-950/95 via-brand-950/55 to-brand-950/10" />
+            <span className="absolute start-4 top-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-gold-300 ring-1 ring-white/20 backdrop-blur">
+              <t.icon className="h-5 w-5" />
+            </span>
+            <p className="relative text-sm font-semibold leading-snug">{t.label}</p>
+            <p className="relative mt-0.5 text-[11px] text-white/70">{t.hint}</p>
+            <ArrowRight className="relative mt-2 h-4 w-4 text-gold-300 transition group-hover:translate-x-1 rtl:rotate-180" />
           </Link>
         ))}
       </div>
