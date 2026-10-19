@@ -564,7 +564,7 @@ function Cities() {
         <Carousel slideClass="basis-[85%] sm:basis-1/2 lg:basis-1/3" arrows dots>
           {cities.map((c) => (
             <Link key={c.id} to={`/cities/${encodeURIComponent(c.name)}`} className="group relative block aspect-[16/11] overflow-hidden rounded-3xl shadow-card">
-              <img src={cityImage(c.name)} alt={c.name} loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+              <img src={cityImage(c.name, c.image)} alt={c.name} title={c.image_credit ? `Photo: ${c.image_credit}` : undefined} loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
               <div className="absolute start-4 top-4 flex gap-2">
                 {c.state && <span className="chip bg-white/90 text-brand-800">{c.state}</span>}
@@ -588,6 +588,7 @@ function Cities() {
                 <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-gold-200 opacity-0 transition group-hover:opacity-100">
                   Explore <ArrowRight className="h-4 w-4 rtl:rotate-180" />
                 </span>
+                {c.image_credit && <p className="mt-1 truncate text-[10px] text-white/55">Photo: {c.image_credit}</p>}
               </div>
             </Link>
           ))}

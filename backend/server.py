@@ -59,6 +59,7 @@ import access
 import geo
 import gis_import
 import project_inventory
+import seed_media
 import knowledge
 import memory as user_memory
 import storage
@@ -695,6 +696,8 @@ def list_cities() -> str:
                 "development_authority": c.development_authority,
                 "schemes": len(schemes),
                 "properties": len(props),
+                "image": (c.image_urls or [None])[0],
+                "image_credit": ((c.multimedia or {}).get("photo_credit") or {}).get("text"),
             }
         )
     return dump({"count": len(out), "cities": out})
@@ -722,6 +725,8 @@ def list_schemes(city: Optional[str] = None) -> str:
                 "latitude": s.latitude,
                 "longitude": s.longitude,
                 "blocks": len([b for b in block_zone_areas_db if b.scheme_id == s.id]),
+                "image": (s.image_urls or [None])[0],
+                "image_credit": ((s.multimedia or {}).get("photo_credit") or {}).get("text"),
             }
         )
     return dump({"count": len(out), "schemes": out})
@@ -16715,6 +16720,9 @@ def init_sample_data() -> None:
 
     # ---- New projects with live unit inventories (China Center, Skyra Tower, Goldcrest Breeze …) ----
     project_inventory.sync()
+
+    # ---- Real, credited photos for cities and housing schemes (Wikimedia Commons) ----
+    seed_media.apply()
 
     # ---- Every map layer (except base maps) waits for an admin to publish it ----
     for layer in gis.GIS_LAYERS:

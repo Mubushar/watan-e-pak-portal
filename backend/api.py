@@ -56,6 +56,7 @@ import knowledge
 import memory as user_memory
 import portal_env
 import project_inventory
+import seed_media
 import prompts
 import property_admin
 import storage
@@ -92,6 +93,7 @@ async def lifespan(app: FastAPI):
     storage_state = storage.start()
     core.ensure_builtin_layers()  # overlays added in a newer version join the saved ones (unpublished)
     project_inventory.sync()      # project inventories from the data file: new units in, sold ones marked
+    seed_media.apply()            # credited photos for cities / schemes that have none yet
     logging.getLogger("portal").info("storage: %s", storage_state)
     try:
         async with core.mcp.session_manager.run():

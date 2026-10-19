@@ -53,7 +53,14 @@ export function gallery(p: Imageable): string[] {
   return [...ext.slice(0, 3), ...interiors, ...plan];
 }
 
-export function cityImage(name?: string | null): string {
+/** A Wikimedia Commons thumbnail at a smaller standard width (cards don't need 1280 px). */
+export function sized(url: string, width: 330 | 500 | 960 | 1280 = 960): string {
+  return url.includes("upload.wikimedia.org") ? url.replace(/\/\d+px-/, `/${width}px-`) : url;
+}
+
+/** A city's photo: its real (credited) image when it has one, else the bundled illustration. */
+export function cityImage(name?: string | null, image?: string | null): string {
+  if (image) return sized(image, 960);
   const n = (name ?? "").toLowerCase();
   if (["lahore", "karachi", "islamabad", "rawalpindi"].includes(n)) return `/seed/cities/${n}.svg`;
   return `/seed/cities/rawalpindi.svg`;

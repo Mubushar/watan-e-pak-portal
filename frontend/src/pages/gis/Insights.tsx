@@ -411,7 +411,7 @@ export default function Insights() {
             <CardBody className="space-y-2 p-3">
               {cities.map((c) => (
                 <Link key={c.id} to={`/cities/${encodeURIComponent(c.name)}`} className="group flex items-center gap-3 rounded-xl p-2 transition hover:bg-brand-50 dark:hover:bg-white/5">
-                  <img src={cityImage(c.name)} alt="" className="h-12 w-16 rounded-lg object-cover" />
+                  <img src={cityImage(c.name, c.image)} alt="" className="h-12 w-16 rounded-lg object-cover" />
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold text-ink group-hover:text-brand-700 dark:text-white">{c.name}</span>
                     <span className="block text-[11px] text-ink-mute">

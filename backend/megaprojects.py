@@ -50,7 +50,15 @@ def all_projects() -> List[Dict[str, Any]]:
         extra = project_inventory.as_megaprojects()
     except Exception:
         extra = []
-    return _load()["projects"] + extra
+    try:
+        import seed_media
+
+        photos = seed_media.load().get("megaprojects") or {}
+    except Exception:
+        photos = {}
+    base = [{**p, "image": photos[p["id"]]["url"], "image_credit": photos[p["id"]].get("credit")} if p["id"] in photos else p
+            for p in _load()["projects"]]
+    return base + extra
 
 
 def get(project_id: str) -> Optional[Dict[str, Any]]:

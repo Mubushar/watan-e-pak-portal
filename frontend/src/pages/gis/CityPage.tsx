@@ -92,7 +92,7 @@ export default function CityPage() {
   return (
     <div className="pb-16">
       <PageHeader
-        image={cityImage(cityName)}
+        image={cityImage(cityName, (citiesQ.data?.cities ?? []).find((c) => c.name.toLowerCase() === cityName.toLowerCase())?.image)}
         eyebrow={d ? [d.city.state, d.city.country].filter(Boolean).join(" · ") : "City guide"}
         title={
           <>
@@ -351,7 +351,7 @@ export default function CityPage() {
                 .filter((c) => c.name !== cityName)
                 .map((c) => (
                   <Link key={c.id} to={`/cities/${encodeURIComponent(c.name)}`} className="group relative block aspect-[4/3] overflow-hidden rounded-2xl shadow-soft">
-                    <img src={cityImage(c.name)} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                    <img src={cityImage(c.name, c.image)} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
                     <div className="absolute inset-0 bg-gradient-to-t from-brand-950/85 to-transparent" />
                     <div className="absolute bottom-3 start-3 text-white">
                       <p className="font-display text-lg font-bold">{c.name}</p>

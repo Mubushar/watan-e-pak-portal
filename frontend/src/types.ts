@@ -90,6 +90,9 @@ export interface City {
   schemes: number;
   properties: number;
   population?: number | null;
+  /** Real photo (Wikimedia Commons) and its credit line, when the city has one. */
+  image?: string | null;
+  image_credit?: string | null;
 }
 
 export interface Scheme {
