@@ -720,15 +720,15 @@ export default function Home() {
       <FeatureStrip />
       <StatsBand />
       <MarketShowcase props={props} loading={q.isLoading} />
-      <Together />
-      <MapShowcase />
-      <MapAndAssistant props={props} />
       <div className="container mt-12">
         <AdSlot slot="banner" placement="home" />
       </div>
       <Cities />
       <Categories />
       <MegaProjects />
+      <Together />
+      <MapShowcase />
+      <MapAndAssistant props={props} />
       <AgentsShowcase />
       <ToolsStrip />
       <div className="container">
