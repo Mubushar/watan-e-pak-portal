@@ -536,88 +536,62 @@ function MarketPulse() {
   );
 }
 
-/** Columns of the cities grid at the current width (1 / sm: 2 / lg: 4), to page it two rows at a time. */
-function useGridColumns(): number {
-  const read = () => (typeof window === "undefined" ? 4 : window.matchMedia("(min-width: 1024px)").matches ? 4 : window.matchMedia("(min-width: 640px)").matches ? 2 : 1);
-  const [cols, setCols] = useState(read);
-  useEffect(() => {
-    const on = () => setCols(read());
-    window.addEventListener("resize", on);
-    return () => window.removeEventListener("resize", on);
-  }, []);
-  return cols;
-}
-
 function Cities() {
   const q = useApi<{ cities: City[] }>("/cities");
-  // Most listings first, then the biggest cities; two rows per page.
+  // Most listings first, then the biggest cities — the same carousel as the mega projects.
   const cities = useMemo(
-    () => [...(q.data?.cities ?? [])].sort((a, b) => (b.properties ?? 0) - (a.properties ?? 0) || (b.population ?? 0) - (a.population ?? 0) || a.name.localeCompare(b.name)),
+    () => [...(q.data?.cities ?? [])].sort((a, b) => (b.properties ?? 0) - (a.properties ?? 0) || (b.population ?? 0) - (a.population ?? 0) || a.name.localeCompare(b.name)).slice(0, 12),
     [q.data],
   );
-  const perPage = useGridColumns() * 2;
-  const pages = Math.max(1, Math.ceil(cities.length / perPage));
-  const [page, setPage] = useState(0);
-  useEffect(() => setPage((p) => Math.min(p, pages - 1)), [pages]);
-  const shown = cities.slice(page * perPage, page * perPage + perPage);
   return (
     <Section
       eyebrow="Explore Pakistan"
       title="Top cities"
       subtitle="From Lahore’s heritage to Karachi’s coastline — dive into every city’s schemes, prices and growth."
       action={
-        pages > 1 ? (
-          <div className="flex items-center gap-2">
-            <span className="text-sm tabular-nums text-ink-mute">
-              {page * perPage + 1}–{Math.min(cities.length, page * perPage + perPage)} of {cities.length}
-            </span>
-            <button type="button" className="btn btn-outline btn-icon h-10 w-10" aria-label="Previous cities" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
-              <ArrowRight className="h-4 w-4 rotate-180 rtl:rotate-0" />
-            </button>
-            <button type="button" className="btn btn-outline btn-icon h-10 w-10" aria-label="More cities" disabled={page >= pages - 1} onClick={() => setPage((p) => Math.min(pages - 1, p + 1))}>
-              <ArrowRight className="h-4 w-4 rtl:rotate-180" />
-            </button>
-          </div>
-        ) : undefined
+        <Link to="/schemes" className="btn btn-outline">
+          All cities <ArrowRight className="h-4 w-4 rtl:rotate-180" />
+        </Link>
       }
     >
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {shown.map((c, i) => (
-          <motion.div key={c.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-            <Link to={`/cities/${encodeURIComponent(c.name)}`} className="group relative block aspect-[4/5] overflow-hidden rounded-3xl shadow-card">
-              <img src={cityImage(c.name)} alt={c.name} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
-              <div className="absolute inset-0 bg-gradient-to-t from-brand-950/90 via-brand-950/20 to-transparent" />
+      {q.isLoading ? (
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="aspect-[16/11] rounded-3xl" />
+          ))}
+        </div>
+      ) : (
+        <Carousel slideClass="basis-[85%] sm:basis-1/2 lg:basis-1/3" arrows dots>
+          {cities.map((c) => (
+            <Link key={c.id} to={`/cities/${encodeURIComponent(c.name)}`} className="group relative block aspect-[16/11] overflow-hidden rounded-3xl shadow-card">
+              <img src={cityImage(c.name)} alt={c.name} loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+              <div className="absolute start-4 top-4 flex gap-2">
+                {c.state && <span className="chip bg-white/90 text-brand-800">{c.state}</span>}
+                {!!c.properties && <span className="chip bg-gold-400 text-brand-950">{c.properties} listings</span>}
+              </div>
               <div className="absolute inset-x-0 bottom-0 p-5 text-white">
-                <p className="text-xs font-semibold uppercase tracking-widest text-gold-300">{c.state}</p>
-                <p className="font-display text-2xl font-bold">{c.name}</p>
-                <div className="mt-2 flex gap-3 text-xs text-white/80">
-                  <span>{c.schemes} schemes</span>
-                  <span>·</span>
-                  <span>{c.properties} listings</span>
+                <p className="font-display text-xl font-bold">{c.name}</p>
+                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/80">
+                  <span className="inline-flex items-center gap-1">
+                    <Building className="h-3.5 w-3.5" /> {c.schemes} schemes
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <MapPin className="h-3.5 w-3.5" /> {c.properties} listings
+                  </span>
+                  {!!c.population && (
+                    <span className="inline-flex items-center gap-1">
+                      <Ruler className="h-3.5 w-3.5" /> {compact(c.population)} people
+                    </span>
+                  )}
                 </div>
                 <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-gold-200 opacity-0 transition group-hover:opacity-100">
                   Explore <ArrowRight className="h-4 w-4 rtl:rotate-180" />
                 </span>
               </div>
             </Link>
-          </motion.div>
-        ))}
-        {q.isLoading && Array.from({ length: perPage }).map((_, i) => <Skeleton key={i} className="aspect-[4/5] rounded-3xl" />)}
-      </div>
-      {pages > 1 && (
-        <div className="mt-6 flex justify-center gap-1.5" role="tablist" aria-label="City pages">
-          {Array.from({ length: pages }).map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              role="tab"
-              aria-selected={i === page}
-              aria-label={`Page ${i + 1}`}
-              onClick={() => setPage(i)}
-              className={`h-2 rounded-full transition-all ${i === page ? "w-6 bg-brand-700 dark:bg-gold-400" : "w-2 bg-black/15 hover:bg-black/30 dark:bg-white/20"}`}
-            />
           ))}
-        </div>
+        </Carousel>
       )}
     </Section>
   );
@@ -644,7 +618,7 @@ function Categories() {
 }
 
 function MegaProjects() {
-  const q = useApi<{ projects: { id: string; name: string; project_type: string; status: string; city: string; floor_count: number; total_area: number; occupancy_rate: number | null }[] }>("/bigprojects");
+  const q = useApi<{ projects: { id: string; name: string; project_type: string; status: string; city: string; floor_count: number; total_area: number; occupancy_rate: number | null; image?: string | null }[] }>("/bigprojects");
   if (!q.data?.projects.length) return null;
   return (
     <Section
@@ -659,8 +633,8 @@ function MegaProjects() {
     >
       <Carousel slideClass="basis-[85%] sm:basis-1/2 lg:basis-1/3" arrows dots>
         {q.data.projects.map((p) => (
-          <Link key={p.id} to="/projects" className="group relative block aspect-[16/11] overflow-hidden rounded-3xl shadow-card">
-            <img src={themedImage(p.id, `${p.project_type} ${p.name}`)} alt="" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+          <Link key={p.id} to={`/projects?project=${p.id}`} className="group relative block aspect-[16/11] overflow-hidden rounded-3xl shadow-card">
+            <img src={p.image ?? themedImage(p.id, `${p.project_type} ${p.name}`)} alt="" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
             <div className="absolute start-4 top-4 flex gap-2">
               <span className="chip bg-white/90 text-brand-800">{titleCase(p.project_type)}</span>
