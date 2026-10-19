@@ -442,13 +442,13 @@ function Cities() {
       }
     >
       {q.isLoading ? (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="aspect-[16/11] rounded-3xl" />
           ))}
         </div>
       ) : (
-        <Carousel slideClass="basis-[85%] sm:basis-1/2 lg:basis-1/3" arrows dots>
+        <Carousel slideClass="basis-[85%] sm:basis-1/2 lg:basis-1/4" arrows dots>
           {cities.map((c) => (
             <Link key={c.id} to={`/cities/${encodeURIComponent(c.name)}`} className="group relative block aspect-[16/11] overflow-hidden rounded-3xl shadow-card">
               <img src={cityImage(c.name, c.image)} alt={c.name} title={c.image_credit ? `Photo: ${c.image_credit}` : undefined} loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
@@ -519,7 +519,7 @@ function MegaProjects() {
         </Link>
       }
     >
-      <Carousel slideClass="basis-[85%] sm:basis-1/2 lg:basis-1/3" arrows dots>
+      <Carousel slideClass="basis-[85%] sm:basis-1/2 lg:basis-1/4" arrows dots>
         {q.data.projects.map((p) => (
           <Link key={p.id} to={`/projects?project=${p.id}`} className="group relative block aspect-[16/11] overflow-hidden rounded-3xl shadow-card">
             <img src={p.image ?? themedImage(p.id, `${p.project_type} ${p.name}`)} alt="" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
