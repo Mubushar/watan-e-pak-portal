@@ -23,7 +23,7 @@ TYPE_LABELS = {
     "ring_road": "Ring road", "motorway": "Motorway", "expressway": "Expressway / avenue",
     "transit": "Mass transit", "railway": "Railway", "subdivision": "New sector / city",
     "industrial": "Industrial / economic zone", "airport": "Airport", "cbd": "Business district",
-    "tower": "High-rise & mixed-use project",
+    "tower": "High-rise & mixed-use project", "mall": "Shopping mall",
 }
 STATUS_LABELS = {"planned": "Planned", "approved": "Approved", "under_construction": "Under construction", "completed": "Recently completed"}
 # How much a project's status counts towards price effect today (0-1).

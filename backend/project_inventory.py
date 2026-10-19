@@ -21,6 +21,7 @@ Updating an inventory = rebuilding the JSON file and restarting (or calling ``sy
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
@@ -84,12 +85,16 @@ def _city(core: Any, name: str) -> Any:
 
 
 def _scheme(core: Any, name: str, city_id: str) -> Any:
-    want = name.lower().replace("phase viii", "phase 8")
-    for s in core.housing_schemes_db:
-        n = s.name.lower().replace("phase viii", "phase 8")
-        if n == want or (want in n and len(n) - len(want) < 6):
-            return s
-    return None
+    """The portal's society for a name — "Johar Town" matches "Johar Town (LDA)", the same city first."""
+    def norm(x: str) -> str:
+        return re.sub(r"\s*\(.*?\)", "", x.lower().replace("phase viii", "phase 8")).strip()
+
+    want = norm(name)
+    if not want:
+        return None
+    hits = [s for s in core.housing_schemes_db
+            if norm(s.name) == want or (want in norm(s.name) and len(norm(s.name)) - len(want) < 6)]
+    return next((s for s in hits if s.city_id == city_id), hits[0] if hits else None)
 
 
 def _description(p: Dict[str, Any], u: Dict[str, Any], checked: str) -> str:
@@ -223,18 +228,25 @@ def as_megaprojects() -> List[Dict[str, Any]]:
     for p in load().get("projects", []):
         prices = [u["price"] for u in p.get("units", [])]
         n = len(p.get("units", []))
+        plan = (p.get("payment_plan") or {}).get("summary")
+        on_sale = (f" {n} units available" + (f" from {_money(min(prices))} to {_money(max(prices))}" if prices else "")
+                   + (f"; {plan}" if plan else "") + ".") if n else ""
         out.append({
-            "id": p["id"], "name": p["name"], "name_ur": None, "type": "tower", "status": p["status"],
+            "id": p["id"], "name": p["name"], "name_ur": None,
+            "type": "mall" if p.get("project_type") == "mall" else "tower", "status": p["status"],
             "city": p["city"], "scheme": p.get("scheme"), "province": PROVINCE.get(p["city"]), "authority": p["developer"],
-            "start_year": None, "completion": "To be confirmed by the developer",
-            "summary": f"{p['tagline']} — {p['address']}. {n} units available"
-                       + (f" from {_money(min(prices))} to {_money(max(prices))}" if prices else "")
-                       + f"; {p['payment_plan']['summary']}.",
-            "impact": "Adds new shops, offices and homes to the area; nearby rents and resale prices are compared "
-                      "against its launch prices.",
+            "start_year": p.get("opened"),
+            "completion": "Open" if p["status"] == "completed" else "To be confirmed by the developer",
+            "summary": f"{p['tagline']} — {p['address']}." + on_sale,
+            "impact": ("A landmark that draws shoppers and offices; homes and shops nearby are compared against it."
+                       if p["status"] == "completed" else
+                       "Adds new shops, offices and homes to the area; nearby rents and resale prices are compared "
+                       "against its launch prices."),
             "uplift": "low", "impact_radius_km": 0.5,
             "geometry": {"type": "point", "center": [p["location"]["lat"], p["location"]["lon"]], "radius_km": 0.08},
             "sources": p.get("sources", []), "portal_project": True, "units_available": n,
             "price_from": min(prices) if prices else None, "website": (p.get("sources") or [{}])[0].get("url"),
+            "image": (p.get("images") or [{}])[0].get("url"),
+            "image_credit": (p.get("images") or [{}])[0].get("caption"),
         })
     return out

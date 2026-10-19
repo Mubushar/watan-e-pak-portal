@@ -238,7 +238,17 @@ data = {
     "checked": CHECKED,
     "projects": [china, skyra, goldcrest],
 }
+
+# ------------------------------------------------------------------ landmark malls and towers
+# Completed or selling landmarks without a public unit inventory (researched 2026-10-19 from the
+# developers' sites, Wikipedia and OpenStreetMap); photos are credited, Wikimedia Commons first.
+LANDMARKS = HERE / "landmarks.json"
+if LANDMARKS.exists():
+    for r in json.loads(LANDMARKS.read_text(encoding="utf-8")):
+        r.setdefault("units", [])
+        r["images"] = [{"url": i["url"], "caption": i.get("credit") or ""} for i in r.get("images") or []]
+        data["projects"].append(r)
 OUT.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
 for p in data["projects"]:
     prices = [u["price"] for u in p["units"]]
-    print(p["name"], len(p["units"]), "available", min(prices), max(prices))
+    print(p["name"], len(p["units"]), "available", *((min(prices), max(prices)) if prices else ()))
