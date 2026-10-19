@@ -120,6 +120,7 @@ _add("*", r"^/memory(/|$)", "settings.manage")
 _add(W, r"^/masterplans/knowledge/refresh$", "settings.manage")
 _add("*", r"^/admin/basedata(/|$)", "basedata.manage")
 _add("*", r"^/admin/properties(/|$)", "properties.manage")
+_add("GET", r"^/admin/locations$", "properties.manage")  # Locate tool: records with missing / doubtful locations
 _add(W, r"^/(cities|schemes|blocks)(/|$)", "basedata.manage")
 
 # ---- CRM family

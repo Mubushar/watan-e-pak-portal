@@ -49,6 +49,7 @@ import masterplan
 import web_lookup
 import ai_guard
 import directions as routing
+import locations
 import megaprojects
 import roads
 import access
@@ -2405,6 +2406,15 @@ def geo_megaproject_add_photo(project_id: str, payload: PhotoUpload) -> Any:
         return megaprojects.admin_add_photo(project_id, _save_upload(payload.data_url), payload.is_primary)
     except KeyError:
         raise HTTPException(status_code=404, detail="Project not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.get("/admin/locations", tags=["admin"])
+def admin_locations(kind: str = "property", q: str = "", status: str = "problems", page: int = 1, page_size: int = 30) -> Any:
+    """Listings, big projects or mega-project points with a missing or doubtful location (Locate tool)."""
+    try:
+        return locations.search(kind=kind, q=q, status=status, page=page, page_size=page_size)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 

@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui";
 import type { MegaProject } from "./MegaProjects";
 
-export type EditMode = null | "select" | "add-property" | "add-project" | "add-mega-point" | "add-mega-line" | "add-mega-polygon";
+export type EditMode = null | "select" | "locate" | "add-property" | "add-project" | "add-mega-point" | "add-mega-line" | "add-mega-polygon";
 export type LatLng = [number, number];
 export type Geom = { type: "point"; at: LatLng | null; radius_km?: number } | { type: "line" | "polygon"; pts: LatLng[] };
 export type EditKind = "property" | "project" | "mega";
@@ -328,7 +328,7 @@ export function GeoEditPanel({
   const set = (k: string, v: unknown) => draft && setDraft({ ...draft, fields: { ...draft.fields, [k]: v } });
   const schemes = useMemo(() => (meta.data?.schemes ?? []).filter((s) => s.city_id === f.city_id), [meta.data, f.city_id]);
 
-  if (!mode && !draft) return null;
+  if ((!mode && !draft) || mode === "locate") return null;
   const hint = !draft
     ? mode === "select"
       ? "Click a listing, a project or a mega project on the map to edit it."

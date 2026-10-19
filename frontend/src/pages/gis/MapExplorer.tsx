@@ -66,6 +66,7 @@ import { POI_CATEGORIES, POI_MIN_ZOOM, PoiLayer } from "@/components/gis/PoiLaye
 import { AreaDraw, shapeAreaKm2, type DrawMode, type StudyShape } from "@/components/gis/AreaDraw";
 import { StudyReport, useStudyReport } from "@/components/gis/StudyReport";
 import { EditBar } from "@/components/gis/MapControls";
+import { LocateMarks, LocatePanel, type LocRow } from "@/components/gis/LocateTool";
 import { GeoEditLayer, GeoEditPanel, loadDraft, newDraft, pick, type Draft, type EditMode } from "@/components/gis/GeoEditor";
 import { useAuth } from "@/store/auth";
 import { ANNOTATION_MIN_ZOOM, MEGA_TYPES, MegaProjectLayer, useMegaProjects } from "@/components/gis/MegaProjects";
@@ -410,10 +411,12 @@ export default function MapExplorer() {
   const editRights = { property: can("properties.manage"), project: can("projects.manage"), mega: can("gis.manage") };
   const [editMode, setEditModeRaw] = useState<EditMode>(null);
   const [editDraft, setEditDraft] = useState<Draft | null>(null);
+  const [locateRow, setLocateRow] = useState<LocRow | null>(null);
   const editProjectsQ = useApi<{ projects: { id: string; name: string; latitude?: number | null; longitude?: number | null }[] }>(editMode ? "/bigprojects" : null);
   const setEditMode = (m: EditMode) => {
     setEditModeRaw(m);
     setEditDraft(null);
+    setLocateRow(null);
     if (m) {
       setZoomMode(null);
       setDrawMode(null);
@@ -421,6 +424,11 @@ export default function MapExplorer() {
     }
   };
   const onEditClick = async (at: L.LatLng) => {
+    if (editMode === "locate") {
+      // Locate: a click places the record's pin (once a record is chosen)
+      if (locateRow) setEditDraft({ kind: locateRow.kind, id: locateRow.id, fields: {}, geom: { type: "point", at: [at.lat, at.lng] } });
+      return;
+    }
     if (editDraft?.drawing && editDraft.geom.type !== "point") {
       setEditDraft({ ...editDraft, geom: { ...editDraft.geom, pts: [...editDraft.geom.pts, [at.lat, at.lng]] } });
       return;
@@ -734,11 +742,15 @@ export default function MapExplorer() {
         <ZoomArea active={zoomDraw} mode={zoomMode ?? "in"} onDone={endZoomDraw} padding={sidePad()} sticky />
         <AreaDraw mode={drawMode} shape={studyShape} onShape={onStudyShape} onCancel={cancelDraw} />
         <GeoEditLayer mode={editMode} draft={editDraft} setDraft={setEditDraft} onPick={onEditClick} />
+        {editMode === "locate" && <LocateMarks row={locateRow} />}
       </PortalMap>
       <EditBar
         edit={{ rights: editRights, mode: editMode, onMode: setEditMode }}
         className={cn("start-3", open ? "bottom-[calc(56%+0.75rem)] md:bottom-3 md:start-[408px]" : "bottom-[4.5rem] md:bottom-3 md:start-3")}
       />
+      {editMode === "locate" && (
+        <LocatePanel rights={editRights} draft={editDraft} setDraft={setEditDraft} row={locateRow} setRow={setLocateRow} map={map} onClose={() => setEditMode(null)} />
+      )}
       <GeoEditPanel
         mode={editMode}
         draft={editDraft}

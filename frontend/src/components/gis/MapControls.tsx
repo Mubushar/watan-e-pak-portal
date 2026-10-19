@@ -12,7 +12,7 @@
  * and shows how many of its layers are on; items can have sub-layers (e.g. a plan's labels).
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Building2, MapPin, Milestone, PencilLine, Plus, Spline, Square } from "lucide-react";
+import { Building2, LocateFixed, MapPin, Milestone, PencilLine, Plus, Spline, Square } from "lucide-react";
 import type { EditMode, EditRights } from "./GeoEditor";
 import { Check, ChevronDown, Circle, Globe, Hand, Undo2, Hexagon, Languages, Layers, Layers3, PencilRuler, RectangleHorizontal, Search, X, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
 import type { DrawMode } from "./AreaDraw";
@@ -467,7 +467,7 @@ export function EditBar({ edit, className }: { edit: { rights: EditRights; mode:
     return () => document.removeEventListener("pointerdown", close);
   }, [menu]);
   if (!edit.rights.property && !edit.rights.project && !edit.rights.mega) return null;
-  const adding = !!edit.mode && edit.mode !== "select";
+  const adding = !!edit.mode && edit.mode !== "select" && edit.mode !== "locate";
   const item = (active: boolean) =>
     cn("flex h-10 items-center gap-1.5 px-3 text-xs font-bold transition first:rounded-s-xl last:rounded-e-xl", active ? "bg-brand-700 text-white" : "text-brand-800 hover:bg-brand-50 dark:text-white dark:hover:bg-white/10");
   return (
@@ -494,6 +494,18 @@ export function EditBar({ edit, className }: { edit: { rights: EditRights; mode:
           onClick={() => (adding ? edit.onMode(null) : setMenu((m) => !m))}
         >
           <Plus className="h-4 w-4" /> {adding ? "Adding…" : "Add"}
+        </button>
+        <button
+          type="button"
+          className={item(edit.mode === "locate")}
+          aria-pressed={edit.mode === "locate"}
+          title={edit.mode === "locate" ? "Close Locate" : "Locate: find records with a missing or wrong location and set it — map, coordinates, place search, GPS or society centre"}
+          onClick={() => {
+            setMenu(false);
+            edit.onMode(edit.mode === "locate" ? null : "locate");
+          }}
+        >
+          <LocateFixed className="h-4 w-4" /> Locate
         </button>
       </div>
       {menu && (
