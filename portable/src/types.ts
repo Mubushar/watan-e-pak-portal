@@ -17,6 +17,7 @@ export interface Property {
   scheme_id?: string | null;
   project_id?: string | null;
   project_unit?: string | null;
+  sector?: string | null;
   block_zone_area_id?: string | null;
   bedrooms?: number | null;
   bathrooms?: number | null;

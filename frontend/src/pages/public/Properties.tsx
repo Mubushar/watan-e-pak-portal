@@ -13,6 +13,8 @@ import { Badge, Button, Drawer, EmptyState, ErrorState, RangeSlider, Segmented, 
 import { CompareButton, FavoriteButton, NearbyNote, PropertyCard } from "@/components/property/PropertyCard";
 import { PortalMap, pin } from "@/components/map/PortalMap";
 import { AdSlot } from "@/components/ads/AdSlot";
+import { UnitGroupCard } from "@/components/property/UnitGroupCard";
+import { floorOf, groupProjectUnits, isGroup, priceRange, projectNameOf, unitTypeOf } from "@/lib/projectGroups";
 
 const CATEGORIES = ["house", "apartment", "plot", "shop", "office", "floor", "building", "space"];
 const USE_TYPES = ["residential", "commercial", "mix"];
@@ -81,10 +83,11 @@ function useFilters() {
     sort: sp.get("sort") ?? "relevance",
     view: (sp.get("view") ?? "grid") as "grid" | "list" | "map",
     project: sp.get("project") ?? "",
+    unitType: sp.get("unit_type") ?? "",
   };
   const set = (patch: Partial<Record<keyof typeof f, string | number | boolean>>) => {
     const next = new URLSearchParams(sp);
-    const keyMap: Record<string, string> = { minPrice: "min", maxPrice: "max", nearPlace: "near_place", nearKm: "near_km" };
+    const keyMap: Record<string, string> = { minPrice: "min", maxPrice: "max", nearPlace: "near_place", nearKm: "near_km", unitType: "unit_type" };
     for (const [k, v] of Object.entries(patch)) {
       const key = keyMap[k] ?? k;
       const isDefault =
@@ -108,6 +111,7 @@ function matches(p: Property, f: ReturnType<typeof useFilters>["f"], societyId?:
   if (f.baths && (p.bathrooms ?? 0) < f.baths) return false;
   if (f.featured && !p.featured) return false;
   if (f.project && p.project_id !== f.project) return false;
+  if (f.unitType && (!p.project_id || unitTypeOf(p) !== f.unitType)) return false;
   if (f.q) {
     const hay = [p.title, p.description, p.scheme_name, p.block_name, p.city_name, p.category, p.use_type, p.street_address].join(" ").toLowerCase();
     const words = f.q.toLowerCase().split(/\s+/).filter((w) => w.length > 2 && !["for", "the", "and", "with", "under", "in"].includes(w));
@@ -509,6 +513,7 @@ export default function Properties() {
   const activeChips = [
     f.q && { k: "q", label: `“${f.q}”` },
     f.project && { k: "project", label: "One project’s units" },
+    f.unitType && { k: "unitType", label: f.unitType },
     f.city && { k: "city", label: f.city },
     f.society && { k: "society", label: f.society },
     f.category && { k: "category", label: titleCase(f.category) },
@@ -523,6 +528,9 @@ export default function Properties() {
   ].filter(Boolean) as { k: string; label: string }[];
 
   const pts = results.filter((p) => p.latitude && p.longitude);
+  // Big project inventories: one summary card per unit type, unless one project is open.
+  const shown = useMemo(() => (f.project ? results : groupProjectUnits(results)), [results, f.project]);
+  const projectUnits = useMemo(() => (f.project ? all.filter((p) => p.project_id === f.project) : []), [all, f.project]);
 
   return (
     <div>
@@ -598,6 +606,7 @@ export default function Properties() {
               ) : (
                 <>
                   <b className="text-ink dark:text-white">{results.length}</b> of {all.length} properties
+                  {shown.length < results.length && <> · new projects grouped by unit type</>}
                 </>
               )}
             </p>
@@ -640,6 +649,7 @@ export default function Properties() {
           )}
 
           {f.purpose === "rent" && <Rentals city={f.city} />}
+          {f.project && projectUnits.length > 0 && <ProjectInventorySummary units={projectUnits} active={f.unitType} onType={(unitType) => set({ unitType })} />}
 
           {q.error ? (
             <ErrorState error={q.error} onRetry={() => q.refetch()} />
@@ -702,17 +712,17 @@ export default function Properties() {
             </div>
           ) : f.view === "list" ? (
             <div className="space-y-4">
-              {results.map((p, i) => (
-                <div key={p.id}>
-                  <ListRow p={p} />
+              {shown.map((p, i) => (
+                <div key={isGroup(p) ? p.key : p.id}>
+                  {isGroup(p) ? <UnitGroupCard g={p} /> : <ListRow p={p} />}
                   {i === 3 && <AdSlot slot="banner" className="mt-4" placement="explore" />}
                 </div>
               ))}
             </div>
           ) : (
             <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-              {results.flatMap((p, i) => {
-                const items = [<PropertyCard key={p.id} p={p} />];
+              {shown.flatMap((p, i) => {
+                const items = [isGroup(p) ? <UnitGroupCard key={p.key} g={p} /> : <PropertyCard key={p.id} p={p} />];
                 if (i === 5) items.push(<AdSlot key="ad" slot="infeed" placement="explore" />);
                 return items;
               })}
@@ -910,6 +920,43 @@ function SocietyFilter({ societies, counts, city, value, onChange }: { societies
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/** When one project's units are open: its whole available inventory at a glance, by unit type. */
+function ProjectInventorySummary({ units, active, onType }: { units: Property[]; active: string; onType: (t: string) => void }) {
+  const types = useMemo(() => {
+    const m = new Map<string, Property[]>();
+    units.forEach((u) => m.set(unitTypeOf(u), [...(m.get(unitTypeOf(u)) ?? []), u]));
+    return [...m.entries()].sort((a, b) => Math.min(...a[1].map((u) => u.price)) - Math.min(...b[1].map((u) => u.price)));
+  }, [units]);
+  const prices = units.map((u) => u.price);
+  const floors = new Set(units.map(floorOf).filter(Boolean)).size;
+  return (
+    <div className="card mb-5 p-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="section-eyebrow">Available inventory</p>
+          <h2 className="font-display text-xl font-bold text-brand-900 dark:text-white">{projectNameOf(units[0]!)}</h2>
+          <p className="mt-1 text-sm text-ink-mute">
+            <b className="text-ink dark:text-white">{units.length}</b> units available · {types.length} types{floors ? ` · on ${floors} floors` : ""} · {priceRange(Math.min(...prices), Math.max(...prices))}
+          </p>
+        </div>
+        <Link to={`/projects?project=${units[0]!.project_id}`} className="btn btn-outline btn-sm">
+          Project details
+        </Link>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-1.5">
+        <button type="button" onClick={() => onType("")} className={cn("chip ring-1 transition", !active ? "bg-brand-700 text-white ring-brand-700" : "bg-white text-ink-soft ring-black/10 hover:ring-brand-300 dark:bg-white/5 dark:text-slate-300 dark:ring-white/10")}>
+          All types <span className="ms-1 text-[10px] opacity-70">{units.length}</span>
+        </button>
+        {types.map(([t, list]) => (
+          <button key={t} type="button" onClick={() => onType(active === t ? "" : t)} className={cn("chip capitalize ring-1 transition", active === t ? "bg-brand-700 text-white ring-brand-700" : "bg-white text-ink-soft ring-black/10 hover:ring-brand-300 dark:bg-white/5 dark:text-slate-300 dark:ring-white/10")}>
+            {t} <span className="ms-1 text-[10px] opacity-70">{list.length} · from {pkrShort(Math.min(...list.map((u) => u.price)), false)}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

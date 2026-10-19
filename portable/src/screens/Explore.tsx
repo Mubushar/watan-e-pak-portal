@@ -1,4 +1,4 @@
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Bot, LayoutGrid, List, SearchX, SlidersHorizontal, X } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -7,6 +7,8 @@ import { useApi } from "@/hooks/useApi";
 import { pkrShort, titleCase } from "@/lib/format";
 import { Button, EmptyState, Field, Input, Segmented, Select, Sheet, Skeleton, TopBar } from "@/components/ui";
 import { PropertyCard, PropertyRow } from "@/components/PropertyCard";
+import { groupHref, priceSpan, UnitGroupCard } from "@/components/UnitGroupCard";
+import { groupProjectUnits, isGroup, projectNameOf, unitTypeOf } from "@/lib/projectGroups";
 import { AdSlot, BannerSpacer, useNativeBanner } from "@/components/Ads";
 
 /** Listings between in-feed ads. */
@@ -56,11 +58,27 @@ export default function Explore() {
   const filters: Filters = Object.fromEntries(FILTER_KEYS.map((k) => [k, sp.get(k) ?? undefined]).filter(([, v]) => v));
   const [draft, setDraft] = useState<Filters>(filters);
   const cities = useApi<{ cities: City[] }>("/cities");
+  // One project's units (from a project card): filtered here; /search doesn't know projects.
+  const project = sp.get("project") ?? "";
+  const unitType = sp.get("unit_type") ?? "";
   const q = useApi<PropertyList>("/search", {
     ...filters,
     featured: filters.featured ? true : undefined,
-    limit: 60,
+    limit: 600,
   });
+  const results = useMemo(
+    () => (q.data?.results ?? []).filter((p) => (!project || p.project_id === project) && (!unitType || unitTypeOf(p) === unitType)),
+    [q.data, project, unitType],
+  );
+  // Big project inventories: one card per unit type, unless one project is open.
+  const shown = useMemo(() => (project ? results : groupProjectUnits(results)), [results, project]);
+  const projectUnits = useMemo(() => (project ? (q.data?.results ?? []).filter((p) => p.project_id === project) : []), [q.data, project]);
+  const setUnitType = (t: string) => {
+    const next = new URLSearchParams(sp);
+    if (t) next.set("unit_type", t);
+    else next.delete("unit_type");
+    setSp(next, { replace: true });
+  };
 
   const apply = (f: Filters) => {
     const next = new URLSearchParams();
@@ -130,7 +148,29 @@ export default function Explore() {
           </div>
         )}
 
-        <p className="mt-4 text-sm text-ink-mute dark:text-slate-400">{q.data ? `${q.data.count} ${q.data.count === 1 ? "property" : "properties"} found` : " "}</p>
+        {project && projectUnits.length > 0 && (
+          <div className="card mt-4 p-4">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-gold-700 dark:text-gold-300">Available inventory</p>
+            <p className="font-display text-lg font-bold text-brand-900 dark:text-white">{projectNameOf(projectUnits[0]!)}</p>
+            <p className="text-xs text-ink-mute">
+              {projectUnits.length} units · {priceSpan(Math.min(...projectUnits.map((u) => u.price)), Math.max(...projectUnits.map((u) => u.price)))}
+            </p>
+            <div className="no-scrollbar -mx-1 mt-3 flex gap-1.5 overflow-x-auto px-1">
+              <button onClick={() => setUnitType("")} className={`chip shrink-0 ring-1 ${!unitType ? "bg-brand-700 text-white ring-brand-700" : "bg-white text-ink-soft ring-black/10 dark:bg-white/5 dark:text-slate-300 dark:ring-white/10"}`}>
+                All {projectUnits.length}
+              </button>
+              {[...new Set(projectUnits.map(unitTypeOf))].map((t) => (
+                <button key={t} onClick={() => setUnitType(unitType === t ? "" : t)} className={`chip shrink-0 capitalize ring-1 ${unitType === t ? "bg-brand-700 text-white ring-brand-700" : "bg-white text-ink-soft ring-black/10 dark:bg-white/5 dark:text-slate-300 dark:ring-white/10"}`}>
+                  {t} <span className="text-[10px] opacity-70">{projectUnits.filter((u) => unitTypeOf(u) === t).length}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <p className="mt-4 text-sm text-ink-mute dark:text-slate-400">
+          {q.data ? `${results.length} ${results.length === 1 ? "property" : "properties"} found${shown.length < results.length ? " · new projects grouped by unit type" : ""}` : " "}
+        </p>
 
         {q.isLoading ? (
           <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -171,18 +211,26 @@ export default function Explore() {
           </EmptyState>
         ) : view === "grid" ? (
           <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {q.data.results.map((p, i) => (
-              <Fragment key={p.id}>
-                <PropertyCard p={p} />
+            {shown.map((p, i) => (
+              <Fragment key={isGroup(p) ? p.key : p.id}>
+                {isGroup(p) ? <UnitGroupCard g={p} /> : <PropertyCard p={p} />}
                 {(i + 1) % AD_EVERY === 0 && <AdSlot slot="infeed" placement="explore" index={(i + 1) / AD_EVERY - 1} />}
               </Fragment>
             ))}
           </div>
         ) : (
           <div className="card mt-3 divide-y divide-black/5 p-1.5 dark:divide-white/5">
-            {q.data.results.map((p, i) => (
-              <Fragment key={p.id}>
-                <PropertyRow p={p} />
+            {shown.map((p, i) => (
+              <Fragment key={isGroup(p) ? p.key : p.id}>
+                {isGroup(p) ? (
+                  <PropertyRow
+                    p={{ ...p.units[0]!, title: `${p.projectName} — ${p.units.length} × ${p.unitType}` }}
+                    to={groupHref(p)}
+                    extra={<span className="shrink-0 text-xs font-semibold text-brand-700 dark:text-brand-300">{priceSpan(p.priceMin, p.priceMax)}</span>}
+                  />
+                ) : (
+                  <PropertyRow p={p} />
+                )}
                 {(i + 1) % AD_EVERY === 0 && <AdSlot slot="infeed" placement="explore" variant="row" index={(i + 1) / AD_EVERY - 1} />}
               </Fragment>
             ))}

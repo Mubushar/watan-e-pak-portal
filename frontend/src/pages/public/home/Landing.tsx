@@ -13,6 +13,7 @@ import { useApi } from "@/hooks/useApi";
 import { pkrShort } from "@/lib/format";
 import { coverImage } from "@/lib/images";
 import { RepresentativeTag } from "@/components/property/PropertyCard";
+import { groupProjectUnits, isGroup, priceRange } from "@/lib/projectGroups";
 import { cn } from "@/lib/utils";
 import { usePrefs } from "@/store/prefs";
 
@@ -187,12 +188,36 @@ export function MarketShowcase({ props, loading }: { props: Property[]; loading:
   const [more, setMore] = useState(false);
   const list = useMemo(() => {
     const f = FILTERS.find((x) => x.key === filter)!;
-    const rows = props.filter(f.match);
-    if (filter !== "all") return rows;
-    // the portal's order from the API (DHA / Bahria phases first, Islamabad first); one unit per
-    // new project so a big inventory doesn't fill the row
+    // the portal's order from the API (DHA / Bahria phases first, Islamabad first); a big project's
+    // units become one card per unit type, and on "All" one card per project so it can't fill the row
+    const rows = groupProjectUnits(props.filter(f.match));
     const seen = new Set<string>();
-    return rows.filter((p) => !p.project_id || (!seen.has(p.project_id) && !!seen.add(p.project_id)));
+    const items = filter === "all" ? rows.filter((r) => !isGroup(r) || (!seen.has(r.projectId) && !!seen.add(r.projectId))) : rows;
+    return items.map((r) =>
+      isGroup(r)
+        ? {
+            id: r.key,
+            href: `/properties?project=${r.projectId}&unit_type=${encodeURIComponent(r.unitType)}`,
+            img: coverImage(r.units[0]!),
+            chip: `New project · ${r.units.length} available`,
+            title: `${r.projectName} — ${/s$/i.test(r.unitType) ? r.unitType : r.unitType + "s"}`,
+            where: [r.units[0]!.scheme_name, r.units[0]!.city_name].filter(Boolean).join(", "),
+            price: priceRange(r.priceMin, r.priceMax),
+            ask: `Tell me about the ${r.unitType}s at ${r.projectName} — prices, sizes, floors and payment plan.`,
+            cta: `See all ${r.units.length}`,
+          }
+        : {
+            id: r.id,
+            href: `/properties/${r.id}`,
+            img: coverImage(r),
+            chip: r.project_id ? "New project" : r.category,
+            title: r.title,
+            where: [r.scheme_name, r.city_name].filter(Boolean).join(", "),
+            price: pkrShort(r.price),
+            ask: `Tell me about “${r.title}” — is it good value, and what is nearby?`,
+            cta: "View details",
+          },
+    );
   }, [props, filter]);
   const shown = list.slice(0, more ? 12 : 8);
   return (
@@ -234,24 +259,24 @@ export function MarketShowcase({ props, loading }: { props: Property[]; loading:
                 transition={{ delay: Math.min(i, 8) * 0.04 }}
                 className="card card-hover flex flex-col overflow-hidden"
               >
-                <Link to={`/properties/${p.id}`} className="group relative block aspect-[16/10] overflow-hidden bg-black/5">
-                  <img src={coverImage(p)} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                  <span className="chip absolute start-2.5 top-2.5 bg-white/90 text-brand-800 shadow">{p.project_id ? "New project" : p.category}</span>
-                  <RepresentativeTag src={coverImage(p)} className="bottom-2 start-2.5" />
+                <Link to={p.href} className="group relative block aspect-[16/10] overflow-hidden bg-black/5">
+                  <img src={p.img} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                  <span className="chip absolute start-2.5 top-2.5 bg-white/90 text-brand-800 shadow">{p.chip}</span>
+                  <RepresentativeTag src={p.img} className="bottom-2 start-2.5" />
                 </Link>
                 <div className="flex flex-1 flex-col p-3.5">
                   <p className="line-clamp-2 text-sm font-semibold leading-snug text-ink dark:text-white">{p.title}</p>
                   <p className="mt-1 flex items-center gap-1 truncate text-xs text-ink-mute">
-                    <MapPin className="h-3.5 w-3.5 shrink-0" /> {[p.scheme_name, p.city_name].filter(Boolean).join(", ")}
+                    <MapPin className="h-3.5 w-3.5 shrink-0" /> {p.where}
                   </p>
-                  <p className="mt-1.5 font-display text-base font-bold text-brand-800 dark:text-gold-300">{pkrShort(p.price)}</p>
+                  <p className="mt-1.5 font-display text-base font-bold text-brand-800 dark:text-gold-300">{p.price}</p>
                   <div className="mt-auto flex gap-2 pt-3">
-                    <Link to={`/properties/${p.id}`} className="btn btn-primary btn-sm flex-1">
-                      View details
+                    <Link to={p.href} className="btn btn-primary btn-sm flex-1">
+                      {p.cta}
                     </Link>
                     <button
                       type="button"
-                      onClick={() => nav(`/ai?q=${encodeURIComponent(`Tell me about “${p.title}” — is it good value, and what is nearby?`)}`)}
+                      onClick={() => nav(`/ai?q=${encodeURIComponent(p.ask)}`)}
                       className="btn btn-gold btn-sm flex-1"
                     >
                       <Sparkles className="h-3.5 w-3.5" /> Ask AI
