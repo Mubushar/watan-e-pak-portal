@@ -4,7 +4,7 @@ import { Bath, BedDouble, GitCompareArrows, Heart, MapPin, Ruler, Sparkles } fro
 import { toast } from "sonner";
 import type { Property } from "@/types";
 import { area, pkrShort, titleCase } from "@/lib/format";
-import { coverImage } from "@/lib/images";
+import { coverImage, isRepresentative } from "@/lib/images";
 import { cn } from "@/lib/utils";
 import { usePrefs } from "@/store/prefs";
 
@@ -67,6 +67,19 @@ export function NearbyNote({ p, className }: { p: Property; className?: string }
   return null;
 }
 
+/** Shown on a library photo: a real photo of a similar property, not this listing's own. */
+export function RepresentativeTag({ src, className }: { src: string; className?: string }) {
+  if (!isRepresentative(src)) return null;
+  return (
+    <span
+      title="A real photo of a similar property — the owner hasn’t added photos of this one yet"
+      className={cn("pointer-events-none absolute bottom-12 start-3 rounded-md bg-black/40 px-1.5 py-0.5 text-[10px] font-medium text-white/90 backdrop-blur-sm", className)}
+    >
+      Representative photo
+    </span>
+  );
+}
+
 export function PropertyCard({ p, className, compact }: { p: Property; className?: string; compact?: boolean }) {
   const loc = [p.block_name, p.scheme_name, p.city_name].filter(Boolean).join(", ") || p.street_address || p.city_name || "Pakistan";
   return (
@@ -75,6 +88,7 @@ export function PropertyCard({ p, className, compact }: { p: Property; className
         <div className={cn("relative overflow-hidden", compact ? "aspect-[16/10]" : "aspect-[4/3]")}>
           <img src={coverImage(p)} alt={p.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-80" />
+          <RepresentativeTag src={coverImage(p)} />
           <div className="absolute start-3 top-3 flex flex-wrap gap-1.5">
             {p.featured && (
               <span className="chip bg-gold-gradient text-brand-950 shadow">

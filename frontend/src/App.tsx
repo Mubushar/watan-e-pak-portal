@@ -27,6 +27,7 @@ const P: Record<string, ComponentType> = {
   Infrastructure: lazy(() => import("@/pages/gis/Infrastructure")),
   ContentPage: lazy(() => import("@/pages/content/ContentPage")),
   Stories: lazy(() => import("@/pages/content/Stories")),
+  PhotoCredits: lazy(() => import("@/pages/content/PhotoCredits")),
   Pricing: lazy(() => import("@/pages/content/Pricing")),
   // AI & tools
   AIHub: lazy(() => import("@/pages/ai/AIHub")),
@@ -116,6 +117,7 @@ export default function App() {
             <Route path="infrastructure" element={<P.Infrastructure />} />
             <Route path="pages/:key" element={<P.ContentPage />} />
             <Route path="stories" element={<P.Stories />} />
+            <Route path="credits" element={<P.PhotoCredits />} />
             <Route path="pricing" element={<P.Pricing />} />
             <Route path="ai" element={<P.AIHub />} />
             <Route path="ai/agents/:key" element={<P.AgentDetail />} />

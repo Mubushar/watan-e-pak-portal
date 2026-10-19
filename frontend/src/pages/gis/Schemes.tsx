@@ -26,7 +26,7 @@ import {
 import type { Property, PropertyList, Scheme } from "@/types";
 import { useApi } from "@/hooks/useApi";
 import { compact, num, pct, pkrShort } from "@/lib/format";
-import { HERO, themedImage } from "@/lib/images";
+import { HERO, sized, themedImage } from "@/lib/images";
 import { cn } from "@/lib/utils";
 import { Badge, Button, Card, CardBody, CardHeader, EmptyState, ErrorState, Input, JsonView, PageHeader, ScoreRing, Skeleton, StatCard } from "@/components/ui";
 import { PropertyCard } from "@/components/property/PropertyCard";
@@ -328,7 +328,7 @@ function BrowseAll({
                 className="card card-hover group overflow-hidden text-start"
               >
                 <div className="relative aspect-[16/10] overflow-hidden">
-                  <img src={themedImage(s.id, s.name)} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                  <img src={s.image ? sized(s.image, 500) : themedImage(s.id, s.name)} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
                   <div className="absolute inset-0 bg-gradient-to-t from-brand-950/80 via-brand-950/10 to-transparent" />
                   <span className="chip absolute start-3 top-3 bg-white/90 text-brand-800 shadow dark:bg-black/50 dark:text-white">
                     <MapPin className="h-3 w-3 text-gold-600" /> {s.city}
@@ -391,7 +391,7 @@ function SchemeDetail({
     <div className="space-y-6">
       {/* hero */}
       <div className="relative overflow-hidden rounded-3xl bg-brand-950 text-white shadow-soft">
-        <img src={themedImage(scheme.id, scheme.name)} alt="" className="absolute inset-0 h-full w-full object-cover opacity-55" />
+        <img src={scheme.image ? sized(scheme.image, 1280) : themedImage(scheme.id, scheme.name)} alt="" className="absolute inset-0 h-full w-full object-cover opacity-55" />
         <div className="absolute inset-0 bg-gradient-to-r from-brand-950 via-brand-950/80 to-brand-900/20 rtl:bg-gradient-to-l" />
         <div className="relative p-6 sm:p-8">
           <button onClick={onBack} className="inline-flex items-center gap-1 text-xs font-semibold text-white/70 transition hover:text-white">

@@ -104,6 +104,9 @@ export interface Scheme {
   blocks?: number;
   development_status?: string | null;
   approval_authority?: string | null;
+  /** A real, credited photo of the society (seed media), when there is one. */
+  image?: string | null;
+  image_credit?: string | null;
 }
 
 export interface NewsItem {

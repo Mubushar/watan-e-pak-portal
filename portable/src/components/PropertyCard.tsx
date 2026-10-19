@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Bath, BedDouble, Heart, MapPin, Ruler, Sparkles } from "lucide-react";
 import type { Property } from "@/types";
 import { area, pkrShort, titleCase } from "@/lib/format";
-import { coverImage } from "@/lib/images";
+import { coverImage, isRepresentative } from "@/lib/images";
 import { cn } from "@/lib/utils";
 import { usePrefs } from "@/store/prefs";
 import { Badge, statusTone } from "./ui";
@@ -31,6 +31,19 @@ export function FavoriteButton({ id, className }: { id: string; className?: stri
   );
 }
 
+/** Shown on a library photo: a real photo of a similar property, not this listing's own. */
+export function RepresentativeTag({ src, className }: { src: string; className?: string }) {
+  if (!isRepresentative(src)) return null;
+  return (
+    <span
+      title="A real photo of a similar property — the owner hasn’t added photos of this one yet"
+      className={cn("pointer-events-none absolute bottom-12 start-3 rounded-md bg-black/40 px-1.5 py-0.5 text-[10px] font-medium text-white/90 backdrop-blur-sm", className)}
+    >
+      Representative photo
+    </span>
+  );
+}
+
 /** Large photo card — portal PropertyCard styling. */
 export function PropertyCard({ p, className, compact }: { p: Property; className?: string; compact?: boolean }) {
   return (
@@ -38,6 +51,7 @@ export function PropertyCard({ p, className, compact }: { p: Property; className
       <div className={cn("relative overflow-hidden", compact ? "aspect-[16/10]" : "aspect-[4/3]")}>
         <img src={coverImage(p)} alt={p.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
+        <RepresentativeTag src={coverImage(p)} />
         <div className="absolute start-3 top-3 flex flex-wrap gap-1.5">
           {p.featured && (
             <span className="chip bg-gold-gradient text-brand-950 shadow">

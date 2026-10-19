@@ -7,7 +7,7 @@ import type { MapView, NearbyList, Property } from "@/types";
 import { useApi } from "@/hooks/useApi";
 import { apiBase, post } from "@/lib/api";
 import { area, date, num, pkr, pkrShort, titleCase } from "@/lib/format";
-import { gallery } from "@/lib/images";
+import { gallery, libraryPhoto } from "@/lib/images";
 import { isNative } from "@/lib/platform";
 import { useAuth } from "@/store/auth";
 import { Badge, Button, EmptyState, Field, Input, Sheet, Skeleton, statusTone, Textarea, TopBar } from "@/components/ui";
@@ -127,6 +127,17 @@ export default function PropertyDetail() {
             ))}
           </div>
         </div>
+        {(() => {
+          const lib = imgs[slide] ? libraryPhoto(imgs[slide]!) : undefined;
+          return lib ? (
+            <p className="mt-1.5 text-[11px] leading-snug text-ink-mute">
+              <b className="text-ink-soft dark:text-slate-300">Representative photo</b> — the owner hasn’t added photos yet.{" "}
+              <a href={lib.link} target="_blank" rel="noreferrer" className="underline">
+                Photo: {lib.credit}
+              </a>
+            </p>
+          ) : null;
+        })()}
 
         {/* headline */}
         <div className="mt-5">

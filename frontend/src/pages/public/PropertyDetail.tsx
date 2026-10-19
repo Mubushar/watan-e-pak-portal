@@ -36,7 +36,7 @@ import type { MapOverlay, NearbyList, Property, PropertyList } from "@/types";
 import { useApi, useMutate } from "@/hooks/useApi";
 import { API_BASE, apiUrl, post } from "@/lib/api";
 import { area, num, pct, pkr, pkrShort, titleCase } from "@/lib/format";
-import { gallery, resolveImage } from "@/lib/images";
+import { gallery, libraryPhoto, resolveImage } from "@/lib/images";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/store/auth";
 import { usePrefs } from "@/store/prefs";
@@ -70,6 +70,17 @@ function Gallery({ images, title }: { images: string[]; title: string }) {
           <AnimatePresence mode="wait">
             <motion.img key={i} src={images[i]} alt={title} initial={{ opacity: 0, scale: 1.02 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.35 }} className="h-full w-full object-cover" />
           </AnimatePresence>
+          {(() => {
+            const lib = images[i] ? libraryPhoto(images[i]!) : undefined;
+            return lib ? (
+              <p className="absolute bottom-3 start-3 max-w-[70%] rounded-xl bg-black/50 px-3 py-1.5 text-[11px] leading-snug text-white backdrop-blur">
+                <b>Representative photo</b> — the owner hasn’t added photos yet.{" "}
+                <a href={lib.link} target="_blank" rel="noreferrer" className="underline decoration-white/40 hover:decoration-white">
+                  Photo: {lib.credit}
+                </a>
+              </p>
+            ) : null;
+          })()}
           <button onClick={() => go(-1)} className="absolute start-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-brand-800 opacity-0 shadow-soft transition group-hover:opacity-100" aria-label="Previous">
             <ChevronLeft className="h-5 w-5 rtl:rotate-180" />
           </button>
@@ -85,7 +96,7 @@ function Gallery({ images, title }: { images: string[]; title: string }) {
             <button key={src + k} onClick={() => setI(k)} className={cn("relative aspect-[16/10] w-36 shrink-0 overflow-hidden rounded-2xl ring-2 ring-offset-2 ring-offset-transparent transition lg:w-full", k === i ? "ring-gold-400" : "ring-transparent opacity-75 hover:opacity-100")}>
               <img src={src} alt="" className="h-full w-full object-cover" />
               {src.includes("/plans/") && <span className="chip absolute bottom-1.5 start-1.5 bg-white/90 text-[10px] text-brand-800">Floor plan</span>}
-              {src.includes("/interiors/") && <span className="chip absolute bottom-1.5 start-1.5 bg-white/90 text-[10px] text-brand-800">Interior</span>}
+              {(src.includes("/interiors/") || src.includes("/photos/interior-")) && <span className="chip absolute bottom-1.5 start-1.5 bg-white/90 text-[10px] text-brand-800">Interior</span>}
             </button>
           ))}
         </div>

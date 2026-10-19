@@ -12,6 +12,7 @@ import type { Property } from "@/types";
 import { useApi } from "@/hooks/useApi";
 import { pkrShort } from "@/lib/format";
 import { coverImage } from "@/lib/images";
+import { RepresentativeTag } from "@/components/property/PropertyCard";
 import { cn } from "@/lib/utils";
 import { usePrefs } from "@/store/prefs";
 
@@ -236,6 +237,7 @@ export function MarketShowcase({ props, loading }: { props: Property[]; loading:
                 <Link to={`/properties/${p.id}`} className="group relative block aspect-[16/10] overflow-hidden bg-black/5">
                   <img src={coverImage(p)} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
                   <span className="chip absolute start-2.5 top-2.5 bg-white/90 text-brand-800 shadow">{p.project_id ? "New project" : p.category}</span>
+                  <RepresentativeTag src={coverImage(p)} className="bottom-2 start-2.5" />
                 </Link>
                 <div className="flex flex-1 flex-col p-3.5">
                   <p className="line-clamp-2 text-sm font-semibold leading-snug text-ink dark:text-white">{p.title}</p>

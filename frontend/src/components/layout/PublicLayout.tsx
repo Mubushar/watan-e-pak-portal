@@ -194,7 +194,7 @@ function Footer() {
     { title: "Explore", links: [["Properties", "/properties"], ["Housing societies", "/schemes"], ["Infrastructure", "/infrastructure"], ["Mega projects", "/projects"], ["Map explorer", "/map"], ["Compare", "/compare"]] },
     { title: "Intelligence", links: [["Market insights", "/insights"], ["News & impact", "/news"], ["AI Hub", "/ai"], ["MCP console", "/ai/mcp"], ["Tools center", "/tools"]] },
     { title: "Company", links: [["About", "/pages/about"], ["Mission", "/pages/mission"], ["Careers", "/pages/careers"], ["Success stories", "/stories"], ["Pricing", "/pricing"]] },
-    { title: "Help", links: [["How it works", "/pages/how-it-works"], ["FAQ", "/pages/faq"], ["Terms", "/pages/terms"], ["Privacy", "/pages/privacy"], ["Dashboard", "/app"]] },
+    { title: "Help", links: [["How it works", "/pages/how-it-works"], ["FAQ", "/pages/faq"], ["Terms", "/pages/terms"], ["Privacy", "/pages/privacy"], ["Photo credits", "/credits"], ["Dashboard", "/app"]] },
   ];
   return (
     <footer className="relative mt-16 overflow-hidden bg-brand-950 text-white">
