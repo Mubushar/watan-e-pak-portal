@@ -1120,6 +1120,7 @@ export default function MapExplorer() {
                           },
                         }}
                         map={map}
+                        only={layersQ.data ? visiblePlans : undefined}
                         shown={planShown}
                         setShown={(s) => {
                           setPlanShown(s);

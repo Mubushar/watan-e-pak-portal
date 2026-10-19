@@ -16732,9 +16732,10 @@ def init_sample_data() -> None:
     # ---- Real, credited photos for cities and housing schemes (Wikimedia Commons) ----
     seed_media.apply()
 
-    # ---- Every map layer (except base maps) waits for an admin to publish it ----
+    # ---- Every map layer (except base maps) waits for an admin to publish it — except the DHA
+    # master plans, which are attached by default (an admin can still hide them) ----
     for layer in gis.GIS_LAYERS:
-        layer.published = False
+        layer.published = is_master_plan_layer(layer)
     ensure_builtin_layers()
 
 
@@ -16777,6 +16778,34 @@ def ensure_builtin_layers() -> int:
                                            published=False, z_index=-100 + z, created_by="system"))
         added += 1
     return added
+
+
+def is_master_plan_layer(layer: Any) -> bool:
+    """A layer generated from a built DHA master plan (the plan itself, its outline or its text)."""
+    ref = str(getattr(layer, "geojson_ref", "") or "")
+    return (ref.startswith("masterplan") or str(getattr(layer, "image_url", "") or "").startswith("/masterplans/")
+            or (getattr(layer, "entity_type", None) == "scheme" and getattr(layer, "layer_type", None) in ("boundary", "master_plan")
+                and getattr(layer, "name", "").split(" — ")[0].lower() in _master_plan_names()))
+
+
+def _master_plan_names() -> set:
+    return {m["name"].lower() for m in masterplan.store().meta.values()} if masterplan.available() else set()
+
+
+def publish_master_plans_once(store: Any) -> int:
+    """Databases saved before master plans were attached by default have them unpublished: publish
+    them once (kept as an admin's choice afterwards — the flag stops it running again)."""
+    if store is None or store.kv_get("masterplans_published_v1") == "1":
+        return 0
+    changed = 0
+    for layer in gis.GIS_LAYERS:
+        if is_master_plan_layer(layer) and not layer.published:
+            layer.published, layer.updated_at = True, datetime.now()
+            changed += 1
+    store.kv_set("masterplans_published_v1", "1")
+    if changed:
+        store.mark_dirty()
+    return changed
 
 
 def builtin_layer(ref: str) -> Optional[Any]:

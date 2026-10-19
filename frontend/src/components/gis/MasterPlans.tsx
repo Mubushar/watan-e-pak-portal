@@ -150,8 +150,11 @@ export function MasterPlanPanel({
   onHit,
   pad,
   labels,
+  only,
 }: {
   labels?: PlanLabelControls;
+  /** The plans the map can draw (their layers are published); others are not listed. */
+  only?: MasterPlan[];
   map: L.Map | null;
   shown: Set<string>;
   setShown: (s: Set<string>) => void;
@@ -162,7 +165,8 @@ export function MasterPlanPanel({
   const [text, setText] = useState("");
   const [query, setQuery] = useState("");
   const hits = useApi<{ count: number; results: PlanLabel[]; note?: string }>(query ? "/masterplans/search" : null, { q: query, limit: 12 });
-  const plans = q.data?.plans ?? [];
+  const built = q.data?.plans ?? [];
+  const plans = only ?? built;
   const show = (key: string, on: boolean) => {
     const n = new Set(shown);
     if (on) n.add(key);
@@ -177,8 +181,10 @@ export function MasterPlanPanel({
       </p>
       {q.isLoading ? (
         <Skeleton className="h-16 w-full" />
-      ) : !plans.length ? (
+      ) : !built.length ? (
         <EmptyState title="No master plans loaded" hint="Build them on the server with backend/masterplans/build_masterplans.py." />
+      ) : !plans.length ? (
+        <EmptyState title="Master plans are hidden" hint="An administrator can show them in Administration › GIS layers (publish the master plan layers)." />
       ) : (
         <>
           {plans.map((p) => (
