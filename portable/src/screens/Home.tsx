@@ -53,8 +53,8 @@ function actionsFor(role?: string): Action[] {
 
 // A real photo (Wikimedia Commons, credited) behind the greeting.
 const HERO_PHOTO = {
-  img: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Faisal_Mosque%2C_Islamabad_III.jpg/960px-Faisal_Mosque%2C_Islamabad_III.jpg",
-  credit: "Faisal Mosque, Islamabad · Fassifarooq · CC BY-SA 4.0",
+  img: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/Faisal_Mosque%2C_Islamabad%2C_Pakistan.jpg/960px-Faisal_Mosque%2C_Islamabad%2C_Pakistan.jpg",
+  credit: "Faisal Mosque & Margalla Hills · Ahmad Haq · CC BY-SA 4.0",
 };
 
 type Mode = "find" | "invest" | "sell";
@@ -97,9 +97,9 @@ export default function Home() {
   return (
     <div>
       {/* ---------- hero ---------- */}
-      <section className="relative overflow-hidden bg-brand-950 text-white md:mx-6 md:mt-6 md:rounded-3xl">
-        <img src={HERO_PHOTO.img} alt="Faisal Mosque, Islamabad" className="absolute inset-0 h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/75" />
+      <section className="relative overflow-hidden bg-brand-gradient text-white md:mx-6 md:mt-6 md:rounded-3xl">
+        <img src={HERO_PHOTO.img} alt="Faisal Mosque and the Margalla Hills, Islamabad" className="absolute inset-0 h-full w-full object-cover opacity-35" />
+        <div className="absolute inset-0 bg-mesh" />
         <p className="absolute bottom-12 end-3 text-[9px] text-white/50">{HERO_PHOTO.credit}</p>
         <div className="pt-safe relative">
           <div className="screen flex items-center justify-between py-3 md:hidden">
@@ -116,14 +116,14 @@ export default function Home() {
           </div>
           <div className="screen pb-16 pt-4 md:pb-14 md:pt-10">
             <p className="text-sm text-white/75">{first ? `Assalam-o-Alaikum, ${first}` : "Assalam-o-Alaikum"} 👋</p>
-            <h1 className="mt-1 font-display text-[2rem] font-light leading-[1.1] tracking-tight md:text-5xl">
+            <h1 className="mt-1 font-display text-3xl font-bold leading-tight md:text-4xl">
               {user ? (
                 <>
                   What can we help you <span className="text-gradient">{["seller", "agent", "landlord"].includes(user.role) ? "sell" : "find"}</span> today?
                 </>
               ) : (
                 <>
-                  Tell us the home you want. <span className="font-semibold text-gold-300">Watch AI find it.</span>
+                  Find your place in <span className="text-gradient">Pakistan</span>
                 </>
               )}
             </h1>
@@ -135,7 +135,7 @@ export default function Home() {
       <div className="screen -mt-9 relative z-10">
         {/* ---------- AI search ---------- */}
         <form
-          className="rounded-[26px] bg-white p-1.5 shadow-[0_24px_60px_-20px_rgba(0,0,0,.5)] dark:bg-[#0f1f17]"
+          className="card p-1.5 shadow-soft"
           onSubmit={(e) => {
             e.preventDefault();
             ask(q);
