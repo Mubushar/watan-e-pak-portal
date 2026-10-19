@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Marker, Popup } from "react-leaflet";
-import { BedDouble, Grid3X3, KeyRound, List, Map as MapIcon, MapPin, Navigation, RotateCcw, Search, SlidersHorizontal, Sparkles, Wand2, X } from "lucide-react";
+import { BedDouble, Briefcase, Building, Building2, ChevronDown, Grid3X3, Home as HomeIcon, KeyRound, LandPlot, Layers, List, Map as MapIcon, MapPin, Navigation, RotateCcw, Search, SlidersHorizontal, Sparkles, Store, Wand2, Warehouse, X } from "lucide-react";
 import type { City, Property, PropertyList } from "@/types";
 import { useApi } from "@/hooks/useApi";
 import { post } from "@/lib/api";
@@ -65,6 +65,7 @@ function useFilters() {
   const f = {
     q: sp.get("q") ?? "",
     city: sp.get("city") ?? "",
+    society: sp.get("society") ?? "",
     category: sp.get("category") ?? "",
     use_type: sp.get("use_type") ?? "",
     purpose: sp.get("purpose") ?? "buy",
@@ -97,8 +98,9 @@ function useFilters() {
   return { f, set, reset };
 }
 
-function matches(p: Property, f: ReturnType<typeof useFilters>["f"]) {
+function matches(p: Property, f: ReturnType<typeof useFilters>["f"], societyId?: string | null) {
   if (f.city && (p.city_name ?? "").toLowerCase() !== f.city.toLowerCase()) return false;
+  if (f.society && p.scheme_id !== societyId) return false;
   if (f.category && p.category !== f.category) return false;
   if (f.use_type && p.use_type !== f.use_type) return false;
   if (p.price < f.minPrice || p.price > f.maxPrice) return false;
@@ -114,118 +116,239 @@ function matches(p: Property, f: ReturnType<typeof useFilters>["f"]) {
   return true;
 }
 
-function FilterPanel({ f, set, reset, cities, counts }: { f: ReturnType<typeof useFilters>["f"]; set: ReturnType<typeof useFilters>["set"]; reset: () => void; cities: City[]; counts: Record<string, number> }) {
+/** Plain-language labels so anyone can use the filters (the backend values stay the same). */
+const TYPE_LABELS: Record<string, { label: string; icon: typeof HomeIcon }> = {
+  house: { label: "House", icon: HomeIcon },
+  apartment: { label: "Flat / Apartment", icon: Building2 },
+  plot: { label: "Plot", icon: LandPlot },
+  shop: { label: "Shop", icon: Store },
+  office: { label: "Office", icon: Briefcase },
+  floor: { label: "Floor / Portion", icon: Layers },
+  building: { label: "Whole building", icon: Building },
+  space: { label: "Business space", icon: Warehouse },
+};
+const USE_LABELS: Record<string, string> = { "": "Any", residential: "To live in", commercial: "For business", mix: "Both" };
+const BUDGETS: [number, number, string][] = [
+  [0, 5_000_000, "Under 50 Lakh"],
+  [5_000_000, 10_000_000, "50 Lakh – 1 Crore"],
+  [10_000_000, 30_000_000, "1 – 3 Crore"],
+  [30_000_000, 50_000_000, "3 – 5 Crore"],
+  [50_000_000, 100_000_000, "5 – 10 Crore"],
+  [100_000_000, MAX_PRICE, "10 Crore +"],
+];
+
+type Society = { id: string; name: string; city: string };
+
+/** Counts for each filter's options, worked out with every OTHER active filter applied — so the
+ * filters stay linked: a city narrows the societies, a society narrows the types, and so on. */
+type Facets = { cities: Record<string, number>; societies: Record<string, number>; types: Record<string, number>; uses: Record<string, number>; budgets: number[]; beds: number[] };
+
+/** One numbered step of the filter panel: a plain question, a hint, then the choices. */
+function Step({ n, title, hint, children }: { n: number; title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <section className="border-t border-black/5 pt-5 first:border-0 first:pt-0 dark:border-white/10">
+      <div className="mb-3 flex items-start gap-2.5">
+        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-700 text-[11px] font-bold text-white">{n}</span>
+        <div>
+          <p className="font-display text-sm font-semibold text-ink dark:text-white">{title}</p>
+          {hint && <p className="text-xs text-ink-mute">{hint}</p>}
+        </div>
+      </div>
+      <div className="space-y-4">{children}</div>
+    </section>
+  );
+}
+
+const choice = (active: boolean) =>
+  cn("rounded-xl text-sm font-medium ring-1 transition", active ? "bg-brand-700 text-white ring-brand-700" : "bg-white text-ink-soft ring-black/10 hover:ring-brand-300 dark:bg-white/5 dark:text-slate-300 dark:ring-white/10");
+
+function FilterPanel({
+  f,
+  set,
+  reset,
+  cities,
+  societies,
+  facets,
+  matching,
+}: {
+  f: ReturnType<typeof useFilters>["f"];
+  set: ReturnType<typeof useFilters>["set"];
+  reset: () => void;
+  cities: City[];
+  societies: Society[];
+  facets: Facets;
+  matching: number;
+}) {
   const [price, setPrice] = useState<[number, number]>([f.minPrice, f.maxPrice]);
   useEffect(() => setPrice([f.minPrice, f.maxPrice]), [f.minPrice, f.maxPrice]);
   const [place, setPlace] = useState(f.nearPlace);
   useEffect(() => setPlace(f.nearPlace), [f.nearPlace]);
   const [feature, setFeature] = useState(f.feature);
   useEffect(() => setFeature(f.feature), [f.feature]);
+  const moreActive = !!(f.near || f.nearPlace || f.feature || f.featured || f.baths);
+  const [more, setMore] = useState(moreActive);
+  useEffect(() => {
+    if (moreActive) setMore(true);
+  }, [moreActive]);
+  const budget = BUDGETS.find(([lo, hi]) => lo === f.minPrice && hi === f.maxPrice);
+  const anyPrice = f.minPrice === 0 && f.maxPrice === MAX_PRICE;
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <p className="flex items-center gap-2 font-display font-semibold">
-          <SlidersHorizontal className="h-4 w-4 text-brand-600" /> Filters
+          <SlidersHorizontal className="h-4 w-4 text-brand-600" /> Find a property
         </p>
         <button onClick={reset} className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:underline dark:text-brand-300">
-          <RotateCcw className="h-3 w-3" /> Reset
+          <RotateCcw className="h-3 w-3" /> Start over
         </button>
       </div>
-      <CityFilter cities={cities} value={f.city} onChange={(city) => set({ city })} />
-      <div>
-        <p className="label">Property type</p>
-        <div className="grid grid-cols-2 gap-1.5">
-          {CATEGORIES.map((c) => (
-            <button
-              key={c}
-              onClick={() => set({ category: f.category === c ? "" : c })}
-              className={cn("flex items-center justify-between rounded-xl px-3 py-2 text-sm font-medium ring-1 transition", f.category === c ? "bg-brand-50 text-brand-800 ring-brand-500 dark:bg-brand-500/15 dark:text-white" : "ring-black/10 hover:ring-brand-300 dark:ring-white/10")}
-            >
-              {titleCase(c)}
-              <span className="text-xs text-ink-mute">{counts[c] ?? 0}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-      <div>
-        <p className="label">Use</p>
-        <div className="flex flex-wrap gap-1.5">
-          {["", ...USE_TYPES].map((u) => (
-            <button key={u || "any"} onClick={() => set({ use_type: u })} className={cn("chip ring-1 transition", f.use_type === u ? "bg-brand-700 text-white ring-brand-700" : "bg-white text-ink-soft ring-black/10 hover:ring-brand-300 dark:bg-white/5 dark:text-slate-300 dark:ring-white/10")}>
-              {u ? titleCase(u) : "Any"}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div>
-        <p className="label">Price range</p>
-        <div onPointerUp={() => set({ minPrice: price[0], maxPrice: price[1] })} onKeyUp={() => set({ minPrice: price[0], maxPrice: price[1] })}>
-          <RangeSlider min={0} max={MAX_PRICE} step={2_500_000} value={price} onChange={setPrice} format={(v) => (v >= MAX_PRICE ? "20 Crore+" : pkrShort(v, false))} />
-        </div>
-      </div>
-      <div>
-        <p className="label">Bedrooms (min)</p>
-        <div className="flex gap-1.5">
-          {[0, 1, 2, 3, 4, 5].map((b) => (
-            <button key={b} onClick={() => set({ beds: b })} className={cn("h-9 flex-1 rounded-lg text-sm font-semibold ring-1 transition", f.beds === b ? "bg-brand-700 text-white ring-brand-700" : "ring-black/10 hover:ring-brand-300 dark:ring-white/10")}>
-              {b === 0 ? "Any" : `${b}+`}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div>
-        <p className="label">Bathrooms (min)</p>
-        <div className="flex gap-1.5">
-          {[0, 1, 2, 3, 4].map((b) => (
-            <button key={b} onClick={() => set({ baths: b })} className={cn("h-9 flex-1 rounded-lg text-sm font-semibold ring-1 transition", f.baths === b ? "bg-brand-700 text-white ring-brand-700" : "ring-black/10 hover:ring-brand-300 dark:ring-white/10")}>
-              {b === 0 ? "Any" : `${b}+`}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div>
-        <p className="label">Close to</p>
-        <div className="flex flex-wrap gap-1.5">
-          {NEAR_KINDS.map((k) => (
-            <button key={k.value} onClick={() => set({ near: f.near === k.value ? "" : k.value })} className={cn("chip ring-1 transition", f.near === k.value ? "bg-brand-700 text-white ring-brand-700" : "bg-white text-ink-soft ring-black/10 hover:ring-brand-300 dark:bg-white/5 dark:text-slate-300 dark:ring-white/10")}>
-              {k.label}
-            </button>
-          ))}
-        </div>
-        <form
-          className="mt-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            set({ nearPlace: place.trim() });
+      <p className="-mt-3 text-xs text-ink-mute">
+        <b className="text-ink dark:text-white">{matching}</b> {matching === 1 ? "property matches" : "properties match"} your choices
+      </p>
+
+      <Step n={1} title="Where?" hint="Pick a city, then a housing society if you have one in mind.">
+        <CityFilter cities={cities} counts={facets.cities} value={f.city} onChange={(city) => set({ city, society: "" })} />
+        <SocietyFilter
+          societies={societies}
+          counts={facets.societies}
+          city={f.city}
+          value={f.society}
+          onChange={(society) => {
+            // picking a society also picks its city, so the two never disagree
+            const s = societies.find((x) => x.name.toLowerCase() === society.toLowerCase());
+            set(s && !f.city ? { society, city: s.city } : { society });
           }}
-        >
-          <div className="flex items-center gap-2 rounded-xl px-3 ring-1 ring-black/10 focus-within:ring-brand-400 dark:ring-white/10">
-            <Navigation className="h-4 w-4 shrink-0 text-brand-600" />
-            <input value={place} onChange={(e) => setPlace(e.target.value)} onBlur={() => place.trim() !== f.nearPlace && set({ nearPlace: place.trim() })} placeholder="A place, e.g. G-13 or a university" className="h-10 w-full bg-transparent text-sm outline-none placeholder:text-ink-mute" />
-          </div>
-        </form>
-        {(f.near || f.nearPlace) && (
-          <div className="mt-2 flex gap-1.5">
-            {NEAR_KM.map((km) => (
-              <button key={km} onClick={() => set({ nearKm: km })} className={cn("h-8 flex-1 rounded-lg text-xs font-semibold ring-1 transition", f.nearKm === km ? "bg-brand-700 text-white ring-brand-700" : "ring-black/10 hover:ring-brand-300 dark:ring-white/10")}>
-                within {km} km
+        />
+      </Step>
+
+      <Step n={2} title="What kind of property?">
+        <div className="grid grid-cols-2 gap-1.5">
+          {CATEGORIES.map((c) => {
+            const t = TYPE_LABELS[c] ?? { label: titleCase(c), icon: HomeIcon };
+            const active = f.category === c;
+            return (
+              <button key={c} onClick={() => set({ category: active ? "" : c })} className={cn(choice(active), "flex items-center gap-2 px-2.5 py-2 text-start", !active && !facets.types[c] && "opacity-45")}>
+                <t.icon className={cn("h-4 w-4 shrink-0", active ? "text-gold-300" : "text-brand-600")} />
+                <span className="min-w-0 flex-1 text-[13px] leading-tight">{t.label}</span>
+                <span className={cn("text-[10px] tabular-nums", active ? "text-white/80" : "text-ink-mute")}>{facets.types[c] ?? 0}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div>
+          <p className="mb-1.5 text-xs font-semibold text-ink-soft dark:text-slate-300">To live in or for business?</p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {["", ...USE_TYPES].map((u) => (
+              <button key={u || "any"} onClick={() => set({ use_type: u })} className={cn(choice(f.use_type === u), "flex items-center justify-between px-2.5 py-1.5 text-xs", u && f.use_type !== u && !facets.uses[u] && "opacity-45")}>
+                {USE_LABELS[u] ?? titleCase(u)}
+                {u && <span className={cn("text-[10px] tabular-nums", f.use_type === u ? "text-white/80" : "text-ink-mute")}>{facets.uses[u] ?? 0}</span>}
               </button>
             ))}
           </div>
-        )}
-      </div>
-      <div>
-        <p className="label">Feature</p>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            set({ feature: feature.trim() });
-          }}
-        >
-          <input value={feature} onChange={(e) => setFeature(e.target.value)} onBlur={() => feature.trim() !== f.feature && set({ feature: feature.trim() })} placeholder="e.g. solar, basement, corner" className="input text-sm" />
-        </form>
-      </div>
-      <Toggle checked={f.featured} onChange={(v) => set({ featured: v })} label={<span className="text-sm font-medium">Featured only</span>} />
+        </div>
+      </Step>
+
+      <Step n={3} title="What’s your budget?" hint="Tap a range, or drag the slider for an exact one.">
+        <div className="grid grid-cols-2 gap-1.5">
+          <button onClick={() => set({ minPrice: 0, maxPrice: MAX_PRICE })} className={cn(choice(anyPrice), "col-span-2 px-2 py-1.5 text-xs")}>
+            Any budget
+          </button>
+          {BUDGETS.map(([lo, hi, label], i) => (
+            <button key={label} onClick={() => set({ minPrice: lo, maxPrice: hi })} className={cn(choice(budget?.[2] === label), "flex items-center justify-between px-2 py-1.5 text-xs", budget?.[2] !== label && !facets.budgets[i] && "opacity-45")}>
+              {label}
+              <span className={cn("text-[10px] tabular-nums", budget?.[2] === label ? "text-white/80" : "text-ink-mute")}>{facets.budgets[i] ?? 0}</span>
+            </button>
+          ))}
+        </div>
+        <div onPointerUp={() => set({ minPrice: price[0], maxPrice: price[1] })} onKeyUp={() => set({ minPrice: price[0], maxPrice: price[1] })}>
+          <RangeSlider min={0} max={MAX_PRICE} step={2_500_000} value={price} onChange={setPrice} format={(v) => (v >= MAX_PRICE ? "20 Crore+" : pkrShort(v, false))} />
+        </div>
+      </Step>
+
+      {f.category !== "plot" && (
+        <Step n={4} title="How many bedrooms?" hint="At least this many.">
+          <div className="flex gap-1.5">
+            {[0, 1, 2, 3, 4, 5].map((b) => (
+              <button key={b} onClick={() => set({ beds: b })} title={`${facets.beds[b] ?? 0} properties`} className={cn(choice(f.beds === b), "h-9 flex-1 font-semibold", b > 0 && f.beds !== b && !facets.beds[b] && "opacity-45")}>
+                {b === 0 ? "Any" : `${b}+`}
+              </button>
+            ))}
+          </div>
+        </Step>
+      )}
+
+      <section className="border-t border-black/5 pt-4 dark:border-white/10">
+        <button type="button" onClick={() => setMore((m) => !m)} className="flex w-full items-center justify-between text-sm font-semibold text-brand-800 dark:text-brand-200" aria-expanded={more}>
+          More options
+          <span className="flex items-center gap-1 text-xs font-normal text-ink-mute">
+            near a school, bathrooms, features
+            <ChevronDown className={cn("h-4 w-4 transition", more && "rotate-180")} />
+          </span>
+        </button>
+        <AnimatePresence initial={false}>
+          {more && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+              <div className="space-y-5 pt-4">
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold text-ink-soft dark:text-slate-300">Close to</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {NEAR_KINDS.map((k) => (
+                      <button key={k.value} onClick={() => set({ near: f.near === k.value ? "" : k.value })} className={cn("chip ring-1 transition", f.near === k.value ? "bg-brand-700 text-white ring-brand-700" : "bg-white text-ink-soft ring-black/10 hover:ring-brand-300 dark:bg-white/5 dark:text-slate-300 dark:ring-white/10")}>
+                        {k.label}
+                      </button>
+                    ))}
+                  </div>
+                  <form
+                    className="mt-2"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      set({ nearPlace: place.trim() });
+                    }}
+                  >
+                    <div className="flex items-center gap-2 rounded-xl px-3 ring-1 ring-black/10 focus-within:ring-brand-400 dark:ring-white/10">
+                      <Navigation className="h-4 w-4 shrink-0 text-brand-600" />
+                      <input value={place} onChange={(e) => setPlace(e.target.value)} onBlur={() => place.trim() !== f.nearPlace && set({ nearPlace: place.trim() })} placeholder="Or a place, e.g. G-13 or a university" className="h-10 w-full bg-transparent text-sm outline-none placeholder:text-ink-mute" />
+                    </div>
+                  </form>
+                  {(f.near || f.nearPlace) && (
+                    <div className="mt-2 flex gap-1.5">
+                      {NEAR_KM.map((km) => (
+                        <button key={km} onClick={() => set({ nearKm: km })} className={cn(choice(f.nearKm === km), "h-8 flex-1 text-xs font-semibold")}>
+                          within {km} km
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {f.category !== "plot" && (
+                  <div>
+                    <p className="mb-1.5 text-xs font-semibold text-ink-soft dark:text-slate-300">Bathrooms (at least)</p>
+                    <div className="flex gap-1.5">
+                      {[0, 1, 2, 3, 4].map((b) => (
+                        <button key={b} onClick={() => set({ baths: b })} className={cn(choice(f.baths === b), "h-9 flex-1 font-semibold")}>
+                          {b === 0 ? "Any" : `${b}+`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold text-ink-soft dark:text-slate-300">Must have</p>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      set({ feature: feature.trim() });
+                    }}
+                  >
+                    <input value={feature} onChange={(e) => setFeature(e.target.value)} onBlur={() => feature.trim() !== f.feature && set({ feature: feature.trim() })} placeholder="e.g. solar, basement, corner plot" className="input text-sm" />
+                  </form>
+                </div>
+                <Toggle checked={f.featured} onChange={(v) => set({ featured: v })} label={<span className="text-sm font-medium">Only featured listings</span>} />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </section>
       <AdSlot slot="sidebar" />
     </div>
   );
@@ -316,6 +439,9 @@ export default function Properties() {
     serverSearch ? { near: f.near, near_place: f.nearPlace, near_km: f.near || f.nearPlace ? f.nearKm : undefined, feature: f.feature, limit: 1000 } : { limit: 1000 },
   );
   const cities = useApi<{ cities: City[] }>("/cities");
+  const schemesQ = useApi<{ schemes: Society[] }>("/schemes");
+  const societies = schemesQ.data?.schemes ?? [];
+  const societyId = f.society ? (societies.find((x) => x.name.toLowerCase() === f.society.toLowerCase())?.id ?? "none") : null;
   const [text, setText] = useState(f.q);
   const [mobileFilters, setMobileFilters] = useState(false);
   const [brief, setBrief] = useState<ParsedBrief | null>(null);
@@ -323,9 +449,30 @@ export default function Properties() {
   useEffect(() => setText(f.q), [f.q]);
 
   const all = q.data?.results ?? [];
-  const counts = useMemo(() => all.reduce<Record<string, number>>((a, p) => ((a[p.category] = (a[p.category] ?? 0) + 1), a), {}), [all]);
+  const facets = useMemo<Facets>(() => {
+    const without = (patch: Partial<typeof f>) => {
+      const g = { ...f, ...patch };
+      return all.filter((p) => matches(p, g, g.society ? societyId : null));
+    };
+    const tally = (rows: Property[], key: (p: Property) => string | null | undefined) =>
+      rows.reduce<Record<string, number>>((a, p) => {
+        const k = key(p);
+        if (k) a[k] = (a[k] ?? 0) + 1;
+        return a;
+      }, {});
+    const byPrice = without({ minPrice: 0, maxPrice: MAX_PRICE });
+    const byBeds = without({ beds: 0 });
+    return {
+      cities: tally(without({ city: "", society: "" }), (p) => p.city_name?.toLowerCase()),
+      societies: tally(without({ society: "" }), (p) => p.scheme_id),
+      types: tally(without({ category: "" }), (p) => p.category),
+      uses: tally(without({ use_type: "" }), (p) => p.use_type),
+      budgets: BUDGETS.map(([lo, hi]) => byPrice.filter((p) => p.price >= lo && (hi >= MAX_PRICE || p.price <= hi)).length),
+      beds: [0, 1, 2, 3, 4, 5].map((b) => byBeds.filter((p) => (p.bedrooms ?? 0) >= b).length),
+    };
+  }, [all, f, societyId]);
   const results = useMemo(() => {
-    const r = all.filter((p) => matches(p, f));
+    const r = all.filter((p) => matches(p, f, societyId));
     const s = [...r];
     if (f.sort === "price_asc") s.sort((a, b) => a.price - b.price);
     else if (f.sort === "price_desc") s.sort((a, b) => b.price - a.price);
@@ -333,7 +480,7 @@ export default function Properties() {
     else if (f.sort === "newest") s.sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
     else if (!f.near && !f.nearPlace) s.sort((a, b) => Number(!!b.featured) - Number(!!a.featured)); // near searches come back closest first
     return s;
-  }, [all, f]);
+  }, [all, f, societyId]);
   const nearPlace = q.data?.near_place;
   const outside = q.data?.nearest_outside_radius ?? [];
 
@@ -346,6 +493,7 @@ export default function Properties() {
       set({
         q: "",
         city: r.city ?? "",
+        society: "",
         category: r.category ?? "",
         beds: r.bedrooms ?? 0,
         maxPrice: r.budget_max ? Math.min(MAX_PRICE, Math.round(r.budget_max * 1.15)) : MAX_PRICE,
@@ -362,6 +510,7 @@ export default function Properties() {
     f.q && { k: "q", label: `“${f.q}”` },
     f.project && { k: "project", label: "One project’s units" },
     f.city && { k: "city", label: f.city },
+    f.society && { k: "society", label: f.society },
     f.category && { k: "category", label: titleCase(f.category) },
     f.use_type && { k: "use_type", label: titleCase(f.use_type) },
     f.beds > 0 && { k: "beds", label: `${f.beds}+ beds` },
@@ -428,10 +577,10 @@ export default function Properties() {
         </div>
       </section>
 
-      <div className="container grid gap-8 py-8 lg:grid-cols-[280px_1fr]">
+      <div className="container grid gap-8 py-8 lg:grid-cols-[300px_1fr]">
         <aside className="hidden lg:block">
           <div className="card sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto p-5">
-            <FilterPanel f={f} set={set} reset={reset} cities={cities.data?.cities ?? []} counts={counts} />
+            <FilterPanel f={f} set={set} reset={reset} cities={cities.data?.cities ?? []} societies={societies} facets={facets} matching={results.length} />
           </div>
         </aside>
 
@@ -574,7 +723,7 @@ export default function Properties() {
 
       <Drawer open={mobileFilters} onClose={() => setMobileFilters(false)} title="Filters" side="left">
         <div className="p-5">
-          <FilterPanel f={f} set={set} reset={reset} cities={cities.data?.cities ?? []} counts={counts} />
+          <FilterPanel f={f} set={set} reset={reset} cities={cities.data?.cities ?? []} societies={societies} facets={facets} matching={results.length} />
           <Button className="mt-6 w-full" onClick={() => setMobileFilters(false)}>
             Show {results.length} results
           </Button>
@@ -589,7 +738,7 @@ export default function Properties() {
  * always visible, and every city one tap away in a searchable list grouped by province.
  */
 const TOP_CITIES = 6;
-function CityFilter({ cities, value, onChange }: { cities: City[]; value: string; onChange: (city: string) => void }) {
+function CityFilter({ cities, counts, value, onChange }: { cities: City[]; counts: Record<string, number>; value: string; onChange: (city: string) => void }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const ranked = cities; // already in the portal's order (Islamabad, Rawalpindi, Lahore, Karachi, then by population)
@@ -630,7 +779,7 @@ function CityFilter({ cities, value, onChange }: { cities: City[]; value: string
         {chips.map((c) => (
           <button key={c.id} type="button" onClick={() => pick(c.name)} className={chip(value.toLowerCase() === c.name.toLowerCase())}>
             {c.name}
-            {!!c.properties && <span className="ms-1 text-[10px] opacity-70">{c.properties}</span>}
+            {!!counts[c.name.toLowerCase()] && <span className="ms-1 text-[10px] opacity-70">{counts[c.name.toLowerCase()]}</span>}
           </button>
         ))}
       </div>
@@ -654,10 +803,10 @@ function CityFilter({ cities, value, onChange }: { cities: City[]; value: string
                             key={c.id}
                             type="button"
                             onClick={() => pick(c.name)}
-                            className={cn("flex items-center justify-between gap-1 rounded-lg px-2 py-1.5 text-start text-[13px] transition", active ? "bg-brand-700 text-white" : "hover:bg-brand-50 dark:hover:bg-white/10")}
+                            className={cn("flex items-center justify-between gap-1 rounded-lg px-2 py-1.5 text-start text-[13px] transition", active ? "bg-brand-700 text-white" : counts[c.name.toLowerCase()] ? "hover:bg-brand-50 dark:hover:bg-white/10" : "text-ink-mute hover:bg-brand-50 dark:hover:bg-white/10")}
                           >
                             <span className="truncate">{c.name}</span>
-                            {!!c.properties && <span className={cn("text-[10px] tabular-nums", active ? "text-white/80" : "text-ink-mute")}>{c.properties}</span>}
+                            <span className={cn("text-[10px] tabular-nums", active ? "text-white/80" : "text-ink-mute")}>{counts[c.name.toLowerCase()] || "—"}</span>
                           </button>
                         );
                       })}
@@ -665,6 +814,97 @@ function CityFilter({ cities, value, onChange }: { cities: City[]; value: string
                   </div>
                 ))}
                 {!groups.length && <p className="px-1 py-3 text-sm text-ink-mute">No city matches “{query}”.</p>}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/**
+ * Society filter: the societies with listings as chips (the portal's order — DHA / Bahria phases
+ * first), only the chosen city's when a city is picked, and every society in a searchable list.
+ */
+const TOP_SOCIETIES = 6;
+function SocietyFilter({ societies, counts, city, value, onChange }: { societies: Society[]; counts: Record<string, number>; city: string; value: string; onChange: (society: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const inCity = useMemo(() => (city ? societies.filter((s) => s.city.toLowerCase() === city.toLowerCase()) : societies), [societies, city]);
+  const withListings = inCity.filter((s) => counts[s.id]);
+  const top = withListings.slice(0, TOP_SOCIETIES);
+  const chosen = value && !top.some((s) => s.name.toLowerCase() === value.toLowerCase()) ? inCity.find((s) => s.name.toLowerCase() === value.toLowerCase()) : undefined;
+  const chips = chosen ? [...top, chosen] : top;
+  const groups = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const m = new Map<string, Society[]>();
+    for (const s of inCity) {
+      if (q && !s.name.toLowerCase().includes(q) && !s.city.toLowerCase().includes(q)) continue;
+      m.set(s.city, [...(m.get(s.city) ?? []), s]);
+    }
+    return [...m.entries()];
+  }, [inCity, query]);
+  const chip = (active: boolean) =>
+    cn("chip ring-1 transition", active ? "bg-brand-700 text-white ring-brand-700" : "bg-white text-ink-soft ring-black/10 hover:ring-brand-300 dark:bg-white/5 dark:text-slate-300 dark:ring-white/10");
+  const pick = (name: string) => {
+    onChange(value.toLowerCase() === name.toLowerCase() ? "" : name);
+    setOpen(false);
+    setQuery("");
+  };
+  if (!inCity.length) return null;
+  return (
+    <div>
+      <div className="flex items-baseline justify-between">
+        <p className="label">Housing society</p>
+        <button type="button" onClick={() => setOpen((o) => !o)} className="text-xs font-semibold text-brand-700 hover:underline dark:text-brand-300" aria-expanded={open}>
+          {open ? "Show fewer" : `All ${inCity.length} ${inCity.length === 1 ? "society" : "societies"}`}
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        <button type="button" onClick={() => onChange("")} className={chip(!value)}>
+          Any
+        </button>
+        {chips.map((s) => (
+          <button key={s.id} type="button" onClick={() => pick(s.name)} className={chip(value.toLowerCase() === s.name.toLowerCase())}>
+            {s.name}
+            {!!counts[s.id] && <span className="ms-1 text-[10px] opacity-70">{counts[s.id]}</span>}
+          </button>
+        ))}
+        {!chips.length && <p className="text-xs text-ink-mute">No society listings here yet — see the full list.</p>}
+      </div>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+            <div className="mt-3 rounded-2xl border border-black/5 bg-white p-2 dark:border-white/10 dark:bg-white/5">
+              <label className="flex items-center gap-2 rounded-xl bg-black/5 px-2.5 dark:bg-white/10">
+                <Search className="h-3.5 w-3.5 text-ink-mute" />
+                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find a society, e.g. DHA or Bahria" aria-label="Find a society" className="h-8 w-full bg-transparent text-sm outline-none" autoFocus />
+              </label>
+              <div className="mt-2 max-h-72 space-y-3 overflow-y-auto pe-1">
+                {groups.map(([cityName, list]) => (
+                  <div key={cityName}>
+                    {!city && <p className="px-1 text-[10px] font-bold uppercase tracking-wider text-ink-mute">{cityName}</p>}
+                    <div className="mt-1 space-y-0.5">
+                      {list.map((s) => {
+                        const active = value.toLowerCase() === s.name.toLowerCase();
+                        const n = counts[s.id] ?? 0;
+                        return (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => pick(s.name)}
+                            className={cn("flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-start text-[13px] transition", active ? "bg-brand-700 text-white" : n ? "hover:bg-brand-50 dark:hover:bg-white/10" : "text-ink-mute hover:bg-brand-50 dark:hover:bg-white/10")}
+                          >
+                            <span className="truncate">{s.name}</span>
+                            <span className={cn("shrink-0 text-[10px] tabular-nums", active ? "text-white/80" : "text-ink-mute")}>{n || "—"}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+                {!groups.length && <p className="px-1 py-3 text-sm text-ink-mute">No society matches “{query}”.</p>}
               </div>
             </div>
           </motion.div>
