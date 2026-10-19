@@ -10,8 +10,11 @@ Run:
 """
 
 import logging
+import os
 import threading
 import time
+
+os.environ.setdefault("PORTAL_PERSIST", "0")  # a smoke run must not write the portal's database
 
 import httpx
 import uvicorn
@@ -39,6 +42,23 @@ def main() -> None:
     base = f"http://127.0.0.1:{PORT}"
     ok = True
 
+    # Most of the portal needs a signed-in user: sign in once as the development demo admin and
+    # send that token with every call that doesn't set its own Authorization header.
+    login = httpx.post(f"{base}/auth/login", json={"identifier": "admin@portal.pk", "password": "Admin@12345"})
+    if login.status_code == 200:
+        token = login.json()["token"]
+        for verb in ("get", "post", "put", "patch", "delete"):
+            plain = getattr(httpx, verb)
+
+            def signed(url, *a, _plain=plain, _token=token, **kw):
+                headers = dict(kw.pop("headers", None) or {})
+                headers.setdefault("Authorization", f"Bearer {_token}")
+                return _plain(url, *a, headers=headers, **kw)
+
+            setattr(httpx, verb, signed)
+    else:
+        print("(demo admin not available - PORTAL_SEED_DEMO is off; protected checks will fail)")
+
     scheme_id = __import__("server").housing_schemes_db[0].id
 
     r = httpx.get(f"{base}/health")
@@ -50,7 +70,7 @@ def main() -> None:
     ok &= r.status_code == 200
 
     r = httpx.get(f"{base}/crm/dashboard")
-    print("REST /crm/dashboard ->", r.status_code, "leads =", r.json()["leads"]["total"])
+    print("REST /crm/dashboard ->", r.status_code, "leads =", r.json().get("leads", {}).get("total") if r.status_code == 200 else r.json())
     ok &= r.status_code == 200
 
     r = httpx.get(f"{base}/v1/models")
@@ -129,7 +149,7 @@ def main() -> None:
     print("REST /auth/me         ->", r.status_code, "user =", (r.json().get("user") or {}).get("status"))
     ok &= r.status_code == 200 and r.json()["user"]["email"] == "smoke@portal.test"
 
-    r = httpx.get(f"{base}/auth/me")
+    r = httpx.get(f"{base}/auth/me", headers={"Authorization": ""})
     print("REST /auth/me (no tok)->", r.status_code)
     ok &= r.status_code == 401
 

@@ -585,29 +585,26 @@ export default function Properties() {
 }
 
 /**
- * City filter: the main cities as chips (most listings first, then the largest), the chosen city
+ * City filter: the main cities as chips (in the portal's order from the API), the chosen city
  * always visible, and every city one tap away in a searchable list grouped by province.
  */
 const TOP_CITIES = 6;
 function CityFilter({ cities, value, onChange }: { cities: City[]; value: string; onChange: (city: string) => void }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const ranked = useMemo(
-    () => [...cities].sort((a, b) => (b.properties ?? 0) - (a.properties ?? 0) || (b.population ?? 0) - (a.population ?? 0) || a.name.localeCompare(b.name)),
-    [cities],
-  );
+  const ranked = cities; // already in the portal's order (Islamabad, Rawalpindi, Lahore, Karachi, then by population)
   const top = ranked.slice(0, TOP_CITIES);
   const chosen = value && !top.some((c) => c.name.toLowerCase() === value.toLowerCase()) ? ranked.find((c) => c.name.toLowerCase() === value.toLowerCase()) : undefined;
   const chips = chosen ? [...top, chosen] : top;
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
     const m = new Map<string, City[]>();
-    for (const c of [...cities].sort((a, b) => a.name.localeCompare(b.name))) {
+    for (const c of cities) {
       if (q && !c.name.toLowerCase().includes(q) && !(c.state ?? "").toLowerCase().includes(q)) continue;
       const k = c.state || "Other";
       m.set(k, [...(m.get(k) ?? []), c]);
     }
-    return [...m.entries()].sort((a, b) => b[1].length - a[1].length);
+    return [...m.entries()]; // provinces in the order of their first city
   }, [cities, query]);
   const chip = (active: boolean) =>
     cn("chip ring-1 transition", active ? "bg-brand-700 text-white ring-brand-700" : "bg-white text-ink-soft ring-black/10 hover:ring-brand-300 dark:bg-white/5 dark:text-slate-300 dark:ring-white/10");

@@ -1735,7 +1735,7 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         r = client.get("/search", params={"feature": "solar"})
         titles = [x["title"] for x in r.json().get("results", [])]
         check("GET /search?feature=solar (listing amenities)", titles == ["Modern 10 Marla House"], str(titles))
-        modern = next((x for x in client.get("/search", params={"limit": 50}).json()["results"]
+        modern = next((x for x in client.get("/search", params={"limit": 1000}).json()["results"]
                        if x["title"] == "Modern 10 Marla House"), None)
         r = client.get(f"/properties/{modern['id']}/nearby") if modern else None
         kinds = [n["category"] for n in r.json().get("nearby", [])] if r is not None and r.status_code == 200 else []
@@ -2992,7 +2992,7 @@ def run_geo_checks(client: TestClient) -> None:
     ps = r.json().get("portal_scheme", {})
     check("GET /areas/profile (portal scheme details)", ps.get("approval_authority") == "LDA"
           and ps.get("development_status") == "under development", r.text[:300])
-    listing = next(x for x in client.get("/search", params={"limit": 50}).json()["results"]
+    listing = next(x for x in client.get("/search", params={"limit": 1000}).json()["results"]
                    if x["title"] == "Modern 10 Marla House")
     r = client.get("/places/map", params={"listing_id": listing["id"]})
     j = r.json()

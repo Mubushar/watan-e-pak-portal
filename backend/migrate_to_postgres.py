@@ -287,7 +287,31 @@ def build_parser() -> argparse.ArgumentParser:
         sub = subs.add_parser(name, help="%s the migration against a database" % name)
         sub.add_argument("--dsn", required=True,
                          help="PostgreSQL DSN, e.g. postgresql://postgres:postgres@localhost:5432/arzepak")
+    parser.add_argument("--seed-only", action="store_true",
+                        help="export the start-up sample data instead of what the portal has saved")
     return parser
+
+
+def _load_saved_data() -> None:
+    """Export what the portal has saved (durable storage), not just the start-up sample data.
+    Reads the database named by DATABASE_URL / PORTAL_DB_PATH (or backend/data/portal.sqlite3)
+    and never creates or writes one."""
+    import storage
+
+    url = storage.database_url()
+    is_pg = url.startswith(("postgres://", "postgresql://"))
+    path = url[len("sqlite:///"):] if url.startswith("sqlite:///") else (url or os.path.join(HERE, "data", "portal.sqlite3"))
+    if not storage.enabled() or (not is_pg and not os.path.exists(path)):
+        print("(no saved portal database found - exporting the start-up sample data)")
+        return
+    db_migration._load_modules()
+    st = storage.Storage(url)
+    if st.kv_get("seeded") != "1":
+        print("(the saved database is empty - exporting the start-up sample data)")
+        return
+    result = st.load()
+    st.db.close()
+    print("(exporting the saved portal data: %s rows from %s)" % (result.get("rows"), st.db.describe()))
 
 
 def main(argv=None) -> int:
@@ -295,6 +319,8 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     if not args.command:
         args.command = "all"
+    if args.command not in ("doctor",) and not getattr(args, "seed_only", False):
+        _load_saved_data()
     handlers = {
         "report": cmd_report,
         "schema": cmd_schema,

@@ -77,6 +77,15 @@ def rows(table: str, q: Optional[str] = None, city_id: Optional[str] = None, sch
         if q and _norm(q) not in _norm(f"{r.name} {getattr(r, 'name_ur', '') or ''} {getattr(r, 'developer', '') or ''} {getattr(r, 'state', '') or ''}"):
             continue
         out.append(_row(table, r))
+    # the portal's order: Islamabad first, the DHA / Bahria phases first among societies
+    import priority
+
+    if table == "cities":
+        return priority.sort_cities(out)
+    if table == "schemes":
+        pops = {c.id: (c.name, c.population) for c in core.cities_db}
+        return sorted(out, key=lambda d: priority.society_key(d["name"], *pops.get(d.get("city_id"), (d.get("city"), None)),
+                                                             d.get("properties") or 0, d.get("total_units")))
     return sorted(out, key=lambda d: d["name"].lower())
 
 

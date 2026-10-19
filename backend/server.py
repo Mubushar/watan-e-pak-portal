@@ -40,6 +40,7 @@ import json
 import math
 import os
 import re
+import sys
 import statistics
 import uuid
 from datetime import datetime, timedelta
@@ -58,6 +59,7 @@ import content
 import access
 import geo
 import gis_import
+import priority
 import project_inventory
 import seed_media
 import knowledge
@@ -678,9 +680,10 @@ def validate_image_url(url: str) -> bool:
 
 @mcp.tool()
 def list_cities() -> str:
-    """List every city in the portal with its coordinates and child counts."""
+    """List every city in the portal with its coordinates and child counts, in the portal's order
+    (Islamabad, Rawalpindi, Lahore, Karachi, then by population)."""
     out = []
-    for c in cities_db:
+    for c in priority.sort_cities(list(cities_db)):
         schemes = [s for s in housing_schemes_db if s.city_id == c.id]
         props = [p for p in properties_db if p.city_id == c.id]
         out.append(
@@ -708,7 +711,7 @@ def list_schemes(city: Optional[str] = None) -> str:
     """List housing schemes/societies, optionally filtered by city (id or name)."""
     c = resolve_city(city) if city else None
     out = []
-    for s in housing_schemes_db:
+    for s in sorted(housing_schemes_db, key=priority.society_sort_key_for(sys.modules[__name__])):
         if c and s.city_id != c.id:
             continue
         out.append(
@@ -755,9 +758,10 @@ def list_blocks(scheme: Optional[str] = None) -> str:
 def get_hierarchy() -> str:
     """Return the full City -> Scheme -> Block -> Property tree with counts."""
     tree = []
-    for c in cities_db:
+    society_order = priority.society_sort_key_for(sys.modules[__name__])
+    for c in priority.sort_cities(list(cities_db)):
         schemes = []
-        for s in housing_schemes_db:
+        for s in sorted(housing_schemes_db, key=society_order):
             if s.city_id != c.id:
                 continue
             blocks = []
@@ -1163,6 +1167,17 @@ def search_properties(
         outside = [p for p in ranked if place_dist[p.id] > near_km]
         place_info = {"query": near_place, "found": True, "name": loc["name"], "latitude": round(loc["lat"], 5),
                       "longitude": round(loc["lon"], 5), "radius_km": near_km}
+    if not near_cat and not near_place:
+        # The portal's order: Islamabad / Rawalpindi first, DHA and Bahria phases first among
+        # societies, then featured and newest listings (priority.py).
+        society = priority.society_sort_key_for(sys.modules[__name__])
+        schemes = {s.id: s for s in housing_schemes_db}
+        cities = {c.id: c for c in cities_db}
+        results.sort(key=lambda p: (
+            priority.city_key(cities[p.city_id].name if p.city_id in cities else None,
+                              cities[p.city_id].population if p.city_id in cities else None),
+            society(schemes[p.scheme_id]) if p.scheme_id in schemes else (9,),
+            not p.featured, -(p.created_at.timestamp() if p.created_at else 0)))
 
     long_term_memory["search_history"].append(
         {

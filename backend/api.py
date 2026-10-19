@@ -55,6 +55,7 @@ import access
 import knowledge
 import memory as user_memory
 import portal_env
+import priority
 import project_inventory
 import seed_media
 import prompts
@@ -3547,8 +3548,9 @@ def admin_properties_meta() -> Any:
     """Choices for the property form: statuses, categories, cities, schemes, blocks and agents."""
     return {
         "statuses": property_admin.STATUSES, "categories": property_admin.CATEGORIES, "use_types": property_admin.USE_TYPES,
-        "cities": [{"id": c.id, "name": c.name} for c in sorted(core.cities_db, key=lambda c: c.name)],
-        "schemes": [{"id": s.id, "name": s.name, "city_id": s.city_id} for s in sorted(core.housing_schemes_db, key=lambda s: s.name)],
+        "cities": [{"id": c.id, "name": c.name} for c in priority.sort_cities(list(core.cities_db))],
+        "schemes": [{"id": s.id, "name": s.name, "city_id": s.city_id}
+                    for s in sorted(core.housing_schemes_db, key=priority.society_sort_key_for(core))],
         "blocks": [{"id": b.id, "name": b.name, "scheme_id": b.scheme_id} for b in sorted(core.block_zone_areas_db, key=lambda b: b.name)],
         "agents": [{"id": a.id, "name": a.name} for a in sorted(core.agents_db, key=lambda a: a.name)],
     }
