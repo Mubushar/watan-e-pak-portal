@@ -521,9 +521,9 @@ export default function MapExplorer() {
                   lineCap: "round",
                 })}
               >
-                <Tooltip sticky>
+                <Popup>
                   <span className="font-semibold">{l.name}</span> · {titleCase(l.layer_type)}
-                </Tooltip>
+                </Popup>
               </GeoJSON>
             );
           })}
@@ -545,7 +545,6 @@ export default function MapExplorer() {
                 })}
                 eventHandlers={{ click: () => selectAoi(a) }}
               >
-                <Tooltip sticky>{a.name}</Tooltip>
               </GeoJSON>
             ) : null,
           )}
@@ -609,9 +608,9 @@ export default function MapExplorer() {
               const c = RING_COLORS[idx % RING_COLORS.length]!;
               return (
                 <GeoJSON key={`ring-${r.outer_km}-${pt.join(",")}`} data={r.geometry} style={() => ({ color: c, weight: 2, fillColor: c, fillOpacity: 0.08 })}>
-                  <Tooltip sticky>
+                  <Popup>
                     {r.inner_km}–{r.outer_km} km · {r.summary.properties} listings
-                  </Tooltip>
+                  </Popup>
                 </GeoJSON>
               );
             })}

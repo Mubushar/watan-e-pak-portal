@@ -55,9 +55,10 @@ export function DistrictLayer({ lang, zoom, labels }: { lang: MapLang; zoom: num
       onEachFeature: (f, l) => {
         const p = f.properties as DistrictProps;
         const n = p.listings ?? 0;
-        l.bindTooltip(
+        // details on click (a hover tooltip followed the cursor over the whole district)
+        l.bindPopup(
           `<b>${escapeHtml(labelText(p.name, p.name_ur, lang))}</b><br>${escapeHtml(p.province)}${p.area_km2 ? ` · ${Math.round(p.area_km2).toLocaleString()} km²` : ""}${n ? `<br>${escapeHtml(n)} listing${n === 1 ? "" : "s"} on the portal` : ""}`,
-          { sticky: true, className: "mega-tip" },
+          { className: "mega-tip" },
         );
         l.on("mouseover", () => (l as L.Path).setStyle({ weight: 2.5, opacity: 1, dashArray: "", fillOpacity: 0.12 }));
         l.on("mouseout", () => (l as L.Path).setStyle(base));

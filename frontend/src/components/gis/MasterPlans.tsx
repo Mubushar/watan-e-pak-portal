@@ -92,25 +92,19 @@ export function MasterPlanLayers({
   /** Clicking a plan's boundary (e.g. to zoom to it). */
   onSelect?: (p: MasterPlan) => void;
 }) {
+  const map = useMap();
   const visible = plans.filter((p) => shown.has(p.key));
   const style = { color: "#c99a22", weight: 2, dashArray: "6 5", fillColor: "#f2dd8f", fillOpacity: 0.06 };
   return (
     <>
       {visible.map((p) => {
-        const tip = (
-          <Tooltip sticky>
-            <span className="font-semibold">{p.name}</span> master plan{onSelect ? " · click to zoom in" : ""}
-          </Tooltip>
-        );
-        const eventHandlers = onSelect ? { click: () => onSelect(p) } : undefined;
+        // No cursor tooltip (it covered the plan); a click zooms to the phase only from far out,
+        // so clicks while reading the plan never move the map.
+        const eventHandlers = onSelect ? { click: () => map.getZoom() < 14 && onSelect(p) } : undefined;
         return p.outline?.length ? (
-          <Polygon key={`outline-${p.key}`} positions={p.outline} pathOptions={style} eventHandlers={eventHandlers}>
-            {tip}
-          </Polygon>
+          <Polygon key={`outline-${p.key}`} positions={p.outline} pathOptions={style} eventHandlers={eventHandlers} />
         ) : (
-          <Rectangle key={`outline-${p.key}`} bounds={corners(p.bounds)} pathOptions={style} eventHandlers={eventHandlers}>
-            {tip}
-          </Rectangle>
+          <Rectangle key={`outline-${p.key}`} bounds={corners(p.bounds)} pathOptions={style} eventHandlers={eventHandlers} />
         );
       })}
       {visible
