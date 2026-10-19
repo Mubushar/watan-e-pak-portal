@@ -8,7 +8,7 @@
  * The admin Edit tools sit apart, in a horizontal bar (EditBar) at the bottom left.
  *
  * The layers panel: a filter box, "All on / All off", then collapsible sections (Portal data,
- * Points of interest, Reference, DHA master plans, GIS layers). Each section has a master switch
+ * Points of interest, Reference, DHA / Bahria / society master plans, GIS layers). Each section has a master switch
  * and shows how many of its layers are on; items can have sub-layers (e.g. a plan's labels).
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";

@@ -97,6 +97,8 @@ async def lifespan(app: FastAPI):
     core.publish_master_plans_once(storage.instance())  # DHA master plans are attached by default
     if basedata.add_missing_schemes():                     # societies added to the data file since the save
         storage.mark_dirty()
+    if core.add_missing_master_plans():                    # master plans (Bahria, societies…) built since the save
+        storage.mark_dirty()
     project_inventory.sync()      # project inventories from the data file: new units in, sold ones marked
     seed_media.apply()            # credited photos for cities / schemes that have none yet
     logging.getLogger("portal").info("storage: %s", storage_state)

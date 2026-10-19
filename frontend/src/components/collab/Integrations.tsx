@@ -102,7 +102,7 @@ export function IntegrationsCard() {
                 "Place data not installed"
               )}
               <br />
-              {plans.data?.count ? `${plans.data.count} DHA master plan(s): ${plans.data.plans.map((p) => p.name).join(", ")}` : "No master plans built (run backend/masterplans/build_masterplans.py)"}
+              {plans.data?.count ? `${plans.data.count} master plan(s): ${plans.data.plans.map((p) => p.name).join(", ")}` : "No master plans built (run backend/masterplans/build_masterplans.py)"}
             </Row>
           </>
         )}

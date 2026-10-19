@@ -1,11 +1,16 @@
 """
-Build the DHA master-plan data the portal and the assistant use, from the PDFs and the
-georeferenced images in a "Maps" folder::
+Build the master-plan data the portal and the assistant use (DHA, Bahria Town and other
+housing societies), from the PDFs / images and the georeferenced plans in a "Maps" folder::
 
     Maps/
-      PH-I Colours (14-04-25)-Model.pdf, …            the 8 master-plan PDFs
+      PH-I Colours (14-04-25)-Model.pdf, …            the 8 DHA master-plan PDFs
       Georeferenced/DHA_Phase_I/DHA_Phase_I_source.png, _EPSG3857.png/.pgw, _gcps.csv …
       Georeferenced/accuracy_report.json
+      Bahria Town/Georeferenced/…                     the same, one folder per group (GROUPS)
+      Islamabad Societies/Georeferenced/…
+
+A plan from an image (no PDF) gets no text labels; one from a PDF gets them like DHA's. For the
+Bahria / society plans the source file and page come from the group's ``accuracy_report.json``.
 
 Run from backend/ (a few minutes)::
 
@@ -53,6 +58,13 @@ R = 6378137.0
 WORLD = 2 * math.pi * R
 CHUNK = 1024
 
+# group -> its sub-folder of --maps and the credit shown on the map
+GROUPS: Dict[str, Dict[str, str]] = {
+    "dha": {"dir": "", "attribution": "Master plan © DHA Islamabad-Rawalpindi"},
+    "bahria": {"dir": "Bahria Town", "attribution": "Master plan © Bahria Town (Pvt) Ltd"},
+    "societies": {"dir": "Islamabad Societies", "attribution": "Master plan © the society's developer"},
+}
+
 PLANS: List[Dict[str, Any]] = [
     {"key": "ph1", "folder": "DHA_Phase_I", "pdf": "PH-I Colours (14-04-25)-Model.pdf",
      "name": "DHA Phase I", "city": "Islamabad", "aliases": ["dha 1", "dha phase 1", "dha phase i", "dha ph 1", "phase 1 dha"]},
@@ -73,6 +85,145 @@ PLANS: List[Dict[str, Any]] = [
      "name": "DHA River View South", "city": "Rawalpindi",
      "aliases": ["river view south", "dha river view south", "rvs", "dha phase 4 south"]},
 ]
+
+# Bahria Town: "scheme" is the portal society the plan belongs to (geodata/pk_housing_schemes.json)
+_B = "Bahria Town Phases 1-6 (Islamabad/Rawalpindi)"
+PLANS += [dict(p, group="bahria") for p in [
+    {"key": "bt16", "folder": "Bahria_Town_Phase_1-6", "name": "Bahria Town Phase 1-6", "city": "Rawalpindi", "scheme": _B,
+     "aliases": ["bahria town phase 1", "bahria phase 1-6", "bahria town rawalpindi", "bahria town islamabad", "bahria phase 4", "bahria phase 6"]},
+    {"key": "bt7", "folder": "Bahria_Town_Phase_7", "name": "Bahria Town Phase 7", "city": "Rawalpindi", "scheme": "Bahria Town Phase 7",
+     "aliases": ["bahria phase 7", "bahria town phase vii", "bahria phase vii"]},
+    {"key": "bt8", "folder": "Bahria_Town_Phase_8", "name": "Bahria Town Phase 8", "city": "Rawalpindi", "scheme": "Bahria Town Phase 8",
+     "aliases": ["bahria phase 8", "bahria town phase viii", "bahria phase viii"]},
+    {"key": "bt8sv", "folder": "Bahria_Town_Phase_8_Safari_Valley", "name": "Bahria Safari Valley", "city": "Rawalpindi",
+     "scheme": "Bahria Town Phase 8", "aliases": ["safari valley", "bahria safari valley", "phase 8 safari valley"]},
+    {"key": "btgc", "folder": "Bahria_Garden_City", "name": "Bahria Garden City", "city": "Islamabad", "scheme": "Bahria Garden City",
+     "aliases": ["bahria garden city", "garden city bahria", "bgc"]},
+    {"key": "bte", "folder": "Bahria_Enclave", "name": "Bahria Enclave", "city": "Islamabad", "scheme": "Bahria Enclave Islamabad",
+     "aliases": ["bahria enclave", "bahria enclave islamabad", "enclave 1"]},
+    {"key": "bte2", "folder": "Bahria_Enclave_II", "name": "Bahria Enclave II", "city": "Islamabad", "scheme": "Bahria Enclave Islamabad",
+     "aliases": ["bahria enclave 2", "bahria enclave ii", "enclave 2"]},
+    {"key": "btpar", "folder": "Bahria_Paradise", "name": "Bahria Paradise", "city": "Rawalpindi", "scheme": "Bahria Town Phase 8",
+     "aliases": ["bahria paradise", "paradise bahria"]},
+    {"key": "btlhr", "folder": "Bahria_Town_Lahore", "name": "Bahria Town Lahore", "city": "Lahore", "scheme": "Bahria Town Lahore",
+     "aliases": ["bahria town lahore", "bahria lahore", "btl"]},
+    {"key": "borch", "folder": "Bahria_Orchard", "name": "Bahria Orchard", "city": "Lahore", "scheme": "Bahria Orchard",
+     "aliases": ["bahria orchard", "orchard lahore", "bahria orchard phase 1"]},
+    {"key": "bemc", "folder": "Bahria_Education_Medical_City", "name": "Bahria Education & Medical City", "city": "Lahore",
+     "scheme": "Bahria Town Lahore", "aliases": ["bahria education and medical city", "bemc", "bahria medical city"]},
+    {"key": "bnash", "folder": "Bahria_Nasheman", "name": "Bahria Nasheman", "city": "Lahore", "scheme": "Bahria Town Lahore",
+     "aliases": ["bahria nasheman", "nasheman lahore"]},
+    {"key": "brehm", "folder": "Bahria_Rehmat", "name": "Bahria Rehmat", "city": "Lahore", "scheme": "Bahria Town Lahore",
+     "aliases": ["bahria rehmat"]},
+    {"key": "btk", "folder": "Bahria_Town_Karachi", "name": "Bahria Town Karachi", "city": "Karachi", "scheme": "Bahria Town Karachi",
+     "aliases": ["bahria town karachi", "btk", "bahria karachi"]},
+    *[{"key": f"btk{c}", "folder": f"Bahria_Town_Karachi_Side_{c.upper()}", "name": f"Bahria Town Karachi Side {c.upper()}",
+       "city": "Karachi", "scheme": "Bahria Town Karachi", "aliases": [f"bahria town karachi side {c}", f"btk side {c}"]}
+      for c in "abcd"],
+]]
+
+# Other housing societies (Islamabad Expressway, Lehtrar Road, Murree Road, near the airport)
+SOCIETIES: List[Dict[str, Any]] = [
+    {"key": "topc", "folder": "Top_City-1", "name": "Top City-1", "city": "Islamabad", "scheme": "Top City-1",
+     "aliases": ["top city", "top city 1", "topcity"]},
+    {"key": "aamin", "folder": "Aamin_Housing_1", "name": "Aamin Housing 1", "city": "Islamabad", "scheme": None,
+     "aliases": ["aamin housing", "aamin housing one"]},
+    {"key": "eight", "folder": "Eighteen", "name": "Eighteen", "city": "Islamabad", "scheme": "Eighteen (Elite Reverie Housing)",
+     "aliases": ["eighteen islamabad", "elite reverie", "18 islamabad"]},
+    {"key": "unit", "folder": "University_Town", "name": "University Town", "city": "Islamabad", "scheme": "University Town",
+     "aliases": ["university town islamabad"]},
+    {"key": "mumtz", "folder": "Mumtaz_City", "name": "Mumtaz City", "city": "Islamabad", "scheme": None,
+     "aliases": ["mumtaz city islamabad"]},
+    {"key": "agg", "folder": "Airport_Green_Garden", "name": "Airport Green Garden", "city": "Islamabad", "scheme": None,
+     "aliases": ["airport green garden", "agg"]},
+    {"key": "khuda", "folder": "Khudadad_City", "name": "Khudadad City (Airport Enclave)", "city": "Islamabad", "scheme": None,
+     "aliases": ["khudadad city", "airport enclave"]},
+    {"key": "parad", "folder": "Paradise_City", "name": "Paradise City", "city": "Islamabad", "scheme": None,
+     "aliases": ["paradise city islamabad"]},
+    {"key": "teleg", "folder": "Tele_Gardens_F-17", "name": "Tele Gardens F-17", "city": "Islamabad", "scheme": None,
+     "aliases": ["tele gardens", "f-17 tele gardens", "t&t echs f-17"]},
+    {"key": "scehs", "folder": "Supreme_Court_EHS", "name": "Supreme Court Employees Housing Scheme", "city": "Islamabad", "scheme": None,
+     "aliases": ["supreme court housing", "scehs"]},
+    {"key": "fres", "folder": "Faisal_Residencia", "name": "Faisal Residencia", "city": "Islamabad", "scheme": None,
+     "aliases": ["faisal residencia", "faisal residentia", "e-17 faisal"]},
+    {"key": "ft1", "folder": "Faisal_Town_I", "name": "Faisal Town Phase I", "city": "Islamabad", "scheme": "Faisal Town Phase 1 (F-18)",
+     "aliases": ["faisal town", "faisal town 1", "faisal town f-18"]},
+    {"key": "ft2", "folder": "Faisal_Town_II", "name": "Faisal Town Phase II", "city": "Rawalpindi", "scheme": None,
+     "aliases": ["faisal town 2", "faisal town phase 2"]},
+    {"key": "fmc", "folder": "Faisal_Margalla_City", "name": "Faisal Margalla City", "city": "Islamabad", "scheme": None,
+     "aliases": ["faisal margalla city", "fmc"]},
+    {"key": "fh1", "folder": "Faisal_Hills_Phase_I", "name": "Faisal Hills Phase I", "city": "Rawalpindi", "scheme": None,
+     "aliases": ["faisal hills", "faisal hills 1", "faisal hills phase 1"]},
+    {"key": "fh2", "folder": "Faisal_Hills_Phase_II", "name": "Faisal Hills Phase II", "city": "Rawalpindi", "scheme": None,
+     "aliases": ["faisal hills 2", "faisal hills phase 2"]},
+    {"key": "mg17", "folder": "Multi_Gardens_B-17", "name": "Multi Gardens B-17 Phase I", "city": "Islamabad", "scheme": "B-17 Multi Gardens (MPCHS) Phase I",
+     "aliases": ["b-17", "multi gardens b-17", "mpchs b-17"]},
+    {"key": "mg18", "folder": "Multi_Gardens_B-18_DE", "name": "Multi Gardens B-18 Blocks D & E", "city": "Islamabad", "scheme": "B-17 Multi Gardens (MPCHS) Phase I",
+     "aliases": ["b-18", "multi gardens b-18"]},
+    {"key": "mgpb", "folder": "Multi_Gardens_Punjab", "name": "Multi Gardens Punjab Part", "city": "Rawalpindi", "scheme": "B-17 Multi Gardens (MPCHS) Phase I",
+     "aliases": ["multi gardens punjab"]},
+    {"key": "csc1", "folder": "Capital_Smart_City_Phase_1", "name": "Capital Smart City Phase 1", "city": "Rawalpindi", "scheme": "Capital Smart City",
+     "aliases": ["capital smart city", "csc", "smart city islamabad"]},
+    {"key": "csc2", "folder": "Capital_Smart_City_Phase_2", "name": "Capital Smart City Phase 2", "city": "Rawalpindi", "scheme": "Capital Smart City",
+     "aliases": ["capital smart city phase 2", "csc phase 2"]},
+    {"key": "qurt", "folder": "Qurtaba_City", "name": "Qurtaba City", "city": "Rawalpindi", "scheme": None,
+     "aliases": ["qurtaba city"]},
+    {"key": "bwc", "folder": "Blue_World_City_General_Block", "name": "Blue World City General Block", "city": "Rawalpindi", "scheme": "Blue World City",
+     "aliases": ["blue world city", "bwc"]},
+    {"key": "gbg", "folder": "Gulberg_Greens", "name": "Gulberg Greens", "city": "Islamabad", "scheme": "Gulberg Greens",
+     "aliases": ["gulberg greens", "gulberg green"]},
+    {"key": "gbr", "folder": "Gulberg_Residencia", "name": "Gulberg Residencia", "city": "Islamabad", "scheme": "Gulberg Residencia",
+     "aliases": ["gulberg residencia", "gulberg islamabad"]},
+    {"key": "nav", "folder": "Naval_Anchorage", "name": "Naval Anchorage", "city": "Islamabad", "scheme": "Naval Anchorage Islamabad",
+     "aliases": ["naval anchorage"]},
+    {"key": "jg1", "folder": "Jinnah_Garden_Phase_I_Ext", "name": "Jinnah Garden Phase I Extension", "city": "Islamabad", "scheme": "Jinnah Garden",
+     "aliases": ["jinnah garden", "jinnah garden phase 1"]},
+    {"key": "jg2", "folder": "Jinnah_Garden_Phase_II", "name": "Jinnah Garden Phase II", "city": "Islamabad", "scheme": "Jinnah Garden",
+     "aliases": ["jinnah garden phase 2"]},
+    {"key": "soan", "folder": "Soan_Garden", "name": "Soan Garden", "city": "Islamabad", "scheme": "Soan Garden",
+     "aliases": ["soan garden", "soan gardens"]},
+    {"key": "cbr", "folder": "CBR_Town_Phase_I", "name": "CBR Town Phase I", "city": "Islamabad", "scheme": "CBR Town Phase I",
+     "aliases": ["cbr town", "cbr"]},
+    {"key": "rivg", "folder": "River_Garden", "name": "River Garden", "city": "Islamabad", "scheme": None,
+     "aliases": ["river garden islamabad"]},
+    {"key": "opf", "folder": "OPF_Housing_Scheme", "name": "OPF Housing Scheme", "city": "Islamabad", "scheme": None,
+     "aliases": ["opf housing", "opf zone 5"]},
+    {"key": "senat", "folder": "Senate_Avenue", "name": "Senate Avenue", "city": "Islamabad", "scheme": None,
+     "aliases": ["senate avenue"]},
+    {"key": "pwd", "folder": "PWD_Housing_Society", "name": "PWD Housing Society", "city": "Islamabad", "scheme": "PWD Housing Scheme",
+     "aliases": ["pwd", "pwd housing"]},
+    {"key": "pvc", "folder": "Park_View_City", "name": "Park View City Islamabad", "city": "Islamabad", "scheme": "Park View City Islamabad",
+     "aliases": ["park view city", "park view", "pvc"]},
+    {"key": "pvcx", "folder": "Park_View_City_Extensions", "name": "Park View City Extensions", "city": "Islamabad", "scheme": "Park View City Islamabad",
+     "aliases": ["park view city extension"]},
+    {"key": "pke", "folder": "Park_Enclave_III", "name": "Park Enclave III", "city": "Islamabad", "scheme": None,
+     "aliases": ["park enclave", "park enclave 3"]},
+    {"key": "fgge", "folder": "FGEHA_Green_Enclave", "name": "FGEHA Green Enclave Bhara Kahu", "city": "Islamabad", "scheme": None,
+     "aliases": ["green enclave", "fgeha bhara kahu"]},
+    {"key": "navf", "folder": "Pakistan_Navy_Farms", "name": "Pakistan Navy Farms (Simly Dam Road)", "city": "Islamabad", "scheme": None,
+     "aliases": ["navy farms", "pakistan navy farms"]},
+    {"key": "anza", "folder": "Anza_Zephyr_Dale", "name": "Anza Zephyr Dale Agro Farms", "city": "Islamabad", "scheme": None,
+     "aliases": ["anza zephyr", "zephyr dale"]},
+    {"key": "alham", "folder": "Al-Hamra_Hills", "name": "Al-Hamra Hills Agro Farming", "city": "Islamabad", "scheme": None,
+     "aliases": ["al-hamra hills", "al hamra hills"]},
+    {"key": "rahm", "folder": "Rahman_Enclave", "name": "Rahman Enclave", "city": "Islamabad", "scheme": None,
+     "aliases": ["rahman enclave"]},
+    {"key": "taj", "folder": "Taj_Residencia", "name": "Taj Residencia", "city": "Islamabad", "scheme": "Taj Residencia",
+     "aliases": ["taj residencia", "taj"]},
+    {"key": "tajx", "folder": "Taj_Residencia_Sheikhpur_Extension", "name": "Taj Residencia Sheikhpur Extension", "city": "Rawalpindi", "scheme": "Taj Residencia",
+     "aliases": ["taj residencia extension"]},
+    {"key": "saff", "folder": "Saffron_City", "name": "Saffron City", "city": "Rawalpindi", "scheme": None,
+     "aliases": ["saffron city"]},
+    {"key": "gabad", "folder": "Gulshan-e-Abad", "name": "Gulshan-e-Abad", "city": "Rawalpindi", "scheme": "Gulshan-e-Abad",
+     "aliases": ["gulshan abad", "gulshanabad"]},
+    {"key": "rudn", "folder": "Rudn_Enclave", "name": "Rudn Enclave", "city": "Rawalpindi", "scheme": "Rudn Enclave",
+     "aliases": ["rudn enclave", "rudn"]},
+    {"key": "rudnx", "folder": "Rudn_Enclave_Executive", "name": "Rudn Enclave Executive Block", "city": "Rawalpindi", "scheme": "Rudn Enclave",
+     "aliases": ["rudn executive"]},
+    {"key": "rudnh", "folder": "Rudn_Enclave_H_Block", "name": "Rudn Enclave H-Block", "city": "Rawalpindi", "scheme": "Rudn Enclave",
+     "aliases": ["rudn h block"]},
+]
+PLANS += [dict(p, group="societies") for p in SOCIETIES]
 
 
 # ------------------------------------------------------------------ projections
@@ -193,8 +344,20 @@ def classify(text: str) -> str:
     return "label"
 
 
+def drawn_mask(source: Image.Image, ds: int = 8, grow: int = 6) -> Tuple[np.ndarray, int]:
+    """Where the cleaned plan has drawing (alpha), grown by ``grow`` × ``ds`` px so text on white
+    roads (transparent) still counts — the large cut-away legend / table areas don't."""
+    small = source.resize((max(1, source.width // ds), max(1, source.height // ds)), Image.BILINEAR)
+    a = np.asarray(small.convert("RGBA"))[:, :, 3] > 20
+    out = a.copy()
+    for dyy in range(-grow, grow + 1):
+        for dxx in range(-grow, grow + 1):
+            out |= np.roll(np.roll(a, dyy, axis=0), dxx, axis=1)
+    return out, ds
+
+
 def extract_labels(page: "pymupdf.Page", scale: float, dx: int, dy: int, source_size: Tuple[int, int],
-                   M: List[List[float]]) -> Tuple[List[List[Any]], List[str]]:
+                   M: List[List[float]], keep: Optional[Tuple[np.ndarray, int]] = None) -> Tuple[List[List[Any]], List[str]]:
     labels, sheet = [], []
     d = page.get_text("dict")
     w, h = source_size
@@ -210,7 +373,8 @@ def extract_labels(page: "pymupdf.Page", scale: float, dx: int, dy: int, source_
             cx = c.x * scale - dx
             cy = c.y * scale - dy
             size = max((s.get("size", 0) for s in line.get("spans", [])), default=0)
-            if not (0 <= cx < w and 0 <= cy < h):
+            if not (0 <= cx < w and 0 <= cy < h) or (
+                    keep is not None and not keep[0][min(int(cy) // keep[1], keep[0].shape[0] - 1), min(int(cx) // keep[1], keep[0].shape[1] - 1)]):
                 if re.search(r"[A-Za-z]{3}", text):
                     sheet.append(text)  # title block, legend, area statement
                 continue
@@ -308,8 +472,14 @@ def main(argv: Optional[List[str]] = None) -> None:
     ap.add_argument("--zmax", type=int, default=17)
     ap.add_argument("--skip-images", action="store_true", help="labels and outlines only (fast)")
     args = ap.parse_args(argv)
-    geo_dir = args.maps / "Georeferenced"
-    accuracy = json.loads((geo_dir / "accuracy_report.json").read_text(encoding="utf-8"))
+    reports: Dict[str, Dict[str, Any]] = {}
+
+    def report(group: str) -> Dict[str, Any]:
+        if group not in reports:
+            path = args.maps / GROUPS[group]["dir"] / "Georeferenced" / "accuracy_report.json"
+            reports[group] = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        return reports[group]
+
     wanted = set(args.plans.split(","))
     args.out.mkdir(parents=True, exist_ok=True)
     meta_path = args.out / "plans.json"
@@ -329,20 +499,33 @@ def main(argv: Optional[List[str]] = None) -> None:
                 all_labels[key] = old_labels.get(key, [])
             continue
         t = time.time()
-        folder = geo_dir / cfg["folder"]
-        acc = accuracy.get(key, {})
+        group = cfg.get("group", "dha")
+        base = args.maps / GROUPS[group]["dir"]
+        acc = report(group).get(key)
+        if acc is None:
+            print(f"- {cfg['name']}: not georeferenced yet ({key} missing from the accuracy report)")
+            if key in old:
+                plans_meta.append(old[key])
+                all_labels[key] = old_labels.get(key, [])
+            continue
+        folder = base / "Georeferenced" / (acc.get("folder") or cfg["folder"])
+        cfg = dict(cfg, folder=folder.name)
+        src_file = cfg.get("pdf") or acc.get("source") or ""
+        pdf = base / src_file if src_file.lower().endswith(".pdf") else None
         with open(folder / f"{cfg['folder']}_gcps.csv", newline="", encoding="utf-8") as f:
             gcps = [(float(r["pixel_x"]), float(r["pixel_y"]), float(r["lat"]), float(r["lon"])) for r in csv.DictReader(f)]
         tf = fit_transform(gcps, acc.get("method", "affine"))
         source = Image.open(folder / f"{cfg['folder']}_source.png")
-        doc = pymupdf.open(args.maps / cfg["pdf"])
-        page = doc[0]
-        scale, dx, dy, iou = find_crop(page, source)
-        if iou < 0.6:
-            print(f"! {cfg['name']}: PDF and image don't line up (IoU {iou:.2f}); labels skipped")
-            labels, sheet = [], []
-        else:
-            labels, sheet = extract_labels(page, scale, dx, dy, source.size, tf["matrix"])
+        labels, sheet, scale, dx, dy, iou = [], [], None, 0, 0, None
+        if pdf is not None and pdf.exists():
+            page = pymupdf.open(pdf)[int(acc.get("page") or cfg.get("page") or 0)]
+            scale, dx, dy, iou = find_crop(page, source)
+            if iou < 0.6:
+                print(f"! {cfg['name']}: PDF and image don't line up (IoU {iou:.2f}); labels skipped")
+            else:
+                # plans cleaned of their legend / tables: text over the cut-away parts is sheet text
+                keep = drawn_mask(source) if group != "dha" else None
+                labels, sheet = extract_labels(page, scale, dx, dy, source.size, tf["matrix"], keep)
         pgw = [float(v) for v in (folder / f"{cfg['folder']}_EPSG3857.pgw").read_text().split()]
         warped = Image.open(folder / f"{cfg['folder']}_EPSG3857.png")
         outline = outline_from_warped(warped, pgw)
@@ -361,24 +544,27 @@ def main(argv: Optional[List[str]] = None) -> None:
             prev.thumbnail((2048, 2048))
             prev.save(out_dir / "preview.png", optimize=True)
         meta = {
-            "key": key, "name": cfg["name"], "city": cfg["city"], "aliases": cfg["aliases"], "pdf": cfg["pdf"],
+            "key": key, "name": cfg["name"], "city": cfg["city"], "aliases": cfg["aliases"],
+            "pdf": pdf.name if pdf is not None else None, "source": Path(src_file).name or None,
+            "group": group, "attribution": cfg.get("attribution") or GROUPS[group]["attribution"],
+            "scheme": cfg.get("scheme"), "developer": cfg.get("developer"),
             "outline": outline,
             "bounds": [round(min(lats), 6), round(min(lons), 6), round(max(lats), 6), round(max(lons), 6)],
             "center": [round((min(lats) + max(lats)) / 2, 6), round((min(lons) + max(lons)) / 2, 6)],
             "source_size": list(source.size), "chunk": CHUNK, "to_ground": tf["matrix"], "to_pixels": tf["inverse"],
             "m_per_px": round(tf["m_per_px"], 3), "zoom": [args.zmin, args.zmax], "tiles": tiles,
-            "pdf_alignment": {"scale": round(scale, 5), "offset_px": [dx, dy], "overlap": round(iou, 3)},
+            "pdf_alignment": {"scale": round(scale, 5), "offset_px": [dx, dy], "overlap": round(iou, 3)} if scale else None,
             "accuracy": {"method": acc.get("method"), "gcps": len(gcps), "rmse_m": acc.get("rmse_m"),
                          "max_m": acc.get("max_m"), "residuals_m": tf["residuals_m"]},
             "label_counts": counts, "sheet_text": sheet[:600],
         }
         plans_meta.append(meta)
         all_labels[key] = labels
-        print(f"{cfg['name']}: {len(labels)} labels, {tiles} tiles, alignment {iou:.2f}, "
+        print(f"{cfg['name']}: {len(labels)} labels, {tiles} tiles, alignment {iou if iou is None else round(iou, 2)}, "
               f"GCP residuals {tf['residuals_m']} m ({time.time() - t:.0f}s)")
 
     meta_path.write_text(json.dumps({"built": time.strftime("%Y-%m-%d"), "plans": plans_meta,
-                                     "attribution": "Master plans © DHA Islamabad-Rawalpindi"},
+                                     "attribution": "Master plans © DHA Islamabad-Rawalpindi, Bahria Town and the societies' developers"},
                                     ensure_ascii=False, indent=1), encoding="utf-8")
     with gzip.open(labels_path, "wt", encoding="utf-8") as f:
         json.dump({"fields": ["text", "category", "lat", "lon", "font_size", "angle"], "plans": all_labels},

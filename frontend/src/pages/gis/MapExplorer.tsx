@@ -75,13 +75,17 @@ import { WATER_CLASSES, WaterLayer, type WaterStatus } from "@/components/gis/Wa
 import { DISTRICT_LABEL_ZOOM, DistrictLayer } from "@/components/gis/DistrictLayer";
 import { ELEVATION_GRADIENT, TerrainLayer } from "@/components/gis/TerrainLayer";
 import { usePrefs } from "@/store/prefs";
-import { LABEL_MIN_ZOOM, MasterPlanLayers, MasterPlanPanel, PlanLabels, useMasterPlans, type PlanLabel } from "@/components/gis/MasterPlans";
+import { LABEL_MIN_ZOOM, MasterPlanLayers, MasterPlanPanel, PLAN_GROUPS, PlanLabels, planGroup, useMasterPlans, type PlanLabel } from "@/components/gis/MasterPlans";
 import type { Aoi, AoiStats, GisLayer, GisLayerDetail, Poi, PoiCategory, RingResult, RouteResult } from "@/components/gis/types";
 
 type TabKey = "properties" | "places" | "layers" | "areas" | "analyse";
 type Vis = { props: boolean; pois: boolean; layers: boolean; aois: boolean; provinces: boolean; cities: boolean; districts: boolean; districtNames: boolean };
 type AnalyseMode = "radius" | "route" | "rings";
 type LatLon = [number, number];
+
+/** A layer generated from a built master plan ("<plan> — boundary / master plan / plan labels: …"). */
+const fromPlan = (l: { name: string; layer_type: string }, planNames: Set<string>) =>
+  ["boundary", "master_plan", "annotation"].includes(l.layer_type) && planNames.has(l.name.split(" — ")[0].toLowerCase());
 
 const LAYER_COLORS: Record<string, string> = {
   master_plan: "#c99a22",
@@ -139,18 +143,19 @@ export default function MapExplorer() {
 
   const properties = useMemo(() => (propsQ.data?.results ?? []).filter((p) => p.latitude != null && p.longitude != null), [propsQ.data]);
   const layers = useMemo(() => layersQ.data?.layers ?? [], [layersQ.data]);
-  // Layers generated from the DHA master plans (outline, plan, text labels) are shown by the
-  // "DHA master plans" section; their labels (~100k points) load only when switched on.
-  const planSchemeIds = useMemo(
-    () => new Set(layers.filter((l) => l.layer_type === "master_plan" && l.image_url?.startsWith("/masterplans/")).map((l) => l.entity_id)),
+  // Layers generated from the master plans (outline, plan, text labels — "<plan> — …") are shown by
+  // the DHA / Bahria / society master plan sections; their labels (~100k points) load only when on.
+  const planNames = useMemo(
+    () => new Set(layers.filter((l) => l.layer_type === "master_plan" && l.image_url?.startsWith("/masterplans/")).map((l) => l.name.split(" — ")[0].toLowerCase())),
     [layers],
   );
+
   // Every overlay (except base maps) is a layer record an admin publishes in Administration › GIS
   // layers; the map shows only what is published (built-in overlays carry a `builtin` key).
   const published = useMemo(() => new Set(layers.filter((l) => l.published !== false && l.builtin).map((l) => l.builtin as string)), [layers]);
   const on = (key: string) => published.has(key);
-  const gisLayers = useMemo(() => layers.filter((l) => !l.builtin && l.published !== false && !planSchemeIds.has(l.entity_id)), [layers, planSchemeIds]);
-  const labelLayers = useMemo(() => layers.filter((l) => l.published !== false && planSchemeIds.has(l.entity_id) && l.layer_type === "annotation"), [layers, planSchemeIds]);
+  const gisLayers = useMemo(() => layers.filter((l) => !l.builtin && l.published !== false && !fromPlan(l, planNames)), [layers, planNames]);
+  const labelLayers = useMemo(() => layers.filter((l) => l.published !== false && fromPlan(l, planNames) && l.layer_type === "annotation"), [layers, planNames]);
   const publishedPlans = useMemo(() => new Set(layers.filter((l) => l.published !== false && l.layer_type === "master_plan").map((l) => l.name.split(" — ")[0].toLowerCase())), [layers]);
   const plansQ = useMasterPlans();
   const visiblePlans = useMemo(() => (plansQ.data?.plans ?? []).filter((pl) => publishedPlans.has(pl.name.toLowerCase())), [plansQ.data, publishedPlans]);
@@ -915,23 +920,28 @@ export default function MapExplorer() {
               </>
             ),
           },
-          {
-            key: "plans",
-            title: "DHA master plans",
+          ...PLAN_GROUPS.map((g) => ({
+            key: `plans-${g.key}`,
+            title: g.title,
             icon: LandPlot,
-            items: visiblePlans.map((pl) => ({
-              key: `plan-${pl.key}`,
-              label: pl.name,
-              hint: pl.city,
-              icon: MapIcon,
-              on: vis.layers && planShown.has(pl.key),
-              onChange: (v: boolean) => setPlanOn(pl.key, v),
-              children: labelLayers
-                .filter((l) => l.name.startsWith(`${pl.name} — plan labels: `))
-                .map((l) => ({ key: l.id, label: `Labels: ${l.name.split(" — plan labels: ")[1]}`, on: labelsOn.has(l.id), onChange: (v: boolean) => setLabelOn(l.id, v) })),
-            })),
-            note: `Plan text appears from zoom ${LABEL_MIN_ZOOM}; plot numbers from zoom 17. Use the Layers tab to search a plan.`,
-          },
+            items: visiblePlans
+              .filter((pl) => planGroup(pl) === g.key)
+              .map((pl) => ({
+                key: `plan-${pl.key}`,
+                label: pl.name,
+                hint: pl.city,
+                icon: MapIcon,
+                on: vis.layers && planShown.has(pl.key),
+                onChange: (v: boolean) => setPlanOn(pl.key, v),
+                children: labelLayers
+                  .filter((l) => l.name.startsWith(`${pl.name} — plan labels: `))
+                  .map((l) => ({ key: l.id, label: `Labels: ${l.name.split(" — plan labels: ")[1]}`, on: labelsOn.has(l.id), onChange: (v: boolean) => setLabelOn(l.id, v) })),
+              })),
+            note:
+              g.key === "dha"
+                ? `Plan text appears from zoom ${LABEL_MIN_ZOOM}; plot numbers from zoom 17. Use the Layers tab to search a plan.`
+                : "Georeferenced from the developers' master plans (about 10–20 m accuracy) — plans change, so what is built may differ.",
+          })).filter((g) => g.items.length > 0),
           {
             key: "gis",
             title: "GIS layers",

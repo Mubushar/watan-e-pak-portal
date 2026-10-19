@@ -14730,39 +14730,67 @@ def my_memory_forget(memory_id: Optional[str] = None) -> str:
     return dump(user_memory.forget(uid, memory_id))
 
 
-def _seed_master_plans() -> None:
-    """Register each built DHA master plan as a housing scheme with GIS layers: its outline,
-    the georeferenced plan (map tiles) and the PDF's text as annotation layers."""
+MASTER_PLAN_DEVELOPERS = {"dha": "Defence Housing Authority (DHA) Islamabad-Rawalpindi", "bahria": "Bahria Town (Pvt) Ltd"}
+
+
+def _seed_master_plans(only_missing: bool = False) -> int:
+    """Register each built master plan (DHA, Bahria Town, other housing societies) as GIS layers of its
+    housing scheme: its outline, the georeferenced plan (map tiles) and the PDF's text as annotation
+    layers. ``only_missing``: a loaded database — add only plans it has no layers for yet (published,
+    like the seeded ones). Returns the number of plans added."""
     if os.getenv("MASTERPLANS_GIS", "1").strip().lower() in ("0", "false", "no", "off") or not masterplan.available():
-        return
+        return 0
+    have = {l.image_url for l in gis.GIS_LAYERS if getattr(l, "layer_type", None) == "master_plan" and l.image_url}
+    added = 0
     for meta in masterplan.store().meta.values():
+        tile_url = masterplan.tile_path(meta["key"]) if meta.get("tiles") else None
+        if only_missing and (tile_url in have or not tile_url):
+            continue
         city = resolve_city(meta["city"])
         if not city:
             continue
+        group = meta.get("group", "dha")
         acc = meta["accuracy"]
-        about = (f"Georeferenced from the DHA master plan PDF ({meta.get('pdf')}): {acc.get('method')} fit on "
-                 f"{acc.get('gcps')} ground control points" + (f", RMSE {acc['rmse_m']} m" if acc.get("rmse_m") else "") + ".")
-        scheme = next((s for s in housing_schemes_db if s.name.lower() == meta["name"].lower()), None)
+        source = meta.get("source") or meta.get("pdf")
+        kind = "DHA master plan PDF" if group == "dha" else "master plan"
+        about = (f"Georeferenced from the {kind} ({source}): {acc.get('method')} fit on "
+                 f"{acc.get('gcps')} ground control points" + (f", RMSE {acc['rmse_m']} m" if acc.get("rmse_m") else "") + "."
+                 + (f" {masterplan.credit(meta)}." if group != "dha" else ""))
+        # the society the plan belongs to: its configured scheme, else one of the same name, else a new one
+        names = [n for n in [meta.get("scheme"), meta["name"], *meta.get("aliases", [])] if n]
+        scheme = next((s for n in names for s in housing_schemes_db if s.name.lower() == n.lower()), None)
         if scheme is None:
-            scheme = HousingScheme(name=meta["name"], city_id=city.id, latitude=meta["center"][0], longitude=meta["center"][1],
-                                   developer="Defence Housing Authority (DHA) Islamabad-Rawalpindi", description=about)
+            scheme = HousingScheme(name=meta.get("scheme") or meta["name"], city_id=city.id, latitude=meta["center"][0],
+                                   longitude=meta["center"][1], developer=meta.get("developer") or MASTER_PLAN_DEVELOPERS.get(group),
+                                   description=about)
             housing_schemes_db.append(scheme)
         outline = masterplan.outline_geojson(meta)
-        gis.add_layer(gis.GeoLayer(name=f"{meta['name']} — boundary", layer_type="boundary", entity_type="scheme",
-                                   entity_id=scheme.id, geojson=outline, description=about, source_url=meta.get("pdf"),
-                                   style={"color": "#c99a22", "fillColor": "#c99a22", "fillOpacity": 0.05, "weight": 2, "opacity": 0.9}))
-        gis.add_layer(gis.GeoLayer(name=f"{meta['name']} — master plan", layer_type="master_plan", entity_type="scheme",
-                                   entity_id=scheme.id, geojson=outline, description=about, source_url=meta.get("pdf"),
-                                   image_url=masterplan.tile_path(meta["key"]) if meta.get("tiles") else None,
-                                   opacity=0.75, z_index=1))
-        for title, cats, visible in masterplan.LABEL_GROUPS:
-            gis.add_layer(gis.GeoLayer(name=f"{meta['name']} — plan labels: {title}", layer_type="annotation",
-                                       entity_type="scheme", entity_id=scheme.id, visible=visible, z_index=2,
-                                       geojson=masterplan.geojson_labels(meta["key"], cats),
-                                       geojson_ref=f"masterplan-labels:{meta['key']}:{','.join(cats)}",
-                                       description=f"Text from the master plan PDF, placed on the ground. {about}",
-                                       source_url=meta.get("pdf"),
-                                       style={"color": "#1d4ed8", "fillColor": "#1d4ed8", "fillOpacity": 0.8, "weight": 1, "opacity": 0.9}))
+        new = [gis.GeoLayer(name=f"{meta['name']} — boundary", layer_type="boundary", entity_type="scheme",
+                            entity_id=scheme.id, geojson=outline, description=about, source_url=source,
+                            style={"color": "#c99a22", "fillColor": "#c99a22", "fillOpacity": 0.05, "weight": 2, "opacity": 0.9}),
+               gis.GeoLayer(name=f"{meta['name']} — master plan", layer_type="master_plan", entity_type="scheme",
+                            entity_id=scheme.id, geojson=outline, description=about, source_url=source,
+                            image_url=tile_url, opacity=0.75, z_index=1)]
+        if meta.get("label_counts"):  # plans from a vector PDF carry their text
+            for title, cats, visible in masterplan.LABEL_GROUPS:
+                new.append(gis.GeoLayer(name=f"{meta['name']} — plan labels: {title}", layer_type="annotation",
+                                        entity_type="scheme", entity_id=scheme.id, visible=visible, z_index=2,
+                                        geojson=masterplan.geojson_labels(meta["key"], cats),
+                                        geojson_ref=f"masterplan-labels:{meta['key']}:{','.join(cats)}",
+                                        description=f"Text from the master plan PDF, placed on the ground. {about}",
+                                        source_url=source,
+                                        style={"color": "#1d4ed8", "fillColor": "#1d4ed8", "fillOpacity": 0.8, "weight": 1, "opacity": 0.9}))
+        for layer in new:
+            if only_missing:
+                layer.published = True
+            gis.add_layer(layer)
+        added += 1
+    return added
+
+
+def add_missing_master_plans() -> int:
+    """After the database is loaded: attach master plans built since it was saved."""
+    return _seed_master_plans(only_missing=True)
 
 
 def _seed_pois() -> None:
@@ -16819,7 +16847,7 @@ def ensure_builtin_layers() -> int:
 
 
 def is_master_plan_layer(layer: Any) -> bool:
-    """A layer generated from a built DHA master plan (the plan itself, its outline or its text)."""
+    """A layer generated from a built master plan (the plan itself, its outline or its text)."""
     ref = str(getattr(layer, "geojson_ref", "") or "")
     return (ref.startswith("masterplan") or str(getattr(layer, "image_url", "") or "").startswith("/masterplans/")
             or (getattr(layer, "entity_type", None) == "scheme" and getattr(layer, "layer_type", None) in ("boundary", "master_plan")

@@ -1,5 +1,5 @@
 /**
- * DHA master plans as map layers (built locally by backend/masterplans/build_masterplans.py).
+ * Master plans (DHA, Bahria Town, other housing societies) as map layers (built locally by backend/masterplans/build_masterplans.py).
  *   GET /masterplans                         plans, bounds, zoom range, tile URL
  *   GET /masterplans/{key}/tiles/{z}/{x}/{y}.png
  *   GET /masterplans/search?q=…              text on the plans (sectors, roads, mosques, plot numbers)
@@ -57,7 +57,19 @@ export interface MasterPlan {
   zoom?: [number, number];
   accuracy?: { rmse_m?: number };
   attribution?: string;
+  /** dha | bahria | societies — each is its own section on the map */
+  group?: string;
+  group_label?: string;
 }
+
+/** The plan sections, in the order the map lists them. */
+export const PLAN_GROUPS: { key: string; title: string }[] = [
+  { key: "dha", title: "DHA master plans" },
+  { key: "bahria", title: "Bahria Town master plans" },
+  { key: "societies", title: "Housing society master plans" },
+];
+export const planGroup = (p: MasterPlan) => p.group ?? "dha";
+
 export interface PlanLabel {
   text: string;
   kind: string;
@@ -171,7 +183,7 @@ export function MasterPlanPanel({
   return (
     <div className="space-y-3">
       <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-ink-mute">
-        <MapIcon className="h-3.5 w-3.5" /> DHA master plans
+        <MapIcon className="h-3.5 w-3.5" /> Master plans
       </p>
       {q.isLoading ? (
         <Skeleton className="h-16 w-full" />
@@ -181,7 +193,12 @@ export function MasterPlanPanel({
         <EmptyState title="Master plans are hidden" hint="An administrator can show them in Administration › GIS layers (publish the master plan layers)." />
       ) : (
         <>
-          {plans.map((p) => (
+          {PLAN_GROUPS.map((g) => ({ ...g, plans: plans.filter((p) => planGroup(p) === g.key) }))
+            .filter((g) => g.plans.length)
+            .map((g) => (
+              <div key={g.key} className="space-y-2">
+                <p className="text-[11px] font-semibold text-ink-soft dark:text-slate-300">{g.title}</p>
+          {g.plans.map((p) => (
             <div key={p.key} className="flex items-center gap-3 rounded-xl border border-black/5 p-3 dark:border-white/10">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold">{p.name}</p>
@@ -205,6 +222,8 @@ export function MasterPlanPanel({
               <Toggle checked={shown.has(p.key)} onChange={(v) => show(p.key, v)} />
             </div>
           ))}
+              </div>
+            ))}
           {!!labels?.layers.length && (
             <div className="rounded-xl bg-brand-50/60 p-3 dark:bg-white/5">
               <p className="text-xs font-semibold">Text from the plans</p>

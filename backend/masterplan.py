@@ -128,6 +128,15 @@ def _inside(meta: Dict[str, Any], lat: float, lon: float) -> bool:
     return geo.point_in_ring(lat, lon, meta["outline"]) if meta.get("outline") else True
 
 
+# Plan groups shown as separate sections on the map (each plan's "group" in plans.json).
+GROUPS = {"dha": "DHA master plans", "bahria": "Bahria Town master plans", "societies": "Housing society master plans"}
+
+
+def credit(meta: Optional[Dict[str, Any]]) -> str:
+    """The plan's own credit line (Bahria / society plans carry theirs), else the DHA one."""
+    return (meta or {}).get("attribution") or ATTRIBUTION
+
+
 def tile_path(key: str) -> str:
     return f"/masterplans/{key}/tiles/{{z}}/{{x}}/{{y}}.png"
 
@@ -137,7 +146,9 @@ def _public(meta: Dict[str, Any]) -> Dict[str, Any]:
         "key": meta["key"], "name": meta["name"], "city": meta["city"], "center": meta["center"], "bounds": meta["bounds"],
         "outline": meta.get("outline"), "tile_url": tile_path(meta["key"]) if meta.get("tiles") else None,
         "zoom": meta.get("zoom"), "accuracy": {k: meta["accuracy"].get(k) for k in ("method", "gcps", "rmse_m", "max_m")},
-        "label_counts": meta.get("label_counts", {}), "attribution": ATTRIBUTION,
+        "label_counts": meta.get("label_counts", {}), "attribution": credit(meta),
+        "group": meta.get("group", "dha"), "group_label": GROUPS.get(meta.get("group", "dha"), "Master plans"),
+        "society": meta.get("scheme"),
     }
 
 
@@ -177,7 +188,7 @@ def overlays_at(lat: float, lon: float, margin_km: float = 1.0) -> List[Dict[str
         if b[0] - d <= lat <= b[2] + d and b[1] - d <= lon <= b[3] + d:
             out.append({"key": m["key"], "name": f"{m['name']} master plan", "tile_url": tile_path(m["key"]),
                         "bounds": b, "min_zoom": m["zoom"][0], "max_native_zoom": m["zoom"][1],
-                        "attribution": ATTRIBUTION})
+                        "attribution": credit(m), "group": m.get("group", "dha")})
     return out
 
 
@@ -255,7 +266,7 @@ def search(q: str, plan: Optional[str] = None, category: Optional[str] = None, l
         rows.append(v)
     return {"query": q, "plan": meta["name"] if meta else None, "count": len(hits), "results": rows,
             "note": "Positions are from the georeferenced master plan (about 10–20 m accuracy).",
-            "attribution": ATTRIBUTION}
+            "attribution": credit(meta)}
 
 
 def at(lat: float, lon: float, radius_m: float = 200.0) -> Dict[str, Any]:
@@ -275,7 +286,7 @@ def at(lat: float, lon: float, radius_m: float = 200.0) -> Dict[str, Any]:
             "plot_sizes": [{"size": k, "count": n} for k, n in sizes.most_common(6)], "plot_numbers": plots,
             "infrastructure_marks": sum(1 for v in near if v["category"] == "infrastructure"),
             "note": "From the georeferenced master plan (about 10–20 m accuracy); what is built may differ.",
-            "attribution": ATTRIBUTION}
+            "attribution": "; ".join(sorted({credit(m) for m in here})) or ATTRIBUTION}
 
 
 SIZE_RE = re.compile(r"(\d+(?:\.\d+)?)\s*'?\s*[xX×]\s*(\d+(?:\.\d+)?)")
@@ -338,8 +349,8 @@ def summary(plan: str) -> Dict[str, Any]:
         "facilities": {CATEGORY_LABELS[c]: where(c) for c in FACILITY_CATEGORIES if c != "parking" and names(c, 1)},
         "sheet_notes": notes[:40],
         "web_facts": store().knowledge.get(k),
-        "note": "From the DHA master plan PDF (plans change; what is built may differ). Plot sizes in marla use 225 sq ft per marla.",
-        "attribution": ATTRIBUTION,
+        "note": "From the master plan (plans change; what is built may differ). Plot sizes in marla use 225 sq ft per marla.",
+        "attribution": credit(meta),
     }
 
 
