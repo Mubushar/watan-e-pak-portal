@@ -2352,7 +2352,18 @@ def my_listing_add_photo(property_id: str, payload: PhotoUpload,
                          user: Dict[str, Any] = Depends(require_user)) -> Any:
     """Attach a photo (JPEG/PNG/WebP, max 5 MB, base64) to one of your listings."""
     p = _owned_property(property_id, user)
-    encoded = payload.data_url.split(",")[-1]
+    url = _save_upload(payload.data_url)
+    if payload.is_primary:
+        p.image_urls.insert(0, url)
+    else:
+        p.image_urls.append(url)
+    core.image_store("property", p.id, url, is_primary=payload.is_primary)
+    return {"property_id": p.id, "url": url, "image_urls": p.image_urls}
+
+
+def _save_upload(data_url: str) -> str:
+    """Store a base64 photo (JPEG / PNG / WebP, 5 MB at most) under media/uploads; returns its URL."""
+    encoded = data_url.split(",")[-1]
     if len(encoded) > UPLOAD_MAX_BYTES * 4 // 3 + 4:
         raise HTTPException(status_code=413, detail="Photo must be between 1 byte and 5 MB")
     try:
@@ -2368,13 +2379,65 @@ def my_listing_add_photo(property_id: str, payload: PhotoUpload,
     name = f"{core.uuid.uuid4().hex}.{ext}"
     with open(os.path.join(UPLOAD_DIR, name), "wb") as fh:
         fh.write(raw)
-    url = f"/media/uploads/{name}"
+    return f"/media/uploads/{name}"
+
+
+@app.post("/bigprojects/{project_id}/photos", tags=["big-projects"], status_code=201)
+def big_project_add_photo(project_id: str, payload: PhotoUpload) -> Any:
+    """Attach a photo taken on site (base64 JPEG / PNG / WebP) to a big project."""
+    b = core.find_project(project_id)
+    if not b:
+        raise HTTPException(status_code=404, detail="Big project not found")
+    url = _save_upload(payload.data_url)
     if payload.is_primary:
-        p.image_urls.insert(0, url)
+        b.image_urls.insert(0, url)
     else:
-        p.image_urls.append(url)
-    core.image_store("property", p.id, url, is_primary=payload.is_primary)
-    return {"property_id": p.id, "url": url, "image_urls": p.image_urls}
+        b.image_urls.append(url)
+    b.image_library = [*(b.image_library or []), url]
+    b.updated_at = datetime.now()
+    return {"project_id": b.id, "url": url, "image_urls": b.image_urls}
+
+
+@app.post("/geo/megaprojects/{project_id}/photos", tags=["places"], status_code=201)
+def geo_megaproject_add_photo(project_id: str, payload: PhotoUpload) -> Any:
+    """Attach a photo taken on site to an infrastructure mega project (GIS managers)."""
+    try:
+        return megaprojects.admin_add_photo(project_id, _save_upload(payload.data_url), payload.is_primary)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Project not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.get("/geo/nearby-entities", tags=["places"])
+def geo_nearby_entities(lat: float, lon: float, radius_m: float = 300.0, limit: int = 20) -> Any:
+    """Listings, big projects and mega projects around a point — for surveying on site."""
+    r_km = max(0.02, min(radius_m, 5000.0)) / 1000.0
+    cities = {c.id: c.name for c in core.cities_db}
+
+    def near(la: Optional[float], lo: Optional[float]) -> Optional[float]:
+        return None if la is None or lo is None else core.haversine_km(lat, lon, la, lo)
+
+    # a project's unit listings follow the project, so the project stands for them here
+    props = sorted(((d, p) for p in core.properties_db if p.status == "active" and not p.project_id
+                    and (d := near(p.latitude, p.longitude)) is not None and d <= r_km),
+                   key=lambda x: x[0])[:limit]
+    projects = sorted(((d, b) for b in core.big_projects_db if (d := near(b.latitude, b.longitude)) is not None and d <= r_km),
+                      key=lambda x: x[0])[:limit]
+    megas = sorted(((megaprojects.distance_km(m, lat, lon), m) for m in megaprojects.all_projects() if not m.get("portal_project")),
+                   key=lambda x: x[0])
+    return {
+        "at": {"latitude": lat, "longitude": lon, "radius_m": round(r_km * 1000)},
+        "properties": [{"id": p.id, "title": p.title, "price": p.price, "category": p.category, "city": cities.get(p.city_id),
+                        "owner_user_id": p.owner_user_id, "project_id": p.project_id, "image": (p.image_urls or [None])[0],
+                        "latitude": p.latitude, "longitude": p.longitude, "distance_m": round(d * 1000)} for d, p in props],
+        "projects": [{"id": b.id, "name": b.name, "project_type": b.project_type, "status": b.status, "city": cities.get(b.city_id),
+                      "image": (b.image_urls or [None])[0], "latitude": b.latitude, "longitude": b.longitude,
+                      "distance_m": round(d * 1000)} for d, b in projects],
+        "megaprojects": [{"id": m["id"], "name": m["name"], "type": m["type"], "status": m["status"], "city": m.get("city"),
+                          "geometry_type": m["geometry"]["type"], "image": m.get("image"), "distance_m": round(d * 1000)}
+                         for d, m in megas if d <= r_km][:limit],
+    }
 
 
 @app.get("/media/uploads/{name}", tags=["properties"], include_in_schema=False)

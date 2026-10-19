@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Camera, CheckCircle2, Home, ImagePlus, Loader2, MapPin, Mic, Ruler, Sparkles, Square, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Home, ImagePlus, Loader2, MapPin, Mic, Ruler, Sparkles, Square, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { City, Hierarchy, Property } from "@/types";
 import { useApi } from "@/hooks/useApi";
@@ -19,6 +19,8 @@ import { compressImage, coverImage } from "@/lib/images";
 import { draftFromIntent, parseIntent, type ListingDraft } from "@/lib/intent";
 import { listen, type ListenSession } from "@/lib/voice";
 import { cn } from "@/lib/utils";
+import { getPosition, inPakistan, nearestCity, type Fix } from "@/lib/device";
+import { CameraButton } from "@/components/CameraButton";
 import { Button, Field, Input, Segmented, Select, Stepper, Textarea, TopBar } from "@/components/ui";
 
 const CATEGORIES = ["house", "apartment", "plot", "shop", "office", "floor", "building"];
@@ -47,12 +49,16 @@ interface Form {
   /** Comma-separated: "Solar system, Basement, Gated community". */
   amenities: string;
   photos: string[];
+  /** Where it is — from the device GPS on site (survey) or left empty. */
+  gps: Fix | null;
 }
 
 export default function ListingForm() {
   const nav = useNavigate();
   const loc = useLocation();
   const [incoming] = useState<ListingDraft | undefined>(() => (loc.state as { draft?: ListingDraft } | null)?.draft ?? useChat.getState().pendingDraft ?? undefined);
+  /** A GPS fix handed over by the field survey screen ("New listing here"). */
+  const [surveyFix] = useState<Fix | null>(() => (loc.state as { gps?: Fix } | null)?.gps ?? null);
   const cities = useApi<{ cities: City[] }>("/cities");
   const tree = useApi<Hierarchy>("/hierarchy");
   const [step, setStep] = useState(0);
@@ -73,6 +79,7 @@ export default function ListingForm() {
     price: 0,
     amenities: "",
     photos: [],
+    gps: null,
   });
   const set = (patch: Partial<Form>) => setF((x) => ({ ...x, ...patch }));
 
@@ -104,6 +111,31 @@ export default function ListingForm() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incoming, cities.data]);
+
+  const appliedFix = useRef(false);
+  useEffect(() => {
+    if (!surveyFix || appliedFix.current || !cities.data) return;
+    appliedFix.current = true;
+    const c = nearestCity(surveyFix, cities.data.cities);
+    setF((x) => ({ ...x, gps: surveyFix, city_id: x.city_id || c?.id || "" }));
+  }, [surveyFix, cities.data]);
+
+  // ---- location from the device GPS
+  const [locating, setLocating] = useState(false);
+  const useGps = async () => {
+    setLocating(true);
+    try {
+      const fix = await getPosition();
+      if (!inPakistan(fix)) toast.warning("That location is outside Pakistan — check the GPS");
+      const c = nearestCity(fix, cities.data?.cities ?? []);
+      setF((x) => ({ ...x, gps: fix, city_id: x.city_id || c?.id || "" }));
+      toast.success(`Location saved (±${fix.accuracy} m)`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setLocating(false);
+    }
+  };
 
   // ---- voice description
   const [rec, setRec] = useState<ListenSession | null>(null);
@@ -186,6 +218,8 @@ export default function ListingForm() {
         bathrooms: isLand ? undefined : f.bathrooms,
         price: f.price,
         amenities: amenityList.length ? amenityList : undefined,
+        latitude: f.gps?.latitude,
+        longitude: f.gps?.longitude,
       });
       for (let i = 0; i < f.photos.length; i++) {
         setBusy(`Uploading photo ${i + 1} of ${f.photos.length}…`);
@@ -297,6 +331,30 @@ export default function ListingForm() {
 
             {step === 1 && (
               <>
+                <div className="rounded-2xl bg-brand-50 p-3.5 dark:bg-white/5">
+                  <div className="flex items-center gap-3">
+                    <MapPin className="h-5 w-5 shrink-0 text-gold-600" />
+                    <div className="min-w-0 flex-1 text-sm">
+                      {f.gps ? (
+                        <>
+                          <p className="font-semibold text-brand-900 dark:text-white">Pinned with GPS</p>
+                          <p className="truncate text-xs text-ink-mute tabular-nums">
+                            {f.gps.latitude.toFixed(6)}, {f.gps.longitude.toFixed(6)} · ±{f.gps.accuracy} m
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-semibold text-brand-900 dark:text-white">Standing at the property?</p>
+                          <p className="text-xs text-ink-mute">Pin its exact spot with your phone's GPS.</p>
+                        </>
+                      )}
+                    </div>
+                    <Button size="sm" variant={f.gps ? "outline" : "primary"} loading={locating} onClick={useGps}>
+                      {f.gps ? "Update" : "Use GPS"}
+                    </Button>
+                  </div>
+                  {f.gps && f.gps.accuracy > 50 && <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">The fix is rough (±{f.gps.accuracy} m) — step outside and tap Update for a better one.</p>}
+                </div>
                 <Field label="City">
                   <Select value={f.city_id} onChange={(e) => set({ city_id: e.target.value, scheme_id: "", block_zone_area_id: "" })}>
                     <option value="">Choose a city</option>
@@ -384,11 +442,7 @@ export default function ListingForm() {
                         <span className="text-xs font-semibold">Gallery</span>
                         <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => void addPhotos(e.target.files)} />
                       </label>
-                      <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-brand-300 text-brand-700 dark:border-white/20 dark:text-brand-200">
-                        <Camera className="h-6 w-6" />
-                        <span className="text-xs font-semibold">Camera</span>
-                        <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => void addPhotos(e.target.files)} />
-                      </label>
+                      <CameraButton className="aspect-square" onPhotos={(urls) => set({ photos: [...f.photos, ...urls].slice(0, MAX_PHOTOS) })} />
                     </>
                   )}
                 </div>

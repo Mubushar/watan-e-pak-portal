@@ -79,7 +79,9 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Arz-e-Pak uses the microphone for voice notes and live conversations with the AI property assistant.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Take photos of your property to add them to a listing.</string>
+	<string>Take photos of your property or a project on site to add them to a listing or the map.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Arz-e-Pak uses your location while you survey on site, to pin listings and projects exactly where they are and show what is around you.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Choose photos of your property to add them to a listing.</string>
 	<key>NSAppTransportSecurity</key>

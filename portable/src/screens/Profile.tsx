@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { BadgeCheck, Building2, ChevronRight, Heart, LogIn, LogOut, Mail, Monitor, Moon, Phone, Server, Sun, UserPlus } from "lucide-react";
+import { BadgeCheck, Building2, ChevronRight, Heart, LogIn, LogOut, Mail, Monitor, Moon, Phone, Server, Sun, UserPlus, LocateFixed } from "lucide-react";
 import { toast } from "sonner";
 import { apiBase, post } from "@/lib/api";
 import { DEFAULT_API_BASE, normalizeServerUrl } from "@/lib/config";
@@ -80,6 +80,9 @@ export default function Profile() {
               )}
               <Link to="/listings" className="flex items-center gap-3 px-5 py-3 text-sm font-semibold">
                 <Building2 className="h-4 w-4 text-brand-600" /> <span className="flex-1">My listings</span> <ChevronRight className="h-4 w-4 text-ink-mute rtl:rotate-180" />
+              </Link>
+              <Link to="/survey" className="flex items-center gap-3 px-5 py-3 text-sm font-semibold">
+                <LocateFixed className="h-4 w-4 text-brand-600" /> <span className="flex-1">Field survey (GPS + camera)</span> <ChevronRight className="h-4 w-4 text-ink-mute rtl:rotate-180" />
               </Link>
               <Link to="/saved" className="flex items-center gap-3 px-5 py-3 text-sm font-semibold">
                 <Heart className="h-4 w-4 text-brand-600" /> <span className="flex-1">Saved properties</span> <ChevronRight className="h-4 w-4 text-ink-mute rtl:rotate-180" />

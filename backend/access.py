@@ -188,6 +188,7 @@ _add("POST", r"^/aoi/compare$", "public")
 _add(W, r"^/aoi(/|$)", "aoi.manage")
 _add("POST", r"^/geo/study-area$", "public")
 _add(W, r"^/geo/megaprojects(/|$)", "gis.manage")  # admins edit the infrastructure mega projects on the map
+_add("GET", r"^/geo/nearby-entities$", "public")  # surveying on site: what is around me
 
 # ---- compute-only tools, calculators, AI (rate-limited by ai_guard)
 _add("*", r"^/tools/projects(/|$)", "user")

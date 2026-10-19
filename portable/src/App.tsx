@@ -21,6 +21,7 @@ const PropertyDetail = lazy(() => import("@/screens/PropertyDetail"));
 const Assistant = lazy(() => import("@/screens/Assistant"));
 const MyListings = lazy(() => import("@/screens/MyListings"));
 const ListingForm = lazy(() => import("@/screens/ListingForm"));
+const Survey = lazy(() => import("@/screens/Survey"));
 const Saved = lazy(() => import("@/screens/Saved"));
 const Profile = lazy(() => import("@/screens/Profile"));
 
@@ -148,6 +149,14 @@ export default function App() {
                 element={
                   <RequireAuth>
                     <MyListings />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/survey"
+                element={
+                  <RequireAuth>
+                    <Survey />
                   </RequireAuth>
                 }
               />

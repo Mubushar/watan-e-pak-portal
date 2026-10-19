@@ -189,6 +189,26 @@ def admin_save(project_id: Optional[str], fields: Dict[str, Any]) -> Dict[str, A
     return summary(get(project_id))
 
 
+def admin_add_photo(project_id: str, url: str, primary: bool = False) -> Dict[str, Any]:
+    """A photo taken on site: kept with the project's admin edits; the first one becomes its picture."""
+    from datetime import datetime
+
+    current = get(project_id)
+    if current is None:
+        raise KeyError(project_id)
+    if current.get("portal_project"):
+        raise ValueError("This is a portal project — add photos to it as a big project")
+    edits = _edits()
+    e = edits.setdefault(project_id, {"created": False, "deleted": False, "fields": {}})
+    fields = e.setdefault("fields", {})
+    images = [*(fields.get("images") or []), url]
+    fields["images"] = images
+    if primary or not any(u.startswith("/media/") for u in images[:-1]):
+        fields["image"], fields["image_credit"] = url, "Photo taken on site (Arz-e-Pak survey)"
+    e["updated_at"] = datetime.now().isoformat(timespec="seconds")
+    return summary(get(project_id))
+
+
 def admin_delete(project_id: str) -> Dict[str, Any]:
     edits = _edits()
     current = get(project_id)

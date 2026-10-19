@@ -2,7 +2,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, Bot, Building, Building2, Compass, Heart, Home as HomeIcon, KeyRound, LandPlot, LineChart, Mic, PlusCircle, Search, Shuffle, Sparkles, Store, TrendingUp, UserRound, Wand2 } from "lucide-react";
+import { ArrowRight, Bot, Building, Building2, Compass, Heart, Home as HomeIcon, KeyRound, LandPlot, LineChart, Mic, PlusCircle, Search, Shuffle, Sparkles, Store, TrendingUp, UserRound, Wand2, LocateFixed } from "lucide-react";
 import type { City, Property, PropertyList } from "@/types";
 import { useApi } from "@/hooks/useApi";
 import { cityImage } from "@/lib/images";
@@ -24,9 +24,15 @@ function onePerProject(rows: Property[] | undefined, n: number): Property[] {
 function actionsFor(role?: string): Action[] {
   const ask = (q: string) => `/assistant?q=${encodeURIComponent(q)}`;
   switch (role) {
+    case "agent":
+      return [
+        { icon: LocateFixed, label: "Field survey", to: "/survey", tone: "gold" },
+        { icon: PlusCircle, label: "Add listing", to: "/listings/new" },
+        { icon: Building2, label: "My listings", to: "/listings" },
+        { icon: Wand2, label: "Price check", to: ask("What is a fair asking price for a 10 marla house in Lahore?") },
+      ];
     case "seller":
     case "landlord":
-    case "agent":
       return [
         { icon: PlusCircle, label: "Add listing", to: "/listings/new", tone: "gold" },
         { icon: Building2, label: "My listings", to: "/listings" },
