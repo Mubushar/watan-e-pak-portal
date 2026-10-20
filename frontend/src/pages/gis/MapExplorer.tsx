@@ -76,7 +76,7 @@ import { DISTRICT_LABEL_ZOOM, DistrictLayer } from "@/components/gis/DistrictLay
 import { ELEVATION_GRADIENT, TerrainLayer } from "@/components/gis/TerrainLayer";
 import { usePrefs } from "@/store/prefs";
 import { onMapFocus, takePendingFocus, type MapFocus } from "@/lib/mapFocus";
-import { LABEL_MIN_ZOOM, MasterPlanLayers, MasterPlanPanel, PLAN_GROUPS, PlanLabels, planGroup, useMasterPlans, type PlanLabel } from "@/components/gis/MasterPlans";
+import { LABEL_MIN_ZOOM, MasterPlanLayers, MasterPlanPanel, PLAN_GROUPS, PlanLabels, planGroup, planOfLayer, useMasterPlans, type PlanLabel } from "@/components/gis/MasterPlans";
 import type { Aoi, AoiStats, GisLayer, GisLayerDetail, Poi, PoiCategory, RingResult, RouteResult } from "@/components/gis/types";
 
 type TabKey = "properties" | "places" | "layers" | "areas" | "analyse";
@@ -86,7 +86,7 @@ type LatLon = [number, number];
 
 /** A layer generated from a built master plan ("<plan> — boundary / master plan / plan labels: …"). */
 const fromPlan = (l: { name: string; layer_type: string }, planNames: Set<string>) =>
-  ["boundary", "master_plan", "annotation"].includes(l.layer_type) && planNames.has(l.name.split(" — ")[0].toLowerCase());
+  ["boundary", "master_plan", "annotation"].includes(l.layer_type) && planNames.has(planOfLayer(l.name));
 
 const LAYER_COLORS: Record<string, string> = {
   master_plan: "#c99a22",
@@ -147,7 +147,7 @@ export default function MapExplorer() {
   // Layers generated from the master plans (outline, plan, text labels — "<plan> — …") are shown by
   // the DHA / Bahria / society master plan sections; their labels (~100k points) load only when on.
   const planNames = useMemo(
-    () => new Set(layers.filter((l) => l.layer_type === "master_plan" && l.image_url?.startsWith("/masterplans/")).map((l) => l.name.split(" — ")[0].toLowerCase())),
+    () => new Set(layers.filter((l) => l.layer_type === "master_plan" && l.image_url?.startsWith("/masterplans/")).map((l) => planOfLayer(l.name))),
     [layers],
   );
 
@@ -157,7 +157,7 @@ export default function MapExplorer() {
   const on = (key: string) => published.has(key);
   const gisLayers = useMemo(() => layers.filter((l) => !l.builtin && l.published !== false && !fromPlan(l, planNames)), [layers, planNames]);
   const labelLayers = useMemo(() => layers.filter((l) => l.published !== false && fromPlan(l, planNames) && l.layer_type === "annotation"), [layers, planNames]);
-  const publishedPlans = useMemo(() => new Set(layers.filter((l) => l.published !== false && l.layer_type === "master_plan").map((l) => l.name.split(" — ")[0].toLowerCase())), [layers]);
+  const publishedPlans = useMemo(() => new Set(layers.filter((l) => l.published !== false && l.layer_type === "master_plan").map((l) => planOfLayer(l.name))), [layers]);
   const plansQ = useMasterPlans();
   const visiblePlans = useMemo(() => (plansQ.data?.plans ?? []).filter((pl) => publishedPlans.has(pl.name.toLowerCase())), [plansQ.data, publishedPlans]);
   /** The Layers panel offers only published overlays (a group disappears when nothing in it is). */

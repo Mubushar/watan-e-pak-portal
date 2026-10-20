@@ -3,9 +3,9 @@ Build the master-plan data the portal and the assistant use (DHA, Bahria Town an
 housing societies), from the PDFs / images and the georeferenced plans in a "Maps" folder::
 
     Maps/
-      PH-I Colours (14-04-25)-Model.pdf, …            the 8 DHA master-plan PDFs
-      Georeferenced/DHA_Phase_I/DHA_Phase_I_source.png, _EPSG3857.png/.pgw, _gcps.csv …
-      Georeferenced/accuracy_report.json
+      DHA Rawalpindi/PH-I Colours (14-04-25)-Model.pdf, …   the 8 DHA master-plan PDFs
+      DHA Rawalpindi/Georeferenced/DHA_Phase_I/DHA_Phase_I_source.png, _EPSG3857.png/.pgw, _gcps.csv …
+      DHA Rawalpindi/Georeferenced/accuracy_report.json
       Bahria Town/Georeferenced/…                     the same, one folder per group (GROUPS)
       Islamabad Societies/Georeferenced/…
 
@@ -60,7 +60,7 @@ CHUNK = 1024
 
 # group -> its sub-folder of --maps and the credit shown on the map
 GROUPS: Dict[str, Dict[str, str]] = {
-    "dha": {"dir": "", "attribution": "Master plan © DHA Islamabad-Rawalpindi"},
+    "dha": {"dir": "DHA Rawalpindi", "attribution": "Master plan © DHA Islamabad-Rawalpindi"},
     "bahria": {"dir": "Bahria Town", "attribution": "Master plan © Bahria Town (Pvt) Ltd"},
     "societies": {"dir": "Islamabad Societies", "attribution": "Master plan © the society's developer"},
 }

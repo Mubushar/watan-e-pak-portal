@@ -17,7 +17,7 @@ import { BarList, Button, Input, ScoreRing, Skeleton } from "@/components/ui";
 import type { StudyShape } from "./AreaDraw";
 import { megaColor, StatusPill, type MegaProject } from "./MegaProjects";
 import { shapeBounds, studyMapImage, type StudyMapBase, type StudyOverlay } from "./studyMapImage";
-import { useMasterPlans } from "./MasterPlans";
+import { planOfLayer, useMasterPlans } from "./MasterPlans";
 import type { GisLayer, GisLayerDetail } from "./types";
 
 const AreaTrend = lazy(() => import("@/components/ui/charts").then((m) => ({ default: m.AreaTrend })));
@@ -115,14 +115,14 @@ export function StudyReport({
     if (!shape) return [];
     const [s0, w0, n0, e0] = shapeBounds(shape);
     const layers = (layersQ.data?.layers ?? []).filter((l) => l.published !== false && !l.builtin);
-    const planNames = new Set(layers.filter((l) => l.layer_type === "master_plan").map((l) => l.name.split(" — ")[0]!.toLowerCase()));
+    const planNames = new Set(layers.filter((l) => l.layer_type === "master_plan").map((l) => planOfLayer(l.name)));
     const plans = (plansQ.data?.plans ?? [])
       .filter((pl) => pl.tile_url && planNames.has(pl.name.toLowerCase()))
       .filter((pl) => pl.bounds[0] <= n0 && pl.bounds[2] >= s0 && pl.bounds[1] <= e0 && pl.bounds[3] >= w0)
       .map((pl) => ({ key: `plan:${pl.key}`, label: `${pl.name} master plan`, plan: pl, layer: null as GisLayer | null }));
     // the plans' own derived layers (outline, text) are covered by the plan tiles
     const custom = layers
-      .filter((l) => !(l.entity_type === "scheme" && planNames.has(l.name.split(" — ")[0]!.toLowerCase())))
+      .filter((l) => !(l.entity_type === "scheme" && planNames.has(planOfLayer(l.name))))
       .map((l) => ({ key: `layer:${l.id}`, label: l.name, plan: null, layer: l }));
     return [...plans, ...custom];
   }, [shape, layersQ.data, plansQ.data]);

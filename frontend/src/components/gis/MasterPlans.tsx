@@ -69,6 +69,9 @@ export const PLAN_GROUPS: { key: string; title: string }[] = [
   { key: "societies", title: "Housing society master plans" },
 ];
 export const planGroup = (p: MasterPlan) => p.group ?? "dha";
+/** The plan a generated layer belongs to ("<plan> — boundary / master plan / plan labels: …"), lower-cased.
+ *  Plan names may themselves contain " — " (e.g. "Bahria Town Lahore — Sector A"). */
+export const planOfLayer = (name: string) => name.replace(/ — (boundary|master plan|plan labels: .*)$/, "").toLowerCase();
 
 export interface PlanLabel {
   text: string;

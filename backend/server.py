@@ -16851,7 +16851,7 @@ def is_master_plan_layer(layer: Any) -> bool:
     ref = str(getattr(layer, "geojson_ref", "") or "")
     return (ref.startswith("masterplan") or str(getattr(layer, "image_url", "") or "").startswith("/masterplans/")
             or (getattr(layer, "entity_type", None) == "scheme" and getattr(layer, "layer_type", None) in ("boundary", "master_plan")
-                and getattr(layer, "name", "").split(" — ")[0].lower() in _master_plan_names()))
+                and re.sub(r" — (boundary|master plan|plan labels: .*)$", "", getattr(layer, "name", "")).lower() in _master_plan_names()))
 
 
 def _master_plan_names() -> set:
