@@ -12,7 +12,7 @@ import type { NearbyList, NearbyPlace, Property, PropertyList } from "@/types";
 import { useAuth } from "@/store/auth";
 import { API_BASE, get, post } from "./api";
 import { pkrShort } from "./format";
-import { focusMap, onMapPage } from "./mapFocus";
+import { focusMap, getMapView, lastFocusAt, onMapPage } from "./mapFocus";
 
 export interface Capabilities {
   chat_mode: "local" | "upstream";
@@ -32,7 +32,7 @@ type ToolDef = { type: "function"; function: { name: string; description: string
 let toolDefs: Promise<ToolDef[]> | null = null;
 function chatTools(): Promise<ToolDef[]> {
   toolDefs ??= get<{ tools: ToolDef[] }>("/ai/tools", undefined, { noFallback: true })
-    .then((r) => [...r.tools, FOCUS_MAP])
+    .then((r) => [...r.tools, FOCUS_MAP, READ_MAP])
     .catch((e) => {
       toolDefs = null;
       throw e;
@@ -60,6 +60,21 @@ const FOCUS_MAP: ToolDef = {
       },
       additionalProperties: false,
     },
+  },
+};
+
+/** Web-only tool: read what is in the user's current map view, from every layer switched on. */
+const READ_MAP: ToolDef = {
+  type: "function",
+  function: {
+    name: "read_map",
+    description:
+      "Read the user's current view on the portal's Map page: its area, zoom and every layer switched on (master plans, " +
+      "GIS layers, listings, places, roads …), and count what is inside it — parks, mosques, schools, blocks and roads from " +
+      "the master plans (their text, and parks read from the plan drawing's colours), OpenStreetMap places, population, " +
+      "listings, housing societies and mega projects. Call it for any question about the map / this area / the current " +
+      "view / what is visible ('how many parks here?', 'what is this area?', 'which layers are on?', 'which roads?').",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
   },
 };
 
@@ -266,6 +281,35 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<{ o
       effect: wasOnMap ? {} : { navigate: "/map" },
     };
   }
+  if (name === "read_map") {
+    const settle = 1800 - (Date.now() - lastFocusAt()); // just flown somewhere: let the map arrive first
+    if (settle > 0) await new Promise((res) => setTimeout(res, settle));
+    const v = getMapView();
+    if (!v) return { output: { ok: false, error: "The Map page isn't open. Offer to open it (focus_map) on a place first." }, effect: {} };
+    const read = await get<Record<string, unknown>>("/map/read", {
+      south: v.south.toFixed(6),
+      west: v.west.toFixed(6),
+      north: v.north.toFixed(6),
+      east: v.east.toFixed(6),
+      zoom: v.zoom,
+      plans: v.plans.map((p) => p.key).join(","),
+      gis: v.gis.map((l) => l.id).join(","),
+      overlays: v.overlays.join(","),
+    });
+    return {
+      output: {
+        ok: true,
+        switched_on: { master_plans: v.plans.map((p) => p.name), gis_layers: v.gis.map((l) => `${l.name} (${l.type})`), overlays: v.overlays, base_map: v.base },
+        ...read,
+        how_to_answer:
+          "Answer from these numbers and name the source (master plan text / master plan drawing / OpenStreetMap / portal listings). " +
+          "Parks read from a plan drawing's colours are approximate; on a plan with text, prefer its park labels. " +
+          "Where plans overlap, lead with the plan covering most of the view (largest plan_area_in_view_m2) and don't add their counts. " +
+          "If several sources disagree, give both briefly. Don't list ids or keys.",
+      },
+      effect: {},
+    };
+  }
   if (name === "web_lookup") {
     const r = await post<{ answer: string; sources: { site: string; url: string }[] }>("/ai/web-lookup", { question: String(args.question ?? "") });
     return { output: { answer: r.answer, sources: r.sources.map((x) => x.site) }, effect: {} };
@@ -358,8 +402,11 @@ function systemPrompt(): string {
 }
 
 /** Added to the server's prompt: what only the web portal can do. */
-const WEB_ONLY =
-  "You are on the web portal, which has a full Map page. When the user asks to zoom / go / fly the map somewhere, or to see a place, block, sector or listing 'on the map' / 'on the front-end map', call focus_map — it moves the main map (opening the Map page if needed) and switches on the master plan there; show_map only puts a small map in the chat. Never say the main map moved unless focus_map returned ok.";
+const WEB_ONLY = [
+  "You are on the web portal, which has a full Map page with many GIS layers (DHA, Bahria Town and housing-society master plans, places, roads, listings, mega projects, uploaded layers).",
+  "To zoom / go / fly the map somewhere, or show a place, block, sector or listing 'on the map' / 'on the front-end map': focus_map (it moves the main map, opening the Map page if needed, and switches on the master plan there). show_map only puts a small map in the chat. Never say the main map moved unless focus_map returned ok.",
+  "Any question about what is on the map, in this area / the current view / visible ('how many parks here', 'what is this', 'which roads / layers', 'is there a mosque nearby'): call read_map first and answer from it — never say you can't see the map. After focus_map, call read_map if the user also asked what is there.",
+].join(" ");
 
 interface ToolCall {
   id: string;
@@ -400,24 +447,27 @@ export async function agentReply(history: { role: "user" | "assistant"; content:
       return finish(content);
     }
     messages.push({ role: "assistant", content: msg.content ?? null, tool_calls: msg.tool_calls });
-    // Independent tool calls run in parallel; results go back in the order they were asked.
-    const runs = await Promise.all(
-      msg.tool_calls.map(async (call) => {
-        let args: Record<string, unknown> = {};
-        try {
-          args = JSON.parse(call.function.arguments || "{}");
-        } catch {
-          /* keep {} */
-        }
-        try {
-          const run = await runTool(call.function.name, args);
-          if (import.meta.env.DEV) console.debug("[assistant tool]", call.function.name, args, run.output);
-          return { call, ...run };
-        } catch (e) {
-          return { call, output: { error: (e as Error).message } as unknown, effect: {} as AgentEffect };
-        }
-      }),
-    );
+    // Independent tool calls run in parallel; results go back in the order they were asked. read_map
+    // waits for the rest (a focus_map in the same step moves the map it is about to read).
+    const runCall = async (call: ToolCall) => {
+      let args: Record<string, unknown> = {};
+      try {
+        args = JSON.parse(call.function.arguments || "{}");
+      } catch {
+        /* keep {} */
+      }
+      try {
+        const run = await runTool(call.function.name, args);
+        if (import.meta.env.DEV) console.debug("[assistant tool]", call.function.name, args, run.output);
+        return { call, ...run };
+      } catch (e) {
+        return { call, output: { error: (e as Error).message } as unknown, effect: {} as AgentEffect };
+      }
+    };
+    const isRead = (c: ToolCall) => c.function.name === "read_map";
+    const first = await Promise.all(msg.tool_calls.filter((c) => !isRead(c)).map(runCall));
+    const later = await Promise.all(msg.tool_calls.filter(isRead).map(runCall));
+    const runs = msg.tool_calls.map((c) => [...first, ...later].find((r) => r.call === c)!);
     for (const run of runs) {
       // Knowledge found by a tool continues the numbering of what the context already gave ([6], [7] …).
       const offset = effect.sources?.length ?? 0;

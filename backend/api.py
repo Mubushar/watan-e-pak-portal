@@ -46,6 +46,7 @@ import geo
 import gis
 import gis_import
 import masterplan
+import mapread
 import web_lookup
 import ai_guard
 import directions as routing
@@ -545,6 +546,19 @@ def areas_profile(area: str) -> Any:
     if "error" in result:
         raise HTTPException(status_code=503, detail=result["error"])
     return result
+
+
+@app.get("/map/read", tags=["places"])
+def map_read(south: float, west: float, north: float, east: float, zoom: int = 15,
+             plans: Optional[str] = None, gis: Optional[str] = None, overlays: Optional[str] = None) -> Any:
+    """Everything inside a map view, for the assistant: master plans (their text and the green areas drawn
+    on them), OpenStreetMap places, roads, population, listings, societies, mega projects and GIS layers.
+    ``plans`` / ``gis`` / ``overlays`` are the comma-separated layers switched on (omit = all)."""
+    split = lambda v: None if v is None else [x for x in v.split(",") if x]  # noqa: E731
+    result = mapread.read(south, west, north, east, zoom, plans=split(plans), gis_ids=split(gis), overlays=split(overlays))
+    if "error" in result:
+        raise HTTPException(status_code=422, detail=result["error"])
+    return j(result) if isinstance(result, str) else result
 
 
 @app.get("/places/map", tags=["places"])

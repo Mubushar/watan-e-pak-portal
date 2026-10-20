@@ -3002,6 +3002,13 @@ def run_geo_checks(client: TestClient) -> None:
     groups = {m["group"] for m in j.get("markers", [])}
     check("GET /places/map (listing + nearby places)", r.status_code == 200 and j["focus"]["type"] == "listing"
           and {"school", "mosque", "park"} <= groups and "{z}" in j.get("tiles", {}).get("url", ""), str(j)[:300])
+    lat, lon = listing["latitude"], listing["longitude"]
+    r = client.get("/map/read", params={"south": lat - 0.01, "west": lon - 0.01, "north": lat + 0.01, "east": lon + 0.01, "zoom": 15})
+    j = r.json()
+    check("GET /map/read (what is in a map view)", r.status_code == 200 and j["view"]["area_km2"] > 0
+          and j.get("listings", {}).get("count", 0) >= 1 and isinstance(j.get("master_plans"), list), str(j)[:300])
+    r = client.get("/map/read", params={"south": 34, "west": 73, "north": 33, "east": 74})
+    check("GET /map/read rejects upside-down bounds", r.status_code == 422, str(r.status_code))
     r = client.get("/places/map", params={"place": "Centaurus Mall Islamabad", "kinds": "hospital,bank"})
     j = r.json()
     check("GET /places/map (named place, chosen kinds)", r.status_code == 200 and j["focus"]["type"] == "place"

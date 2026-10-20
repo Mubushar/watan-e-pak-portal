@@ -75,7 +75,7 @@ import { WATER_CLASSES, WaterLayer, type WaterStatus } from "@/components/gis/Wa
 import { DISTRICT_LABEL_ZOOM, DistrictLayer } from "@/components/gis/DistrictLayer";
 import { ELEVATION_GRADIENT, TerrainLayer } from "@/components/gis/TerrainLayer";
 import { usePrefs } from "@/store/prefs";
-import { onMapFocus, takePendingFocus, type MapFocus } from "@/lib/mapFocus";
+import { onMapFocus, registerMapView, takePendingFocus, type MapFocus } from "@/lib/mapFocus";
 import { LABEL_MIN_ZOOM, MasterPlanLayers, MasterPlanPanel, PLAN_GROUPS, PlanLabels, planGroup, planOfLayer, useMasterPlans, type PlanLabel } from "@/components/gis/MasterPlans";
 import type { Aoi, AoiStats, GisLayer, GisLayerDetail, Poi, PoiCategory, RingResult, RouteResult } from "@/components/gis/types";
 
@@ -543,6 +543,13 @@ export default function MapExplorer() {
       }
     }
     map.flyTo([f.latitude, f.longitude], f.zoom, { duration: 1.1 });
+    // Where animation frames don't run (a background tab, a busy device) the fly-to never arrives: jump.
+    setTimeout(() => {
+      if (map.getZoom() !== f.zoom || map.getCenter().distanceTo([f.latitude, f.longitude]) > 30) {
+        map.stop();
+        map.setView([f.latitude, f.longitude], f.zoom, { animate: false });
+      }
+    }, 1600);
     if (window.innerWidth < 768) setOpen(false);
   };
   useEffect(() => {
@@ -550,6 +557,31 @@ export default function MapExplorer() {
     const waiting = takePendingFocus();
     if (waiting) setTimeout(() => applyFocus.current(waiting), 250); // after the map has sized itself
     return onMapFocus((f) => applyFocus.current(f));
+  }, [map]);
+
+  // Share what is on screen with the assistant (read_map): the view and every layer switched on.
+  const viewLayers = useRef({ plans: [] as { key: string; name: string }[], gis: [] as { id: string; name: string; type: string }[], overlays: [] as string[], base: "" });
+  viewLayers.current = {
+    plans: vis.layers ? visiblePlans.filter((pl) => planShown.has(pl.key)).map((pl) => ({ key: pl.key, name: pl.name })) : [],
+    gis: vis.layers ? gisLayers.filter((l) => !hidden.has(l.id)).map((l) => ({ id: l.id, name: l.name, type: l.layer_type })) : [],
+    overlays: [
+      vis.props && on("listings") && "listings",
+      vis.pois && on("featured_places") && "featured_places",
+      osmCats.size > 0 && on("osm_pois") && "osm_pois",
+      megaTypes.size > 0 && on("mega_projects") && "mega_projects",
+      roadClasses.size > 0 && on("roads") && "roads",
+      vis.districts && on("districts") && "districts",
+      vis.aois && "areas_of_interest",
+    ].filter(Boolean) as string[],
+    base: baseMap,
+  };
+  useEffect(() => {
+    if (!map) return;
+    registerMapView(() => {
+      const b = map.getBounds();
+      return { south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast(), zoom: map.getZoom(), ...viewLayers.current };
+    });
+    return () => registerMapView(null);
   }, [map]);
 
   const focusPoint = (lat: number, lon: number, z = 16) => {

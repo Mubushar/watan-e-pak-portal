@@ -114,6 +114,29 @@ export function ChatPanel({ compact, className, initial }: { compact?: boolean; 
   const scroller = useRef<HTMLDivElement>(null);
   const nav = useNavigate();
   const sentInitial = useRef(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const wasBusy = useRef(false);
+
+  // The input is disabled while the assistant answers, which drops focus — and moving the map can take
+  // it too. Give it back when the reply lands (and again once a fly-to has finished), so the user keeps typing.
+  useEffect(() => {
+    if (busy) {
+      wasBusy.current = true;
+      return;
+    }
+    if (!wasBusy.current) return;
+    wasBusy.current = false;
+    const refocus = () => {
+      const a = document.activeElement;
+      if (!a || a === document.body || a.closest?.(".leaflet-container") || a === inputRef.current) inputRef.current?.focus({ preventScroll: true });
+    };
+    const t1 = setTimeout(refocus, 30);
+    const t2 = setTimeout(refocus, 1400);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [busy]);
 
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
@@ -285,7 +308,7 @@ export function ChatPanel({ compact, className, initial }: { compact?: boolean; 
           void send(input);
         }}
       >
-        <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask about properties, prices, areas…" className="input flex-1 rounded-full" disabled={busy} />
+        <input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask about properties, prices, areas…" className="input flex-1 rounded-full" disabled={busy} />
         <button type="submit" className="btn btn-primary btn-icon h-11 w-11 rounded-full" disabled={busy || !input.trim()} aria-label="Send">
           <Send className="h-4 w-4 rtl:rotate-180" />
         </button>
