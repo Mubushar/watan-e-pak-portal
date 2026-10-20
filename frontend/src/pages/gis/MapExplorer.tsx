@@ -75,6 +75,7 @@ import { WATER_CLASSES, WaterLayer, type WaterStatus } from "@/components/gis/Wa
 import { DISTRICT_LABEL_ZOOM, DistrictLayer } from "@/components/gis/DistrictLayer";
 import { ELEVATION_GRADIENT, TerrainLayer } from "@/components/gis/TerrainLayer";
 import { usePrefs } from "@/store/prefs";
+import { onMapFocus, takePendingFocus, type MapFocus } from "@/lib/mapFocus";
 import { LABEL_MIN_ZOOM, MasterPlanLayers, MasterPlanPanel, PLAN_GROUPS, PlanLabels, planGroup, useMasterPlans, type PlanLabel } from "@/components/gis/MasterPlans";
 import type { Aoi, AoiStats, GisLayer, GisLayerDetail, Poi, PoiCategory, RingResult, RouteResult } from "@/components/gis/types";
 
@@ -525,6 +526,32 @@ export default function MapExplorer() {
     map.once("moveend", () => markerRefs.current.get(p.id)?.openPopup());
     if (window.innerWidth < 768) setOpen(false);
   };
+  // The assistant moving this map (focus_map): fly there, mark the spot, switch on the plan covering it.
+  const [aiPin, setAiPin] = useState<MapFocus | null>(null);
+  const applyFocus = useRef<(f: MapFocus) => void>(() => undefined);
+  applyFocus.current = (f) => {
+    if (!map) return;
+    didFit.current = true; // the first "fit all listings" must not undo it
+    setAiPin(f);
+    if (f.masterPlan) {
+      const inside = (plansQ.data?.plans ?? []).filter(
+        (pl) => f.latitude >= pl.bounds[0] && f.latitude <= pl.bounds[2] && f.longitude >= pl.bounds[1] && f.longitude <= pl.bounds[3],
+      );
+      if (inside.length) {
+        setVis((v) => ({ ...v, layers: true }));
+        setPlanShown((s) => new Set([...s, ...inside.map((pl) => pl.key)]));
+      }
+    }
+    map.flyTo([f.latitude, f.longitude], f.zoom, { duration: 1.1 });
+    if (window.innerWidth < 768) setOpen(false);
+  };
+  useEffect(() => {
+    if (!map) return;
+    const waiting = takePendingFocus();
+    if (waiting) setTimeout(() => applyFocus.current(waiting), 250); // after the map has sized itself
+    return onMapFocus((f) => applyFocus.current(f));
+  }, [map]);
+
   const focusPoint = (lat: number, lon: number, z = 16) => {
     map?.flyTo([lat, lon], z, { duration: 0.9 });
     if (window.innerWidth < 768) setOpen(false);
@@ -584,6 +611,20 @@ export default function MapExplorer() {
               )
             }
           />
+        )}
+
+        {/* ----------------------------------------------------- the spot the assistant flew to */}
+        {aiPin && (
+          <CircleMarker
+            center={[aiPin.latitude, aiPin.longitude]}
+            radius={11}
+            pathOptions={{ color: "#c99a22", weight: 3, fillColor: "#f2dd8f", fillOpacity: 0.65 }}
+            eventHandlers={{ click: () => setAiPin(null) }}
+          >
+            <Tooltip permanent direction="top" offset={[0, -10]}>
+              <span className="font-semibold">{aiPin.name}</span>
+            </Tooltip>
+          </CircleMarker>
         )}
 
         {/* ----------------------------------------------------- master-plan text labels (zoomed in only) */}

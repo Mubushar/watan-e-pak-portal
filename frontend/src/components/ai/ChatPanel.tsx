@@ -138,8 +138,9 @@ export function ChatPanel({ compact, className, initial }: { compact?: boolean; 
     if (chat_mode === "upstream") {
       try {
         const turns = history.filter((m) => m !== WELCOME && m.content).map((m) => ({ role: m.role, content: m.content }));
-        const reply = await agentReply(turns, chat_model);
+        const { navigate, ...reply } = await agentReply(turns, chat_model);
         setMsgs([...history, { role: "assistant", ...reply }]);
+        if (navigate) nav(navigate); // focus_map: open the Map page it moved
         setBusy(false);
         return;
       } catch (e) {

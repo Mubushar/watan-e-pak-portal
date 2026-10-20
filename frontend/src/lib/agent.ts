@@ -12,6 +12,7 @@ import type { NearbyList, NearbyPlace, Property, PropertyList } from "@/types";
 import { useAuth } from "@/store/auth";
 import { API_BASE, get, post } from "./api";
 import { pkrShort } from "./format";
+import { focusMap, onMapPage } from "./mapFocus";
 
 export interface Capabilities {
   chat_mode: "local" | "upstream";
@@ -31,13 +32,36 @@ type ToolDef = { type: "function"; function: { name: string; description: string
 let toolDefs: Promise<ToolDef[]> | null = null;
 function chatTools(): Promise<ToolDef[]> {
   toolDefs ??= get<{ tools: ToolDef[] }>("/ai/tools", undefined, { noFallback: true })
-    .then((r) => r.tools)
+    .then((r) => [...r.tools, FOCUS_MAP])
     .catch((e) => {
       toolDefs = null;
       throw e;
     });
   return toolDefs;
 }
+
+/** Web-only tool: move the portal's own map (the Map page) — the chat's map cards can't do that. */
+const FOCUS_MAP: ToolDef = {
+  type: "function",
+  function: {
+    name: "focus_map",
+    description:
+      "Move the portal's main map (the Map page behind this chat) to a place, block, sector, society or listing, mark it and " +
+      "switch on the master plan there. Opens the Map page if the user is elsewhere. Use whenever the user asks to zoom / " +
+      "go / fly the map to somewhere, or to show something 'on the map' / 'on the front-end map'. This really moves the map — " +
+      "never claim the map moved without calling it.",
+    parameters: {
+      type: "object",
+      properties: {
+        place: { type: "string", description: "What to go to, as specific as possible, e.g. 'Umar Block, Bahria Town Phase 8 Safari Valley, Rawalpindi'" },
+        listing_id: { type: "string", description: "Or a listing id from search_listings / get_listing" },
+        zoom: { type: "number", description: "10 = city, 13 = society, 15 = block / sector (default), 17 = street" },
+        master_plan: { type: "boolean", description: "Also switch on the master plan covering the spot (default true)" },
+      },
+      additionalProperties: false,
+    },
+  },
+};
 
 /** A button under the reply: a portal link. */
 export interface ChatLink {
@@ -63,6 +87,8 @@ export interface KnowledgeSource {
 }
 /** What tool calls add under the reply. */
 export interface AgentEffect {
+  /** Open this portal page (e.g. the Map page focus_map moved). */
+  navigate?: string;
   listings?: Property[];
   links?: ChatLink[];
   image?: { url: string; caption: string };
@@ -206,6 +232,40 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<{ o
       effect: { map: view },
     };
   }
+  if (name === "focus_map") {
+    const place = str(args, "place");
+    let spot: { name: string; latitude: number; longitude: number } | null = null;
+    const lookup = async (q: { listing_id?: string; place?: string }) =>
+      (await get<MapCard>("/places/map", { ...q, per_kind: 1, radius_km: 0.5 }).catch(() => null))?.focus ?? null;
+    if (args.listing_id) spot = await lookup({ listing_id: str(args, "listing_id") });
+    else if (place) {
+      // The model adds society / city context ("Umar Block, Safari Valley, Bahria Town Phase 8, Rawalpindi") that
+      // the gazetteer may not match: try the full name, then shorter forms, then the master-plan text.
+      const parts = place.split(/\s*,\s*/).filter(Boolean);
+      const tries = [place, parts.slice(0, 2).join(" "), parts.slice(0, 2).reverse().join(" "), ...parts.slice(0, -1).map((_, i) => parts.slice(0, parts.length - 1 - i).join(", "))]
+        .filter((q, i, all) => q && all.indexOf(q) === i);
+      for (const q of tries) if ((spot = await lookup({ place: q }))) break;
+      if (!spot) {
+        const hit = (await get<{ results: { text: string; plan: string; latitude: number; longitude: number }[] }>("/masterplans/search", { q: parts[0], limit: 1 }).catch(() => null))?.results?.[0];
+        if (hit) spot = { name: `${hit.text}, ${hit.plan}`, latitude: hit.latitude, longitude: hit.longitude };
+      }
+    }
+    if (!spot) return { output: { ok: false, error: `Couldn't find "${place ?? args.listing_id}" — ask for a nearby landmark or the society name.` }, effect: {} };
+    const zoom = Math.max(5, Math.min(19, numArg(args, "zoom") ?? 15));
+    const wasOnMap = onMapPage();
+    focusMap({ ...spot, zoom, masterPlan: args.master_plan !== false });
+    return {
+      output: {
+        ok: true,
+        moved_main_map: true,
+        location: spot.name,
+        coordinates: [Number(spot.latitude.toFixed(5)), Number(spot.longitude.toFixed(5))],
+        zoom,
+        shown_on_screen: wasOnMap ? "The main map has flown there and the spot is marked." : "The Map page is opening, centred there with the spot marked.",
+      },
+      effect: wasOnMap ? {} : { navigate: "/map" },
+    };
+  }
   if (name === "web_lookup") {
     const r = await post<{ answer: string; sources: { site: string; url: string }[] }>("/ai/web-lookup", { question: String(args.question ?? "") });
     return { output: { answer: r.answer, sources: r.sources.map((x) => x.site) }, effect: {} };
@@ -263,7 +323,7 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<{ o
 
 function merge(a: AgentEffect, b: AgentEffect): AgentEffect {
   const links = [...(b.listings ? [] : a.links ?? []), ...(b.links ?? [])].filter((x, i, all) => all.findIndex((y) => y.label === x.label) === i);
-  return { listings: b.listings ?? a.listings, links: links.length ? links : undefined, image: b.image ?? a.image, map: b.map ?? a.map, sources: a.sources || b.sources ? [...(a.sources ?? []), ...(b.sources ?? [])] : undefined };
+  return { navigate: b.navigate ?? a.navigate, listings: b.listings ?? a.listings, links: links.length ? links : undefined, image: b.image ?? a.image, map: b.map ?? a.map, sources: a.sources || b.sources ? [...(a.sources ?? []), ...(b.sources ?? [])] : undefined };
 }
 
 /** Knowledge, memory and the shared system prompt for this question (one fast call). */
@@ -290,12 +350,16 @@ function systemPrompt(): string {
     "Keep replies short (under 120 words), warm and practical; markdown bullet points only when comparing options. Prices in crore/lakh, sizes in marla/kanal (1 kanal = 20 marla). Never read out ids.",
     "Search yourself with search_listings — never ask the user to press a search button. Follow-ups refine the previous search. If nothing is found, relax one filter, search again and say what you changed. Mention the best 1-3 results; they appear as cards under your reply. Never invent listings.",
     "To show one listing call get_listing. 'Near a school / mosque / mall': search_listings with near (feature for things inside the property). 'Near <a named place>': near_place; if nothing is in range, name the nearest listings it returns (nearest_outside_radius) with their distance.",
-    "Area questions (what's in it, how many schools, population, how developed): find_places and area_info, with real names and numbers. A map with nearby places: show_map. DHA Islamabad-Rawalpindi phases: master_plan (summary / search / at) and show_plan for a close-up; say it's from the master plan and what is built may differ.",
+    "Area questions (what's in it, how many schools, population, how developed): find_places and area_info, with real names and numbers. A map with nearby places in the chat: show_map. To move the portal's own map (zoom / go to a block, sector, society or listing 'on the map'): focus_map. DHA Islamabad-Rawalpindi phases: master_plan (summary / search / at) and show_plan for a close-up; say it's from the master plan and what is built may differ.",
     "For approval status, possession, developer, news or anything else the tools don't cover, use web_lookup and name the source. Never guess facts.",
     "To visit or talk to the owner, offer a call request and call request_call once they agree. To sell or rent out, ask briefly for missing essentials then call draft_listing. Their own listings: my_listings.",
     "Only mention buttons a tool result says are on screen.",
   ].join("\n");
 }
+
+/** Added to the server's prompt: what only the web portal can do. */
+const WEB_ONLY =
+  "You are on the web portal, which has a full Map page. When the user asks to zoom / go / fly the map somewhere, or to see a place, block, sector or listing 'on the map' / 'on the front-end map', call focus_map — it moves the main map (opening the Map page if needed) and switches on the master plan there; show_map only puts a small map in the chat. Never say the main map moved unless focus_map returned ok.";
 
 interface ToolCall {
   id: string;
@@ -313,7 +377,7 @@ interface ChatMessage {
 export async function agentReply(history: { role: "user" | "assistant"; content: string }[], model: string): Promise<AgentReply> {
   const question = [...history].reverse().find((m) => m.role === "user")?.content ?? "";
   const [tools, ctx] = await Promise.all([chatTools(), aiContext(question)]);
-  const messages: ChatMessage[] = [{ role: "system", content: ctx?.system_prompt || systemPrompt() }, ...history.slice(-12).map((m) => ({ role: m.role, content: m.content }))];
+  const messages: ChatMessage[] = [{ role: "system", content: (ctx?.system_prompt || systemPrompt()) + `\n${WEB_ONLY}` }, ...history.slice(-12).map((m) => ({ role: m.role, content: m.content }))];
   let effect: AgentEffect = { sources: ctx?.knowledge?.results };
   const finish = (content: string): AgentReply => {
     if (useAuth.getState().token) void post("/ai/turn", { content, conversation_id: conversationId }).catch(() => undefined);
@@ -346,7 +410,9 @@ export async function agentReply(history: { role: "user" | "assistant"; content:
           /* keep {} */
         }
         try {
-          return { call, ...(await runTool(call.function.name, args)) };
+          const run = await runTool(call.function.name, args);
+          if (import.meta.env.DEV) console.debug("[assistant tool]", call.function.name, args, run.output);
+          return { call, ...run };
         } catch (e) {
           return { call, output: { error: (e as Error).message } as unknown, effect: {} as AgentEffect };
         }
