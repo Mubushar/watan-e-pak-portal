@@ -327,6 +327,17 @@ def read(south: float, west: float, north: float, east: float, zoom: int = 15,
     if megas:
         out["mega_projects"] = megas[:20]
 
+    # ---- cadastre parcels (collected on the map); owners are never included here
+    parcels = [q for q in getattr(core, "cadastre_parcels_db", {}).values()
+               if any(_in(b, pt[0], pt[1]) for pt in q.get("ring") or [])]
+    if parcels and core.layer_open("builtin:cadastre"):
+        out["cadastre_parcels"] = {
+            "count": len(parcels), "verified": sum(1 for q in parcels if q.get("verified")),
+            "area_m2": round(sum(q.get("area_m2") or 0 for q in parcels)),
+            "by_status": dict(Counter(q.get("status") or "unknown" for q in parcels)),
+            "by_land_use": dict(Counter(q.get("land_use") or "unknown" for q in parcels)),
+        }
+
     # ---- other GIS layers (uploaded / drawn), whichever are switched on
     wanted = set(gis_ids) if gis_ids is not None else None
     plan_names = {m["name"].lower() for m in store.meta.values()}

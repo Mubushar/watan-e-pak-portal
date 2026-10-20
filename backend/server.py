@@ -16823,6 +16823,9 @@ BUILTIN_LAYERS = [
      "https://www.arcgis.com/home/item.html?id=94f838a535334cf1aa061846514b77c7"),
     ("builtin:mega_projects", "Infrastructure mega projects", "mega_project", True,
      "Ring roads, motorways, new sectors, industrial and economic zones that move land prices.", None),
+    ("builtin:cadastre", "Cadastre parcels", "cadastre", True,
+     "Land parcels collected on the map with the Cadastre tools: society plot and revenue record (mouza, khewat, "
+     "khatooni, khasra), land use, status and survey method.", None),
 ]
 
 
@@ -16886,6 +16889,9 @@ def publish_master_plans_once(store: Any) -> int:
 # id -> {"created": bool, "deleted": bool, "fields": {...}, "updated_at": iso}. megaprojects.all_projects()
 # lays these over geodata/pk_megaprojects.json, so an admin can move, reshape, add or remove projects.
 megaproject_edits_db: Dict[str, Dict[str, Any]] = {}
+
+# ---------- cadastre: land parcels collected on the map (see cadastre.py); starts empty ----------
+cadastre_parcels_db: Dict[str, Dict[str, Any]] = {}
 
 
 def builtin_layer(ref: str) -> Optional[Any]:

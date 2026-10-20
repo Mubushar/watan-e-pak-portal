@@ -3009,6 +3009,34 @@ def run_geo_checks(client: TestClient) -> None:
           and j.get("listings", {}).get("count", 0) >= 1 and isinstance(j.get("master_plans"), list), str(j)[:300])
     r = client.get("/map/read", params={"south": 34, "west": 73, "north": 33, "east": 74})
     check("GET /map/read rejects upside-down bounds", r.status_code == 422, str(r.status_code))
+
+    # ---- cadastre: parcels collected on the map (GIS managers write; the layer starts empty and unpublished)
+    adm = {"Authorization": "Bearer " + client.post("/auth/login", json={"identifier": "admin@portal.pk", "password": "Admin@12345"}).json()["token"]}
+    nobody = {"Authorization": ""}
+    ring = [[33.4870, 73.1040], [33.4870, 73.10425], [33.4868, 73.10425], [33.4868, 73.1040]]
+    check("POST /cadastre/parcels needs a GIS manager", client.post("/cadastre/parcels", json={"ring": ring}, headers=nobody).status_code == 401)
+    r = client.post("/cadastre/parcels", json={"ring": ring, "plot_no": "12", "block": "Umar", "mouza": "Thalian", "khasra_no": "345/2",
+                                               "owner_name": "A. Owner", "status": "vacant"}, headers=adm)
+    par = r.json().get("parcel", {})
+    check("POST /cadastre/parcels (measured, numbered)", r.status_code == 201 and par.get("parcel_no", "").startswith("PK-CAD-")
+          and 480 < par.get("area_m2", 0) < 560 and len(par.get("edges_m", [])) == 4, r.text[:300])
+    r = client.post("/cadastre/parcels", json={"ring": [[33.4869, 73.1041], [33.4869, 73.1043], [33.4867, 73.1043], [33.4867, 73.1041]]}, headers=adm)
+    check("POST /cadastre/parcels warns about an overlap", r.status_code == 201 and any("Overlaps" in w for w in r.json().get("warnings", [])), r.text[:300])
+    second = r.json()["parcel"]["id"]
+    r = client.post("/cadastre/parcels", json={"ring": [[33.4870, 73.1040], [33.4868, 73.10425], [33.4870, 73.10425], [33.4868, 73.1040]]}, headers=adm)
+    check("POST /cadastre/parcels rejects a self-crossing outline", r.status_code == 422, r.text[:200])
+    r = client.get("/cadastre/parcels", headers=nobody)
+    check("GET /cadastre/parcels hides an unpublished layer from the public", r.json().get("unpublished") is True and r.json()["count"] == 0)
+    r = client.get("/cadastre/parcels", params={"q": "345/2"}, headers=adm)
+    check("GET /cadastre/parcels (manager, search by khasra)", r.json().get("count") == 1
+          and r.json()["features"][0]["properties"].get("owner_name") == "A. Owner", r.text[:200])
+    r = client.put(f"/cadastre/parcels/{par.get('id')}", json={"status": "built", "verified": True}, headers=adm)
+    check("PUT /cadastre/parcels/{id}", r.status_code == 200 and r.json()["parcel"]["version"] == 2 and r.json()["parcel"]["verified"], r.text[:200])
+    check("GET /cadastre/export.geojson needs a GIS manager", client.get("/cadastre/export.geojson", headers=nobody).status_code == 401
+          and client.get("/cadastre/export.geojson", headers=adm).json().get("count") == 2)
+    for pid in (par.get("id"), second):
+        client.delete(f"/cadastre/parcels/{pid}", headers=adm)
+    check("DELETE /cadastre/parcels/{id}", client.get("/cadastre/summary").json().get("parcels") == 0)
     r = client.get("/places/map", params={"place": "Centaurus Mall Islamabad", "kinds": "hospital,bank"})
     j = r.json()
     check("GET /places/map (named place, chosen kinds)", r.status_code == 200 and j["focus"]["type"] == "place"

@@ -32,7 +32,7 @@ from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
-from fastapi import (Depends, FastAPI, Header, HTTPException, Query, Request, WebSocket,
+from fastapi import (Body, Depends, FastAPI, Header, HTTPException, Query, Request, WebSocket,
                      WebSocketDisconnect)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -47,6 +47,7 @@ import gis
 import gis_import
 import masterplan
 import mapread
+import cadastre
 import web_lookup
 import ai_guard
 import directions as routing
@@ -546,6 +547,70 @@ def areas_profile(area: str) -> Any:
     if "error" in result:
         raise HTTPException(status_code=503, detail=result["error"])
     return result
+
+
+# ---- cadastre: land parcels collected on the map (Cadastre tools); the layer starts empty and unpublished
+
+def _cad_manager() -> bool:
+    return access.can(access.current(), "gis.manage")
+
+
+def _cad(result: Dict[str, Any], status: int = 200) -> Any:
+    if "error" in result:
+        raise HTTPException(status_code=404 if "not found" in result["error"].lower() else 422, detail=result["error"])
+    return result
+
+
+@app.get("/cadastre/parcels", tags=["cadastre"])
+def cadastre_parcels(south: Optional[float] = None, west: Optional[float] = None, north: Optional[float] = None,
+                     east: Optional[float] = None, q: Optional[str] = None) -> Any:
+    """Parcels as GeoJSON (in a view with south/west/north/east, or matching ``q``: parcel / plot / khasra no., mouza …)."""
+    if (hidden := _unpublished("builtin:cadastre", {**_EMPTY_FC, "count": 0})) is not None:
+        return hidden
+    return cadastre.in_view(_cad_manager(), south, west, north, east, q)
+
+
+@app.get("/cadastre/summary", tags=["cadastre"])
+def cadastre_summary() -> Any:
+    """Parcel counts by status, land use, society and survey method, and the form's options."""
+    return cadastre.summary()
+
+
+@app.get("/cadastre/export.geojson", tags=["cadastre"])
+def cadastre_export() -> Any:
+    """Every parcel with all its fields, as a GeoJSON FeatureCollection (GIS managers)."""
+    return JSONResponse(cadastre.in_view(True), headers={"Content-Disposition": 'attachment; filename="cadastre_parcels.geojson"'})
+
+
+@app.post("/cadastre/check", tags=["cadastre"])
+def cadastre_check(payload: Dict[str, Any] = Body(...)) -> Any:
+    """Measure an outline and check it (self-crossing, overlaps) without saving."""
+    ring = cadastre._clean_ring(payload.get("ring"))
+    errors, warnings = cadastre.check(ring, payload.get("id")) if len(ring) >= 3 else (["A parcel needs at least 3 corners."], [])
+    return {"errors": errors, "warnings": warnings, **(cadastre.measure(ring) if len(ring) >= 3 else {})}
+
+
+@app.post("/cadastre/parcels", tags=["cadastre"], status_code=201)
+def cadastre_create(payload: Dict[str, Any] = Body(...)) -> Any:
+    return _cad(cadastre.create(payload))
+
+
+@app.get("/cadastre/parcels/{parcel_id}", tags=["cadastre"])
+def cadastre_get(parcel_id: str) -> Any:
+    p = core.cadastre_parcels_db.get(parcel_id)
+    if not p or not core.layer_open("builtin:cadastre"):
+        raise HTTPException(status_code=404, detail="Parcel not found")
+    return cadastre.public(p, _cad_manager())
+
+
+@app.put("/cadastre/parcels/{parcel_id}", tags=["cadastre"])
+def cadastre_update(parcel_id: str, payload: Dict[str, Any] = Body(...)) -> Any:
+    return _cad(cadastre.update(parcel_id, payload))
+
+
+@app.delete("/cadastre/parcels/{parcel_id}", tags=["cadastre"])
+def cadastre_delete(parcel_id: str) -> Any:
+    return _cad(cadastre.delete(parcel_id))
 
 
 @app.get("/map/read", tags=["places"])

@@ -128,7 +128,7 @@ const PIN = L.divIcon({
 });
 
 /** Draggable vertices with "+" midpoints for a line or an area. */
-function VertexEditor({ pts, closed, onChange }: { pts: LatLng[]; closed: boolean; onChange: (pts: LatLng[]) => void }) {
+export function VertexEditor({ pts, closed, onChange }: { pts: LatLng[]; closed: boolean; onChange: (pts: LatLng[]) => void }) {
   const [live, setLive] = useState(pts);
   useEffect(() => setLive(pts), [pts]);
   const style = { color: "#c99a22", weight: 3, dashArray: "6 4", fillColor: "#f2dd8f", fillOpacity: 0.18 };

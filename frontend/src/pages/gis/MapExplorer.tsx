@@ -21,6 +21,7 @@ import {
   Globe2,
   Grid2x2,
   Home,
+  Hexagon,
   LandPlot,
   Layers3,
   Map as MapIcon,
@@ -76,6 +77,7 @@ import { DISTRICT_LABEL_ZOOM, DistrictLayer } from "@/components/gis/DistrictLay
 import { ELEVATION_GRADIENT, TerrainLayer } from "@/components/gis/TerrainLayer";
 import { usePrefs } from "@/store/prefs";
 import { onMapFocus, registerMapView, takePendingFocus, type MapFocus } from "@/lib/mapFocus";
+import { CAD_DEFAULTS, CadastreBar, CadastreLayer, CadastrePanel, parcelDraft, plotRect, type CadDraft, type CadMode } from "@/components/gis/Cadastre";
 import { LABEL_MIN_ZOOM, MasterPlanLayers, MasterPlanPanel, PlanLabels, groupPlans, phaseLabel, planOfLayer, useMasterPlans, type PlanLabel } from "@/components/gis/MasterPlans";
 import type { Aoi, AoiStats, GisLayer, GisLayerDetail, Poi, PoiCategory, RingResult, RouteResult } from "@/components/gis/types";
 
@@ -163,7 +165,7 @@ export default function MapExplorer() {
   /** The Layers panel offers only published overlays (a group disappears when nothing in it is). */
   const gateGroups = (groups: LayerGroup[]): LayerGroup[] => {
     const itemLayer: Record<string, string> = { props: "listings", pois: "featured_places", aois: "aois", provinces: "provinces", districts: "districts", cities: "city_names", "road-live": "roads_live" };
-    const groupLayer: Record<string, string> = { poi: "osm_pois", terrain: "terrain", water: "water", roads: "roads", mega: "mega_projects" };
+    const groupLayer: Record<string, string> = { poi: "osm_pois", terrain: "terrain", water: "water", roads: "roads", mega: "mega_projects", cadastre: "cadastre" };
     return groups
       .map((g) => ({ ...g, items: g.items.filter((it) => {
         const key = itemLayer[it.key] ?? groupLayer[g.key];
@@ -429,8 +431,66 @@ export default function MapExplorer() {
       setZoomMode(null);
       setDrawMode(null);
       nav.setPicking(null);
+      setCadModeRaw(null);
+      setCadDraft(null);
     }
   };
+
+  // -------------------------------------------------------------- cadastre (GIS managers)
+  const cadRights = can("gis.manage");
+  const [cadMode, setCadModeRaw] = useState<CadMode>(null);
+  const [cadDraft, setCadDraft] = useState<CadDraft | null>(null);
+  const [cadOn, setCadOn] = useSavedState("map.cadastre", true);
+  const setCadMode = (m: CadMode) => {
+    setCadModeRaw(m);
+    setCadDraft(null);
+    if (m) {
+      setEditModeRaw(null);
+      setEditDraft(null);
+      setLocateRow(null);
+      setZoomMode(null);
+      setDrawMode(null);
+      nav.setPicking(null);
+      setCadOn(true);
+    }
+  };
+  /** Society and city from the master plan under a point (a starting value the surveyor can change). */
+  const cadSuggest = (at: [number, number]) => {
+    // the most specific plan there (the smallest one covering the point, e.g. Safari Valley within Phase 8)
+    const size = (x: { bounds: number[] }) => (x.bounds[2]! - x.bounds[0]!) * (x.bounds[3]! - x.bounds[1]!);
+    const pl = (plansQ.data?.plans ?? [])
+      .filter((x) => at[0] >= x.bounds[0] && at[0] <= x.bounds[2] && at[1] >= x.bounds[1] && at[1] <= x.bounds[3])
+      .sort((x, y) => size(x) - size(y))[0];
+    return pl ? { society: pl.name, city: pl.city ?? "" } : {};
+  };
+  const onCadPick = (at: [number, number], first: boolean) => {
+    if (cadMode === "draw") {
+      if (!cadDraft) setCadDraft({ fields: { ...CAD_DEFAULTS, ...cadSuggest(at) }, pts: [at], drawing: true });
+      else if (cadDraft.drawing) setCadDraft(first ? { ...cadDraft, drawing: false } : { ...cadDraft, pts: [...cadDraft.pts, at] });
+      return;
+    }
+    if (cadMode === "size" && !cadDraft?.id) {
+      const f = cadDraft?.fields ?? { ...CAD_DEFAULTS, ...cadSuggest(at) };
+      setCadDraft({ fields: f, center: at, pts: plotRect(at, Number(f.front_ft) || 25, Number(f.depth_ft) || 50, Number(f.angle) || 0), drawing: false });
+    }
+  };
+  const onCadSelect = async (id: string) => {
+    try {
+      setCadDraft(await parcelDraft(id));
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+  useEffect(() => {
+    if (!cadMode) return;
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (cadDraft) setCadDraft(null);
+      else setCadModeRaw(null);
+    };
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [cadMode, cadDraft]);
   const onEditClick = async (at: L.LatLng) => {
     if (editMode === "locate") {
       // Locate: a click places the record's pin (once a record is chosen)
@@ -580,6 +640,7 @@ export default function MapExplorer() {
       roadClasses.size > 0 && on("roads") && "roads",
       vis.districts && on("districts") && "districts",
       vis.aois && "areas_of_interest",
+      cadOn && (on("cadastre") || cadRights) && "cadastre",
     ].filter(Boolean) as string[],
     base: baseMap,
   };
@@ -822,11 +883,22 @@ export default function MapExplorer() {
         <ZoomArea active={zoomDraw} mode={zoomMode ?? "in"} onDone={endZoomDraw} padding={sidePad()} sticky />
         <AreaDraw mode={drawMode} shape={studyShape} onShape={onStudyShape} onCancel={cancelDraw} />
         <GeoEditLayer mode={editMode} draft={editDraft} setDraft={setEditDraft} onPick={onEditClick} />
+        {(cadOn || cadMode) && (on("cadastre") || cadRights) && (
+          <CadastreLayer on={cadOn} mode={cadMode} draft={cadDraft} setDraft={setCadDraft} onPick={onCadPick} onSelect={(f) => void onCadSelect(f.id)} />
+        )}
         {editMode === "locate" && <LocateMarks row={locateRow} />}
       </PortalMap>
-      <EditBar
-        edit={{ rights: editRights, mode: editMode, onMode: setEditMode }}
-        className={cn("start-3", open ? "bottom-[calc(56%+0.75rem)] md:bottom-3 md:start-[408px]" : "bottom-[4.5rem] md:bottom-3 md:start-3")}
+      {/* Map editing menus, bottom left beside the explorer: Edit Listing, then Cadastre */}
+      <div className={cn("absolute z-[450] flex flex-wrap items-end gap-2", "start-3", open ? "bottom-[calc(56%+0.75rem)] md:bottom-3 md:start-[408px]" : "bottom-[4.5rem] md:bottom-3 md:start-3")}>
+        <EditBar edit={{ rights: editRights, mode: editMode, onMode: setEditMode }} className="static" />
+        {cadRights && <CadastreBar mode={cadMode} onMode={setCadMode} layerOn={cadOn} onLayer={setCadOn} />}
+      </div>
+      <CadastrePanel
+        mode={cadMode}
+        draft={cadDraft}
+        setDraft={setCadDraft}
+        onClose={() => setCadMode(null)}
+        className="end-16 top-3"
       />
       {editMode === "locate" && (
         <LocatePanel rights={editRights} draft={editDraft} setDraft={setEditDraft} row={locateRow} setRow={setLocateRow} map={map} onClose={() => setEditMode(null)} />
@@ -1030,6 +1102,12 @@ export default function MapExplorer() {
             }),
             note: "Georeferenced master plans (about 10–20 m accuracy) — plans change, so what is built may differ. Plan text: Layers tab.",
           })),
+          {
+            key: "cadastre",
+            title: "Cadastre",
+            icon: Hexagon,
+            items: [{ key: "cad-parcels", label: "Land parcels", hint: "Collected with the Cadastre tools · colour = status", icon: Hexagon, on: cadOn, onChange: setCadOn }],
+          },
           {
             key: "gis",
             title: "GIS layers",

@@ -189,6 +189,8 @@ _add("POST", r"^/aoi/compare$", "public")
 _add(W, r"^/aoi(/|$)", "aoi.manage")
 _add("POST", r"^/geo/study-area$", "public")
 _add(W, r"^/geo/megaprojects(/|$)", "gis.manage")  # admins edit the infrastructure mega projects on the map
+_add("GET", r"^/cadastre/export", "gis.manage")      # the full parcel file (with owners) is for GIS managers
+_add(W, r"^/cadastre(/|$)", "gis.manage")            # collecting parcels with the map's Cadastre tools
 _add("GET", r"^/geo/nearby-entities$", "public")  # surveying on site: what is around me
 
 # ---- compute-only tools, calculators, AI (rate-limited by ai_guard)
