@@ -582,12 +582,36 @@ def cadastre_export() -> Any:
     return JSONResponse(cadastre.in_view(True), headers={"Content-Disposition": 'attachment; filename="cadastre_parcels.geojson"'})
 
 
+@app.get("/cadastre/pin/{pin}", tags=["cadastre"])
+def cadastre_pin(pin: str) -> Any:
+    """A parcel PIN (XXXXX-XXXXX-XXXXX, optional -NN suffix) → its parcel, or the ~1 m cell it codes. A shorter
+    prefix (6 / 8 / 10 / 12 digits) gives the area it covers (~11 km / 1 km / 110 m / 11 m)."""
+    if not core.layer_open("builtin:cadastre"):
+        return {"parcel_id": None, "area": cadastre.decode_pin(pin), "unpublished": True}
+    return _cad(cadastre.find_pin(pin))
+
+
+@app.get("/cadastre/pin", tags=["cadastre"])
+def cadastre_pin_at(lat: float, lon: float) -> Any:
+    """The PIN of the ~1 m cell at a point."""
+    try:
+        return {"pin": cadastre.encode_pin(lat, lon), "cell": cadastre.decode_pin(cadastre.encode_pin(lat, lon))}
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
 @app.post("/cadastre/check", tags=["cadastre"])
 def cadastre_check(payload: Dict[str, Any] = Body(...)) -> Any:
     """Measure an outline and check it (self-crossing, overlaps) without saving."""
     ring = cadastre._clean_ring(payload.get("ring"))
     errors, warnings = cadastre.check(ring, payload.get("id")) if len(ring) >= 3 else (["A parcel needs at least 3 corners."], [])
-    return {"errors": errors, "warnings": warnings, **(cadastre.measure(ring) if len(ring) >= 3 else {})}
+    pin = None
+    if len(ring) >= 3 and not errors:
+        try:
+            pin = cadastre.assign_pin(ring, payload.get("id"))[0]
+        except ValueError as e:
+            errors.append(str(e))
+    return {"errors": errors, "warnings": warnings, "pin": pin, **(cadastre.measure(ring) if len(ring) >= 3 else {})}
 
 
 @app.post("/cadastre/parcels", tags=["cadastre"], status_code=201)

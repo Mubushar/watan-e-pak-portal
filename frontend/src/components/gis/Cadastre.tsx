@@ -351,6 +351,20 @@ export function CadastrePanel({
 }) {
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
+  // Live check of a closed outline: the PIN it will get, and overlap / shape problems before saving.
+  const [check, setCheck] = useState<{ pin?: string | null; errors: string[]; warnings: string[] } | null>(null);
+  const closedRing = draft && !draft.drawing && draft.pts.length >= 3 ? JSON.stringify(draft.pts) : null;
+  useEffect(() => {
+    setCheck(null);
+    if (!closedRing) return;
+    const t = setTimeout(() => {
+      post<{ pin?: string | null; errors: string[]; warnings: string[] }>("/cadastre/check", { ring: JSON.parse(closedRing), id: draft?.id })
+        .then(setCheck)
+        .catch(() => undefined);
+    }, 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closedRing, draft?.id]);
   if (!mode) return null;
   const set = (k: string, v: unknown) => draft && setDraft({ ...draft, fields: { ...draft.fields, [k]: v } });
   const m = draft ? measureRing(draft.pts) : null;
@@ -409,7 +423,7 @@ export function CadastrePanel({
     <div className={cn("absolute z-[450] max-h-[calc(100%-1.5rem)] w-[360px] max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-black/5 dark:bg-brand-950", className)}>
       <div className="mb-2 flex items-center gap-2">
         <Hexagon className="h-4 w-4 text-gold-600" />
-        <p className="flex-1 text-sm font-bold">{draft?.id ? `Parcel ${draft.fields.parcel_no ?? ""}` : mode === "size" ? "Plot by size" : mode === "draw" ? "New parcel" : "Edit a parcel"}</p>
+        <p className="flex-1 text-sm font-bold">{draft?.id ? `Parcel ${draft.fields.plot_no ? `plot ${draft.fields.plot_no}` : ""}` : mode === "size" ? "Plot by size" : mode === "draw" ? "New parcel" : "Edit a parcel"}</p>
         <button type="button" onClick={onClose} className="rounded-md p-1 text-ink-mute hover:bg-black/5 dark:hover:bg-white/10" aria-label="Close the Cadastre tool">
           <X className="h-4 w-4" />
         </button>
@@ -418,6 +432,22 @@ export function CadastrePanel({
         <p className="rounded-xl bg-brand-50/70 p-3 text-xs text-ink-soft dark:bg-white/5 dark:text-slate-300">{HINTS[mode]}</p>
       ) : (
         <div className="space-y-3">
+          {/* ---- parcel PIN: 15-digit geographic ID (≈1 m cell + check digit) */}
+          <div className="flex items-center justify-between gap-2 rounded-xl bg-gold-50 px-3 py-2 ring-1 ring-gold-200 dark:bg-white/5 dark:ring-white/10">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-ink-mute" title="Parcel PIN: a 15-digit geographic code of the ~1 m cell inside the parcel, with a check digit. Parcels nearby share their leading digits.">
+              Parcel PIN
+            </span>
+            <span className="font-mono text-sm font-bold tabular-nums tracking-wide">
+              {draft.fields.pin ?? check?.pin ?? (closed ? "…" : "after the shape is closed")}
+            </span>
+          </div>
+          {!!check && (check.errors.length > 0 || check.warnings.length > 0) && (
+            <div className="space-y-1 rounded-xl bg-amber-50 p-2.5 text-[11px] text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-100 dark:ring-amber-400/20">
+              {[...check.errors, ...check.warnings].map((w) => (
+                <p key={w}>{w}</p>
+              ))}
+            </div>
+          )}
           {/* ---- geometry */}
           <div className="rounded-xl bg-brand-50/70 p-3 text-xs dark:bg-white/5">
             {m && m.area > 0 ? (
@@ -460,7 +490,7 @@ export function CadastrePanel({
           {/* ---- record */}
           <p className="text-[11px] font-bold uppercase tracking-wider text-ink-mute">Plot / society</p>
           <div className="grid grid-cols-2 gap-2">
-            <F label="Parcel no.">{input("parcel_no", "auto")}</F>
+            <F label="Parcel no. (optional)">{input("parcel_no", "= PIN")}</F>
             <F label="Plot no.">{input("plot_no")}</F>
             <F label="Sector / phase">{input("sector")}</F>
             <F label="Block">{input("block")}</F>

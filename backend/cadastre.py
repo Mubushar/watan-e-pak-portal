@@ -7,6 +7,18 @@ khewat, khatooni, khasra) — plus land use, status, ownership type and how it w
 Area, perimeter and edge lengths are computed from the geometry; overlaps with other parcels and
 bad shapes (too few corners, self-crossing) are reported.
 
+Parcel PIN (the parcel's ID): a 15-digit geographic code, written like a CNIC — ``XXXXX-XXXXX-XXXXX``.
+  * The grid: 0.00001° cells (≈1.1 m N–S, 0.9–1.0 m E–W in Pakistan), counted from 23°N / 60°E, so the north
+    and east indexes (up to 1,500,000 / 1,800,000) are 7 digits each. The smallest parcels in Pakistan —
+    8×10 ft market shops, 6×6 ft kiosks, 1-marla houses — are ≥ 1.8 m wide, so neighbours never share a cell.
+  * The two indexes are interleaved digit by digit (north, east, north, east …): every extra pair narrows the
+    area tenfold — 4 digits ≈ 111 km, 6 ≈ 11 km, 8 ≈ 1.1 km, 10 ≈ 110 m, 12 ≈ 11 m, 14 ≈ 1 m — so parcels
+    nearby share their leading digits, like a postal PIN, and sorting by PIN groups them by area.
+  * Digit 15 is a Damm check digit (catches every single wrong digit and swap of neighbouring digits).
+  * The point coded is inside the parcel (its centre, or an interior point for an L-shaped / concave one).
+  * Two parcels in the same 1 m cell (or strata units in one building) get a suffix: -01, -02 …
+  * Reshaping keeps a parcel's PIN; a split / merge makes new parcels with new PINs.
+
 Parcels live in ``server.cadastre_parcels_db`` (persisted like every ``*_db`` store) and are drawn
 as the built-in "Cadastre parcels" layer (``builtin:cadastre``), which starts empty and unpublished.
 """
@@ -45,10 +57,12 @@ def _db() -> Dict[str, Dict[str, Any]]:
 # ------------------------------------------------------------------ geometry
 
 def _local(ring: List[List[float]]) -> List[Tuple[float, float]]:
-    """Corners in metres on a local plane (equirectangular about the centroid — fine for parcels)."""
+    """Corners in metres on a local plane centred on the first corner (equirectangular — fine for parcels;
+    small numbers keep the arithmetic exact even for a 2 m kiosk)."""
     lat0 = sum(p[0] for p in ring) / len(ring)
     k = math.cos(math.radians(lat0))
-    return [(math.radians(p[1]) * R * k, math.radians(p[0]) * R) for p in ring]
+    o = ring[0]
+    return [(math.radians(p[1] - o[1]) * R * k, math.radians(p[0] - o[0]) * R) for p in ring]
 
 
 def measure(ring: List[List[float]]) -> Dict[str, Any]:
@@ -149,12 +163,121 @@ def check(ring: List[List[float]], skip_id: Optional[str] = None) -> Tuple[List[
     return errors, warnings
 
 
+# ------------------------------------------------------------------ parcel PIN
+
+PIN_ORIGIN = (23.0, 60.0)   # south-west corner of the grid (Pakistan: 23.5–37.1°N, 60.8–77.9°E)
+PIN_CELL = 1e-5             # degrees (≈1 m)
+PIN_LIMIT = (38.0, 78.0)
+_DAMM = [[0, 3, 1, 7, 5, 9, 8, 6, 4, 2], [7, 0, 9, 2, 1, 5, 4, 8, 6, 3], [4, 2, 0, 6, 8, 7, 1, 3, 5, 9],
+         [1, 7, 5, 0, 9, 8, 3, 4, 2, 6], [6, 1, 2, 3, 0, 4, 5, 9, 7, 8], [3, 6, 7, 4, 2, 0, 9, 5, 8, 1],
+         [5, 8, 6, 9, 7, 2, 0, 1, 3, 4], [8, 9, 4, 5, 3, 6, 2, 0, 1, 7], [9, 4, 3, 8, 6, 1, 7, 2, 0, 5],
+         [2, 5, 8, 1, 4, 3, 6, 7, 9, 0]]
+
+
+def _damm(digits: str) -> int:
+    i = 0
+    for d in digits:
+        i = _DAMM[i][int(d)]
+    return i
+
+
+def _pin_digits(pin: str) -> str:
+    """The 15 digits of a PIN (a strata / clash suffix "-01" after them is ignored)."""
+    return "".join(c for c in str(pin) if c.isdigit())[:15]
+
+
+def pin_valid(pin: str) -> bool:
+    d = _pin_digits(pin)
+    return len(d) == 15 and _damm(d) == 0
+
+
+def encode_pin(lat: float, lon: float) -> str:
+    """The 15-digit PIN of the ~1 m cell containing (lat, lon), as XXXXX-XXXXX-XXXXX."""
+    if not (PIN_ORIGIN[0] <= lat < PIN_LIMIT[0] and PIN_ORIGIN[1] <= lon < PIN_LIMIT[1]):
+        raise ValueError("Outside Pakistan's parcel grid (23–38°N, 60–78°E)")
+    n = f"{int((lat - PIN_ORIGIN[0]) / PIN_CELL + 1e-9):07d}"
+    e = f"{int((lon - PIN_ORIGIN[1]) / PIN_CELL + 1e-9):07d}"
+    body = "".join(a + b for a, b in zip(n, e))
+    d = body + str(_damm(body))
+    return f"{d[:5]}-{d[5:10]}-{d[10:]}"
+
+
+def decode_pin(pin: str) -> Dict[str, Any]:
+    """The cell a PIN (or a PIN prefix of 2–14 digits) stands for: its centre, edges and size."""
+    digits = "".join(c for c in str(pin) if c.isdigit())
+    if len(digits) >= 15:
+        if _damm(digits[:15]) != 0:
+            return {"error": "Check digit doesn't match — a digit is mistyped"}
+        digits = digits[:14]
+    if not digits:
+        return {"error": "Not a parcel PIN"}
+    nd, ed = digits[0::2], digits[1::2]
+    span_n = 10 ** (7 - len(nd)) * PIN_CELL
+    span_e = 10 ** (7 - len(ed)) * PIN_CELL
+    s0 = PIN_ORIGIN[0] + int(nd.ljust(7, "0")) * PIN_CELL
+    w0 = PIN_ORIGIN[1] + int(ed.ljust(7, "0")) * PIN_CELL
+    return {"digits": len(digits), "south": round(s0, 6), "west": round(w0, 6), "north": round(s0 + span_n, 6),
+            "east": round(w0 + span_e, 6), "center": [round(s0 + span_n / 2, 7), round(w0 + span_e / 2, 7)],
+            "size_m": [round(span_n * 111_320, 1), round(span_e * 111_320 * math.cos(math.radians(s0 + span_n / 2)), 1)]}
+
+
+def interior_point(ring: List[List[float]]) -> List[float]:
+    """A point inside the parcel: its centroid when that is inside, else the middle of the widest
+    inside stretch along the centroid's latitude (L-shaped / concave parcels)."""
+    pts = _local(ring)
+    n = len(pts)
+    a = cx = cy = 0.0
+    for i in range(n):
+        x0, y0 = pts[i]
+        x1, y1 = pts[(i + 1) % n]
+        f = x0 * y1 - x1 * y0
+        a += f
+        cx += (x0 + x1) * f
+        cy += (y0 + y1) * f
+    if abs(a) > 1e-9:
+        cx, cy = cx / (3 * a), cy / (3 * a)
+    else:
+        cx, cy = sum(p[0] for p in pts) / n, sum(p[1] for p in pts) / n
+    if not _inside((cx, cy), pts):
+        xs = sorted(x0 + (cy - y0) * (x1 - x0) / (y1 - y0) for (x0, y0), (x1, y1) in zip(pts, pts[1:] + pts[:1])
+                    if (y0 > cy) != (y1 > cy))
+        spans = [(xs[i + 1] - xs[i], (xs[i] + xs[i + 1]) / 2) for i in range(0, len(xs) - 1, 2)]
+        if spans:
+            cx = max(spans)[1]
+    lat0 = sum(p[0] for p in ring) / len(ring)
+    k = math.cos(math.radians(lat0))
+    return [round(ring[0][0] + math.degrees(cy / R), 7), round(ring[0][1] + math.degrees(cx / (R * k)), 7)]
+
+
+def assign_pin(ring: List[List[float]], skip_id: Optional[str] = None) -> Tuple[str, List[float]]:
+    pt = interior_point(ring)
+    base = encode_pin(*pt)
+    taken = {q.get("pin") for q in _db().values() if q["id"] != skip_id}
+    if base not in taken:
+        return base, pt
+    k = 1
+    while f"{base}-{k:02d}" in taken:
+        k += 1
+    return f"{base}-{k:02d}", pt
+
+
+def find_pin(pin: str) -> Dict[str, Any]:
+    """A parcel by its PIN, or — for a PIN with no parcel / a prefix — the area it stands for."""
+    d = _pin_digits(pin)
+    suffix = str(pin).strip()[len(str(pin).strip()) - 3:] if str(pin).strip()[-3:-2] == "-" and len(d) == 15 else ""
+    for q in _db().values():
+        if _pin_digits(q.get("pin") or "") == d and (not suffix or str(q.get("pin", "")).endswith(suffix)):
+            return {"parcel_id": q["id"], "pin": q["pin"], "area": decode_pin(d)}
+    cell = decode_pin(pin)
+    return cell if "error" in cell else {"parcel_id": None, "area": cell}
+
+
 # ------------------------------------------------------------------ records
 
 def _label(p: Dict[str, Any]) -> str:
     bits = [f"Plot {p['plot_no']}" if p.get("plot_no") else None, p.get("block"), p.get("society"),
             f"Khasra {p['khasra_no']}" if p.get("khasra_no") and not p.get("plot_no") else None]
-    return " · ".join(b for b in bits if b) or p.get("parcel_no") or p["id"][:8]
+    return " · ".join(b for b in bits if b) or p.get("pin") or p.get("parcel_no") or p["id"][:8]
 
 
 def _next_no() -> str:
@@ -202,9 +325,14 @@ def create(data: Dict[str, Any]) -> Dict[str, Any]:
     errors, warnings = check(ring)
     if errors:
         return {"error": " ".join(errors), "errors": errors}
+    try:
+        pin, pin_point = assign_pin(ring)
+    except ValueError as e:
+        return {"error": str(e)}
     now = datetime.now().isoformat(timespec="seconds")
     p = _fields(data)
-    p.update({"id": str(uuid.uuid4()), "parcel_no": (str(data.get("parcel_no")).strip() or None) if data.get("parcel_no") else _next_no(),
+    p.update({"id": str(uuid.uuid4()), "pin": pin, "pin_point": pin_point,
+              "parcel_no": (str(data.get("parcel_no")).strip() or None) if data.get("parcel_no") else pin,
               "ring": ring, **{k: v for k, v in measure(ring).items() if k not in ("edges_ft",)},
               "verified": bool(data.get("verified")), "verified_by": _who() if data.get("verified") else None,
               "surveyed_by": _who(), "created_at": now, "updated_at": now, "version": 1})
@@ -264,8 +392,10 @@ def in_view(manager: bool, south: Optional[float] = None, west: Optional[float] 
                                        or _bbox(p["ring"])[3] < west or _bbox(p["ring"])[1] > east)]
     if q:
         ql = q.lower()
-        rows = [p for p in rows if ql in " ".join(str(p.get(k) or "") for k in ("parcel_no", "plot_no", "block", "sector", "society",
-                                                                                    "mouza", "khasra_no", "khewat_no", "khatooni_no")).lower()]
+        qd = "".join(c for c in q if c.isdigit())
+        keys = ("pin", "parcel_no", "plot_no", "block", "sector", "society", "mouza", "khasra_no", "khewat_no", "khatooni_no")
+        rows = [p for p in rows if ql in " ".join(str(p.get(k) or "") for k in keys).lower()
+                or (len(qd) >= 6 and _pin_digits(p.get("pin") or "").startswith(qd))]
     return {"type": "FeatureCollection", "count": len(rows), "features": [feature(p, manager) for p in rows[:limit]]}
 
 

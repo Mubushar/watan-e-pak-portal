@@ -17,6 +17,7 @@ import base64
 import json
 import logging
 import os
+import re
 import time
 from typing import Any, Dict, List, Tuple
 
@@ -3018,11 +3019,23 @@ def run_geo_checks(client: TestClient) -> None:
     r = client.post("/cadastre/parcels", json={"ring": ring, "plot_no": "12", "block": "Umar", "mouza": "Thalian", "khasra_no": "345/2",
                                                "owner_name": "A. Owner", "status": "vacant"}, headers=adm)
     par = r.json().get("parcel", {})
-    check("POST /cadastre/parcels (measured, numbered)", r.status_code == 201 and par.get("parcel_no", "").startswith("PK-CAD-")
+    check("POST /cadastre/parcels (measured, PIN)", r.status_code == 201 and re.fullmatch(r"\d{5}-\d{5}-\d{5}", par.get("pin", ""))
+          and par.get("parcel_no") == par.get("pin")
           and 480 < par.get("area_m2", 0) < 560 and len(par.get("edges_m", [])) == 4, r.text[:300])
     r = client.post("/cadastre/parcels", json={"ring": [[33.4869, 73.1041], [33.4869, 73.1043], [33.4867, 73.1043], [33.4867, 73.1041]]}, headers=adm)
     check("POST /cadastre/parcels warns about an overlap", r.status_code == 201 and any("Overlaps" in w for w in r.json().get("warnings", [])), r.text[:300])
     second = r.json()["parcel"]["id"]
+    r = client.get(f"/cadastre/pin/{par.get('pin')}", headers=adm)
+    check("GET /cadastre/pin/{pin} finds the parcel", r.json().get("parcel_id") == par.get("id") and r.json()["area"]["size_m"][0] < 2, r.text[:200])
+    pin = par.get("pin", "00000-00000-00000")
+    typo = pin[:3] + str((int(pin[3]) + 1) % 10) + pin[4:]
+    check("GET /cadastre/pin/{pin} catches a mistyped digit", client.get(f"/cadastre/pin/{typo}", headers=adm).status_code == 422)
+    r = client.get(f"/cadastre/pin/{pin.replace('-', '')[:8]}", headers=adm)
+    check("GET /cadastre/pin/{prefix} -> the ~1 km area", r.status_code == 200 and 800 < r.json()["area"]["size_m"][0] < 1200, r.text[:200])
+    r = client.post("/cadastre/parcels", json={"ring": ring}, headers=adm)
+    third = r.json().get("parcel", {})
+    check("POST /cadastre/parcels: same 1 m cell -> PIN suffix -01", third.get("pin") == f"{pin}-01", r.text[:200])
+    client.delete(f"/cadastre/parcels/{third.get('id')}", headers=adm)
     r = client.post("/cadastre/parcels", json={"ring": [[33.4870, 73.1040], [33.4868, 73.10425], [33.4870, 73.10425], [33.4868, 73.1040]]}, headers=adm)
     check("POST /cadastre/parcels rejects a self-crossing outline", r.status_code == 422, r.text[:200])
     r = client.get("/cadastre/parcels", headers=nobody)
