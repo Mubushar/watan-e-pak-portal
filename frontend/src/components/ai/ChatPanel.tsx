@@ -234,6 +234,15 @@ export function ChatPanel({ compact, className, initial }: { compact?: boolean; 
                     </Suspense>
                   </div>
                 )}
+                {!!m.choices?.length && i === msgs.length - 1 && !busy && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {m.choices.map((c) => (
+                      <button key={c} type="button" onClick={() => void send(c)} className="chip bg-gold-50 text-brand-900 ring-1 ring-gold-300 hover:bg-gold-100 dark:bg-white/10 dark:text-gold-200 dark:ring-white/20">
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {!!m.links?.length && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {m.links.map((l) => (

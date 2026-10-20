@@ -76,7 +76,7 @@ import { WATER_CLASSES, WaterLayer, type WaterStatus } from "@/components/gis/Wa
 import { DISTRICT_LABEL_ZOOM, DistrictLayer } from "@/components/gis/DistrictLayer";
 import { ELEVATION_GRADIENT, TerrainLayer } from "@/components/gis/TerrainLayer";
 import { usePrefs } from "@/store/prefs";
-import { onMapFocus, registerMapView, takePendingFocus, type MapFocus } from "@/lib/mapFocus";
+import { onMapFocus, onMapRoute, registerMapView, takePendingFocus, takePendingRoute, type MapFocus, type MapSelection, type RouteRequest } from "@/lib/mapFocus";
 import { CAD_DEFAULTS, CadastreBar, CadastreLayer, CadastrePanel, parcelDraft, plotRect, type CadDraft, type CadMode } from "@/components/gis/Cadastre";
 import { LABEL_MIN_ZOOM, MasterPlanLayers, MasterPlanPanel, PlanLabels, groupPlans, phaseLabel, planOfLayer, useMasterPlans, type PlanLabel } from "@/components/gis/MasterPlans";
 import type { Aoi, AoiStats, GisLayer, GisLayerDetail, Poi, PoiCategory, RingResult, RouteResult } from "@/components/gis/types";
@@ -596,6 +596,9 @@ export default function MapExplorer() {
   };
   // The assistant moving this map (focus_map): fly there, mark the spot, switch on the plan covering it.
   const [aiPin, setAiPin] = useState<MapFocus | null>(null);
+  // What the user has selected (popups opened on listings / places), for the assistant's context.
+  const [selListing, setSelListing] = useState<{ id: string; label: string; lat: number; lon: number; price?: number | null; open: boolean } | null>(null);
+  const [selPlace, setSelPlace] = useState<{ label: string; lat: number; lon: number } | null>(null);
   const applyFocus = useRef<(f: MapFocus) => void>(() => undefined);
   applyFocus.current = (f) => {
     if (!map) return;
@@ -620,6 +623,19 @@ export default function MapExplorer() {
     }, 1600);
     if (window.innerWidth < 768) setOpen(false);
   };
+  const applyRoute = useRef<(r: RouteRequest) => void>(() => undefined);
+  applyRoute.current = (rq) => {
+    nav.setFrom({ type: "picked", label: rq.from.label, lat: rq.from.lat, lon: rq.from.lon });
+    nav.setTo({ type: "picked", label: rq.to.label, lat: rq.to.lat, lon: rq.to.lon });
+    nav.setMode(rq.mode);
+    nav.setPicking(null);
+    nav.setRouting(true);
+  };
+  useEffect(() => {
+    const waiting = takePendingRoute();
+    if (waiting) applyRoute.current(waiting);
+    return onMapRoute((rq) => applyRoute.current(rq));
+  }, []);
   useEffect(() => {
     if (!map) return;
     const waiting = takePendingFocus();
@@ -628,7 +644,45 @@ export default function MapExplorer() {
   }, [map]);
 
   // Share what is on screen with the assistant (read_map): the view and every layer switched on.
-  const viewLayers = useRef({ plans: [] as { key: string; name: string }[], gis: [] as { id: string; name: string; type: string }[], overlays: [] as string[], base: "" });
+  const viewLayers = useRef({ plans: [] as { key: string; name: string }[], gis: [] as { id: string; name: string; type: string }[], overlays: [] as string[], base: "", selection: {} as MapSelection });
+  const spot = (label: string, lat: number, lon: number) => ({ label, lat: Number(lat.toFixed(6)), lon: Number(lon.toFixed(6)) });
+  const editAt = editDraft?.geom.type === "point" ? editDraft.geom.at : editDraft && editDraft.geom.pts.length ? editDraft.geom.pts[0]! : null;
+  const cadAt = cadDraft?.pts.length
+    ? ([cadDraft.pts.reduce((a, q) => a + q[0], 0) / cadDraft.pts.length, cadDraft.pts.reduce((a, q) => a + q[1], 0) / cadDraft.pts.length] as [number, number])
+    : null;
+  const selection: MapSelection = {
+    listing: selListing ? { ...spot(selListing.label, selListing.lat, selListing.lon), id: selListing.id, open: selListing.open, price: selListing.price } : undefined,
+    place: selPlace ? spot(selPlace.label, selPlace.lat, selPlace.lon) : undefined,
+    search_pin: nav.hit ? spot(nav.hit.label, nav.hit.lat, nav.hit.lon) : undefined,
+    route:
+      nav.from || nav.to
+        ? {
+            from: nav.from && nav.from.lat ? spot(nav.from.label, nav.from.lat, nav.from.lon) : undefined,
+            to: nav.to && nav.to.lat ? spot(nav.to.label, nav.to.lat, nav.to.lon) : undefined,
+            mode: nav.mode,
+            showing: nav.routing,
+          }
+        : undefined,
+    analysis_point: pt ? spot("Analysis point", pt[0], pt[1]) : undefined,
+    editing: editDraft && editAt ? { ...spot(String(editDraft.fields.title ?? editDraft.fields.name ?? "New feature"), editAt[0], editAt[1]), kind: editDraft.kind } : undefined,
+    parcel: cadDraft && cadAt ? { ...spot(cadDraft.fields.parcel_no ? `Parcel ${cadDraft.fields.parcel_no}` : "New parcel", cadAt[0], cadAt[1]), parcel_no: cadDraft.fields.parcel_no } : undefined,
+    assistant_pin: aiPin ? spot(aiPin.name, aiPin.latitude, aiPin.longitude) : undefined,
+    active_tool: nav.picking
+      ? `route finder: picking the ${nav.picking === "from" ? "start" : "destination"} on the map`
+      : cadMode
+        ? `cadastre: ${cadMode === "draw" ? "drawing a parcel" : cadMode === "size" ? "plot by size" : "editing a parcel"}`
+        : editMode
+          ? `map editor: ${editMode}`
+          : drawMode
+            ? `study area: drawing a ${drawMode}`
+            : zoomMode
+              ? `zoom box (${zoomMode})`
+              : analysing
+                ? `analyse (${mode})`
+                : nav.routing
+                  ? "route finder open"
+                  : null,
+  };
   viewLayers.current = {
     plans: vis.layers ? visiblePlans.filter((pl) => planShown.has(pl.key)).map((pl) => ({ key: pl.key, name: pl.name })) : [],
     gis: vis.layers ? gisLayers.filter((l) => !hidden.has(l.id)).map((l) => ({ id: l.id, name: l.name, type: l.layer_type })) : [],
@@ -643,6 +697,7 @@ export default function MapExplorer() {
       cadOn && (on("cadastre") || cadRights) && "cadastre",
     ].filter(Boolean) as string[],
     base: baseMap,
+    selection,
   };
   useEffect(() => {
     if (!map) return;
@@ -797,6 +852,10 @@ export default function MapExplorer() {
               ref={(m) => {
                 if (m) markerRefs.current.set(p.id, m);
               }}
+              eventHandlers={{
+                popupopen: () => setSelListing({ id: p.id, label: p.title, lat: p.latitude!, lon: p.longitude!, price: p.price, open: true }),
+                popupclose: () => setSelListing((cur) => (cur?.id === p.id ? { ...cur, open: false } : cur)),
+              }}
             >
               <Popup>
                 <PropertyPopup p={p} />
@@ -808,7 +867,15 @@ export default function MapExplorer() {
         {vis.pois &&
           on("featured_places") &&
           pois.map((p) => (
-            <Marker key={p.id} position={[p.latitude, p.longitude]} icon={placePin(p.category)}>
+            <Marker
+              key={p.id}
+              position={[p.latitude, p.longitude]}
+              icon={placePin(p.category)}
+              eventHandlers={{
+                popupopen: () => setSelPlace({ label: p.name, lat: p.latitude, lon: p.longitude }),
+                popupclose: () => setSelPlace((cur) => (cur?.label === p.name ? null : cur)),
+              }}
+            >
               <Popup>
                 <PoiPopup p={p} />
               </Popup>

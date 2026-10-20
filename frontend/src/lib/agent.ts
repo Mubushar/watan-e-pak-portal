@@ -12,7 +12,7 @@ import type { NearbyList, NearbyPlace, Property, PropertyList } from "@/types";
 import { useAuth } from "@/store/auth";
 import { API_BASE, get, post } from "./api";
 import { pkrShort } from "./format";
-import { focusMap, getMapView, lastFocusAt, onMapPage } from "./mapFocus";
+import { focusMap, getMapView, lastFocusAt, onMapPage, routeOnMap, type Spot } from "./mapFocus";
 
 export interface Capabilities {
   chat_mode: "local" | "upstream";
@@ -32,7 +32,7 @@ type ToolDef = { type: "function"; function: { name: string; description: string
 let toolDefs: Promise<ToolDef[]> | null = null;
 function chatTools(): Promise<ToolDef[]> {
   toolDefs ??= get<{ tools: ToolDef[] }>("/ai/tools", undefined, { noFallback: true })
-    .then((r) => [...r.tools, FOCUS_MAP, READ_MAP])
+    .then((r) => [...r.tools, FOCUS_MAP, READ_MAP, ROUTE_ON_MAP, OFFER_CHOICES])
     .catch((e) => {
       toolDefs = null;
       throw e;
@@ -78,6 +78,113 @@ const READ_MAP: ToolDef = {
   },
 };
 
+/** Web-only tool: a route on the portal's map, starting from what the user means by "here". */
+const ROUTE_ON_MAP: ToolDef = {
+  type: "function",
+  function: {
+    name: "route_on_map",
+    description:
+      "Find the shortest / fastest route on real roads and show it on the portal's Map page (route finder with turn-by-turn " +
+      "steps). from: 'auto' (default) picks the start the user means — the listing selected on the map (or the listing page " +
+      "they are on), else their device's location, else the centre of the map view — and asks when that's ambiguous. " +
+      "Use from='my_location' when the user says 'my (current) location', 'selected' for the selected listing / place, " +
+      "'map_center' for 'the centre of the map', or a place name. to: a place / listing / society name, or 'selected', " +
+      "'search_pin', 'assistant_pin'. Use it for any route / directions / 'how far by road' question.",
+    parameters: {
+      type: "object",
+      properties: {
+        to: { type: "string", description: "Destination: a place, society, block or listing name; or selected | search_pin | assistant_pin" },
+        to_listing_id: { type: "string", description: "Or the destination listing's id" },
+        from: { type: "string", description: "auto (default) | my_location | selected | map_center | search_pin | assistant_pin | a place name" },
+        from_listing_id: { type: "string", description: "Or the start listing's id" },
+        mode: { type: "string", enum: ["drive", "bike", "walk"], description: "Default drive" },
+      },
+      additionalProperties: false,
+    },
+  },
+};
+
+/** Web-only tool: put 2–4 choices under the reply as buttons when the request is ambiguous. */
+const OFFER_CHOICES: ToolDef = {
+  type: "function",
+  function: {
+    name: "offer_choices",
+    description:
+      "When the user's request could mean different things (which listing, which start point, which society / phase, which " +
+      "city), ask one short question and offer 2–4 concrete choices — they appear as buttons the user can tap. Then stop and " +
+      "follow the user's pick.",
+    parameters: {
+      type: "object",
+      properties: {
+        question: { type: "string" },
+        choices: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 4, description: "Short, specific options in the user's language" },
+      },
+      required: ["question", "choices"],
+      additionalProperties: false,
+    },
+  },
+};
+
+/** A place, block, society or listing name → a point (gazetteer, shorter forms of the name, then master-plan text). */
+async function findSpot(text: string): Promise<Spot | null> {
+  const lookup = async (place: string) => (await get<MapCard>("/places/map", { place, per_kind: 1, radius_km: 0.5 }).catch(() => null))?.focus ?? null;
+  const parts = text.split(/\s*,\s*/).filter(Boolean);
+  const tries = [text, parts.slice(0, 2).join(" "), parts.slice(0, 2).reverse().join(" "), ...parts.slice(0, -1).map((_, i) => parts.slice(0, parts.length - 1 - i).join(", "))].filter(
+    (q, i, all) => q && all.indexOf(q) === i,
+  );
+  for (const q of tries) {
+    const f = await lookup(q);
+    if (f) return { label: f.name, lat: f.latitude, lon: f.longitude };
+  }
+  const hit = (await get<{ results: { text: string; plan: string; latitude: number; longitude: number }[] }>("/masterplans/search", { q: parts[0], limit: 1 }).catch(() => null))?.results?.[0];
+  return hit ? { label: `${hit.text}, ${hit.plan}`, lat: hit.latitude, lon: hit.longitude } : null;
+}
+
+async function listingSpot(id: string): Promise<Spot | null> {
+  const p = await get<Property>(`/properties/${id}`).catch(() => null);
+  return p && p.latitude != null && p.longitude != null ? { label: p.title, lat: p.latitude, lon: p.longitude } : null;
+}
+
+/** The device's position (asks the browser; null with the reason when it can't). */
+function deviceSpot(timeoutMs = 9000): Promise<{ spot: Spot | null; why?: string }> {
+  return new Promise((res) => {
+    if (!navigator.geolocation) return res({ spot: null, why: "this browser has no location service" });
+    navigator.geolocation.getCurrentPosition(
+      (p) => res({ spot: { label: `Your location (±${Math.round(p.coords.accuracy)} m)`, lat: p.coords.latitude, lon: p.coords.longitude } }),
+      (e) => res({ spot: null, why: e.code === 1 ? "location permission was refused" : e.code === 3 ? "the location request timed out" : "the device couldn't find its location" }),
+      { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 60_000 },
+    );
+  });
+}
+
+/** The listing the user is looking at: selected on the map, or the listing page they are on. */
+async function selectedListing(): Promise<(Spot & { id: string }) | null> {
+  const sel = getMapView()?.selection.listing;
+  if (sel) return sel;
+  const m = window.location.pathname.match(/\/properties\/([^/?#]+)/);
+  if (m) {
+    const s = await listingSpot(m[1]!);
+    return s ? { ...s, id: m[1]! } : null;
+  }
+  return null;
+}
+
+/** The user's screen, as context for "this", "here", "selected", "my location" (sent with every turn). */
+function screenContext(): string {
+  const v = getMapView();
+  const path = window.location.pathname;
+  const ctx: Record<string, unknown> = { page: path };
+  const listingPage = path.match(/\/properties\/([^/?#]+)/);
+  if (listingPage) ctx.viewing_listing_id = listingPage[1];
+  if (v) {
+    const clean = Object.fromEntries(Object.entries(v.selection).filter(([, x]) => x !== undefined && x !== null));
+    ctx.page = "Map page";
+    ctx.map_view = { center: [Number(((v.south + v.north) / 2).toFixed(6)), Number(((v.west + v.east) / 2).toFixed(6))], zoom: v.zoom, plans_on: v.plans.length, layers_on: v.overlays };
+    ctx.selection = Object.keys(clean).length ? clean : "nothing selected";
+  }
+  return `SCREEN CONTEXT (live, read from the user's screen this turn — use it to resolve "this", "here", "selected", "the listing", "my location"; ids are for tools only): ${JSON.stringify(ctx)}`;
+}
+
 /** A button under the reply: a portal link. */
 export interface ChatLink {
   label: string;
@@ -104,6 +211,8 @@ export interface KnowledgeSource {
 export interface AgentEffect {
   /** Open this portal page (e.g. the Map page focus_map moved). */
   navigate?: string;
+  /** Quick replies under the reply (a choice when the request is ambiguous); a click sends it. */
+  choices?: string[];
   listings?: Property[];
   links?: ChatLink[];
   image?: { url: string; caption: string };
@@ -281,6 +390,117 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<{ o
       effect: wasOnMap ? {} : { navigate: "/map" },
     };
   }
+  if (name === "offer_choices") {
+    const choices = (Array.isArray(args.choices) ? (args.choices as unknown[]) : []).map(String).filter(Boolean).slice(0, 4);
+    return { output: { ok: true, shown_on_screen: "The choices are buttons under your reply. Ask the question briefly and wait." }, effect: { choices } };
+  }
+  if (name === "route_on_map") {
+    const sel = getMapView()?.selection;
+    const named = (k?: string): Spot | null | undefined =>
+      k === "search_pin" ? sel?.search_pin ?? null : k === "assistant_pin" ? sel?.assistant_pin ?? null : k === "map_center" ? centreSpot() : undefined;
+    const centreSpot = (): Spot | null => {
+      const v = getMapView();
+      return v ? { label: "Centre of the map view", lat: (v.south + v.north) / 2, lon: (v.west + v.east) / 2 } : null;
+    };
+    // ---- destination
+    const toKey = str(args, "to")?.trim();
+    let to: Spot | null = null;
+    if (args.to_listing_id) to = await listingSpot(str(args, "to_listing_id")!);
+    else if (toKey && /^(selected|selected_listing|this|this listing)$/i.test(toKey)) to = (await selectedListing()) ?? sel?.place ?? null;
+    else if (toKey && named(toKey) !== undefined) to = named(toKey) ?? null;
+    else if (toKey) to = await findSpot(toKey);
+    if (!to) return { output: { ok: false, ask_user: `Where to? I couldn't place "${toKey ?? "the destination"}" — ask for a landmark, society or listing.` }, effect: {} };
+    // ---- start: what the user means by "here"
+    const fromKey = (str(args, "from") ?? "auto").trim();
+    let from: Spot | null = null;
+    let why = "";
+    if (args.from_listing_id) {
+      from = await listingSpot(str(args, "from_listing_id")!);
+      why = "the listing you named";
+    } else if (/^(my_location|my location|current location|here)$/i.test(fromKey)) {
+      const d = await deviceSpot();
+      from = d.spot;
+      why = "your device's location";
+      if (!from)
+        return {
+          output: { ok: false, ask_user: `I couldn't get your location (${d.why}). Should I start from the selected listing, the centre of the map, or a place you name?` },
+          effect: { choices: ["Start from the selected listing", "Start from the centre of the map", "Allow my location and try again"] },
+        };
+    } else if (/^(selected|selected_listing|this listing)$/i.test(fromKey)) {
+      from = (await selectedListing()) ?? sel?.place ?? null;
+      why = "the selected listing";
+      if (!from)
+        return {
+          output: { ok: false, ask_user: "Nothing is selected on the map. Open a listing's pin first, or tell me where to start (your location, a place)." },
+          effect: { choices: ["Start from my current location", "Start from the centre of the map"] },
+        };
+    } else if (fromKey !== "auto" && named(fromKey) !== undefined) {
+      from = named(fromKey) ?? null;
+      why = fromKey.replace("_", " ");
+    } else if (fromKey !== "auto") {
+      from = await findSpot(fromKey);
+      why = "the place you named";
+    } else {
+      // auto: the selected listing → the device's location → the map centre; ask when two selections compete
+      const listing = await selectedListing();
+      const same = (a: Spot | null | undefined, b: Spot) => !!a && Math.abs(a.lat - b.lat) < 1e-5 && Math.abs(a.lon - b.lon) < 1e-5;
+      const others = [sel?.place, sel?.search_pin, sel?.analysis_point].filter((x): x is Spot => !!x && !same(x, to!));
+      const listingUsable = listing && !same(listing, to) ? listing : null;
+      if (listingUsable && others.length) {
+        return {
+          output: {
+            ok: false,
+            ask_user: `Should the route start from the selected listing (${listingUsable.label}) or from ${others.map((o) => o.label).join(" / ")} — or from your current location?`,
+          },
+          effect: { choices: [`Start from ${listingUsable.label}`, ...others.slice(0, 2).map((o) => `Start from ${o.label}`), "Start from my current location"] },
+        };
+      }
+      if (listingUsable) {
+        from = listingUsable;
+        why = sel?.listing ? "the listing selected on the map" : "the listing page you're on";
+      } else if (others.length === 1) {
+        from = others[0]!;
+        why = "the point selected on the map";
+      } else {
+        const d = await deviceSpot();
+        if (d.spot) {
+          from = d.spot;
+          why = "your device's location";
+        } else {
+          from = centreSpot();
+          why = `the centre of the map view (no listing selected and ${d.why})`;
+          if (!from)
+            return {
+              output: { ok: false, ask_user: `Where should the route start? Nothing is selected and ${d.why}.` },
+              effect: { choices: ["Allow my location and try again", "Open the map so I can pick a start"] },
+            };
+        }
+      }
+    }
+    if (!from) return { output: { ok: false, ask_user: `I couldn't place the start "${fromKey}". Where should the route start?` }, effect: {} };
+    const mode = (["drive", "bike", "walk"].includes(String(args.mode)) ? args.mode : "drive") as "drive" | "bike" | "walk";
+    const d = await get<{ routes: { label: string; distance_text: string; duration_text: string; via: string[] }[]; source: string }>("/geo/directions", {
+      from_lat: from.lat,
+      from_lon: from.lon,
+      to_lat: to.lat,
+      to_lon: to.lon,
+      mode,
+    });
+    const wasOnMap = onMapPage();
+    routeOnMap({ from, to, mode });
+    return {
+      output: {
+        ok: true,
+        from: { place: from.label, chosen_because: why },
+        to: to.label,
+        mode,
+        routes: d.routes.slice(0, 3).map((x) => ({ route: x.label, distance: x.distance_text, time: x.duration_text, via: x.via.slice(0, 4) })),
+        shown_on_screen: wasOnMap ? "The route is drawn on the map with turn-by-turn steps in the route finder." : "The Map page is opening with the route and its steps.",
+        how_to_answer: "Say where the route starts and why (e.g. 'from the selected listing'), give the shortest route's distance and time, and mention a faster alternative if there is one.",
+      },
+      effect: wasOnMap ? {} : { navigate: "/map" },
+    };
+  }
   if (name === "read_map") {
     const settle = 1800 - (Date.now() - lastFocusAt()); // just flown somewhere: let the map arrive first
     if (settle > 0) await new Promise((res) => setTimeout(res, settle));
@@ -367,7 +587,7 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<{ o
 
 function merge(a: AgentEffect, b: AgentEffect): AgentEffect {
   const links = [...(b.listings ? [] : a.links ?? []), ...(b.links ?? [])].filter((x, i, all) => all.findIndex((y) => y.label === x.label) === i);
-  return { navigate: b.navigate ?? a.navigate, listings: b.listings ?? a.listings, links: links.length ? links : undefined, image: b.image ?? a.image, map: b.map ?? a.map, sources: a.sources || b.sources ? [...(a.sources ?? []), ...(b.sources ?? [])] : undefined };
+  return { choices: b.choices ?? a.choices, navigate: b.navigate ?? a.navigate, listings: b.listings ?? a.listings, links: links.length ? links : undefined, image: b.image ?? a.image, map: b.map ?? a.map, sources: a.sources || b.sources ? [...(a.sources ?? []), ...(b.sources ?? [])] : undefined };
 }
 
 /** Knowledge, memory and the shared system prompt for this question (one fast call). */
@@ -406,6 +626,8 @@ const WEB_ONLY = [
   "You are on the web portal, which has a full Map page with many GIS layers (DHA, Bahria Town and housing-society master plans, places, roads, listings, mega projects, uploaded layers).",
   "To zoom / go / fly the map somewhere, or show a place, block, sector or listing 'on the map' / 'on the front-end map': focus_map (it moves the main map, opening the Map page if needed, and switches on the master plan there). show_map only puts a small map in the chat. Never say the main map moved unless focus_map returned ok.",
   "Any question about what is on the map, in this area / the current view / visible ('how many parks here', 'what is this', 'which roads / layers', 'is there a mosque nearby'): call read_map first and answer from it — never say you can't see the map. After focus_map, call read_map if the user also asked what is there.",
+  "When a request is ambiguous, don't guess: call offer_choices (or use a tool's ask_user / choices) with 2–4 concrete options and follow what the user picks. The user's choice wins; if it can't work (no location permission, a place that doesn't exist, a listing that isn't on the map), say why politely and offer the closest choice that does.",
+  "SCREEN CONTEXT tells you what the user has selected (a listing pin, a place, a search pin, the route finder, the item being edited) and the active tool: 'this / selected / here / the listing' mean those. Routes / directions / 'how far by road': route_on_map — with from='auto' unless the user names the start ('my current location' = my_location). If it returns ask_user, ask exactly that and wait.",
 ].join(" ");
 
 interface ToolCall {
@@ -424,7 +646,7 @@ interface ChatMessage {
 export async function agentReply(history: { role: "user" | "assistant"; content: string }[], model: string): Promise<AgentReply> {
   const question = [...history].reverse().find((m) => m.role === "user")?.content ?? "";
   const [tools, ctx] = await Promise.all([chatTools(), aiContext(question)]);
-  const messages: ChatMessage[] = [{ role: "system", content: (ctx?.system_prompt || systemPrompt()) + `\n${WEB_ONLY}` }, ...history.slice(-12).map((m) => ({ role: m.role, content: m.content }))];
+  const messages: ChatMessage[] = [{ role: "system", content: (ctx?.system_prompt || systemPrompt()) + `\n${WEB_ONLY}\n${screenContext()}` }, ...history.slice(-12).map((m) => ({ role: m.role, content: m.content }))];
   let effect: AgentEffect = { sources: ctx?.knowledge?.results };
   const finish = (content: string): AgentReply => {
     if (useAuth.getState().token) void post("/ai/turn", { content, conversation_id: conversationId }).catch(() => undefined);

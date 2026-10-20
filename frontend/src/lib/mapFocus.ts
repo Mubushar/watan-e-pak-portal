@@ -57,6 +57,60 @@ export interface MapViewState {
   /** Built-in overlays switched on (listings, osm_pois, mega_projects, roads, …). */
   overlays: string[];
   base: string;
+  /** What the user has selected / is doing on the map (the assistant resolves "this", "here", "selected" from it). */
+  selection: MapSelection;
+}
+export interface Spot {
+  label: string;
+  lat: number;
+  lon: number;
+}
+export interface MapSelection {
+  /** A listing whose popup is open (or the one last opened, ``open: false``). */
+  listing?: Spot & { id: string; open: boolean; price?: number | null };
+  /** A featured place whose popup is open. */
+  place?: Spot;
+  /** The search bar's result pin. */
+  search_pin?: Spot;
+  /** The route finder's From / To. */
+  route?: { from?: Spot; to?: Spot; mode: string; showing: boolean };
+  /** A point clicked with the Analyse tool. */
+  analysis_point?: Spot;
+  /** The listing / project / mega project open in the map editor. */
+  editing?: Spot & { kind: string };
+  /** The parcel open in the Cadastre form. */
+  parcel?: Spot & { parcel_no?: string };
+  /** Where the assistant last flew the map. */
+  assistant_pin?: Spot;
+  /** The tool switched on, in words (e.g. "route finder: picking the start point"). */
+  active_tool?: string | null;
+}
+
+/** The assistant asking the Map page to show a route in its route finder. */
+export interface RouteRequest {
+  from: Spot;
+  to: Spot;
+  mode: "drive" | "bike" | "walk";
+}
+const ROUTE_EVENT = "arzepak:map-route";
+let pendingRoute: RouteRequest | null = null;
+export function routeOnMap(r: RouteRequest): void {
+  pendingRoute = r;
+  focusedAt = Date.now();
+  window.dispatchEvent(new CustomEvent<RouteRequest>(ROUTE_EVENT, { detail: r }));
+}
+export function takePendingRoute(): RouteRequest | null {
+  const r = pendingRoute;
+  pendingRoute = null;
+  return r;
+}
+export function onMapRoute(fn: (r: RouteRequest) => void): () => void {
+  const h = (e: Event) => {
+    pendingRoute = null;
+    fn((e as CustomEvent<RouteRequest>).detail);
+  };
+  window.addEventListener(ROUTE_EVENT, h);
+  return () => window.removeEventListener(ROUTE_EVENT, h);
 }
 let readView: (() => MapViewState) | null = null;
 /** The Map page registers how to read its view (null when it closes). */
