@@ -8,14 +8,15 @@
  * Plan tiles exist only for zooms 12–17, so each plan's boundary is also drawn as an
  * outline (visible at any zoom, click to zoom in) and the tiles are scaled down to zoom 9.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type L from "leaflet";
 import type { FeatureCollection } from "geojson";
 import { CircleMarker, Polygon, Rectangle, TileLayer, Tooltip, useMap } from "react-leaflet";
-import { Map as MapIcon, Search, Target } from "lucide-react";
+import { ChevronDown, Map as MapIcon, Search, Target } from "lucide-react";
 import { useApi } from "@/hooks/useApi";
 import { API_BASE } from "@/lib/api";
-import { Badge, Button, EmptyState, Input, Skeleton, Toggle } from "@/components/ui";
+import { EmptyState, Input, Skeleton, Toggle } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import { fitTo } from "./kit";
 import type { GisLayer } from "./types";
 import { PlanTextLayer } from "./PlanTextLayer";
@@ -69,6 +70,63 @@ export const PLAN_GROUPS: { key: string; title: string }[] = [
   { key: "societies", title: "Housing society master plans" },
 ];
 export const planGroup = (p: MasterPlan) => p.group ?? "dha";
+/** The society a plan belongs to (its phases / sections / sheets are grouped under it). */
+const FAMILIES: [RegExp, string][] = [
+  [/^DHA /, "DHA"],
+  [/^Bahria Town Lahore/, "Bahria Town Lahore"],
+  [/^Bahria Town Karachi/, "Bahria Town Karachi"],
+  [/^Bahria Nasheman/, "Bahria Nasheman"],
+  [/^Bahria Enclave/, "Bahria Enclave"],
+  [/^Bahria (Town|Garden City|Paradise)/, "Bahria Town"],
+  [/^Multi Gardens/, "Multi Gardens (MPCHS)"],
+  [/^Faisal Town/, "Faisal Town"],
+  [/^Faisal Hills/, "Faisal Hills"],
+  [/^Jinnah Garden/, "Jinnah Garden"],
+  [/^Rudn Enclave/, "Rudn Enclave"],
+  [/^Capital Smart City/, "Capital Smart City"],
+  [/^Park View City/, "Park View City"],
+  [/^Taj Residencia/, "Taj Residencia"],
+];
+export const planFamily = (p: MasterPlan) => FAMILIES.find(([re]) => re.test(p.name))?.[1] ?? p.name;
+/** The plan's name within its society: "DHA Phase II" → "Phase II", "Bahria Town Lahore — Sector A" → "Sector A". */
+export function phaseLabel(p: MasterPlan, family = planFamily(p)): string {
+  let n = p.name;
+  if (n.startsWith(family)) n = n.slice(family.length);
+  else if (family.startsWith("Bahria ") && n.startsWith("Bahria ")) n = n.slice(7).replace(/^Town /, "");
+  n = n.replace(/^[\s—:–-]+/, "").trim();
+  return n || "Master plan";
+}
+/** Cities in the portal's priority order (Islamabad first), others alphabetically. */
+const CITY_ORDER = ["Islamabad", "Rawalpindi", "Lahore", "Karachi"];
+const cityRank = (c: string) => (CITY_ORDER.includes(c) ? CITY_ORDER.indexOf(c) : CITY_ORDER.length);
+
+export interface PlanCity {
+  city: string;
+  societies: { name: string; plans: MasterPlan[] }[];
+  plans: MasterPlan[];
+}
+/** Plans as city → society → phase. */
+export function groupPlans(plans: MasterPlan[]): PlanCity[] {
+  const by = new Map<string, Map<string, MasterPlan[]>>();
+  for (const p of plans) {
+    const city = p.city || "Other";
+    const fam = planFamily(p);
+    if (!by.has(city)) by.set(city, new Map());
+    const m = by.get(city)!;
+    if (!m.has(fam)) m.set(fam, []);
+    m.get(fam)!.push(p);
+  }
+  const cmp = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true });
+  return [...by.entries()]
+    .sort(([a], [b]) => cityRank(a) - cityRank(b) || cmp(a, b))
+    .map(([city, m]) => {
+      const societies = [...m.entries()]
+        .sort(([a], [b]) => cmp(a, b))
+        .map(([name, ps]) => ({ name, plans: ps.sort((x, y) => cmp(phaseLabel(x, name), phaseLabel(y, name))) }));
+      return { city, societies, plans: societies.flatMap((s) => s.plans) };
+    });
+}
+
 /** The plan a generated layer belongs to ("<plan> — boundary / master plan / plan labels: …"), lower-cased.
  *  Plan names may themselves contain " — " (e.g. "Bahria Town Lahore — Sector A"). */
 export const planOfLayer = (name: string) => name.replace(/ — (boundary|master plan|plan labels: .*)$/, "").toLowerCase();
@@ -176,12 +234,34 @@ export function MasterPlanPanel({
   const hits = useApi<{ count: number; results: PlanLabel[]; note?: string }>(query ? "/masterplans/search" : null, { q: query, limit: 12 });
   const built = q.data?.plans ?? [];
   const plans = only ?? built;
-  const show = (key: string, on: boolean) => {
+  const show = (key: string, on: boolean) => showAll([key], on);
+  const showAll = (keys: string[], on: boolean) => {
     const n = new Set(shown);
-    if (on) n.add(key);
-    else n.delete(key);
+    keys.forEach((k) => (on ? n.add(k) : n.delete(k)));
     setShown(n);
   };
+  const tree = useMemo(() => groupPlans(plans), [plans]);
+  // Cities and societies start folded, except the first city (Islamabad), so the list stays short.
+  const [openCity, setOpenCity] = useState<Set<string>>(() => new Set());
+  const [openSoc, setOpenSoc] = useState<Set<string>>(() => new Set());
+  const cityOpen = (c: string) => openCity.has(c) !== (c === tree[0]?.city);
+  const flip = (set: Set<string>, k: string) => {
+    const n = new Set(set);
+    if (n.has(k)) n.delete(k);
+    else n.add(k);
+    return n;
+  };
+  const zoomTo = (ps: MasterPlan[]) => {
+    showAll(ps.map((x) => x.key), true);
+    const b: MasterPlan["bounds"] = [
+      Math.min(...ps.map((x) => x.bounds[0])),
+      Math.min(...ps.map((x) => x.bounds[1])),
+      Math.max(...ps.map((x) => x.bounds[2])),
+      Math.max(...ps.map((x) => x.bounds[3])),
+    ];
+    fitTo(map, corners(b), ps.length > 1 ? 15 : 16, pad());
+  };
+  const count = (ps: MasterPlan[]) => ps.filter((x) => shown.has(x.key)).length;
 
   return (
     <div className="space-y-3">
@@ -196,37 +276,103 @@ export function MasterPlanPanel({
         <EmptyState title="Master plans are hidden" hint="An administrator can show them in Administration › GIS layers (publish the master plan layers)." />
       ) : (
         <>
-          {PLAN_GROUPS.map((g) => ({ ...g, plans: plans.filter((p) => planGroup(p) === g.key) }))
-            .filter((g) => g.plans.length)
-            .map((g) => (
-              <div key={g.key} className="space-y-2">
-                <p className="text-[11px] font-semibold text-ink-soft dark:text-slate-300">{g.title}</p>
-          {g.plans.map((p) => (
-            <div key={p.key} className="flex items-center gap-3 rounded-xl border border-black/5 p-3 dark:border-white/10">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold">{p.name}</p>
-                <div className="mt-1 flex flex-wrap gap-1.5">
-                  {p.city && <Badge tone="gray">{p.city}</Badge>}
-                  {!!p.accuracy?.rmse_m && <span className="text-[11px] text-ink-mute">± {Math.round(p.accuracy.rmse_m)} m</span>}
-                  {!p.tile_url && <span className="text-[11px] text-ink-mute">labels only</span>}
+          {/* City → society → phase, each level with its own switch. */}
+          <div className="space-y-2">
+            {tree.map((c) => {
+              const open = cityOpen(c.city);
+              const on = count(c.plans);
+              return (
+                <div key={c.city} className="rounded-xl border border-black/5 dark:border-white/10">
+                  <div className="flex items-center gap-2 px-3 py-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setOpenCity((s) => flip(s, c.city))}
+                      className="flex min-w-0 flex-1 items-center gap-2 text-start"
+                      aria-expanded={open}
+                    >
+                      <ChevronDown className={cn("h-4 w-4 shrink-0 text-ink-mute transition", !open && "-rotate-90")} />
+                      <span className="truncate text-sm font-bold">{c.city}</span>
+                      <span className="text-[11px] text-ink-mute">
+                        {c.societies.length} {c.societies.length === 1 ? "society" : "societies"} · {on}/{c.plans.length} on
+                      </span>
+                    </button>
+                    <Toggle checked={on > 0} onChange={(v) => showAll(c.plans.map((x) => x.key), v)} />
+                  </div>
+                  {open && (
+                    <div className="space-y-1 border-t border-black/5 px-2 py-2 dark:border-white/10">
+                      {c.societies.map((soc) => {
+                        const k = `${c.city}|${soc.name}`;
+                        const many = soc.plans.length > 1;
+                        const socOpen = openSoc.has(k);
+                        const sOn = count(soc.plans);
+                        const one = soc.plans[0]!;
+                        return (
+                          <div key={k} className="rounded-lg bg-black/[0.02] dark:bg-white/[0.03]">
+                            <div className="flex items-center gap-2 px-2 py-1.5">
+                              <button
+                                type="button"
+                                disabled={!many}
+                                onClick={() => setOpenSoc((s) => flip(s, k))}
+                                className="flex min-w-0 flex-1 items-center gap-1.5 text-start"
+                                aria-expanded={many ? socOpen : undefined}
+                              >
+                                {many ? (
+                                  <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 text-ink-mute transition", !socOpen && "-rotate-90")} />
+                                ) : (
+                                  <MapIcon className="h-3.5 w-3.5 shrink-0 text-ink-mute" />
+                                )}
+                                <span className="min-w-0">
+                                  <span className="block truncate text-sm font-semibold">{soc.name}</span>
+                                  <span className="block truncate text-[11px] text-ink-mute">
+                                    {many
+                                      ? `${soc.plans.length} plans · ${sOn} on`
+                                      : [phaseLabel(one, soc.name), one.accuracy?.rmse_m ? `± ${Math.round(one.accuracy.rmse_m)} m` : ""].filter((x) => x && x !== "Master plan").join(" · ")}
+                                    {!many && !one.tile_url && " · labels only"}
+                                  </span>
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => zoomTo(soc.plans)}
+                                className="rounded-md p-1.5 text-brand-700 hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-white/10"
+                                title={`Zoom to ${soc.name}`}
+                                aria-label={`Zoom to ${soc.name}`}
+                              >
+                                <Target className="h-4 w-4" />
+                              </button>
+                              <Toggle checked={sOn > 0} onChange={(v) => showAll(soc.plans.map((x) => x.key), v)} />
+                            </div>
+                            {many && socOpen && (
+                              <div className="pb-1.5 ps-7 pe-2">
+                                {soc.plans.map((p) => (
+                                  <div key={p.key} className="flex items-center gap-2 py-1">
+                                    <span className="min-w-0 flex-1">
+                                      <span className="block truncate text-xs font-medium">{phaseLabel(p, soc.name)}</span>
+                                      {!!p.accuracy?.rmse_m && <span className="block text-[10px] text-ink-mute">± {Math.round(p.accuracy.rmse_m)} m</span>}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => zoomTo([p])}
+                                      className="rounded-md p-1 text-brand-700 hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-white/10"
+                                      title={`Zoom to ${p.name}`}
+                                      aria-label={`Zoom to ${p.name}`}
+                                    >
+                                      <Target className="h-3.5 w-3.5" />
+                                    </button>
+                                    <Toggle checked={shown.has(p.key)} onChange={(v) => show(p.key, v)} />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              </div>
-              <Button
-                size="sm"
-                variant="soft"
-                icon={<Target className="h-3.5 w-3.5" />}
-                onClick={() => {
-                  show(p.key, true);
-                  fitTo(map, corners(p.bounds), 16, pad());
-                }}
-              >
-                Zoom
-              </Button>
-              <Toggle checked={shown.has(p.key)} onChange={(v) => show(p.key, v)} />
-            </div>
-          ))}
-              </div>
-            ))}
+              );
+            })}
+          </div>
           {!!labels?.layers.length && (
             <div className="rounded-xl bg-brand-50/60 p-3 dark:bg-white/5">
               <p className="text-xs font-semibold">Text from the plans</p>

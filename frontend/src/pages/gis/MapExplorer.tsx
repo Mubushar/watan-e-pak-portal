@@ -76,7 +76,7 @@ import { DISTRICT_LABEL_ZOOM, DistrictLayer } from "@/components/gis/DistrictLay
 import { ELEVATION_GRADIENT, TerrainLayer } from "@/components/gis/TerrainLayer";
 import { usePrefs } from "@/store/prefs";
 import { onMapFocus, registerMapView, takePendingFocus, type MapFocus } from "@/lib/mapFocus";
-import { LABEL_MIN_ZOOM, MasterPlanLayers, MasterPlanPanel, PLAN_GROUPS, PlanLabels, planGroup, planOfLayer, useMasterPlans, type PlanLabel } from "@/components/gis/MasterPlans";
+import { LABEL_MIN_ZOOM, MasterPlanLayers, MasterPlanPanel, PlanLabels, groupPlans, phaseLabel, planOfLayer, useMasterPlans, type PlanLabel } from "@/components/gis/MasterPlans";
 import type { Aoi, AoiStats, GisLayer, GisLayerDetail, Poi, PoiCategory, RingResult, RouteResult } from "@/components/gis/types";
 
 type TabKey = "properties" | "places" | "layers" | "areas" | "analyse";
@@ -275,6 +275,14 @@ export default function MapExplorer() {
       const n = new Set(h);
       if (on) n.delete(id);
       else n.add(id);
+      return n;
+    });
+  };
+  const setPlansOn = (keys: string[], on: boolean) => {
+    setVis((v) => ({ ...v, layers: true }));
+    setPlanShown((s) => {
+      const n = new Set(s);
+      keys.forEach((k) => (on ? n.add(k) : n.delete(k)));
       return n;
     });
   };
@@ -993,28 +1001,35 @@ export default function MapExplorer() {
               </>
             ),
           },
-          ...PLAN_GROUPS.map((g) => ({
-            key: `plans-${g.key}`,
-            title: g.title,
+          // Master plans: one section per city (its switch turns the whole city on / off), a row per society
+          // (DHA, Bahria Town, Multi Gardens …) with its own switch, and the phases / sections under it.
+          ...groupPlans(visiblePlans).map((c) => ({
+            key: `plans-${c.city}`,
+            title: `${c.city} master plans`,
             icon: LandPlot,
-            items: visiblePlans
-              .filter((pl) => planGroup(pl) === g.key)
-              .map((pl) => ({
-                key: `plan-${pl.key}`,
-                label: pl.name,
-                hint: pl.city,
+            items: c.societies.map((soc) => {
+              const keys = soc.plans.map((pl) => pl.key);
+              const shownCount = keys.filter((k) => planShown.has(k)).length;
+              return {
+                key: `soc-${c.city}-${soc.name}`,
+                label: soc.name,
+                hint:
+                  soc.plans.length > 1
+                    ? `${soc.plans.length} plans · ${shownCount} on`
+                    : [phaseLabel(soc.plans[0]!, soc.name), soc.plans[0]!.accuracy?.rmse_m ? `± ${Math.round(soc.plans[0]!.accuracy.rmse_m)} m` : ""].filter((x) => x && x !== "Master plan").join(" · ") || undefined,
                 icon: MapIcon,
-                on: vis.layers && planShown.has(pl.key),
-                onChange: (v: boolean) => setPlanOn(pl.key, v),
-                children: labelLayers
-                  .filter((l) => l.name.startsWith(`${pl.name} — plan labels: `))
-                  .map((l) => ({ key: l.id, label: `Labels: ${l.name.split(" — plan labels: ")[1]}`, on: labelsOn.has(l.id), onChange: (v: boolean) => setLabelOn(l.id, v) })),
-              })),
-            note:
-              g.key === "dha"
-                ? `Plan text appears from zoom ${LABEL_MIN_ZOOM}; plot numbers from zoom 17. Use the Layers tab to search a plan.`
-                : "Georeferenced from the developers' master plans (about 10–20 m accuracy) — plans change, so what is built may differ.",
-          })).filter((g) => g.items.length > 0),
+                on: vis.layers && shownCount > 0,
+                onChange: (v: boolean) => setPlansOn(keys, v),
+                children:
+                  soc.plans.length > 1
+                    ? soc.plans.map((pl) => ({ key: `plan-${pl.key}`, label: phaseLabel(pl, soc.name), on: vis.layers && planShown.has(pl.key), onChange: (v: boolean) => setPlanOn(pl.key, v) }))
+                    : labelLayers
+                        .filter((l) => l.name.startsWith(`${soc.plans[0]!.name} — plan labels: `))
+                        .map((l) => ({ key: l.id, label: `Labels: ${l.name.split(" — plan labels: ")[1]}`, on: labelsOn.has(l.id), onChange: (v: boolean) => setLabelOn(l.id, v) })),
+              };
+            }),
+            note: "Georeferenced master plans (about 10–20 m accuracy) — plans change, so what is built may differ. Plan text: Layers tab.",
+          })),
           {
             key: "gis",
             title: "GIS layers",
