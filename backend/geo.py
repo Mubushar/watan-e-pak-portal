@@ -26,7 +26,7 @@ import threading
 import time
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import httpx
 
@@ -530,8 +530,17 @@ def geocode_online(text: str) -> Optional[Dict[str, Any]]:
     return hit
 
 
+# The portal map's own layers (master plans, GIS layers, societies, mega projects) — set by the
+# server (mapfind.find); they win over OpenStreetMap names when they match well.
+LAYER_LOOKUP: Optional[Callable[[str], Optional[Dict[str, Any]]]] = None
+
+
 def locate(text: str) -> Optional[Dict[str, Any]]:
     """Where a named place or area is: {name, lat, lon, shape, kind}."""
+    if LAYER_LOOKUP is not None:
+        hit = LAYER_LOOKUP(text)
+        if hit:
+            return hit
     place = find_place(text)
     areas = find_areas(text)
     # "Johar Town" is the area, not "Lahore Grammar School Johar Town"; a facility word

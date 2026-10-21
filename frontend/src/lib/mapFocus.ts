@@ -10,6 +10,8 @@ export interface MapFocus {
   zoom: number;
   /** Also switch on the master plan(s) covering the spot. */
   masterPlan?: boolean;
+  /** A whole area (a society's master plan …) [south, west, north, east]: fit it instead of `zoom`. */
+  bounds?: [number, number, number, number];
 }
 
 const EVENT = "arzepak:map-focus";

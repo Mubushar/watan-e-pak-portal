@@ -67,6 +67,7 @@ import memory as user_memory
 import storage
 import masterplan
 import gis
+import mapfind
 import intelligence
 import leasing
 import maintenance
@@ -75,6 +76,9 @@ import messaging
 import pmo
 import tools
 import transactions
+
+# Place lookups find the portal map's own layers (master plans, GIS layers, societies …) first.
+geo.LAYER_LOOKUP = mapfind.find
 
 # ============================================================
 # SERVER
@@ -1336,6 +1340,9 @@ def map_view(listing_id: Optional[str] = None, place: Optional[str] = None, kind
         if not loc:
             return dump({"error": f"Couldn't find '{place}' on the map."})
         focus = {"type": "place", "name": loc["name"], "latitude": round(loc["lat"], 6), "longitude": round(loc["lon"], 6)}
+        if loc.get("bounds"):  # a layer on the portal map (a master plan, a society …): its extent
+            focus["bounds"] = [round(x, 6) for x in loc["bounds"]]
+            focus["kind"] = loc.get("kind")
     else:
         return dump({"error": "Give a listing_id or a place."})
     lat, lon = focus["latitude"], focus["longitude"]

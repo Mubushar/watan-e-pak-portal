@@ -34,7 +34,7 @@ type ToolDef = { type: "function"; function: { name: string; description: string
 let toolDefs: Promise<ToolDef[]> | null = null;
 function chatTools(): Promise<ToolDef[]> {
   toolDefs ??= get<{ tools: ToolDef[] }>("/ai/tools", undefined, { noFallback: true })
-    .then((r) => [...r.tools, FOCUS_MAP, READ_MAP, ROUTE_ON_MAP, OFFER_CHOICES, MAKE_DOCUMENT, SHARE_LOCATION, MEASURE])
+    .then((r) => [...r.tools, FOCUS_MAP, READ_MAP, MAP_LAYERS, ROUTE_ON_MAP, OFFER_CHOICES, MAKE_DOCUMENT, SHARE_LOCATION, MEASURE])
     .catch((e) => {
       toolDefs = null;
       throw e;
@@ -81,6 +81,54 @@ const READ_MAP: ToolDef = {
     parameters: { type: "object", properties: {}, additionalProperties: false },
   },
 };
+
+/** Web-only tool: everything the portal's map has (not only what is on screen). */
+const MAP_LAYERS: ToolDef = {
+  type: "function",
+  function: {
+    name: "map_layers",
+    description:
+      "Search / list every layer the portal's map has — master plans of DHA, Bahria Town, housing societies and Islamabad CDA " +
+      "sectors (by city), uploaded GIS layers and their named features, housing societies and mega projects — with where each " +
+      "is (centre, extent) and plan accuracy. Use it for 'which societies / sectors / plans do you have', 'is X on the map', " +
+      "'what layers are there in Rawalpindi', to find the exact name of a society before focus_map, and before ever saying " +
+      "something isn't on the map. q: a name or part of one; city; kind (master plan | mega project | housing society | GIS); " +
+      "or near_latitude / near_longitude for what is around a point.",
+    parameters: {
+      type: "object",
+      properties: {
+        q: { type: "string" },
+        city: { type: "string" },
+        kind: { type: "string" },
+        near_latitude: { type: "number" },
+        near_longitude: { type: "number" },
+        limit: { type: "number", description: "Default 25" },
+      },
+      additionalProperties: false,
+    },
+  },
+};
+
+/** What the map holds, in one line for the system prompt (fetched once). */
+let layerSummary: Promise<string> | null = null;
+function mapLayerSummary(): Promise<string> {
+  layerSummary ??= get<{ total_on_map: number; counts: Record<string, number>; master_plans_by_group_and_city: Record<string, Record<string, number>> }>("/map/layers", { limit: 1 })
+    .then((r) => {
+      const plans = Object.entries(r.master_plans_by_group_and_city)
+        .map(([g, byCity]) => `${g} (${Object.entries(byCity).map(([c, n]) => `${c} ${n}`).join(", ")})`)
+        .join("; ");
+      const other = Object.entries(r.counts)
+        .filter(([k]) => k !== "master plan")
+        .map(([k, n]) => `${n} ${k}${n === 1 ? "" : "s"}`)
+        .join(", ");
+      return `THE PORTAL MAP HAS ${r.total_on_map} named layers: master plans — ${plans}; plus ${other}. Find any of them with map_layers (by name, city or near a point); focus_map and every place lookup find them by name too.`;
+    })
+    .catch(() => {
+      layerSummary = null;
+      return "";
+    });
+  return layerSummary;
+}
 
 /** Web-only tool: a route on the portal's map, starting from what the user means by "here". */
 const ROUTE_ON_MAP: ToolDef = {
@@ -296,7 +344,7 @@ export interface ChatLink {
   primary?: boolean;
 }
 export interface MapCard {
-  focus: { name: string; latitude: number; longitude: number };
+  focus: { name: string; latitude: number; longitude: number; bounds?: [number, number, number, number]; kind?: string };
   markers: { name: string; kind: string; latitude: number; longitude: number; distance_km?: number }[];
 }
 /** A knowledge-base hit the reply can cite as [n] (POST /ai/knowledge/search, /ai/context). */
@@ -466,7 +514,7 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<{ o
   }
   if (name === "focus_map") {
     const place = str(args, "place");
-    let spot: { name: string; latitude: number; longitude: number } | null = null;
+    let spot: { name: string; latitude: number; longitude: number; bounds?: [number, number, number, number]; kind?: string } | null = null;
     const lookup = async (q: { listing_id?: string; place?: string }) =>
       (await get<MapCard>("/places/map", { ...q, per_kind: 1, radius_km: 0.5 }).catch(() => null))?.focus ?? null;
     const coords = place ? parseCoords(place) : null;
@@ -487,15 +535,32 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<{ o
         if (hit) spot = { name: `${hit.text}, ${hit.plan}`, latitude: hit.latitude, longitude: hit.longitude };
       }
     }
-    if (!spot) return { output: { ok: false, error: `Couldn't find "${place ?? args.listing_id}" — ask for a nearby landmark or the society name.` }, effect: {} };
-    const zoom = Math.max(5, Math.min(19, numArg(args, "zoom") ?? 15));
+    if (!spot) {
+      // Not a place name: what on the map is called like it (for the model to offer as choices).
+      const near = await get<{ results: { name: string; kind: string; city?: string }[] }>("/map/layers", { q: place ?? "", limit: 5 }).catch(() => null);
+      return {
+        output: {
+          ok: false,
+          error: `Couldn't find "${place ?? args.listing_id}".`,
+          similar_layers_on_the_map: near?.results?.map((r) => `${r.name} (${r.kind}${r.city ? `, ${r.city}` : ""})`) ?? [],
+          what_to_do: "If one of the similar layers fits, offer them with offer_choices; otherwise ask for a nearby landmark or the society name.",
+        },
+        effect: {},
+      };
+    }
+    const asked = numArg(args, "zoom");
+    const zoom = Math.max(5, Math.min(19, asked ?? 15));
+    // A whole society / sector / project: fit it, unless a closer (street) zoom was asked for.
+    const fit = spot.bounds && (asked === undefined || asked <= 15) ? spot.bounds : undefined;
     const wasOnMap = onMapPage();
-    focusMap({ ...spot, zoom, masterPlan: args.master_plan !== false });
+    focusMap({ name: spot.name, latitude: spot.latitude, longitude: spot.longitude, zoom, masterPlan: args.master_plan !== false, bounds: fit });
     return {
       output: {
         ok: true,
         moved_main_map: true,
         location: spot.name,
+        ...(spot.kind ? { what_it_is: spot.kind } : {}),
+        ...(fit ? { showing: "the whole of it" } : {}),
         coordinates: [Number(spot.latitude.toFixed(5)), Number(spot.longitude.toFixed(5))],
         zoom,
         shown_on_screen: wasOnMap ? "The main map has flown there and the spot is marked." : "The Map page is opening, centred there with the spot marked.",
@@ -694,6 +759,17 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<{ o
     if (!useAuth.getState().token) return { output: { ok: false, reason: "The user is not signed in, so nothing can be remembered." }, effect: {} };
     const r = await post<{ remembered?: boolean; error?: string }>("/me/memory", { text: str(args, "note") ?? "" });
     return { output: r, effect: {} };
+  }
+  if (name === "map_layers") {
+    const r = await get<Record<string, unknown>>("/map/layers", {
+      q: str(args, "q"),
+      city: str(args, "city"),
+      kind: str(args, "kind"),
+      lat: numArg(args, "near_latitude"),
+      lon: numArg(args, "near_longitude"),
+      limit: Math.max(1, Math.min(60, numArg(args, "limit") ?? 25)),
+    });
+    return { output: { ...r, how_to_answer: "Name the layers with their city; to show one call focus_map with its exact name. Don't list coordinates unless asked." }, effect: {} };
   }
   if (name === "make_document") return makeDocument(args);
   if (name === "share_location") {
@@ -921,6 +997,7 @@ function systemPrompt(): string {
 const WEB_ONLY = [
   "You are on the web portal, which has a full Map page with many GIS layers (DHA, Bahria Town and housing-society master plans, places, roads, listings, mega projects, uploaded layers).",
   "To zoom / go / fly the map somewhere, or show a place, block, sector or listing 'on the map' / 'on the front-end map': focus_map (it moves the main map, opening the Map page if needed, and switches on the master plan there). show_map only puts a small map in the chat. Never say the main map moved unless focus_map returned ok.",
+  "Never tell the user a society, sector, phase or project isn't on the map before checking map_layers; if a name doesn't match, call map_layers with part of it and offer the closest names as choices.",
   "Any question about what is on the map, in this area / the current view / visible ('how many parks here', 'what is this', 'which roads / layers', 'is there a mosque nearby'): call read_map first and answer from it — never say you can't see the map. After focus_map, call read_map if the user also asked what is there.",
   "When a request is ambiguous, don't guess: call offer_choices (or use a tool's ask_user / choices) with 2–4 concrete options and follow what the user picks. The user's choice wins; if it can't work (no location permission, a place that doesn't exist, a listing that isn't on the map), say why politely and offer the closest choice that does.",
   "SCREEN CONTEXT tells you what the user has selected (a listing pin, a place, a search pin, the route finder, the item being edited) and the active tool: 'this / selected / here / the listing' mean those. Routes / directions / 'how far by road': route_on_map — with from='auto' unless the user names the start ('my current location' = my_location). If it returns ask_user, ask exactly that and wait.",
@@ -990,8 +1067,8 @@ export async function agentReply(history: ChatTurn[], model: string): Promise<Ag
     const fc = a.kind === "geodata" ? attachmentShape(a) : null;
     if (fc && a.kind === "geodata") showShapeOnMap({ id: `chat-file-${a.name}`, name: a.name, geojson: fc, fit: true });
   }
-  const [tools, ctx] = await Promise.all([chatTools(), aiContext(question)]);
-  const messages: ChatMessage[] = [{ role: "system", content: (ctx?.system_prompt || systemPrompt()) + `\n${WEB_ONLY}\n${screenContext()}` }, ...modelTurns(history)];
+  const [tools, ctx, layersLine] = await Promise.all([chatTools(), aiContext(question), mapLayerSummary()]);
+  const messages: ChatMessage[] = [{ role: "system", content: (ctx?.system_prompt || systemPrompt()) + `\n${WEB_ONLY}\n${layersLine}\n${screenContext()}` }, ...modelTurns(history)];
   let effect: AgentEffect = { sources: ctx?.knowledge?.results };
   const finish = (content: string): AgentReply => {
     if (useAuth.getState().token) void post("/ai/turn", { content, conversation_id: conversationId }).catch(() => undefined);

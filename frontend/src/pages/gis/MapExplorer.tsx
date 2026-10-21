@@ -654,12 +654,20 @@ export default function MapExplorer() {
         setPlanShown((s) => new Set([...s, ...inside.map((pl) => pl.key)]));
       }
     }
-    map.flyTo([f.latitude, f.longitude], f.zoom, { duration: 1.1 });
+    // A whole society / sector: fit its extent (the side panel and tools take the left and right edges).
+    let at: [number, number] = [f.latitude, f.longitude];
+    let z = f.zoom;
+    if (f.bounds) {
+      const b = L.latLngBounds([f.bounds[0], f.bounds[1]], [f.bounds[2], f.bounds[3]]);
+      z = Math.min(17, map.getBoundsZoom(b, false, L.point(window.innerWidth >= 768 ? 520 : 40, 120)));
+      at = [b.getCenter().lat, b.getCenter().lng];
+    }
+    map.flyTo(at, z, { duration: 1.1 });
     // Where animation frames don't run (a background tab, a busy device) the fly-to never arrives: jump.
     setTimeout(() => {
-      if (map.getZoom() !== f.zoom || map.getCenter().distanceTo([f.latitude, f.longitude]) > 30) {
+      if (map.getZoom() !== z || map.getCenter().distanceTo(at) > 30) {
         map.stop();
-        map.setView([f.latitude, f.longitude], f.zoom, { animate: false });
+        map.setView(at, z, { animate: false });
       }
     }, 1600);
     if (window.innerWidth < 768) setOpen(false);

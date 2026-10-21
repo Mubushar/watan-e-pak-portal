@@ -47,6 +47,7 @@ import gis
 import gis_import
 import masterplan
 import mapread
+import mapfind
 import cadastre
 import web_lookup
 import ai_guard
@@ -636,6 +637,16 @@ def cadastre_update(parcel_id: str, payload: Dict[str, Any] = Body(...)) -> Any:
 @app.delete("/cadastre/parcels/{parcel_id}", tags=["cadastre"])
 def cadastre_delete(parcel_id: str) -> Any:
     return _cad(cadastre.delete(parcel_id))
+
+
+@app.get("/map/layers", tags=["places"])
+def map_layers(q: Optional[str] = None, city: Optional[str] = None, kind: Optional[str] = None,
+               lat: Optional[float] = None, lon: Optional[float] = None, limit: int = 60) -> Any:
+    """Every layer on the portal's map — master plans (DHA, Bahria Town, housing societies, CDA sectors),
+    uploaded GIS layers and their named features, housing societies and mega projects — with counts
+    by kind / group / city. Filter by a name ``q``, ``city`` or ``kind``, or sort by distance from
+    ``lat, lon``."""
+    return mapfind.catalogue(q=q, city=city, kind=kind, lat=lat, lon=lon, limit=limit)
 
 
 @app.get("/map/read", tags=["places"])

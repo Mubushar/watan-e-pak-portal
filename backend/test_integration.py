@@ -1757,6 +1757,7 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         run_ai_guard_checks()
         run_extract_checks(client)
         run_chat_image_checks(client)
+        run_mapfind_checks(client)
 
         # --- MCP share the same auth store as REST ---
         r = client.post("/auth/login", json={"identifier": "mcp@portal.test", "password": "Secret@123"})
@@ -2963,7 +2964,7 @@ def run_geo_checks(client: TestClient) -> None:
     r = client.get("/places/find", params={"kind": "high school", "area": "DHA 2 Islamabad"})
     j = r.json()
     check("GET /places/find (high schools in DHA 2)", r.status_code == 200
-          and any("DHA Phase 2" in a for a in j.get("matched_areas", []))
+          and any("dha phase 2" in geo.normalize(a) for a in j.get("matched_areas", []))  # OSM area or the master plan
           and all("high" in p["name"].lower() for p in j.get("places", [])), str(j)[:300])
     r = client.get("/places/find", params={"kind": "hospital", "near": "Rawalpindi Medical University", "radius_km": 3})
     j = r.json()
@@ -3183,6 +3184,36 @@ def _office_zip(files: Dict[str, str]) -> bytes:
         for name, xml in files.items():
             zf.writestr(name, xml)
     return buf.getvalue()
+
+
+def run_mapfind_checks(client: TestClient) -> None:
+    """The map's own layers win place lookups (GET /map/layers, /places/map): "Park View" is the
+    Park View City master plan, a plan part is found on the plan, and real places stay places."""
+    import geo
+    import mapfind
+    import masterplan
+
+    r = client.get("/map/layers", params={"limit": 1})
+    body = r.json()
+    check("GET /map/layers (counts every layer)", r.status_code == 200 and body["total_on_map"] >= body["counts"].get("mega project", 0)
+          and "results" in body, r.text[:200])
+    # Hand-made layers decide matching without depending on which plans are built locally.
+    check("map lookup: generic words alone don't match", mapfind._score(["phase", "7"], "Bahria Town Phase 7") == 0)
+    check("map lookup: a missing name word rejects ('Lake View Park' isn't 'Park View')", mapfind._score(["lake", "view", "park"], "park view") == 0)
+    check("map lookup: a short name matches its alias", mapfind._score(["park", "view"], "park view") >= 1.9)
+    check("map lookup: the phase number must agree", mapfind._score(["bahria", "phase", "8"], "Bahria Town Phase 7") == 0)
+    check("map lookup: a plan part rides along ('sector f')", mapfind._score(["dha", "phase", "2", "sector", "f"], "DHA Phase II") > 1.25)
+    check("map lookup: names without aliases must match whole", mapfind._score(["giga", "mall"], "Giga Mall Extension", whole=True) == 0)
+    meta = masterplan.store().meta
+    if "pvc" not in meta:
+        print("  [SKIP] map lookup by plan name (Park View City plan not built here)")
+        return
+    hit = geo.locate("park view")
+    check("map lookup: 'park view' -> the Park View City master plan", bool(hit) and hit["name"] == meta["pvc"]["name"] and hit.get("bounds"), hit)
+    r = client.get("/places/map", params={"place": "Park View City Islamabad", "per_kind": 1, "radius_km": 0.5})
+    check("GET /places/map (a plan name -> its centre and extent)", r.status_code == 200 and r.json()["focus"].get("bounds"), r.text[:200])
+    r = client.get("/map/layers", params={"q": "park view"})
+    check("GET /map/layers?q= (finds the plan)", r.status_code == 200 and any(x["name"] == meta["pvc"]["name"] for x in r.json()["results"]), r.text[:200])
 
 
 def run_extract_checks(client: TestClient) -> None:
