@@ -68,11 +68,14 @@ export const PLAN_GROUPS: { key: string; title: string }[] = [
   { key: "dha", title: "DHA master plans" },
   { key: "bahria", title: "Bahria Town master plans" },
   { key: "societies", title: "Housing society master plans" },
+  { key: "cda", title: "Islamabad sectors (CDA)" },
 ];
 export const planGroup = (p: MasterPlan) => p.group ?? "dha";
 /** The society a plan belongs to (its phases / sections / sheets are grouped under it). */
 const FAMILIES: [RegExp, string][] = [
   [/^DHA /, "DHA"],
+  [/^(Sector [A-I]-\d+|[A-I]-\d+\b)/, "CDA sectors"],
+  [/^Islamabad (zon|master plan)/i, "Islamabad zoning"],
   [/^Bahria Town Lahore/, "Bahria Town Lahore"],
   [/^Bahria Town Karachi/, "Bahria Town Karachi"],
   [/^Bahria Nasheman/, "Bahria Nasheman"],

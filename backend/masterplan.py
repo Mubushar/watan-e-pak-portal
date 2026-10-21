@@ -129,7 +129,8 @@ def _inside(meta: Dict[str, Any], lat: float, lon: float) -> bool:
 
 
 # Plan groups shown as separate sections on the map (each plan's "group" in plans.json).
-GROUPS = {"dha": "DHA master plans", "bahria": "Bahria Town master plans", "societies": "Housing society master plans"}
+GROUPS = {"dha": "DHA master plans", "bahria": "Bahria Town master plans", "societies": "Housing society master plans",
+          "cda": "Islamabad sectors (CDA)"}
 
 
 def credit(meta: Optional[Dict[str, Any]]) -> str:

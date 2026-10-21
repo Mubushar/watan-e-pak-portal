@@ -14730,7 +14730,8 @@ def my_memory_forget(memory_id: Optional[str] = None) -> str:
     return dump(user_memory.forget(uid, memory_id))
 
 
-MASTER_PLAN_DEVELOPERS = {"dha": "Defence Housing Authority (DHA) Islamabad-Rawalpindi", "bahria": "Bahria Town (Pvt) Ltd"}
+MASTER_PLAN_DEVELOPERS = {"dha": "Defence Housing Authority (DHA) Islamabad-Rawalpindi", "bahria": "Bahria Town (Pvt) Ltd",
+                          "cda": "Capital Development Authority (CDA)"}
 
 
 def _seed_master_plans(only_missing: bool = False) -> int:
