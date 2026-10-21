@@ -82,6 +82,12 @@ export interface MapSelection {
   parcel?: Spot & { parcel_no?: string };
   /** Where the assistant last flew the map. */
   assistant_pin?: Spot;
+  /** Pins the user dropped (right-click → Drop a pin). */
+  user_pins?: Spot[];
+  /** The distance / area measured with the Measure tool. */
+  measurement?: { mode: "distance" | "area"; value: string; points: number; centre: [number, number] };
+  /** Shapes shown from the chat (attached map files, measurements). */
+  shown_shapes?: string[];
   /** The tool switched on, in words (e.g. "route finder: picking the start point"). */
   active_tool?: string | null;
 }
@@ -112,6 +118,36 @@ export function onMapRoute(fn: (r: RouteRequest) => void): () => void {
   window.addEventListener(ROUTE_EVENT, h);
   return () => window.removeEventListener(ROUTE_EVENT, h);
 }
+/** Where the mouse is (or last was) over the map — "the coordinates under my mouse". */
+let pointer: (Spot & { at: number }) | null = null;
+export function setPointer(lat: number, lon: number): void {
+  pointer = { label: "Mouse position", lat: Number(lat.toFixed(6)), lon: Number(lon.toFixed(6)), at: Date.now() };
+}
+export const getPointer = () => pointer;
+
+/** What a picture of the map needs: its tile layers and what is drawn on it (for reports). */
+export interface MapRender {
+  base: { url: string; attribution: string };
+  /** Master plans drawn now (tile URL, bounds, native zooms) and their opacity. */
+  plans: { url: string; bounds: [number, number, number, number]; zoom: [number, number] }[];
+  planOpacity: number;
+  route?: {
+    from: Spot;
+    to: Spot;
+    mode: string;
+    best: { label: string; distance_text: string; duration_text: string; via: string[]; geometry: [number, number][]; steps: { instruction: string; road: string | null; distance_text: string }[] };
+    alternatives: { label: string; distance_text: string; duration_text: string; geometry: [number, number][] }[];
+    attribution: string;
+  };
+  measure?: { mode: "distance" | "area"; coords: [number, number][]; value: string };
+  pins: Spot[];
+}
+let readRender: (() => MapRender) | null = null;
+export function registerMapRender(fn: (() => MapRender) | null): void {
+  readRender = fn;
+}
+export const getMapRender = (): MapRender | null => (onMapPage() && readRender ? readRender() : null);
+
 let readView: (() => MapViewState) | null = null;
 /** The Map page registers how to read its view (null when it closes). */
 export function registerMapView(fn: (() => MapViewState) | null): void {

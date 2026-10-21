@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Building2, LocateFixed, MapPin, Milestone, PencilLine, Plus, Spline, Square } from "lucide-react";
 import type { EditMode, EditRights } from "./GeoEditor";
-import { Check, ChevronDown, Circle, Globe, Hand, Undo2, Hexagon, Languages, Layers, Layers3, PencilRuler, RectangleHorizontal, Search, X, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, Circle, Globe, Hand, Undo2, Hexagon, Languages, Layers, Layers3, PencilRuler, RectangleHorizontal, Ruler, Search, Spline as SplineIcon, X, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
 import type { DrawMode } from "./AreaDraw";
 import type { MapLang } from "./PakistanLayers";
 import { BASE_MAPS, type BaseMapKey } from "@/components/map/PortalMap";
@@ -239,9 +239,14 @@ export function MapControls({
   onLang,
   drawMode,
   onDraw,
+  measureMode,
+  onMeasure,
 }: {
   drawMode?: DrawMode | null;
   onDraw?: (m: DrawMode | null) => void;
+  /** Measure tool: a distance or an area, or off. */
+  measureMode?: "distance" | "area" | null;
+  onMeasure?: (m: "distance" | "area" | null) => void;
   lang: MapLang;
   onLang: (l: MapLang) => void;
   groups: LayerGroup[];
@@ -259,7 +264,7 @@ export function MapControls({
   /** Switch every tool off: back to dragging the map. */
   onPan: () => void;
 }) {
-  const [open, setOpen] = useState<"base" | "layers" | "lang" | "draw" | null>(null);
+  const [open, setOpen] = useState<"base" | "layers" | "lang" | "draw" | "measure" | null>(null);
   const [filter, setFilter] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(readCollapsed);
   const ref = useRef<HTMLDivElement>(null);
@@ -333,7 +338,48 @@ export function MapControls({
             active={!!drawMode || open === "draw"}
             onClick={other(() => (drawMode ? onDraw(null) : setOpen(open === "draw" ? null : "draw")))}
           />
+          {onMeasure && (
+            <Btn
+              icon={Ruler}
+              text="Measure"
+              title={measureMode ? "Stop measuring" : "Measure a distance or an area on the map"}
+              active={!!measureMode || open === "measure"}
+              onClick={other(() => (measureMode ? onMeasure(null) : setOpen(open === "measure" ? null : "measure")))}
+            />
+          )}
         </ToolGroup>
+      )}
+
+      {open === "measure" && onMeasure && (
+        <Popover title="Measure" onClose={() => setOpen(null)} wide>
+          <div className="p-2">
+            {(
+              [
+                ["distance", SplineIcon, "Distance", "Click points along the way; double-click or Enter to finish"],
+                ["area", Hexagon, "Area", "Click each corner; double-click or Enter to finish — in m², marla, kanal, acres"],
+              ] as ["distance" | "area", LucideIcon, string, string][]
+            ).map(([k, Icon, l, hint]) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => {
+                  onMeasure(k);
+                  setOpen(null);
+                }}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-start hover:bg-brand-50 dark:hover:bg-white/10"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-700 dark:text-amber-300">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold">{l}</span>
+                  <span className="block text-[11px] text-ink-mute">{hint}</span>
+                </span>
+              </button>
+            ))}
+            <p className="px-3 pt-1 text-[10px] text-ink-mute">The result can go to the AI assistant, or be saved as a PDF or a picture.</p>
+          </div>
+        </Popover>
       )}
 
       {open === "draw" && onDraw && (

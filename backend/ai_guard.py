@@ -11,6 +11,7 @@ Settings (environment variables, or ``backend/.env``)::
     AI_CHAT_PER_MINUTE=30        # chat completions (typed messages, voice notes)
     AI_VOICE_PER_MINUTE=30       # speech-to-text + text-to-speech calls
     AI_LIVE_PER_HOUR=6           # live voice-agent sessions started (the most expensive call)
+    AI_EXTRACT_PER_MINUTE=20     # documents read for the chat (/ai/extract — server CPU, no credit)
     AI_TRUST_PROXY=0             # 1 = behind a reverse proxy: identify guests by X-Forwarded-For
 """
 
@@ -31,6 +32,7 @@ LIMITS: Dict[str, Tuple[int, int]] = {
     "chat": (int(os.getenv("AI_CHAT_PER_MINUTE", "30")), 60),
     "voice": (int(os.getenv("AI_VOICE_PER_MINUTE", "30")), 60),
     "live": (int(os.getenv("AI_LIVE_PER_HOUR", "6")), 3600),
+    "extract": (int(os.getenv("AI_EXTRACT_PER_MINUTE", "20")), 60),
 }
 
 

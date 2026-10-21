@@ -50,6 +50,7 @@ import mapread
 import cadastre
 import web_lookup
 import ai_guard
+import doc_extract
 import directions as routing
 import locations
 import megaprojects
@@ -1289,6 +1290,35 @@ async def ai_web_lookup(payload: WebLookupRequest, request: Request) -> Any:
     try:
         return await asyncio.to_thread(web_lookup.lookup, payload.question)
     except (web_lookup.WebLookupError, openai_voice.VoiceError) as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc))
+
+
+class ExtractRequest(BaseModel):
+    name: str = Field(default="document", max_length=300)
+    # base64 data URL ("data:application/pdf;base64,...") or bare base64; size checked by hand -> 413
+    data_url: str
+
+
+@app.post("/ai/extract", tags=["ai"])
+async def ai_extract(payload: ExtractRequest, request: Request) -> Any:
+    """Text out of a document attached in the assistant chat, for the app to add to the conversation.
+
+    Reads PDF (``--- page N ---`` per page; scanned PDFs come back with a ``note``), Word
+    (.docx), Excel (.xlsx, first sheets, rows tab-separated) and text files (.txt .csv .tsv .md
+    .json .geojson .kml .gpx .xml). 15 MB max. Images are not read here: the chat sends them to
+    the model directly. Open to guests, rate-limited per caller (``AI_EXTRACT_PER_MINUTE``).
+
+    Returns ``{"name", "kind": "pdf|docx|xlsx|text", "pages", "chars", "text", "truncated", "note"}``
+    — ``text`` is the first 24 000 characters, ``chars`` the full length.
+    """
+    if len(payload.data_url) > doc_extract.max_b64_chars():
+        raise HTTPException(status_code=413, detail=doc_extract.too_big_message())
+    ai_guard.check(request, "extract")
+    name = payload.name.strip() or "document"
+    try:
+        data, mime = doc_extract.decode_data_url(payload.data_url)
+        return await asyncio.to_thread(doc_extract.extract, name, data, mime)
+    except doc_extract.ExtractError as exc:
         raise HTTPException(status_code=exc.status, detail=str(exc))
 
 

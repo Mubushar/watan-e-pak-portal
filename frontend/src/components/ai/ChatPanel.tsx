@@ -12,9 +12,12 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bot, Calculator, Map as MapIcon, Send, Sparkles, User as UserIcon, Wand2 } from "lucide-react";
+import { Bot, Calculator, Check, Copy, Download, ExternalLink, FileText, Loader2, Map as MapIcon, MapPin, Paperclip, Ruler, Send, Shapes, Sparkles, User as UserIcon, Wand2, X } from "lucide-react";
 import type { Property } from "@/types";
-import { agentReply, capabilities, type AgentEffect, type KnowledgeSource } from "@/lib/agent";
+import { agentReply, attachmentText, capabilities, type AgentEffect, type KnowledgeSource } from "@/lib/agent";
+import { ACCEPT, attachmentShape, downloadUrl, onShare, readAttachment, showShapeOnMap, takePendingShares, type ChatAttachment, type ChatFile, type LocationCard } from "@/lib/chatShare";
+import { fmtLatLon, googleMapsUrl, toDms } from "@/lib/geoMeasure";
+import { focusMap, onMapPage } from "@/lib/mapFocus";
 import { toast } from "sonner";
 import { ApiError, get, post } from "@/lib/api";
 import { pkrShort, titleCase } from "@/lib/format";
@@ -42,6 +45,130 @@ interface Msg extends AgentEffect {
   content: string;
   hits?: RagHit[];
   pending?: boolean;
+  /** What the user attached / shared from the map with this message. */
+  attachments?: ChatAttachment[];
+}
+
+const kb = (n: number) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+const attLabel = (a: ChatAttachment) =>
+  a.kind === "image" || a.kind === "document" || a.kind === "geodata" ? a.name : a.kind === "pin" ? `${a.label} · ${fmtLatLon(a.lat, a.lon, 5)}` : `${a.label} · ${a.value_text}`;
+const AttIcon = ({ a, className }: { a: ChatAttachment; className?: string }) => {
+  const I = a.kind === "document" ? FileText : a.kind === "geodata" ? Shapes : a.kind === "pin" ? MapPin : a.kind === "measure" ? Ruler : Paperclip;
+  return <I className={className} />;
+};
+
+/** Show a shared shape / point on the portal's map (opening the Map page when needed). */
+function useShowOnMap() {
+  const nav = useNavigate();
+  return (a: ChatAttachment | LocationCard) => {
+    if ("kind" in a) {
+      const fc = attachmentShape(a);
+      if (fc) showShapeOnMap({ id: `chat-${a.kind}-${attLabel(a)}`, name: attLabel(a), geojson: fc, fit: true });
+    } else focusMap({ name: a.label, latitude: a.lat, longitude: a.lon, zoom: 17, masterPlan: true });
+    if (!onMapPage()) nav("/map");
+  };
+}
+
+/** What the user sent with a message (in their bubble). */
+function SentAttachments({ items }: { items: ChatAttachment[] }) {
+  const show = useShowOnMap();
+  const pics = items.filter((a): a is Extract<ChatAttachment, { kind: "image" }> => a.kind === "image");
+  const rest = items.filter((a) => a.kind !== "image");
+  return (
+    <div className="mt-1.5 space-y-1.5">
+      {pics.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {pics.map((p, i) => (
+            <a key={i} href={p.dataUrl} target="_blank" rel="noreferrer" title={p.name}>
+              <img src={p.dataUrl} alt={p.name} className="h-20 w-20 rounded-lg object-cover ring-1 ring-white/30" />
+            </a>
+          ))}
+        </div>
+      )}
+      {rest.map((a, i) => (
+        <div key={i} className="flex items-center gap-1.5 rounded-lg bg-white/15 px-2 py-1 text-[12px]">
+          <AttIcon a={a} className="h-3.5 w-3.5 shrink-0" />
+          <span className="min-w-0 flex-1 truncate">
+            {attLabel(a)}
+            {a.kind === "document" && a.pages ? ` · ${a.pages} pages` : ""}
+          </span>
+          {(a.kind === "geodata" || a.kind === "pin" || a.kind === "measure") && (
+            <button type="button" onClick={() => show(a)} className="shrink-0 font-semibold underline-offset-2 hover:underline">
+              Show on map
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Files the assistant made: open / download (pictures are shown). */
+function FileCards({ files }: { files: ChatFile[] }) {
+  return (
+    <div className="mt-2 space-y-1.5">
+      {files.map((f) => (
+        <div key={f.url} className="overflow-hidden rounded-xl bg-white ring-1 ring-black/5 dark:bg-black/20 dark:ring-white/10">
+          {f.kind === "image" && (
+            <a href={f.url} target="_blank" rel="noreferrer">
+              <img src={f.url} alt={f.caption ?? f.name} className="max-h-56 w-full object-cover" />
+            </a>
+          )}
+          <div className="flex items-center gap-2 p-2">
+            <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold", f.kind === "pdf" ? "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300" : "bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300")}>
+              {f.kind === "pdf" ? "PDF" : "PNG"}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[13px] font-semibold">{f.name}</span>
+              <span className="block text-[11px] text-ink-mute">{kb(f.size)}</span>
+            </span>
+            <a href={f.url} target="_blank" rel="noreferrer" className="btn btn-ghost btn-icon h-8 w-8" aria-label={`Open ${f.name}`} title="Open">
+              <ExternalLink className="h-4 w-4" />
+            </a>
+            <button type="button" onClick={() => downloadUrl(f.url, f.name)} className="btn btn-primary btn-icon h-8 w-8" aria-label={`Download ${f.name}`} title="Download">
+              <Download className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** A shared location: coordinates, copy, Google Maps, show on the portal map. */
+function LocationCardView({ loc }: { loc: LocationCard }) {
+  const show = useShowOnMap();
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="mt-2 rounded-xl bg-white p-2.5 text-[12px] ring-1 ring-black/5 dark:bg-black/20 dark:ring-white/10">
+      <div className="flex items-start gap-2">
+        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-semibold">{loc.label}</p>
+          <p className="font-mono text-ink-mute">{fmtLatLon(loc.lat, loc.lon)}</p>
+          <p className="font-mono text-ink-mute">{toDms(loc.lat, loc.lon)}</p>
+        </div>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        <button type="button" className="chip bg-brand-700 text-white" onClick={() => show(loc)}>
+          <MapIcon className="h-3 w-3" /> Show on map
+        </button>
+        <button
+          type="button"
+          className="chip bg-brand-50 text-brand-800 dark:bg-white/10 dark:text-brand-100"
+          onClick={() => {
+            void navigator.clipboard?.writeText(fmtLatLon(loc.lat, loc.lon));
+            setCopied(true);
+          }}
+        >
+          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />} {copied ? "Copied" : "Copy"}
+        </button>
+        <a href={googleMapsUrl(loc.lat, loc.lon)} target="_blank" rel="noopener noreferrer" className="chip bg-brand-50 text-brand-800 dark:bg-white/10 dark:text-brand-100">
+          <ExternalLink className="h-3 w-3" /> Google Maps
+        </a>
+      </div>
+    </div>
+  );
 }
 
 let aiWarned = false;
@@ -116,6 +243,40 @@ export function ChatPanel({ compact, className, initial }: { compact?: boolean; 
   const sentInitial = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const wasBusy = useRef(false);
+  // Attachments waiting to go with the next message (files, or items shared from the Map page).
+  const [atts, setAtts] = useState<ChatAttachment[]>([]);
+  const [reading, setReading] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+  async function addFiles(files: FileList | File[]) {
+    const list = [...files].slice(0, 6);
+    setReading((n) => n + list.length);
+    await Promise.all(
+      list.map(async (f) => {
+        try {
+          const a = await readAttachment(f);
+          setAtts((cur) => [...cur, a].slice(-8));
+        } catch (e) {
+          toast.error(`${f.name}: ${(e as Error).message}`);
+        } finally {
+          setReading((n) => n - 1);
+        }
+      }),
+    );
+    inputRef.current?.focus({ preventScroll: true });
+  }
+  useEffect(() => {
+    const take = () => {
+      const got = takePendingShares();
+      if (!got.length) return;
+      setAtts((cur) => [...cur, ...got.map((g) => g.item)].slice(-8));
+      const ask = got.map((g) => g.ask).find(Boolean);
+      if (ask) setInput((cur) => cur || ask);
+      setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 50);
+    };
+    take();
+    return onShare(take);
+  }, []);
 
   // The input is disabled while the assistant answers, which drops focus — and moving the map can take
   // it too. Give it back when the reply lands (and again once a fly-to has finished), so the user keeps typing.
@@ -152,15 +313,17 @@ export function ChatPanel({ compact, className, initial }: { compact?: boolean; 
 
   async function send(text: string) {
     const q = text.trim();
-    if (!q || busy) return;
+    const withAtts = text === input ? atts : [];
+    if ((!q && !withAtts.length) || busy || reading) return;
     setInput("");
+    if (withAtts.length) setAtts([]);
     setBusy(true);
-    const history = [...msgs.filter((m) => !m.pending), { role: "user" as const, content: q }];
+    const history: Msg[] = [...msgs.filter((m) => !m.pending), { role: "user", content: q, attachments: withAtts.length ? withAtts : undefined }];
     setMsgs([...history, { role: "assistant", content: "", pending: true }]);
     const { chat_mode, chat_model } = await capabilities();
     if (chat_mode === "upstream") {
       try {
-        const turns = history.filter((m) => m !== WELCOME && m.content).map((m) => ({ role: m.role, content: m.content }));
+        const turns = history.filter((m) => m !== WELCOME && (m.content || m.attachments?.length)).map((m) => ({ role: m.role, content: m.content, attachments: m.attachments }));
         const { navigate, ...reply } = await agentReply(turns, chat_model);
         setMsgs([...history, { role: "assistant", ...reply }]);
         if (navigate) nav(navigate); // focus_map: open the Map page it moved
@@ -179,10 +342,10 @@ export function ChatPanel({ compact, className, initial }: { compact?: boolean; 
         model: "portal-realestate-rag",
         messages: [
           { role: "system", content: "You are Arz-e-Pak AI, a helpful Pakistani real-estate assistant. Answer concisely; prices in PKR crore/lakh." },
-          ...history.slice(-8).map((m) => ({ role: m.role, content: m.content })),
+          ...history.slice(-8).map((m) => ({ role: m.role, content: [m.content, ...(m.attachments ?? []).map((a) => attachmentText(a, false))].filter(Boolean).join("\n\n") })),
         ],
       }),
-      get<{ results: RagHit[] }>("/rag/search", { query: q, top_k: 6 }),
+      get<{ results: RagHit[] }>("/rag/search", { query: q || withAtts.map(attLabel).join(" "), top_k: 6 }),
     ]);
     let content = chat.status === "fulfilled" ? chat.value.choices?.[0]?.message?.content ?? "" : "";
     // The local RAG fallback appends an operator note; keep replies user-facing.
@@ -196,7 +359,28 @@ export function ChatPanel({ compact, className, initial }: { compact?: boolean; 
   const lastUser = [...msgs].reverse().find((m) => m.role === "user")?.content;
 
   return (
-    <div className={cn("flex h-full min-h-0 flex-col", className)}>
+    <div
+      className={cn("relative flex h-full min-h-0 flex-col", className)}
+      onDragOver={(e) => {
+        if (![...e.dataTransfer.types].includes("Files")) return;
+        e.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false);
+      }}
+      onDrop={(e) => {
+        if (!e.dataTransfer.files.length) return;
+        e.preventDefault();
+        setDragging(false);
+        void addFiles(e.dataTransfer.files);
+      }}
+    >
+      {dragging && (
+        <div className="pointer-events-none absolute inset-2 z-10 flex items-center justify-center rounded-2xl border-2 border-dashed border-brand-500 bg-brand-50/90 text-sm font-semibold text-brand-800 dark:bg-brand-950/90 dark:text-brand-100">
+          Drop photos, PDFs, documents or KML / GeoJSON / GPX here
+        </div>
+      )}
       <div ref={scroller} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
         <AnimatePresence initial={false}>
           {msgs.map((m, i) => (
@@ -212,8 +396,11 @@ export function ChatPanel({ compact, className, initial }: { compact?: boolean; 
                     ))}
                   </span>
                 ) : (
-                  <Markdown text={m.content} />
+                  m.content && <Markdown text={m.content} />
                 )}
+                {!!m.attachments?.length && <SentAttachments items={m.attachments} />}
+                {!!m.files?.length && <FileCards files={m.files} />}
+                {m.location && <LocationCardView loc={m.location} />}
                 {!!m.listings?.length && (
                   <div className="mt-2 space-y-1 rounded-xl bg-white p-1.5 dark:bg-black/20">
                     {m.listings.slice(0, compact ? 3 : 5).map((l: Property) => (
@@ -310,6 +497,24 @@ export function ChatPanel({ compact, className, initial }: { compact?: boolean; 
           </button>
         </div>
       )}
+      {(atts.length > 0 || reading > 0) && (
+        <div className="flex flex-wrap gap-1.5 border-t border-black/5 px-3 pt-2 dark:border-white/10">
+          {atts.map((a, i) => (
+            <span key={i} className="chip max-w-full bg-brand-50 pe-1 text-brand-900 dark:bg-white/10 dark:text-brand-100">
+              {a.kind === "image" ? <img src={a.dataUrl} alt="" className="h-5 w-5 rounded object-cover" /> : <AttIcon a={a} className="h-3.5 w-3.5" />}
+              <span className="max-w-[180px] truncate">{attLabel(a)}</span>
+              <button type="button" onClick={() => setAtts((cur) => cur.filter((_, j) => j !== i))} className="rounded-full p-0.5 hover:bg-black/10" aria-label={`Remove ${attLabel(a)}`}>
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+          {reading > 0 && (
+            <span className="chip bg-brand-50 text-brand-800 dark:bg-white/10 dark:text-brand-100">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Reading {reading} file{reading > 1 ? "s" : ""}…
+            </span>
+          )}
+        </div>
+      )}
       <form
         className="flex items-center gap-2 border-t border-black/5 p-3 dark:border-white/10"
         onSubmit={(e) => {
@@ -317,8 +522,43 @@ export function ChatPanel({ compact, className, initial }: { compact?: boolean; 
           void send(input);
         }}
       >
-        <input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask about properties, prices, areas…" className="input flex-1 rounded-full" disabled={busy} />
-        <button type="submit" className="btn btn-primary btn-icon h-11 w-11 rounded-full" disabled={busy || !input.trim()} aria-label="Send">
+        <input
+          ref={fileInput}
+          type="file"
+          multiple
+          accept={ACCEPT}
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files?.length) void addFiles(e.target.files);
+            e.target.value = "";
+          }}
+        />
+        <button
+          type="button"
+          className="btn btn-ghost btn-icon h-11 w-11 shrink-0 rounded-full"
+          onClick={() => fileInput.current?.click()}
+          disabled={busy}
+          aria-label="Attach photos, documents or map files"
+          title="Attach photos, PDFs, Word / Excel / text files, or KML / GeoJSON / GPX"
+        >
+          <Paperclip className="h-4 w-4" />
+        </button>
+        <input
+          ref={inputRef}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onPaste={(e) => {
+            const files = [...e.clipboardData.files];
+            if (files.length) {
+              e.preventDefault();
+              void addFiles(files);
+            }
+          }}
+          placeholder={atts.length ? "Ask about what you attached…" : "Ask about properties, prices, areas…"}
+          className="input min-w-0 flex-1 rounded-full"
+          disabled={busy}
+        />
+        <button type="submit" className="btn btn-primary btn-icon h-11 w-11 shrink-0 rounded-full" disabled={busy || reading > 0 || (!input.trim() && !atts.length)} aria-label="Send">
           <Send className="h-4 w-4 rtl:rotate-180" />
         </button>
       </form>

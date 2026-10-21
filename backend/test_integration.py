@@ -1755,6 +1755,8 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
             r = client.post("/ai/realtime/session", json={"reply_lang": "ur"})
             check("POST /ai/realtime/session (no OpenAI key -> 501)", r.status_code == 501, str(r.status_code))
         run_ai_guard_checks()
+        run_extract_checks(client)
+        run_chat_image_checks(client)
 
         # --- MCP share the same auth store as REST ---
         r = client.post("/auth/login", json={"identifier": "mcp@portal.test", "password": "Secret@123"})
@@ -3151,6 +3153,131 @@ def run_ai_guard_checks() -> None:
     check("openai_voice: OpenAI 401 -> clear key message", bad_key.status == 502 and "OPENAI_API_KEY" in str(bad_key), str(bad_key))
     gateway = openai_voice._error(httpx.Response(503, text="<html>Service Unavailable</html>"))
     check("openai_voice: non-JSON error handled", gateway.status == 502 and "503" in str(gateway), str(gateway))
+
+
+def _tiny_pdf(page_text: str = "") -> bytes:
+    """A one-page PDF written by hand (Helvetica text stream; no text at all = a 'scan')."""
+    stream = f"BT /F1 18 Tf 72 720 Td ({page_text}) Tj ET".encode() if page_text else b"q 0 0 1 rg 72 72 200 200 re f Q"
+    objs = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream",
+    ]
+    out, offsets = b"%PDF-1.4\n", []
+    for i, obj in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n" % i + obj + b"\nendobj\n"
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1) + b"".join(b"%010d 00000 n \n" % o for o in offsets)
+    return out + b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref)
+
+
+def _office_zip(files: Dict[str, str]) -> bytes:
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("[Content_Types].xml", '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>')
+        for name, xml in files.items():
+            zf.writestr(name, xml)
+    return buf.getvalue()
+
+
+def run_extract_checks(client: TestClient) -> None:
+    """POST /ai/extract: text out of chat attachments (PDF, Word, Excel, text) and its limits."""
+    import doc_extract
+
+    def send(name: str, data: bytes, mime: str = "application/octet-stream") -> Any:
+        return client.post("/ai/extract", json={"name": name, "data_url": f"data:{mime};base64," + base64.b64encode(data).decode()})
+
+    r = send("brochure.pdf", _tiny_pdf("Arz-e-Pak plot 42 Bahria Town"), "application/pdf")
+    body = r.json()
+    check("POST /ai/extract (PDF text read back by pypdf)", r.status_code == 200 and body["kind"] == "pdf" and body["pages"] == 1
+          and "--- page 1 ---" in body["text"] and "Bahria Town" in body["text"] and body["note"] is None, r.text[:200])
+    r = send("scan.pdf", _tiny_pdf(), "application/pdf")
+    check("POST /ai/extract (scanned PDF -> no-text-layer note)", r.status_code == 200 and "no text layer" in (r.json()["note"] or ""), r.text[:200])
+
+    w = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+    docx = _office_zip({"word/document.xml": f'<?xml version="1.0"?><w:document {w}><w:body>'
+                        '<w:p><w:r><w:t>Sale agreement</w:t></w:r><w:r><w:t xml:space="preserve"> for plot 7</w:t></w:r></w:p>'
+                        '<w:tbl><w:tr><w:tc><w:p><w:r><w:t>Price</w:t></w:r></w:p></w:tc>'
+                        '<w:tc><w:p><w:r><w:t>1.5 crore</w:t></w:r></w:p></w:tc></w:tr></w:tbl>'
+                        '</w:body></w:document>'})
+    r = send("agreement.docx", docx)
+    body = r.json()
+    check("POST /ai/extract (DOCX paragraphs + table rows)", r.status_code == 200 and body["kind"] == "docx"
+          and "Sale agreement for plot 7" in body["text"] and "Price\t1.5 crore" in body["text"], r.text[:200])
+
+    s = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"'
+    xlsx = _office_zip({"xl/sharedStrings.xml": f'<sst {s}><si><t>Plot</t></si><si><t>Price</t></si><si><t>A-12</t></si></sst>',
+                        "xl/worksheets/sheet1.xml": f'<worksheet {s}><sheetData>'
+                        '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row>'
+                        '<row r="2"><c r="A2" t="s"><v>2</v></c><c r="C2"><v>9500000</v></c></row>'
+                        '</sheetData></worksheet>'})
+    r = send("prices.xlsx", xlsx)
+    body = r.json()
+    check("POST /ai/extract (XLSX shared strings + cells, tab-separated)", r.status_code == 200 and body["kind"] == "xlsx"
+          and "Plot\tPrice" in body["text"] and "A-12\t\t9500000" in body["text"], r.text[:200])
+
+    r = send("listings.csv", "city,price\nLahore,12000000\r\nکراچی,9000000\n".encode(), "text/csv")
+    body = r.json()
+    check("POST /ai/extract (CSV as text, Urdu kept)", r.status_code == 200 and body["kind"] == "text"
+          and "Lahore,12000000\nکراچی" in body["text"] and body["chars"] == len(body["text"]), r.text[:200])
+    r = client.post("/ai/extract", json={"name": "notes.txt", "data_url": base64.b64encode("plain base64 ok".encode("utf-16")).decode()})
+    check("POST /ai/extract (bare base64, UTF-16 BOM)", r.status_code == 200 and r.json()["text"] == "plain base64 ok", r.text[:200])
+    r = send("big.txt", ("word " * 6000).encode(), "text/plain")
+    body = r.json()
+    check("POST /ai/extract (long text truncated to 24 000)", r.status_code == 200 and body["truncated"] is True
+          and len(body["text"]) == doc_extract.MAX_TEXT and body["chars"] > doc_extract.MAX_TEXT, str(body.get("chars")))
+
+    r = send("setup.exe", b"MZ\x90\x00" + bytes(200))
+    check("POST /ai/extract (unsupported type -> 415)", r.status_code == 415 and "can't be read" in r.json()["detail"], r.text[:160])
+    r = send("empty.txt", b"")
+    check("POST /ai/extract (empty -> 400)", r.status_code == 400, r.text[:160])
+    r = client.post("/ai/extract", json={"name": "huge.pdf", "data_url": "data:application/pdf;base64," + "A" * (doc_extract.max_b64_chars() + 8)})
+    check("POST /ai/extract (over 15 MB -> 413)", r.status_code == 413 and "15 MB" in r.json()["detail"], r.text[:160])
+    try:
+        bomb = _office_zip({"word/document.xml": "<a>" + " " * (doc_extract.MAX_UNZIPPED + 10) + "</a>"})
+        doc_extract.extract("bomb.docx", bomb)
+        check("doc_extract: zip bomb refused", False, "no error")
+    except doc_extract.ExtractError as exc:
+        check("doc_extract: zip bomb refused", exc.status == 413 and len(bomb) < 1_000_000, f"{exc.status} {len(bomb)}")
+
+
+def run_chat_image_checks(client: TestClient) -> None:
+    """The chat proxy counts text only toward its size limit; images have their own caps."""
+    import openai_facade as facade
+
+    photo = "data:image/jpeg;base64," + "A" * 1_000_000
+    msgs = [{"role": "system", "content": "You are Arz-e-Pak AI."},
+            {"role": "user", "content": [{"type": "text", "text": "What does this plot map say?"},
+                                         {"type": "image_url", "image_url": {"url": photo, "detail": "auto"}}]}]
+    size = facade.measure_messages(msgs)
+    check("facade: image data not counted as text", size["error"] is None and size["images"] == 1
+          and size["text_chars"] < 400 and size["image_chars"] == len(photo), str({k: size[k] for k in ("text_chars", "images", "error")}))
+    check("facade: text still counted", facade.measure_messages([{"role": "user", "content": "x" * 250_000}])["text_chars"]
+          > facade.MAX_REQUEST_CHARS)
+    seven = [{"role": "user", "content": [{"type": "image_url", "image_url": {"url": "data:image/png;base64,AAAA"}}] * 7}]
+    err = facade.measure_messages(seven)["error"]
+    check("facade: more than 6 images -> 413", err is not None and err[1] == 413 and "6" in err[0], str(err))
+    err = facade.measure_messages([{"role": "user", "content": [{"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + "A" * 3_100_000}}]}])["error"]
+    check("facade: one oversized image -> 413", err is not None and err[1] == 413, str(err))
+    err = facade.measure_messages([{"role": "user", "content": [{"type": "image_url", "image_url": {"url": "data:image/svg+xml;base64,PHN2Zz4="}}]}])["error"]
+    check("facade: non-raster / http image refused -> 400", err is not None and err[1] == 400
+          and facade.measure_messages([{"role": "user", "content": [{"type": "image_url", "image_url": "http://x.test/a.jpg"}]}])["error"][1] == 400, str(err))
+    five = [{"role": "user", "content": [{"type": "image_url", "image_url": {"url": "data:image/webp;base64," + "A" * 2_900_000}}] * 5}]
+    err = facade.measure_messages(five)["error"]
+    check("facade: images over 12 MB together -> 413", err is not None and err[1] == 413, str(err))
+    check("facade: https image link allowed", facade.measure_messages(
+        [{"role": "user", "content": [{"type": "image_url", "image_url": {"url": "https://example.com/plot.jpg"}}]}])["error"] is None)
+    check("facade: local fallback reads the text parts", facade._last_user_message(msgs) == "What does this plot map say?"
+          and facade._content_text(None) == "" and facade._content_text([{"type": "text", "text": None}]) == "")
+    if not facade._proxying():  # no OpenAI key in the test environment: the local RAG answers
+        r = client.post("/v1/chat/completions", json={"messages": msgs})
+        check("POST /v1/chat/completions (local, picture attached)", r.status_code == 200
+              and r.json()["usage"]["prompt_tokens"] < 50, r.text[:160])
 
 
 def run_products_rest_checks(client: TestClient) -> None:

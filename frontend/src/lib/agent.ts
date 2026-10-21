@@ -12,7 +12,9 @@ import type { NearbyList, NearbyPlace, Property, PropertyList } from "@/types";
 import { useAuth } from "@/store/auth";
 import { API_BASE, get, post } from "./api";
 import { pkrShort } from "./format";
-import { focusMap, getMapView, lastFocusAt, onMapPage, routeOnMap, type Spot } from "./mapFocus";
+import { focusMap, getMapRender, getMapView, getPointer, lastFocusAt, onMapPage, routeOnMap, type Spot } from "./mapFocus";
+import { attachmentShape, geodataParts, showShapeOnMap, type ChatAttachment, type ChatFile, type LocationCard } from "./chatShare";
+import { areaUnits, centroid, fmtLatLon, googleMapsUrl, lengthUnits, parseCoords, pathLengthM, polygonAreaM2, toDms, type LatLon } from "./geoMeasure";
 
 export interface Capabilities {
   chat_mode: "local" | "upstream";
@@ -32,7 +34,7 @@ type ToolDef = { type: "function"; function: { name: string; description: string
 let toolDefs: Promise<ToolDef[]> | null = null;
 function chatTools(): Promise<ToolDef[]> {
   toolDefs ??= get<{ tools: ToolDef[] }>("/ai/tools", undefined, { noFallback: true })
-    .then((r) => [...r.tools, FOCUS_MAP, READ_MAP, ROUTE_ON_MAP, OFFER_CHOICES])
+    .then((r) => [...r.tools, FOCUS_MAP, READ_MAP, ROUTE_ON_MAP, OFFER_CHOICES, MAKE_DOCUMENT, SHARE_LOCATION, MEASURE])
     .catch((e) => {
       toolDefs = null;
       throw e;
@@ -55,6 +57,8 @@ const FOCUS_MAP: ToolDef = {
       properties: {
         place: { type: "string", description: "What to go to, as specific as possible, e.g. 'Umar Block, Bahria Town Phase 8 Safari Valley, Rawalpindi'" },
         listing_id: { type: "string", description: "Or a listing id from search_listings / get_listing" },
+        latitude: { type: "number", description: "Or coordinates (with longitude)" },
+        longitude: { type: "number" },
         zoom: { type: "number", description: "10 = city, 13 = society, 15 = block / sector (default), 17 = street" },
         master_plan: { type: "boolean", description: "Also switch on the master plan covering the spot (default true)" },
       },
@@ -125,8 +129,104 @@ const OFFER_CHOICES: ToolDef = {
   },
 };
 
+/** Web-only tool: make a PDF report or a picture and hand it over in the chat. */
+const MAKE_DOCUMENT: ToolDef = {
+  type: "function",
+  function: {
+    name: "make_document",
+    description:
+      "Make a file for the user — a PDF report or a PNG picture — and put it in the chat with Open / Download buttons. Subjects: " +
+      "route (the route in the map's route finder: map, distance, time, turn-by-turn), map_view (the user's current map view with " +
+      "its layers and what is in it), listing, measurement (the distance / area measured on the map or attached), location (a pin, " +
+      "place or coordinates), conversation (this chat), custom (a report you write: give sections). Use it whenever the user asks " +
+      "for a PDF, report, document, printout, file, picture / image / screenshot of the map or route, or to save / download / share " +
+      "something. Never say you can't make files. For a route, call route_on_map first if no route is showing.",
+    parameters: {
+      type: "object",
+      properties: {
+        subject: { type: "string", enum: ["route", "map_view", "listing", "measurement", "location", "conversation", "custom"] },
+        format: { type: "string", enum: ["pdf", "image"], description: "Default pdf; image = a PNG map picture" },
+        title: { type: "string" },
+        notes: { type: "string", description: "A short summary / your findings to print in the report, in the user's language" },
+        listing_id: { type: "string" },
+        place: { type: "string", description: "location: a place name or coordinates" },
+        latitude: { type: "number" },
+        longitude: { type: "number" },
+        sections: {
+          type: "array",
+          description: "custom: the report's sections",
+          items: {
+            type: "object",
+            properties: {
+              heading: { type: "string" },
+              text: { type: "string" },
+              bullets: { type: "array", items: { type: "string" } },
+              table: { type: "object", properties: { headers: { type: "array", items: { type: "string" } }, rows: { type: "array", items: { type: "array", items: { type: "string" } } } } },
+            },
+          },
+        },
+        include_map: { type: "boolean", description: "custom: add a picture of the current map view" },
+      },
+      required: ["subject"],
+      additionalProperties: false,
+    },
+  },
+};
+
+/** Web-only tool: a location card (coordinates, DMS, Google Maps, show on map). */
+const SHARE_LOCATION: ToolDef = {
+  type: "function",
+  function: {
+    name: "share_location",
+    description:
+      "Share a location in the chat as a card: its name, coordinates (decimal and degrees-minutes-seconds), a Google Maps link and " +
+      "'Show on map'. source: mouse (where the user's mouse is / was on the map), pin (a pin the user dropped or shared), selected " +
+      "(the selected listing / place), map_center, my_location (the device's GPS), place (a name or address), coordinates (latitude " +
+      "+ longitude). Use for 'what are the coordinates of …', 'share / send me the location', 'where is my mouse', 'pin this'.",
+    parameters: {
+      type: "object",
+      properties: {
+        source: { type: "string", enum: ["mouse", "pin", "selected", "map_center", "my_location", "place", "coordinates"] },
+        place: { type: "string" },
+        latitude: { type: "number" },
+        longitude: { type: "number" },
+        label: { type: "string", description: "A name for the card" },
+      },
+      required: ["source"],
+      additionalProperties: false,
+    },
+  },
+};
+
+/** Web-only tool: distances and areas, drawn on the map. */
+const MEASURE: ToolDef = {
+  type: "function",
+  function: {
+    name: "measure",
+    description:
+      "Measure a distance (straight line between places, or along several points) or an area (of a shape from corners) and draw it " +
+      "on the portal's map. points: place names, listing titles or 'lat, lon' strings in order. Without points it measures what the " +
+      "user measured on the map or attached (a measurement, KML / GeoJSON / GPX). Returns every unit: m, km, ft, miles; m², sq ft, " +
+      "marla and kanal (272.25 sq ft marla, and 225 sq ft as many societies use), acres. For distance BY ROAD use route_on_map.",
+    parameters: {
+      type: "object",
+      properties: {
+        kind: { type: "string", enum: ["distance", "area"] },
+        points: { type: "array", items: { type: "string" }, description: "Places / coordinates in order (2+ for distance, 3+ for area)" },
+      },
+      required: ["kind"],
+      additionalProperties: false,
+    },
+  },
+};
+
+/** What the user attached in this conversation (newest last) — the tools can use it. */
+let sharedThisChat: ChatAttachment[] = [];
+
 /** A place, block, society or listing name → a point (gazetteer, shorter forms of the name, then master-plan text). */
 async function findSpot(text: string): Promise<Spot | null> {
+  const c = parseCoords(text);
+  if (c) return { label: fmtLatLon(c[0], c[1], 5), lat: c[0], lon: c[1] };
   const lookup = async (place: string) => (await get<MapCard>("/places/map", { place, per_kind: 1, radius_km: 0.5 }).catch(() => null))?.focus ?? null;
   const parts = text.split(/\s*,\s*/).filter(Boolean);
   const tries = [text, parts.slice(0, 2).join(" "), parts.slice(0, 2).reverse().join(" "), ...parts.slice(0, -1).map((_, i) => parts.slice(0, parts.length - 1 - i).join(", "))].filter(
@@ -181,7 +281,11 @@ function screenContext(): string {
     ctx.page = "Map page";
     ctx.map_view = { center: [Number(((v.south + v.north) / 2).toFixed(6)), Number(((v.west + v.east) / 2).toFixed(6))], zoom: v.zoom, plans_on: v.plans.length, layers_on: v.overlays };
     ctx.selection = Object.keys(clean).length ? clean : "nothing selected";
+    const p = getPointer();
+    if (p) ctx.mouse_on_map = { lat: p.lat, lon: p.lon, seconds_ago: Math.round((Date.now() - p.at) / 1000) };
   }
+  const shared = sharedThisChat.slice(-6).map((a) => (a.kind === "image" || a.kind === "document" || a.kind === "geodata" ? `${a.kind}: ${a.name}` : `${a.kind}: ${a.label}`));
+  if (shared.length) ctx.shared_in_this_chat = shared;
   return `SCREEN CONTEXT (live, read from the user's screen this turn — use it to resolve "this", "here", "selected", "the listing", "my location"; ids are for tools only): ${JSON.stringify(ctx)}`;
 }
 
@@ -218,6 +322,10 @@ export interface AgentEffect {
   image?: { url: string; caption: string };
   map?: MapCard;
   sources?: KnowledgeSource[];
+  /** Files the assistant made (PDF reports, map pictures). */
+  files?: ChatFile[];
+  /** A shared location card. */
+  location?: LocationCard;
 }
 
 interface AiContext {
@@ -361,7 +469,12 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<{ o
     let spot: { name: string; latitude: number; longitude: number } | null = null;
     const lookup = async (q: { listing_id?: string; place?: string }) =>
       (await get<MapCard>("/places/map", { ...q, per_kind: 1, radius_km: 0.5 }).catch(() => null))?.focus ?? null;
-    if (args.listing_id) spot = await lookup({ listing_id: str(args, "listing_id") });
+    const coords = place ? parseCoords(place) : null;
+    const lat = numArg(args, "latitude");
+    const lon = numArg(args, "longitude");
+    if (lat !== undefined && lon !== undefined) spot = { name: fmtLatLon(lat, lon, 5), latitude: lat, longitude: lon };
+    else if (coords) spot = { name: fmtLatLon(coords[0], coords[1], 5), latitude: coords[0], longitude: coords[1] };
+    else if (args.listing_id) spot = await lookup({ listing_id: str(args, "listing_id") });
     else if (place) {
       // The model adds society / city context ("Umar Block, Safari Valley, Bahria Town Phase 8, Rawalpindi") that
       // the gazetteer may not match: try the full name, then shorter forms, then the master-plan text.
@@ -582,12 +695,195 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<{ o
     const r = await post<{ remembered?: boolean; error?: string }>("/me/memory", { text: str(args, "note") ?? "" });
     return { output: r, effect: {} };
   }
+  if (name === "make_document") return makeDocument(args);
+  if (name === "share_location") {
+    const r = await resolveLocation(str(args, "source") ?? "place", args);
+    if ("ask_user" in r) return { output: { ok: false, ask_user: r.ask_user }, effect: r.choices ? { choices: r.choices } : {} };
+    const s = r.spot;
+    const label = str(args, "label") ?? s.label;
+    return {
+      output: {
+        ok: true,
+        location: label,
+        decimal: fmtLatLon(s.lat, s.lon),
+        dms: toDms(s.lat, s.lon),
+        google_maps: googleMapsUrl(s.lat, s.lon),
+        shown_on_screen: "A location card with the coordinates, Copy, Google Maps and 'Show on map' buttons.",
+      },
+      effect: { location: { label, lat: s.lat, lon: s.lon, note: r.why } },
+    };
+  }
+  if (name === "measure") return measureTool(args);
   return { output: { error: `unknown tool ${name}` }, effect: {} };
 }
 
+// ------------------------------------------------------------------ locations, measuring, documents
+
+/** A point the user means: the mouse, a pin, the selection, the map centre, the device, a place or coordinates. */
+async function resolveLocation(source: string, args: Record<string, unknown>): Promise<{ spot: Spot; why: string } | { ask_user: string; choices?: string[] }> {
+  const lat = numArg(args, "latitude");
+  const lon = numArg(args, "longitude");
+  if (lat !== undefined && lon !== undefined) return { spot: { label: fmtLatLon(lat, lon, 5), lat, lon }, why: "the coordinates given" };
+  const sel = getMapView()?.selection;
+  const pinned = [...sharedThisChat].reverse().find((a) => a.kind === "pin") as Extract<ChatAttachment, { kind: "pin" }> | undefined;
+  if (source === "mouse") {
+    const p = getPointer();
+    if (!p) return { ask_user: "I can't see your mouse on the map yet — move it over the map (or right-click the spot → 'Ask AI about this point') and ask again." };
+    return { spot: { label: "Mouse position", lat: p.lat, lon: p.lon }, why: `where your mouse ${Date.now() - p.at < 5000 ? "is" : "last was"} on the map` };
+  }
+  if (source === "pin") {
+    const dropped = sel?.user_pins?.at(-1);
+    if (pinned) return { spot: { label: pinned.label, lat: pinned.lat, lon: pinned.lon }, why: "the point you shared" };
+    if (dropped) return { spot: dropped, why: "your dropped pin" };
+    return { ask_user: "There's no pin yet. Right-click the spot on the map → 'Drop a pin here' (or 'Ask AI about this point')." };
+  }
+  if (source === "selected") {
+    const s = (await selectedListing()) ?? sel?.place ?? sel?.search_pin ?? null;
+    return s ? { spot: s, why: "what is selected" } : { ask_user: "Nothing is selected. Open a listing's pin or search a place first, or tell me the place." };
+  }
+  if (source === "map_center") {
+    const v = getMapView();
+    return v ? { spot: { label: "Centre of the map view", lat: (v.south + v.north) / 2, lon: (v.west + v.east) / 2 }, why: "the centre of your map view" } : { ask_user: "The Map page isn't open." };
+  }
+  if (source === "my_location") {
+    const d = await deviceSpot();
+    return d.spot ? { spot: d.spot, why: "your device's location" } : { ask_user: `I couldn't get your location (${d.why}).`, choices: ["Allow my location and try again", "Use the centre of the map"] };
+  }
+  const place = str(args, "place");
+  if (!place) return { ask_user: "Which place? Give me a name, an address or coordinates." };
+  const s = await findSpot(place);
+  return s ? { spot: s, why: "the place you named" } : { ask_user: `I couldn't find "${place}" — a nearby landmark, society or the coordinates would help.` };
+}
+
+async function measureTool(args: Record<string, unknown>): Promise<{ output: unknown; effect: AgentEffect }> {
+  const kind = str(args, "kind") === "area" ? "area" : "distance";
+  const names = Array.isArray(args.points) ? (args.points as unknown[]).map(String).filter(Boolean) : [];
+  let coords: LatLon[] = [];
+  let source = "";
+  if (names.length) {
+    const spots = await Promise.all(names.map((n) => findSpot(n)));
+    const missing = names.filter((_, i) => !spots[i]);
+    if (missing.length) return { output: { ok: false, ask_user: `I couldn't place ${missing.map((m) => `"${m}"`).join(", ")} — a landmark, society or coordinates?` }, effect: {} };
+    coords = spots.map((s) => [s!.lat, s!.lon] as LatLon);
+    source = "the places given";
+  } else {
+    const m = getMapRender()?.measure;
+    const att = [...sharedThisChat].reverse().find((a) => a.kind === "measure" || a.kind === "geodata");
+    if (m && m.mode === kind) {
+      coords = m.coords;
+      source = "your measurement on the map";
+    } else if (att?.kind === "measure") {
+      coords = att.coords;
+      source = "the measurement you shared";
+    } else if (att?.kind === "geodata") {
+      const parts = geodataParts(att.geojson);
+      coords = kind === "area" ? (parts.polys[0]?.ring ?? []) : (parts.lines[0]?.line ?? []);
+      source = `the file ${att.name}`;
+    }
+    if (!coords.length)
+      return {
+        output: { ok: false, ask_user: `What should I measure? Name the places, or measure it on the map (Measure tool → ${kind === "area" ? "Area" : "Distance"}) and send it to me.` },
+        effect: {},
+      };
+  }
+  if (kind === "area" && coords.length < 3) return { output: { ok: false, ask_user: "An area needs at least three corners." }, effect: {} };
+  if (kind === "distance" && coords.length < 2) return { output: { ok: false, ask_user: "A distance needs at least two points." }, effect: {} };
+  const flip = (p: LatLon): [number, number] => [p[1], p[0]];
+  const len = lengthUnits(kind === "area" ? pathLengthM([...coords, coords[0]!]) : pathLengthM(coords));
+  const area = kind === "area" ? areaUnits(polygonAreaM2(coords)) : undefined;
+  const label = kind === "area" ? `Area ${area!.text}` : `Distance ${len.text}`;
+  showShapeOnMap({
+    id: "assistant-measure",
+    name: label,
+    fit: true,
+    geojson: {
+      type: "FeatureCollection",
+      features: [{ type: "Feature", properties: { name: label }, geometry: kind === "area" ? { type: "Polygon", coordinates: [[...coords, coords[0]!].map(flip)] } : { type: "LineString", coordinates: coords.map(flip) } }],
+    },
+  });
+  sharedThisChat.push({ kind: "measure", label, mode: kind, coords, value_text: kind === "area" ? area!.text : len.text });
+  const wasOnMap = onMapPage();
+  return {
+    output: {
+      ok: true,
+      measured: source,
+      ...(area ? { area, perimeter: len.text } : { straight_line_distance: len }),
+      centre: centroid(coords).map((x) => Number(x.toFixed(6))),
+      shown_on_screen: wasOnMap ? "It is drawn on the map." : "The Map page is opening with it drawn.",
+      how_to_answer: kind === "area" ? "Give the area in marla / kanal (say which marla size) and m² or acres as fits." : "This is the straight line; mention that the road distance is longer (route_on_map) if relevant.",
+    },
+    effect: wasOnMap ? {} : { navigate: "/map" },
+  };
+}
+
+async function makeDocument(args: Record<string, unknown>): Promise<{ output: unknown; effect: AgentEffect }> {
+  const docs = await import("./mapDocs"); // PDF / picture code loads only when a file is asked for
+  const subject = str(args, "subject") ?? "map_view";
+  const kind = str(args, "format") === "image" ? "image" : "pdf";
+  const notes = str(args, "notes");
+  const done = (f: ChatFile | { error: string }, extra: Record<string, unknown> = {}) =>
+    "error" in f
+      ? { output: { ok: false, error: f.error, ...extra }, effect: {} }
+      : { output: { ok: true, file: f.name, kind: f.kind, size_kb: Math.round(f.size / 1024), shown_on_screen: "The file is in the chat with Open and Download buttons.", ...extra }, effect: { files: [f] } };
+  if (subject === "route") {
+    const f = await docs.routeFile(kind, notes);
+    return "error" in f ? done(f, { what_to_do: onMapPage() ? "Call route_on_map first (ask where from / to if unclear), then make_document again." : "Open the route first with route_on_map." }) : done(f);
+  }
+  if (subject === "map_view") {
+    const v = getMapView();
+    if (!v) return done({ error: "The Map page isn't open." }, { what_to_do: "Offer to open it with focus_map on a place first." });
+    const facts = await get<Record<string, unknown>>("/map/read", {
+      south: v.south.toFixed(6),
+      west: v.west.toFixed(6),
+      north: v.north.toFixed(6),
+      east: v.east.toFixed(6),
+      zoom: v.zoom,
+      plans: v.plans.map((p) => p.key).join(","),
+      gis: v.gis.map((l) => l.id).join(","),
+      overlays: v.overlays.join(","),
+    }).catch(() => undefined);
+    const keep = facts ? Object.fromEntries(Object.entries(facts).filter(([k]) => !/^(how_to|view|bounds|zoom|note)/.test(k))) : undefined;
+    return done(await docs.mapViewFile(kind, { title: str(args, "title"), notes, facts: keep }));
+  }
+  if (subject === "listing") {
+    const id = str(args, "listing_id") ?? (await selectedListing())?.id;
+    if (!id) return done({ error: "No listing named or selected." }, { what_to_do: "Ask which listing (offer_choices with the ones discussed)." });
+    const [p, near] = await Promise.all([get<Property>(`/properties/${id}`), get<NearbyList>(`/properties/${id}/nearby`).catch(() => null)]);
+    return done(await docs.listingFile(p, kind, near?.nearby ?? [], notes));
+  }
+  if (subject === "measurement") {
+    const m = getMapRender()?.measure;
+    const att = [...sharedThisChat].reverse().find((a) => a.kind === "measure") as Extract<ChatAttachment, { kind: "measure" }> | undefined;
+    const src = m ?? (att ? { mode: att.mode, coords: att.coords } : null);
+    if (!src) return done({ error: "Nothing has been measured." }, { what_to_do: "Ask the user to measure with the map's Measure tool, or use the measure tool with places." });
+    return done(await docs.measureFile(src, kind, notes));
+  }
+  if (subject === "location") {
+    const r = await resolveLocation(args.latitude !== undefined ? "coordinates" : str(args, "place") ? "place" : "pin", args);
+    if ("ask_user" in r) return { output: { ok: false, ask_user: r.ask_user }, effect: {} };
+    return done(await docs.locationFile({ ...r.spot, label: str(args, "title") ?? r.spot.label }, kind, notes));
+  }
+  if (subject === "conversation") return done(await docs.chatFile(chatForReport, str(args, "title")));
+  const sections = Array.isArray(args.sections) ? (args.sections as import("./mapDocs").ReportSection[]) : notes ? [{ text: notes }] : [];
+  if (!sections.length) return done({ error: "A custom report needs sections." });
+  return done(await docs.writtenReport(str(args, "title") ?? "Report", sections, { withMap: args.include_map === true }));
+}
+/** The conversation so far, for a "conversation" PDF. */
+let chatForReport: { role: "user" | "assistant"; content: string }[] = [];
+
 function merge(a: AgentEffect, b: AgentEffect): AgentEffect {
   const links = [...(b.listings ? [] : a.links ?? []), ...(b.links ?? [])].filter((x, i, all) => all.findIndex((y) => y.label === x.label) === i);
-  return { choices: b.choices ?? a.choices, navigate: b.navigate ?? a.navigate, listings: b.listings ?? a.listings, links: links.length ? links : undefined, image: b.image ?? a.image, map: b.map ?? a.map, sources: a.sources || b.sources ? [...(a.sources ?? []), ...(b.sources ?? [])] : undefined };
+  return {
+    choices: b.choices ?? a.choices,
+    navigate: b.navigate ?? a.navigate,
+    listings: b.listings ?? a.listings,
+    links: links.length ? links : undefined,
+    image: b.image ?? a.image,
+    map: b.map ?? a.map,
+    sources: a.sources || b.sources ? [...(a.sources ?? []), ...(b.sources ?? [])] : undefined,
+    files: a.files || b.files ? [...(a.files ?? []), ...(b.files ?? [])] : undefined,
+    location: b.location ?? a.location,
+  };
 }
 
 /** Knowledge, memory and the shared system prompt for this question (one fast call). */
@@ -628,6 +924,10 @@ const WEB_ONLY = [
   "Any question about what is on the map, in this area / the current view / visible ('how many parks here', 'what is this', 'which roads / layers', 'is there a mosque nearby'): call read_map first and answer from it — never say you can't see the map. After focus_map, call read_map if the user also asked what is there.",
   "When a request is ambiguous, don't guess: call offer_choices (or use a tool's ask_user / choices) with 2–4 concrete options and follow what the user picks. The user's choice wins; if it can't work (no location permission, a place that doesn't exist, a listing that isn't on the map), say why politely and offer the closest choice that does.",
   "SCREEN CONTEXT tells you what the user has selected (a listing pin, a place, a search pin, the route finder, the item being edited) and the active tool: 'this / selected / here / the listing' mean those. Routes / directions / 'how far by road': route_on_map — with from='auto' unless the user names the start ('my current location' = my_location). If it returns ask_user, ask exactly that and wait.",
+  "FILES: you can make real files. 'PDF / report / document / print / save / download / picture / screenshot / image of the map or route': make_document (subject route | map_view | listing | measurement | location | conversation | custom; format pdf or image) — the file appears in the chat; never say you can't make PDFs or images. For a route PDF with no route showing, call route_on_map first. Put a short summary in notes, in the user's language.",
+  "LOCATIONS & MEASURING: share_location for coordinates / 'send me the location' / 'where is my mouse' (SCREEN CONTEXT mouse_on_map is the mouse); measure for straight-line distances and areas (marla, kanal, acres …) — by road is route_on_map. Coordinates the user types (decimal, DMS, a Google Maps link) work as a place in every tool.",
+  "WHAT USERS SEND YOU: pictures (photos, screenshots, scanned plans — look at them and describe what matters for property), documents (their text is in the message between <<< >>>), map files (KML / GeoJSON / GPX — summarised and drawn on the map), and from the Map page a pin, a measured distance / area or 'Ask AI about this point'. Use them as the subject of the question. If you can't tell what the user wants with what they sent (a picture with no question, two documents, a pin and a listing), ask one short question with offer_choices (e.g. 'Find the area on the map', 'Read the plot details', 'Estimate its value') instead of guessing.",
+  "Be a good conversation partner: confirm what you understood when a request is long or has several parts, say briefly what you did, and end with one helpful next step when there is one. If the user corrects you, accept it and continue from their correction.",
 ].join(" ");
 
 interface ToolCall {
@@ -635,18 +935,63 @@ interface ToolCall {
   type: "function";
   function: { name: string; arguments: string };
 }
+type Part = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string; detail?: "auto" | "low" | "high" } };
 interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";
-  content: string | null;
+  content: string | Part[] | null;
   tool_calls?: ToolCall[];
   tool_call_id?: string;
 }
+export interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+  attachments?: ChatAttachment[];
+}
+
+/** How an attachment reads to the model (pictures go as images, the rest as text). */
+export function attachmentText(a: ChatAttachment, full: boolean): string {
+  if (a.kind === "image") return `[Picture attached: ${a.name}, ${a.width}×${a.height}]`;
+  if (a.kind === "document") {
+    const body = full ? a.text : `${a.text.slice(0, 1500)}${a.text.length > 1500 ? " …" : ""}`;
+    return `[Document attached: ${a.name}${a.pages ? `, ${a.pages} pages` : ""}${a.truncated ? " (only the start could be read)" : ""}${a.note ? ` — ${a.note}` : ""}]\n<<<\n${body}\n>>>`;
+  }
+  if (a.kind === "geodata") return `[Map file attached: ${a.name} — shown on the map] ${a.summary}`;
+  if (a.kind === "pin") return `[Location shared from the map (${a.source}): ${a.label} at ${fmtLatLon(a.lat, a.lon)} — ${toDms(a.lat, a.lon)}]`;
+  return `[Measurement shared from the map: ${a.mode} ${a.value_text}; ${a.coords.length} points; ${JSON.stringify(a.mode === "area" ? areaUnits(polygonAreaM2(a.coords)) : lengthUnits(pathLengthM(a.coords)))}; points ${JSON.stringify(a.coords.map((p) => p.map((x) => Number(x.toFixed(6)))))}]`;
+}
+
+/** The turns as model messages: the last 2 user turns' pictures go as images (6 at most), older ones as a note. */
+function modelTurns(history: ChatTurn[]): ChatMessage[] {
+  const turns = history.slice(-12);
+  const userIdx = turns.map((m, i) => (m.role === "user" ? i : -1)).filter((i) => i >= 0);
+  const recent = new Set(userIdx.slice(-2));
+  const latest = userIdx.at(-1);
+  let images = 0;
+  const out = turns.map((m, i): ChatMessage => {
+    if (!m.attachments?.length) return { role: m.role, content: m.content };
+    const text = [m.content || "(no message — see what is attached)", ...m.attachments.map((a) => attachmentText(a, i === latest || (recent.has(i) && a.kind !== "document")))].join("\n\n");
+    const pics = recent.has(i) ? m.attachments.filter((a): a is Extract<ChatAttachment, { kind: "image" }> => a.kind === "image") : [];
+    if (!pics.length) return { role: m.role, content: text };
+    const parts: Part[] = [{ type: "text", text }];
+    for (const p of pics) if (images++ < 6) parts.push({ type: "image_url", image_url: { url: p.dataUrl, detail: "auto" } });
+    return { role: m.role, content: parts };
+  });
+  return out;
+}
 
 /** Answer one user turn with the tool-calling agent. Throws when the model can't be reached. */
-export async function agentReply(history: { role: "user" | "assistant"; content: string }[], model: string): Promise<AgentReply> {
-  const question = [...history].reverse().find((m) => m.role === "user")?.content ?? "";
+export async function agentReply(history: ChatTurn[], model: string): Promise<AgentReply> {
+  const last = [...history].reverse().find((m) => m.role === "user");
+  const question = [last?.content ?? "", ...(last?.attachments ?? []).filter((a) => a.kind !== "image").map((a) => attachmentText(a, false).slice(0, 600))].join("\n");
+  sharedThisChat = history.flatMap((m) => m.attachments ?? []);
+  chatForReport = history.filter((m) => m.content).map((m) => ({ role: m.role, content: m.content }));
+  // Show attached map files on the map so the user and the tools see the same shapes.
+  for (const a of last?.attachments ?? []) {
+    const fc = a.kind === "geodata" ? attachmentShape(a) : null;
+    if (fc && a.kind === "geodata") showShapeOnMap({ id: `chat-file-${a.name}`, name: a.name, geojson: fc, fit: true });
+  }
   const [tools, ctx] = await Promise.all([chatTools(), aiContext(question)]);
-  const messages: ChatMessage[] = [{ role: "system", content: (ctx?.system_prompt || systemPrompt()) + `\n${WEB_ONLY}\n${screenContext()}` }, ...history.slice(-12).map((m) => ({ role: m.role, content: m.content }))];
+  const messages: ChatMessage[] = [{ role: "system", content: (ctx?.system_prompt || systemPrompt()) + `\n${WEB_ONLY}\n${screenContext()}` }, ...modelTurns(history)];
   let effect: AgentEffect = { sources: ctx?.knowledge?.results };
   const finish = (content: string): AgentReply => {
     if (useAuth.getState().token) void post("/ai/turn", { content, conversation_id: conversationId }).catch(() => undefined);
@@ -664,7 +1009,7 @@ export async function agentReply(history: { role: "user" | "assistant"; content:
     const msg = r.choices?.[0]?.message;
     if (!msg) throw new Error("empty reply");
     if (!msg.tool_calls?.length) {
-      const content = (msg.content ?? "").trim();
+      const content = (typeof msg.content === "string" ? msg.content : "").trim();
       if (!content) throw new Error("empty reply");
       return finish(content);
     }

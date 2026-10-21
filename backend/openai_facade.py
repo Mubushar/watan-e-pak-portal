@@ -108,7 +108,65 @@ def _upstream_headers(request: Request) -> Dict[str, str]:
 
 
 MAX_MESSAGES = 60
-MAX_REQUEST_CHARS = 200_000
+MAX_REQUEST_CHARS = 200_000   # text only: image data is limited separately below
+
+# Pictures attached in the chat (OpenAI vision parts: {"type": "image_url", "image_url": {"url": ...}}).
+MAX_IMAGES = 6                        # per request (the whole conversation sent)
+MAX_IMAGE_CHARS = 3_000_000           # one data URL (~2.2 MB of JPEG/PNG)
+MAX_IMAGE_TOTAL_CHARS = 12_000_000    # all images in the request
+_IMAGE_DATA_URL = re.compile(r"data:image/(jpeg|jpg|png|webp|gif);base64,", re.I)
+
+
+def _image_url(part: Dict[str, Any]) -> str:
+    ref = part.get("image_url")
+    return str(ref.get("url") or "") if isinstance(ref, dict) else str(ref or "")
+
+
+def measure_messages(messages: List[Any]) -> Dict[str, Any]:
+    """Size of a chat request with image data set apart.
+
+    Returns ``{"text_chars", "images", "image_chars", "error": (message, status) | None}``:
+    ``text_chars`` is the JSON length of the messages with every image URL blanked out, and
+    ``error`` says why the images break the limits (count, size, or not a JPEG/PNG/WebP/GIF
+    data URL or https:// link)."""
+    stripped: List[Any] = []
+    images = image_chars = 0
+    error: Optional[tuple] = None
+    for msg in messages:
+        content = msg.get("content") if isinstance(msg, dict) else None
+        if not isinstance(content, list):
+            stripped.append(msg)
+            continue
+        parts: List[Any] = []
+        for part in content:
+            if isinstance(part, dict) and part.get("type") == "image_url":
+                url = _image_url(part)
+                images += 1
+                image_chars += len(url)
+                if error is None:
+                    if not (_IMAGE_DATA_URL.match(url) or url.startswith("https://")):
+                        error = ("Images must be JPEG, PNG, WebP or GIF (as a base64 data URL) or an https:// link.", 400)
+                    elif len(url) > MAX_IMAGE_CHARS:
+                        error = (f"One of the images is too large — keep each picture under about "
+                                 f"{MAX_IMAGE_CHARS * 3 // 4 // 1_000_000} MB.", 413)
+                parts.append({k: v for k, v in part.items() if k != "image_url"})
+            else:
+                parts.append(part)
+        stripped.append({**msg, "content": parts})
+    if error is None and images > MAX_IMAGES:
+        error = (f"Too many images — at most {MAX_IMAGES} pictures per conversation. "
+                 "Start a new conversation to send more.", 413)
+    if error is None and image_chars > MAX_IMAGE_TOTAL_CHARS:
+        error = ("The images are too large together — send fewer or smaller pictures.", 413)
+    return {"text_chars": len(json.dumps(stripped)), "images": images, "image_chars": image_chars, "error": error}
+
+
+def _content_text(content: Any) -> str:
+    """The text of a message's ``content``: a string, or the text parts of a multi-part list."""
+    if isinstance(content, list):
+        return " ".join(str(part.get("text") or "") for part in content
+                        if isinstance(part, dict) and part.get("type", "text") == "text")
+    return "" if content is None else str(content)
 
 
 _CLIENT: Optional[httpx.AsyncClient] = None
@@ -168,11 +226,8 @@ async def get_model(model_id: str) -> Any:
 
 def _last_user_message(messages: List[Dict[str, Any]]) -> str:
     for msg in reversed(messages):
-        if msg.get("role") == "user":
-            content = msg.get("content", "")
-            if isinstance(content, list):  # OpenAI multi-part content
-                content = " ".join(part.get("text", "") for part in content if isinstance(part, dict))
-            return str(content)
+        if isinstance(msg, dict) and msg.get("role") == "user":
+            return _content_text(msg.get("content"))  # text parts of multi-part content (images skipped)
     return ""
 
 
@@ -284,7 +339,11 @@ async def chat_completions(request: Request) -> Any:
     if _proxying():
         # The upstream spends the server's OpenAI credit: rate-limit and cap request size.
         ai_guard.check(request, "chat")
-        if len(messages) > MAX_MESSAGES or len(json.dumps(messages)) > MAX_REQUEST_CHARS:
+        size = measure_messages(messages)
+        if size["error"]:
+            message, status = size["error"]
+            return _error(message, status=status)
+        if len(messages) > MAX_MESSAGES or size["text_chars"] > MAX_REQUEST_CHARS:
             return _error("Conversation too long — start a new conversation.", status=413)
         # The server pays, so the server decides: always the configured model (plus any extra
         # models allowed in AI_ALLOWED_MODELS), one completion, and output capped.
@@ -308,7 +367,7 @@ async def chat_completions(request: Request) -> Any:
     # ----- local fallback mode -----
     user_text = _last_user_message(messages)
     content = _local_answer(user_text)
-    prompt_tokens = sum(_tokens(str(m.get("content", ""))) for m in messages)
+    prompt_tokens = sum(_tokens(_content_text(m.get("content"))) for m in messages if isinstance(m, dict))
 
     if stream:
         return StreamingResponse(_stream_local(model, content), media_type="text/event-stream")

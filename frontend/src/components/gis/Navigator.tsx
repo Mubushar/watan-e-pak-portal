@@ -14,7 +14,7 @@ import { useApi } from "@/hooks/useApi";
 import { cn } from "@/lib/utils";
 import { pin } from "@/components/map/PortalMap";
 import { PlaceSearch, type PlaceHit } from "./PlaceSearch";
-import { MapContextMenu } from "./MapContextMenu";
+import { MapContextMenu, type MapMenuItem } from "./MapContextMenu";
 
 type Mode = "drive" | "bike" | "walk";
 interface Step {
@@ -68,7 +68,8 @@ function useFly() {
 }
 
 /** Map side: the search pin, route lines, A / B markers, picking points by clicking. */
-export function NavigatorLayer({ nav }: { nav: NavigatorState }) {
+/** `menu`: more right-click items after the directions ones. */
+export function NavigatorLayer({ nav, menu = [] }: { nav: NavigatorState; menu?: MapMenuItem[] }) {
   const map = useMap();
   const fly = useFly();
   const { hit, routing, from, to, picking, q, selected } = nav;
@@ -173,6 +174,7 @@ export function NavigatorLayer({ nav }: { nav: NavigatorState }) {
               nav.setRouting(true);
             },
           },
+          ...menu,
         ]}
       />
       {/* A and B can be dragged to adjust the route. */}

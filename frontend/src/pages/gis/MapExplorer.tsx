@@ -7,6 +7,7 @@ import type { GeoJsonObject } from "geojson";
 import { Circle, CircleMarker, GeoJSON, Marker, Polyline, Popup, Tooltip } from "react-leaflet";
 import {
   ArrowRight,
+  Bot,
   Building2,
   ChevronDown,
   Circle as CircleIcon,
@@ -35,6 +36,7 @@ import {
   PanelLeftOpen,
   Radar,
   RotateCcw,
+  Ruler,
   Route,
   Search,
   Shapes,
@@ -56,7 +58,7 @@ import { useSavedState } from "@/hooks/useSavedState";
 import { compact, num, pkrShort, titleCase } from "@/lib/format";
 import { coverImage } from "@/lib/images";
 import { cn } from "@/lib/utils";
-import { PortalMap, PIN_STYLES, listingPin, pin, placePin, type BaseMapKey } from "@/components/map/PortalMap";
+import { BASE_MAPS, PortalMap, PIN_STYLES, listingPin, pin, placePin, type BaseMapKey } from "@/components/map/PortalMap";
 import { Badge, BarList, Button, EmptyState, ErrorState, Input, ScoreRing, Select, Segmented, Skeleton, Slider, Tabs, Toggle } from "@/components/ui";
 import { ChipRow, FilterChip, MapClick, MiniStat, ReportButton, ReportModal, fitTo, type ReportRef } from "@/components/gis/kit";
 import { ZoomArea } from "@/components/gis/ZoomArea";
@@ -76,7 +78,11 @@ import { WATER_CLASSES, WaterLayer, type WaterStatus } from "@/components/gis/Wa
 import { DISTRICT_LABEL_ZOOM, DistrictLayer } from "@/components/gis/DistrictLayer";
 import { ELEVATION_GRADIENT, TerrainLayer } from "@/components/gis/TerrainLayer";
 import { usePrefs } from "@/store/prefs";
-import { onMapFocus, onMapRoute, registerMapView, takePendingFocus, takePendingRoute, type MapFocus, type MapSelection, type RouteRequest } from "@/lib/mapFocus";
+import { onMapFocus, onMapRoute, registerMapRender, registerMapView, takePendingFocus, takePendingRoute, type MapFocus, type MapRender, type MapSelection, type RouteRequest, type Spot } from "@/lib/mapFocus";
+import { CoordReadout, MeasureCard, MeasureLayer, PinsLayer, ShapesLayer, measureValue, type MeasureMode, type Measurement } from "@/components/gis/MapShare";
+import { onShowShape, shareToChat, takePendingShapes, type MapShape } from "@/lib/chatShare";
+import { centroid } from "@/lib/geoMeasure";
+import { API_BASE } from "@/lib/api";
 import { CAD_DEFAULTS, CadastreBar, CadastreLayer, CadastrePanel, parcelDraft, plotRect, type CadDraft, type CadMode } from "@/components/gis/Cadastre";
 import { LABEL_MIN_ZOOM, MasterPlanLayers, MasterPlanPanel, PlanLabels, groupPlans, phaseLabel, planOfLayer, useMasterPlans, type PlanLabel } from "@/components/gis/MasterPlans";
 import type { Aoi, AoiStats, GisLayer, GisLayerDetail, Poi, PoiCategory, RingResult, RouteResult } from "@/components/gis/types";
@@ -378,8 +384,28 @@ export default function MapExplorer() {
   const startDraw = (m: DrawMode | null) => {
     setZoomDraw(false);
     nav.setPicking(null);
+    setMeasureModeRaw(null);
     setDrawMode(m);
   };
+  // ---- measure (distance / area), dropped pins, shapes sent from the chat
+  const [measureMode, setMeasureModeRaw] = useState<MeasureMode | null>(null);
+  const [measure, setMeasure] = useState<Measurement | null>(null);
+  const setMeasureMode = (m: MeasureMode | null) => {
+    if (m) {
+      setDrawMode(null);
+      setZoomMode(null);
+      nav.setPicking(null);
+      setMeasure(null);
+    }
+    setMeasureModeRaw(m);
+  };
+  const [userPins, setUserPins] = useState<Spot[]>([]);
+  const [shapes, setShapes] = useState<MapShape[]>([]);
+  useEffect(() => {
+    const queued = takePendingShapes();
+    if (queued.length) setShapes((s) => [...s.filter((x) => !queued.some((q) => q.id === x.id)), ...queued]);
+    return onShowShape((sh) => setShapes((s) => [...s.filter((x) => x.id !== sh.id), sh]));
+  }, []);
   const onStudyShape = useCallback(
     (s: StudyShape) => {
       setDrawMode(null);
@@ -682,7 +708,14 @@ export default function MapExplorer() {
     editing: editDraft && editAt ? { ...spot(String(editDraft.fields.title ?? editDraft.fields.name ?? "New feature"), editAt[0], editAt[1]), kind: editDraft.kind } : undefined,
     parcel: cadDraft && cadAt ? { ...spot(cadDraft.fields.parcel_no ? `Parcel ${cadDraft.fields.parcel_no}` : "New parcel", cadAt[0], cadAt[1]), parcel_no: cadDraft.fields.parcel_no } : undefined,
     assistant_pin: aiPin ? spot(aiPin.name, aiPin.latitude, aiPin.longitude) : undefined,
-    active_tool: nav.picking
+    user_pins: userPins.length ? userPins : undefined,
+    measurement: measure?.done
+      ? { mode: measure.mode, value: measureValue(measure), points: measure.coords.length, centre: centroid(measure.coords).map((x) => Number(x.toFixed(6))) as [number, number] }
+      : undefined,
+    shown_shapes: shapes.length ? shapes.map((x) => x.name) : undefined,
+    active_tool: measureMode
+      ? `measure: ${measureMode} (${measure?.coords.length ?? 0} points so far)`
+      : nav.picking
       ? `route finder: picking the ${nav.picking === "from" ? "start" : "destination"} on the map`
       : cadMode
         ? `cadastre: ${cadMode === "draw" ? "drawing a parcel" : cadMode === "size" ? "plot by size" : "editing a parcel"}`
@@ -722,6 +755,35 @@ export default function MapExplorer() {
     });
     return () => registerMapView(null);
   }, [map]);
+  // What a picture of this map needs (the assistant's PDFs and images).
+  const renderInfo = useRef<MapRender | null>(null);
+  const navRoute = nav.routing ? nav.q.data?.routes?.[nav.selected] : undefined;
+  renderInfo.current = {
+    base: { url: BASE_MAPS[baseMap].url, attribution: BASE_MAPS[baseMap].attribution },
+    plans: vis.layers
+      ? visiblePlans
+          .filter((pl) => planShown.has(pl.key) && pl.tile_url)
+          .map((pl) => ({ url: `${API_BASE}${pl.tile_url}`, bounds: pl.bounds, zoom: (pl.zoom ?? [12, 17]) as [number, number] }))
+      : [],
+    planOpacity: layerOpacity / 100,
+    route:
+      navRoute && nav.from && nav.to
+        ? {
+            from: spot(nav.from.label, nav.from.lat, nav.from.lon),
+            to: spot(nav.to.label, nav.to.lat, nav.to.lon),
+            mode: nav.mode,
+            best: navRoute,
+            alternatives: (nav.q.data?.routes ?? []).filter((x) => x !== navRoute),
+            attribution: nav.q.data?.attribution ?? "",
+          }
+        : undefined,
+    measure: measure?.done ? { mode: measure.mode, coords: measure.coords, value: measureValue(measure) } : undefined,
+    pins: userPins,
+  };
+  useEffect(() => {
+    registerMapRender(() => renderInfo.current!);
+    return () => registerMapRender(null);
+  }, []);
 
   const focusPoint = (lat: number, lon: number, z = 16) => {
     map?.flyTo([lat, lon], z, { duration: 0.9 });
@@ -761,7 +823,40 @@ export default function MapExplorer() {
         {vis.districts && on("districts") && <DistrictLayer lang={mapLang} zoom={zoom} labels={vis.districtNames} />}
         {vis.cities && on("city_names") && <CityLabels zoom={zoom} lang={mapLang} />}
         {osmCats.size > 0 && on("osm_pois") && <PoiLayer categories={osmCats} lang={mapLang} onStatus={setPoiStatus} />}
-        <NavigatorLayer nav={nav} />
+        <NavigatorLayer
+          nav={nav}
+          menu={[
+            {
+              label: "Drop a pin here",
+              icon: <MapPin className="h-4 w-4 text-gold-600" />,
+              onSelect: (lat, lon) => setUserPins((p) => [...p, spot(`Pin ${p.length + 1}`, lat, lon)]),
+            },
+            {
+              label: "Ask AI about this point",
+              icon: <Bot className="h-4 w-4 text-brand-600" />,
+              onSelect: (lat, lon) => shareToChat({ kind: "pin", label: "Point on the map", lat: Number(lat.toFixed(6)), lon: Number(lon.toFixed(6)), source: "right-click" }, "What is here?"),
+            },
+            {
+              label: "Measure from here",
+              icon: <Ruler className="h-4 w-4 text-amber-600" />,
+              onSelect: (lat, lon) => {
+                setMeasureMode("distance");
+                setMeasure({ mode: "distance", coords: [[lat, lon]], done: false });
+              },
+            },
+          ]}
+        />
+        <MeasureLayer
+          active={measureMode}
+          value={measure}
+          onChange={(m, stop) => {
+            setMeasure(m);
+            if (stop) setMeasureModeRaw(null);
+          }}
+        />
+        <PinsLayer pins={userPins} onRemove={(i) => setUserPins((p) => p.filter((_, j) => j !== i))} />
+        <ShapesLayer shapes={shapes} onRemove={(id) => setShapes((s) => s.filter((x) => x.id !== id))} />
+        <CoordReadout className="absolute bottom-3 end-[16.5rem] z-[440] hidden lg:flex" />
 
         {/* ----------------------------------------------------- DHA master plans */}
         {vis.layers && (
@@ -1022,15 +1117,18 @@ export default function MapExplorer() {
           }
           setZoomMode(m);
         }}
-        panActive={!zoomMode && !drawMode && !nav.picking && !editMode}
+        panActive={!zoomMode && !drawMode && !nav.picking && !editMode && !measureMode}
         onPan={() => {
           setZoomMode(null);
           setDrawMode(null);
+          setMeasureModeRaw(null);
           nav.setPicking(null);
           setEditMode(null);
         }}
         drawMode={drawMode}
         onDraw={startDraw}
+        measureMode={measureMode}
+        onMeasure={setMeasureMode}
         onFit={properties.length ? () => fitTo(map, filtered.map((p) => [p.latitude!, p.longitude!]), 13, sidePad()) : undefined}
         onLastView={lastView}
         lastViewReady={canGoBack}
@@ -1235,6 +1333,13 @@ export default function MapExplorer() {
         <div className="pointer-events-none absolute bottom-[6.75rem] end-3 z-[420] flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1 text-xs font-bold shadow-soft ring-1 ring-black/5 dark:bg-brand-950/95">
           <Mountain className="h-3.5 w-3.5 text-brand-700 dark:text-brand-300" />
           {elevation.toLocaleString()} m
+        </div>
+      )}
+
+      {/* ------------------------------------------------------- measure result / hint */}
+      {(measureMode || measure?.done) && (
+        <div className="absolute bottom-24 start-1/2 z-[460] -translate-x-1/2 rtl:translate-x-1/2 md:start-[calc(50%+190px)]">
+          <MeasureCard active={measureMode} value={measure} onClear={() => setMeasure(null)} onStop={() => setMeasureModeRaw(null)} />
         </div>
       )}
 
