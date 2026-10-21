@@ -6,7 +6,9 @@
  * With no plans built, the section says so and nothing is drawn.
  *
  * Plan tiles exist only for zooms 12–17, so each plan's boundary is also drawn as an
- * outline (visible at any zoom, click to zoom in) and the tiles are scaled down to zoom 9.
+ * outline (visible at any zoom, click to zoom in) and the tiles are scaled down to zoom 11.
+ * With 100+ plans, only the tile layers of plans in (or next to) the view are on the map: every
+ * Leaflet tile layer re-plans its whole grid on each pan / zoom, and 129 of them froze the page.
  */
 import { useEffect, useMemo, useState } from "react";
 import type L from "leaflet";
@@ -153,6 +155,29 @@ const corners = (b: MasterPlan["bounds"]): [number, number][] => [
   [b[2], b[3]],
 ];
 
+/** Plan images are drawn from this zoom in (scaled down from 12); further out only outlines. */
+const TILES_FROM_ZOOM = 11;
+
+/** The map view (padded by half a screen each way) and zoom, updated when a move / zoom ends. */
+function useViewBox(map: L.Map): { box: [number, number, number, number]; zoom: number } {
+  const read = () => {
+    const b = map.getBounds().pad(0.5);
+    return { box: [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()] as [number, number, number, number], zoom: map.getZoom() };
+  };
+  const [view, setView] = useState(read);
+  useEffect(() => {
+    const on = () => setView(read());
+    map.on("moveend", on);
+    return () => {
+      map.off("moveend", on);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map]);
+  return view;
+}
+
+const overlaps = (b: MasterPlan["bounds"], v: [number, number, number, number]) => b[0] < v[2] && b[2] > v[0] && b[1] < v[3] && b[3] > v[1];
+
 /** Tile layers, boundaries + the highlighted search hit; render inside the map. */
 export function MasterPlanLayers({
   plans,
@@ -169,7 +194,9 @@ export function MasterPlanLayers({
   onSelect?: (p: MasterPlan) => void;
 }) {
   const map = useMap();
+  const view = useViewBox(map);
   const visible = plans.filter((p) => shown.has(p.key));
+  const tiled = view.zoom >= TILES_FROM_ZOOM ? visible.filter((p) => p.tile_url && overlaps(p.bounds, view.box)) : [];
   const style = { color: "#c99a22", weight: 2, dashArray: "6 5", fillColor: "#f2dd8f", fillOpacity: 0.06 };
   return (
     <>
@@ -183,24 +210,25 @@ export function MasterPlanLayers({
           <Rectangle key={`outline-${p.key}`} bounds={corners(p.bounds)} pathOptions={style} eventHandlers={eventHandlers} />
         );
       })}
-      {visible
-        .filter((p) => p.tile_url)
-        .map((p) => (
-          <TileLayer
-            key={p.key}
-            url={`${API_BASE}${p.tile_url}`}
-            bounds={corners(p.bounds)}
-            // Native tiles start at zoom 12; Leaflet scales them down a few levels so the plan
-            // is still visible when the whole phase is on screen.
-            minNativeZoom={p.zoom?.[0]}
-            minZoom={p.zoom ? Math.max(9, p.zoom[0] - 3) : undefined}
-            maxNativeZoom={p.zoom?.[1]}
-            maxZoom={20}
-            opacity={opacity}
-            attribution={p.attribution}
-            zIndex={250}
-          />
-        ))}
+      {tiled.map((p) => (
+        <TileLayer
+          key={p.key}
+          url={`${API_BASE}${p.tile_url}`}
+          bounds={corners(p.bounds)}
+          // Native tiles start at zoom 12; Leaflet scales them down a level so the plan
+          // is still visible when the whole phase is on screen.
+          minNativeZoom={p.zoom?.[0]}
+          minZoom={p.zoom ? Math.max(TILES_FROM_ZOOM, p.zoom[0] - 1) : TILES_FROM_ZOOM}
+          maxNativeZoom={p.zoom?.[1]}
+          maxZoom={20}
+          // Load tiles once a pan / zoom ends, not on every animation frame.
+          updateWhenIdle
+          updateWhenZooming={false}
+          opacity={opacity}
+          attribution={p.attribution}
+          zIndex={250}
+        />
+      ))}
       {hit && (
         <CircleMarker center={[hit.latitude, hit.longitude]} radius={10} pathOptions={{ color: "#c99a22", weight: 3, fillColor: "#f2dd8f", fillOpacity: 0.6 }}>
           <Tooltip permanent direction="top">

@@ -189,6 +189,20 @@ export default function MapExplorer() {
         (!s || [p.title, p.city_name, p.sector, p.street_address].some((x) => x?.toLowerCase().includes(s))),
     );
   }, [properties, useType, category, featuredOnly, search]);
+  // Listings at the same spot (units of one tower) share one pin: hundreds of stacked markers
+  // looked like one anyway and made every pan / zoom frame slow.
+  const listingGroups = useMemo(() => {
+    const g = new Map<string, Property[]>();
+    for (const p of filtered) {
+      const k = spotKey(p);
+      const arr = g.get(k);
+      if (arr) arr.push(p);
+      else g.set(k, [p]);
+    }
+    return [...g.entries()];
+  }, [filtered]);
+  // The unit shown in each shared pin's popup (spot → listing id).
+  const [groupPick, setGroupPick] = useState<Record<string, string>>({});
 
   // -------------------------------------------------------------- poi filters
   const [cats, setCats] = useState<Set<string> | null>(null);
@@ -590,6 +604,7 @@ export default function MapExplorer() {
   const focusProperty = (p: Property) => {
     if (!map || p.latitude == null || p.longitude == null) return;
     setVis((v) => ({ ...v, props: true }));
+    setGroupPick((g) => ({ ...g, [spotKey(p)]: p.id }));
     map.flyTo([p.latitude, p.longitude], 16, { duration: 0.9 });
     map.once("moveend", () => markerRefs.current.get(p.id)?.openPopup());
     if (window.innerWidth < 768) setOpen(false);
@@ -844,24 +859,40 @@ export default function MapExplorer() {
         {/* ----------------------------------------------------- properties */}
         {vis.props &&
           on("listings") &&
-          filtered.map((p) => (
-            <Marker
-              key={p.id}
-              position={[p.latitude!, p.longitude!]}
-              icon={listingPin(p)}
-              ref={(m) => {
-                if (m) markerRefs.current.set(p.id, m);
-              }}
-              eventHandlers={{
-                popupopen: () => setSelListing({ id: p.id, label: p.title, lat: p.latitude!, lon: p.longitude!, price: p.price, open: true }),
-                popupclose: () => setSelListing((cur) => (cur?.id === p.id ? { ...cur, open: false } : cur)),
-              }}
-            >
-              <Popup>
-                <PropertyPopup p={p} />
-              </Popup>
-            </Marker>
-          ))}
+          listingGroups.map(([k, items]) => {
+            const p = items.find((x) => x.id === groupPick[k]) ?? items[0]!;
+            const select = (x: Property, open = true) =>
+              setSelListing({ id: x.id, label: x.title, lat: x.latitude!, lon: x.longitude!, price: x.price, open });
+            return (
+              <Marker
+                key={k}
+                position={[p.latitude!, p.longitude!]}
+                icon={listingPin(items[0]!, items.length > 1 ? { label: `${items.length} listings` } : {})}
+                ref={(m) => {
+                  if (m) for (const x of items) markerRefs.current.set(x.id, m);
+                }}
+                eventHandlers={{
+                  popupopen: () => select(p),
+                  popupclose: () => setSelListing((cur) => (cur && items.some((x) => x.id === cur.id) ? { ...cur, open: false } : cur)),
+                }}
+              >
+                <Popup>
+                  {items.length > 1 ? (
+                    <ListingGroupPopup
+                      items={items}
+                      current={p}
+                      onPick={(x) => {
+                        setGroupPick((g) => ({ ...g, [k]: x.id }));
+                        select(x);
+                      }}
+                    />
+                  ) : (
+                    <PropertyPopup p={p} />
+                  )}
+                </Popup>
+              </Marker>
+            );
+          })}
 
         {/* ----------------------------------------------------- POIs */}
         {vis.pois &&
@@ -1778,6 +1809,31 @@ function PropertyPopup({ p }: { p: Property }) {
     </div>
   );
 }
+
+/** Listings sharing one spot (e.g. a tower's units): one at a time, with ‹ › to page through. */
+function ListingGroupPopup({ items, current, onPick }: { items: Property[]; current: Property; onPick: (p: Property) => void }) {
+  const i = Math.max(0, items.indexOf(current));
+  const go = (d: number) => onPick(items[(i + d + items.length) % items.length]!);
+  return (
+    <div>
+      <PropertyPopup p={current} />
+      <div className="flex items-center justify-between border-t border-black/5 bg-white px-2 py-1.5 text-[11px] text-ink-mute dark:border-white/10 dark:bg-[#0d1f16]">
+        <button type="button" className="btn btn-ghost btn-sm !px-2" onClick={() => go(-1)} aria-label="Previous listing here">
+          ‹
+        </button>
+        <span>
+          {i + 1} of {items.length} listings here
+        </span>
+        <button type="button" className="btn btn-ghost btn-sm !px-2" onClick={() => go(1)} aria-label="Next listing here">
+          ›
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Listings closer than ~1 m share a pin. */
+const spotKey = (p: { latitude?: number | null; longitude?: number | null }) => `${p.latitude?.toFixed(5)},${p.longitude?.toFixed(5)}`;
 
 function PoiPopup({ p }: { p: Poi }) {
   const st = PIN_STYLES[p.category] ?? PIN_STYLES.other!;
