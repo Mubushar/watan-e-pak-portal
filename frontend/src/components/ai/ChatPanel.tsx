@@ -234,8 +234,14 @@ const WELCOME: Msg = {
     "Assalam-o-Alaikum! I’m **Arz-e-Pak AI**. Tell me what you’re looking for — city, budget, size or purpose — and I’ll search live listings, societies and market data for you.",
 };
 
+/** The conversation outlives the panel: it moves between the floating window and the Map page's dock. */
+let savedMsgs: Msg[] | null = null;
+
 export function ChatPanel({ compact, className, initial }: { compact?: boolean; className?: string; initial?: string }) {
-  const [msgs, setMsgs] = useState<Msg[]>([WELCOME]);
+  const [msgs, setMsgs] = useState<Msg[]>(() => (savedMsgs ?? [WELCOME]).filter((m) => !m.pending));
+  useEffect(() => {
+    savedMsgs = msgs;
+  }, [msgs]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);

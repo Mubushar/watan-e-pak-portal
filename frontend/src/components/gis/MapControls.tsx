@@ -93,12 +93,13 @@ function Btn({
       aria-pressed={active}
       className={cn(
         "relative flex w-10 flex-col items-center justify-center transition first:rounded-t-xl last:rounded-b-xl disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent",
-        text ? "h-12 gap-0.5" : "h-10",
+        // Short screens: icons only, so the rail ends above the map's +/− zoom buttons.
+        text ? "h-12 gap-0.5 [@media(max-height:940px)]:h-10" : "h-10",
         active ? "bg-brand-700 text-white" : "text-brand-800 hover:bg-brand-50 dark:text-white dark:hover:bg-white/10",
       )}
     >
       <Icon className={cn("h-[18px] w-[18px]", !active && iconClass)} />
-      {text && <span className="text-[9px] font-bold leading-none">{text}</span>}
+      {text && <span className="text-[9px] font-bold leading-none [@media(max-height:940px)]:hidden">{text}</span>}
       {!!badge && <span className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-gold-500 px-1 text-[10px] font-bold text-brand-950">{badge}</span>}
     </button>
   );
@@ -106,8 +107,8 @@ function Btn({
 
 function ToolGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col items-center gap-1">
-      <span className="rounded-full bg-white/90 px-1.5 text-[9px] font-bold uppercase tracking-wider text-ink-mute shadow-sm dark:bg-brand-950/90">{label}</span>
+    <div className="flex flex-col items-center gap-1 [@media(max-height:940px)]:gap-0.5">
+      <span className="rounded-full bg-white/90 px-1.5 text-[9px] font-bold uppercase tracking-wider text-ink-mute shadow-sm dark:bg-brand-950/90 [@media(max-height:760px)]:hidden">{label}</span>
       <div className="flex flex-col divide-y divide-black/5 rounded-xl bg-white shadow-soft ring-1 ring-black/5 dark:divide-white/10 dark:bg-brand-950">{children}</div>
     </div>
   );

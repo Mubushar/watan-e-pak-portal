@@ -78,6 +78,7 @@ import { WATER_CLASSES, WaterLayer, type WaterStatus } from "@/components/gis/Wa
 import { DISTRICT_LABEL_ZOOM, DistrictLayer } from "@/components/gis/DistrictLayer";
 import { ELEVATION_GRADIENT, TerrainLayer } from "@/components/gis/TerrainLayer";
 import { usePrefs } from "@/store/prefs";
+import { setAssistantDock, useWideScreen } from "@/lib/assistantDock";
 import { onMapFocus, onMapRoute, registerMapRender, registerMapView, takePendingFocus, takePendingRoute, type MapFocus, type MapRender, type MapSelection, type RouteRequest, type Spot } from "@/lib/mapFocus";
 import { CoordReadout, MeasureCard, MeasureLayer, PinsLayer, ShapesLayer, measureValue, type MeasureMode, type Measurement } from "@/components/gis/MapShare";
 import { onShowShape, shareToChat, takePendingShapes, type MapShape } from "@/lib/chatShare";
@@ -253,11 +254,17 @@ export default function MapExplorer() {
       map.off("zoomend", on);
     };
   }, [map]);
-  // Master plans start switched on until the user chooses (null = no saved choice yet).
-  const [planChoice, setPlanChoice] = useSavedState<Set<string> | null>("map.plans", null);
+  // Master plans are on unless the user switched them off. Saved as the plans switched OFF, so plans
+  // added later show up for everyone (a saved "on" list hid every new plan from whoever had chosen once).
+  const [planOff, setPlanOff] = useSavedState<Set<string>>("map.plansOff", () => new Set());
   const allPlans = useMemo(() => new Set((plansQ.data?.plans ?? []).map((p) => p.key)), [plansQ.data]);
-  const planShown = planChoice ?? allPlans;
-  const setPlanShown = (u: SetStateAction<Set<string>>) => setPlanChoice((prev) => (typeof u === "function" ? u(prev ?? allPlans) : u));
+  const planShown = useMemo(() => new Set([...allPlans].filter((k) => !planOff.has(k))), [allPlans, planOff]);
+  const setPlanShown = (u: SetStateAction<Set<string>>) =>
+    setPlanOff((off) => {
+      const shown = new Set([...allPlans].filter((k) => !off.has(k)));
+      const next = typeof u === "function" ? u(shown) : u;
+      return new Set([...allPlans].filter((k) => !next.has(k)));
+    });
   const [planHit, setPlanHit] = useState<PlanLabel | null>(null);
   const [layerOpacity, setLayerOpacity] = useSavedState("map.layerOpacity", 70);
 
@@ -280,6 +287,10 @@ export default function MapExplorer() {
   const setZoomDraw = (on: boolean) => setZoomMode(on ? "in" : null);
   const [baseMap, setBaseMap] = useSavedState<BaseMapKey>("map.base", "streets");
   const appLang = usePrefs((s) => s.lang);
+  // The assistant docks beside the map on wide screens (the map makes room for it).
+  const assistantOpen = usePrefs((s) => s.assistantOpen);
+  const wide = useWideScreen();
+  const docked = assistantOpen && wide;
   const [mapLang, setMapLang] = useSavedState<MapLang>("map.lang", appLang === "ur" ? "both" : "en");
   const nav = useNavigator();
   const [osmCats, setOsmCats] = useSavedState<Set<string>>("map.poi.v2", () => new Set(POI_CATEGORIES.map((c) => c.key)));
@@ -607,6 +618,14 @@ export default function MapExplorer() {
   };
 
   // -------------------------------------------------------------- map helpers
+  // The map's box changes width when the assistant docks / undocks: tell Leaflet (it only watches the window).
+  const mapBox = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!map || !mapBox.current) return;
+    const ro = new ResizeObserver(() => map.invalidateSize({ pan: false }));
+    ro.observe(mapBox.current);
+    return () => ro.disconnect();
+  }, [map]);
   const onReady = useCallback((m: L.Map) => {
     setMap(m);
     if (zoomMoved.current) return;
@@ -819,7 +838,9 @@ export default function MapExplorer() {
 
   // ================================================================== render
   return (
-    <div className={cn("relative h-[calc(100dvh-110px)] min-h-[540px] w-full overflow-hidden bg-brand-950", analysing && "[&_.leaflet-container]:cursor-crosshair")}>
+    <div className="flex h-[calc(100dvh-110px)] min-h-[540px] w-full">
+    {/* `isolate`: the map's panes and tools (z 400–1000) stay inside the map, under the header's menus and the chat. */}
+    <div ref={mapBox} className={cn("relative isolate h-full min-w-0 flex-1 overflow-hidden bg-brand-950", analysing && "[&_.leaflet-container]:cursor-crosshair")}>
       <PortalMap height="100%" className="rounded-none" scrollWheelZoom onReady={onReady} zoom={5} switcher={false} baseKey={baseMap}>
         {/* ----------------------------------------------------- Pakistan reference layers */}
         {vis.provinces && on("provinces") && <ProvinceLayer map={map} lang={mapLang} zoom={zoom} />}
@@ -1876,6 +1897,12 @@ export default function MapExplorer() {
       </motion.aside>
 
       <ReportModal report={report} onClose={() => setReport(null)} />
+    </div>
+    <div
+      ref={setAssistantDock}
+      className={cn("hidden h-full shrink-0 overflow-hidden border-black/10 dark:border-white/10 lg:block", docked ? "w-[400px] border-s" : "w-0")}
+      aria-hidden={!docked}
+    />
     </div>
   );
 }
