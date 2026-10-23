@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-16",
+  "generated": "2026-10-23",
   "properties": {
     "house": [
       "/seed/properties/house-1.svg",
@@ -101,6 +101,7 @@
   ],
   "brand": [
     "/brand/dashboard-concept.webp",
+    "/brand/Final-Portal-Look.png",
     "/brand/header-en.webp",
     "/brand/header-ur.webp",
     "/brand/logo-en.webp",

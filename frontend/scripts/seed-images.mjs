@@ -513,25 +513,50 @@ async function knockOutWhite(img) {
   return { data, info: { width: info.width, height: info.height, channels: 4 } };
 }
 
+/**
+ * Find a brand asset by role. The current assets live in `branding/` and use the
+ * Watan-e-Pak names; the repo root and the old Arz-e-Pak names remain as fallbacks.
+ */
+function brandAsset(...patterns) {
+  for (const dir of [path.join(repo, "branding"), repo]) {
+    if (!fs.existsSync(dir)) continue;
+    const files = fs
+      .readdirSync(dir)
+      .map((f) => path.join(dir, f))
+      .filter((f) => /\.(png|jpe?g|webp)$/i.test(f));
+    for (const re of patterns) {
+      const hit = files.find((f) => re.test(path.basename(f)));
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+
 async function brand() {
   ensure(out("brand"));
   ensure(out("seed", "hero"));
-  const src = (f) => path.join(repo, f);
-  const logoEn = src("Arz-e-Pak AI Real Estate Logo English.png");
-  const logoUr = src("Arz-e-Pak AI Real Estate Logo Urdue.png");
-  const headEn = src("Arz-e-Pak Header Image English.png");
-  const headUr = src("Arz-e-Pak Header Image Urdue.png");
-  const dash = src("Arz-e-Pak AI Real Estate Dashboard.png");
+  const logoEn = brandAsset(/logo.*english/i, /logo[-_ ]?en\b/i, /logo\.(png|jpe?g|webp)$/i);
+  const logoUr = brandAsset(/logo.*(urdu|urdue)/i, /logo[-_ ]?ur\b/i);
+  const headEn = brandAsset(/header.*english/i, /header[-_ ]?en\b/i);
+  const headUr = brandAsset(/header.*(urdu|urdue)/i, /header[-_ ]?ur\b/i);
+  const dash = brandAsset(/dashboard/i);
   const jobs = [];
-  if (fs.existsSync(logoEn)) {
+  if (logoEn) {
     jobs.push(sharp(logoEn).resize(560).webp({ quality: 88 }).toFile(out("brand", "logo-en.webp")));
-    // mark = the emblem without the wordmark, on a transparent background
-    const mark = await knockOutWhite(sharp(logoEn).extract({ left: 160, top: 140, width: 960, height: 650 }));
+    // mark = the emblem above the wordmark, on a transparent background.
+    // Crop proportionally so square (1254px) and wide logos both work.
+    const meta = await sharp(logoEn).metadata();
+    const mark = await knockOutWhite(sharp(logoEn).extract({
+      left: Math.round(meta.width * 0.08),
+      top: Math.round(meta.height * 0.06),
+      width: Math.round(meta.width * 0.84),
+      height: Math.round(meta.height * 0.5),
+    }));
     jobs.push(sharp(mark.data, { raw: mark.info }).resize(320).png().toFile(out("brand", "logo-mark.png")));
     jobs.push(sharp(mark.data, { raw: mark.info }).resize(640).webp({ quality: 90, alphaQuality: 90 }).toFile(out("brand", "logo-mark.webp")));
   }
-  if (fs.existsSync(logoUr)) jobs.push(sharp(logoUr).resize(560).webp({ quality: 88 }).toFile(out("brand", "logo-ur.webp")));
-  if (fs.existsSync(headEn)) {
+  if (logoUr && fs.existsSync(logoUr)) jobs.push(sharp(logoUr).resize(560).webp({ quality: 88 }).toFile(out("brand", "logo-ur.webp")));
+  if (headEn && fs.existsSync(headEn)) {
     jobs.push(sharp(headEn).resize(1920).webp({ quality: 82 }).toFile(out("brand", "header-en.webp")));
     const m = await sharp(headEn).metadata();
     const box = (l, t, w, h) => ({ left: Math.round(m.width * l), top: Math.round(m.height * t), width: Math.round(m.width * w), height: Math.round(m.height * h) });
@@ -540,10 +565,11 @@ async function brand() {
     jobs.push(sharp(headEn).extract(box(0.75, 0.24, 0.25, 0.58)).resize(1200).webp({ quality: 84 }).toFile(out("seed", "hero", "luxury-villa.webp")));
     jobs.push(sharp(headEn).extract(box(0.63, 0, 0.37, 0.4)).resize(1200).webp({ quality: 84 }).toFile(out("seed", "hero", "ai-map.webp")));
   }
-  if (fs.existsSync(headUr)) jobs.push(sharp(headUr).resize(1920).webp({ quality: 82 }).toFile(out("brand", "header-ur.webp")));
-  if (fs.existsSync(dash)) {
-    const m = await sharp(dash).metadata();
-    jobs.push(sharp(dash).extract({ left: Math.round(m.width * 0.3), top: Math.round(m.height * 0.06), width: Math.round(m.width * 0.32), height: Math.round(m.height * 0.29) }).resize(1600).webp({ quality: 84 }).toFile(out("seed", "hero", "pakistan-landscape.webp")));
+  if (headUr && fs.existsSync(headUr)) jobs.push(sharp(headUr).resize(1920).webp({ quality: 82 }).toFile(out("brand", "header-ur.webp")));
+  if (dash && fs.existsSync(dash)) {
+    // The dashboard mock is a UI screenshot, so it only feeds the brand card.
+    // The scenic hero (`seed/hero/pakistan-landscape.webp`) is kept as-is; it is
+    // regenerated from a header banner when one is supplied.
     jobs.push(sharp(dash).resize(1600).webp({ quality: 80 }).toFile(out("brand", "dashboard-concept.webp")));
   }
   await Promise.all(jobs);
