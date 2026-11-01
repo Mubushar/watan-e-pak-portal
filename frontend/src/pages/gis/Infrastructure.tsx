@@ -74,7 +74,7 @@ export default function Infrastructure() {
         eyebrow="Infrastructure"
         title={
           <>
-            Mega projects that <span className="text-gradient">move land prices</span>
+            Infrastructure projects that <span className="text-gradient">move land prices</span>
           </>
         }
         subtitle="Ring roads, motorways, expressways, mass transit, new sectors, industrial and economic zones, airports and business districts — what is being built, where, and how far its effect on property reaches."

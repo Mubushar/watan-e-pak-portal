@@ -252,6 +252,7 @@ export default function AgentDetail() {
   const [autoApprove, setAutoApprove] = useState(false);
   const [run, setRun] = useState<AgentRun | null>(null);
   const [mode, setMode] = useState<"run" | "plan">("run");
+  const [runIdempotencyKey, setRunIdempotencyKey] = useState<string | null>(null);
 
   useEffect(() => {
     setObjective(params.get("objective") ?? EXAMPLES[key] ?? "");
@@ -262,11 +263,19 @@ export default function AgentDetail() {
     if (!objective && a) setObjective(`Run ${a.name.toLowerCase()} for today`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [a]);
+  useEffect(() => {
+    setRunIdempotencyKey(null);
+  }, [key, objective, subjectType, subjectId, autoApprove]);
 
   const body = { agent_key: key, objective, subject_type: subjectType || undefined, subject_id: (subjectType && subjectId) || undefined };
-  const runM = useMutate((approve: boolean) => post<AgentRun>("/agents/run", { ...body, approve }), {
+  const runM = useMutate((approve: boolean) => {
+    const key = runIdempotencyKey ?? crypto.randomUUID();
+    if (!runIdempotencyKey) setRunIdempotencyKey(key);
+    return post<AgentRun>("/agents/run", { ...body, approve, idempotency_key: key });
+  }, {
     invalidate: ["/agents/runs", "/agents/overview"],
     onSuccess: (r) => {
+      setRunIdempotencyKey(null);
       setMode("run");
       setRun(r);
     },
@@ -278,7 +287,7 @@ export default function AgentDetail() {
       setRun(r);
     },
   });
-  const approveM = useMutate((id: string) => post<AgentRun>(`/agents/runs/${id}/approve`, undefined, { approver: user?.name || user?.email || "web-user", execute: true }), {
+  const approveM = useMutate((id: string) => post<AgentRun>(`/agents/runs/${id}/approve`, undefined, { execute: true }), {
     invalidate: ["/agents/runs", "/agents/overview"],
     success: "Approved — run continued",
     onSuccess: (r) => setRun(r),

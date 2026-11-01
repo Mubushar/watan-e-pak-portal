@@ -61,12 +61,14 @@ catalogs and settings — and never drift from the code.
 | `access.py` | The access guard: one ASGI middleware with the rule table (`_RULES`) that decides what every HTTP route and `/mcp` needs. Reads are public unless a rule says otherwise; unnamed writes need an admin. Also the "act as yourself" messaging check and the agent-owns-it CRM check. |
 | `storage.py` | Durable storage: mirrors every in-memory store into PostgreSQL (`DATABASE_URL`) or SQLite (`backend/data/portal.sqlite3`), incrementally, and restores it on start. |
 | `knowledge.py` | The assistant's knowledge base: BM25 retrieval over listings, schemes (with approval status), cities, mega / big projects, news and guides, with `[n]` citations; understands crore / lakh, marla / kanal, Urdu and Roman Urdu. |
+| `semantic_retrieval.py` | Optional semantic index for the knowledge corpus. Admin-triggered indexing uses the configured embedding provider and PostgreSQL `pgvector`; hybrid agent retrieval embeds search queries through the same provider. |
 | `sources.py` | Trust tiers for sources: `official`, `verified`, `reference`, `listing`, `unverified`. |
 | `memory.py` | The assistant's per-user memory: recent conversation turns and long-term facts (budget, areas, size …), private, with opt-out. |
 | `prompts.py` | The one system prompt every app and the voice agent use (`POST /ai/context`). |
 | `web_lookup.py` | Web look-ups through OpenAI web search: official sources first, sources ranked by trust, 6-hour cache. |
 | `property_admin.py` | Administration › Property database: query, validated save, bulk actions, CSV export / import with dry run. |
 | `gis_import.py` | Reads uploaded GeoJSON / KML / GPX / CSV files into a clean FeatureCollection with stats (dry run, `[lat, lon]` flip, outside-Pakistan share). |
+| `gis_ingest.py` | GDAL/OGR-backed ingestion for vectors, rasters, zipped Shapefiles/file geodatabases and georeferencing by 3+ ground control points. |
 
 Because every `@mcp.tool()` function is also a plain Python function, the REST
 layer calls it directly — MCP and REST can never drift apart.
@@ -129,6 +131,7 @@ wins). The full list, including OTP delivery, voice, maps and ads, is in
 | `AI_ALLOWED_MODELS` | — | Extra models a `/v1` caller may name. |
 | `OPENAI_MAX_OUTPUT_TOKENS` | `800` | Reply cap (a client may ask for up to twice this). |
 | `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` | The only `/v1/embeddings` model. |
+| `OPENAI_BASE_URL` / `OPENAI_API_KEY` or `LLM_BASE_URL` / `LLM_API_KEY` | — | Embedding provider used when an administrator rebuilds the semantic index; provider must return 1536-dimensional embeddings. |
 | `OPENAI_WEB_MODEL` | `OPENAI_MODEL` | Web look-up model. |
 | `PORTAL_HOST` / `PORTAL_PORT` | `127.0.0.1` / `8000` | Where `main.py` listens. |
 
@@ -145,6 +148,10 @@ is in [Security & Operations §2](../docs/SECURITY_AND_OPERATIONS.md#2-security-
 
 ## Durable storage
 
+### Semantic knowledge index
+
+The semantic index is an optional PostgreSQL `pgvector` table. `compose.postgres.yaml` builds the PostGIS image with the PostgreSQL 17 pgvector extension; start it with `docker compose -f compose.yaml -f compose.postgres.yaml up --build -d`. Configure an embedding-capable OpenAI-compatible provider (`OPENAI_API_KEY`/`OPENAI_BASE_URL`, or `LLM_BASE_URL`/`LLM_API_KEY`), then use Administration → System → **Rebuild knowledge vectors**. This sends the portal's current knowledge text to that configured provider. Once indexed, the existing knowledge search uses hybrid BM25 + vector similarity; each query is also sent to the same provider for embedding. The admin-only `GET /ai/knowledge/semantic/status` endpoint reports readiness and index size. The provider must return 1536-dimensional embeddings.
+
 `storage.py` saves every store (about 80 of them: listings, CRM, accounting, messaging, users and
 sessions, GIS layers, assistant memory …) one row per item in `portal_rows(store, key, ord,
 data)`:
@@ -155,8 +162,10 @@ data)`:
 * The first start seeds the sample data and saves it; every later start loads the saved rows
   over the seed.
 * Saves run a few seconds after any write request, once a minute and at shutdown, and only
-  write what changed. One-time codes and rate counters are skipped; master-plan label
-  geometry is rebuilt from the plan files instead of stored.
+  write what changed. One-time codes and rate counters are skipped. Master-plan label geometry
+  is rebuilt from vector sources persisted in `portal_assets`; generated raster tiles remain a cache.
+* New property photos and original GIS upload files are stored in `portal_assets`; legacy photo
+  files are imported at startup. GIS layer geometries and AI/user memory remain in `portal_rows`.
 * A store whose rows can't be loaded keeps its seed, is listed as `frozen`, and is never
   overwritten.
 * `GET /portal/storage` shows the backend, last save, last error and rows per store;
@@ -551,8 +560,25 @@ A **layer** is a styled GeoJSON `FeatureCollection` attached to any entity
 | `gis_add_master_plan` | `POST /gis/master-plans` |
 | `gis_add_boundary` / `gis_add_zone` | `POST /gis/layers` |
 | `gis_list_master_plans` | `GET /gis/master-plans` |
-| — | `POST /gis/layers/upload` (GeoJSON / KML / GPX / CSV file; `dry_run`, `replace_layer_id`) |
+| — | `POST /gis/layers/upload` (vector/raster upload; `dry_run`, `replace_layer_id`, CRS, georeferencing mode and control points) |
 | — | `POST /gis/layers/publish` (`published`, `ids` or `scope`: `all` / `builtin` / `uploaded` / `master_plans`) |
+| — | `GET /gis/storage` (deployment GIS storage capability) |
+
+The map's **Layers** panel links GIS managers to Administration › GIS layers, where they can
+upload, replace, publish, hide, download and delete overlays without leaving the map workflow.
+On the PostGIS deployment (`compose.postgres.yaml`), vector features are mirrored to
+`portal_gis_features` with `geometry(Geometry,4326)` and a GiST spatial index; layer settings and
+the portal's compatibility copy remain in the normal durable store. The admin screen reports
+whether native PostGIS storage is active. SQLite and plain PostgreSQL without the PostGIS extension
+continue to use the JSONB/GeoJSON store.
+
+Direct import accepts GeoJSON, KML, GPX, point CSV, GeoTIFF/DTM, PNG/JPEG, PDF/GeoPDF, ECW,
+DWG/DGN, GeoPackage, and ZIP archives containing Shapefiles or file geodatabases. Backend GDAL/OGR
+normalizes vector files to WGS84 GeoJSON and stores their geometries in PostGIS. Rasters are
+warped to WGS84 GeoTIFF, stored as a PostGIS raster when `postgis_raster` is available, and served
+as preview overlays in the map. Images without spatial metadata need at least three well-spread
+pixel-to-latitude/longitude control points. ECW, GeoPDF and DWG support depends on the GDAL drivers
+compiled into the deployment; shapefiles and `.gdb` directories must arrive as ZIP archives.
 
 **Publishing.** Every map layer except the base maps is a layer record with `published`
 (on the public map at all) and `visible` (drawn by default). That includes the built-in

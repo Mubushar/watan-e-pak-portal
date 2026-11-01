@@ -301,7 +301,7 @@ export function MarketShowcase({ props, loading }: { props: Property[]; loading:
 const TOGETHER: [string, string][] = [
   ["You describe the home, budget and area — in English or Urdu.", "AI searches every listing and new project and shortlists the best three."],
   ["You ask whether a society is approved.", "AI checks the authority’s list and shows the official source."],
-  ["You choose what matters: schools, commute, price per marla.", "AI compares them on the map, with ring roads and mega projects nearby."],
+  ["You choose what matters: schools, commute, price per marla.", "AI compares them on the map, with ring roads and major infrastructure nearby."],
   ["You decide to visit.", "AI sends the call request and remembers your budget for next time."],
 ];
 

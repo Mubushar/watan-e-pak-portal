@@ -844,6 +844,13 @@ class GeoLayer(BaseModel):
     # Unpublished layers are hidden from the public map (admins with gis.manage still see them).
     published: bool = True
     source_file: Optional[str] = None  # the uploaded file it came from
+    source_asset_id: Optional[str] = None  # original uploaded bytes stored in portal_assets
+    raster_asset_id: Optional[str] = None  # rectified GeoTIFF source for the PostGIS raster row
+    raster_preview_asset_id: Optional[str] = None  # small PNG rendered by the map
+    raster_bounds: Optional[List[List[float]]] = None  # [[south,west],[north,east]], WGS84
+    raster_crs: Optional[str] = None
+    georeference_method: Optional[str] = None  # embedded | assisted | manual
+    georeference_rmse_m: Optional[float] = None
     created_by: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)

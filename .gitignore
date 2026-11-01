@@ -63,3 +63,12 @@ db/data/
 # ---- Live portal database (SQLite fallback for durable storage; see backend/storage.py)
 backend/data/
 db/load.sql
+# ---- Local-only files (kept out of the repository) ----
+PortalAdminUser.txt
+*PROMPT.txt
+.pptx-build/
+.pptx-output/
+.claude/launch.json
+# The apps install with npm (package-lock.json); stray pnpm files from a local pnpm run
+frontend/pnpm-lock.yaml
+frontend/pnpm-workspace.yaml

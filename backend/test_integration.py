@@ -970,7 +970,7 @@ def run_access_checks(client: TestClient) -> None:
     check("basedata: signed out -> 401", client.get("/admin/basedata", headers=anon).status_code == 401)
     check("basedata: agent -> 403", client.get("/admin/basedata", headers=agent).status_code == 403)
     ov = client.get("/admin/basedata", headers=admin).json()
-    check("basedata: overview lists cities / schemes / blocks", [t["table"] for t in ov["tables"]] == ["cities", "schemes", "blocks"], str(ov)[:120])
+    check("basedata: overview lists cities / schemes / blocks / landmarks", [t["table"] for t in ov["tables"]] == ["cities", "schemes", "blocks", "landmarks"], str(ov)[:120])
     r = client.post("/admin/basedata/cities", headers=admin, json={"name": "Basedata Test City", "state": "Punjab", "population": 1000,
                                                                    "sources": [{"title": "t", "url": "https://example.com"}]})
     city_id = r.json().get("id")
@@ -1184,7 +1184,8 @@ def run_ai_checks(client: TestClient) -> None:
     check("DELETE /me/memory clears everything", client.delete("/me/memory", headers=buyer).json()["forgotten"] >= 1
           and not user_memory.recent(client.get("/auth/me", headers=buyer).json()["user"]["id"]))
 
-    r = client.post("/agents/run", json={"agent_key": "transaction_agent", "objective": "review a deal"})
+    r = client.post("/agents/run", json={"agent_key": "transaction_agent", "objective": "review a deal",
+                                         "extra": {"price": 25_000_000, "property_title": "Agent test 10 marla house"}})
     run = r.json()
     check("agents: runs pause at the approval gate by default", run.get("status") == "awaiting_approval", str(run.get("status")))
     create = next((st for st in run.get("steps", []) if st["name"] == "transaction_create"), {})
@@ -1194,10 +1195,10 @@ def run_ai_checks(client: TestClient) -> None:
     approved = [a for a in after.get("approvals", []) if a.get("approved_by") != "auto"]
     check("agents: approval is recorded under the signed-in user", approved and "Portal Admin" in approved[0]["approved_by"], str(approved)[:160])
     create = next((st for st in after.get("steps", []) if st["name"] == "transaction_create"), {})
-    check("agents: approving runs the write step", create.get("status") in ("done", "failed") and after.get("status") == "completed",
+    check("agents: approving runs the write step", create.get("status") == "done" and after.get("status") == "completed",
           str(create)[:200])
-    check("agents: approving twice is refused", "error" in client.post(f"/agents/runs/{run['id']}/approve").json()
-          or after.get("status") == "awaiting_approval")
+    again = client.post(f"/agents/runs/{run['id']}/approve")
+    check("agents: approving twice is refused (409)", again.status_code == 409, f"{again.status_code} {again.text[:120]}")
 
 
 def run_admin_crud_checks(client: TestClient) -> None:
@@ -1229,7 +1230,7 @@ def run_admin_crud_checks(client: TestClient) -> None:
     check("admin properties: bulk feature", client.post("/admin/properties/bulk", json={"ids": [pid], "action": "feature"}).json()["affected"] == 1
           and core.find_property(pid).featured)
     csv_text = client.get("/admin/properties/export.csv").text
-    check("GET /admin/properties/export.csv", csv_text.startswith("id,title,price") and "Admin CRUD house" in csv_text)
+    check("GET /admin/properties/export.csv", csv_text.startswith("id,title,listing_purpose,price,") and "Admin CRUD house" in csv_text, csv_text[:80])
     r = client.post("/admin/properties/import", json={"csv": csv_text, "dry_run": True}).json()
     check("admin properties: CSV re-import dry run is clean", r["errors"] == [] and r["would_update"] == len(core.properties_db), str(r)[:200])
     bad = "title,price,city\nNo city,100,Atlantis\n"

@@ -110,3 +110,35 @@ $env:PORTAL_PERSIST = "0"; uv run python smoke_http.py   # live HTTP smoke on :8
 ```
 
 See the [Testing Guide](docs/TESTING_GUIDE.md).
+
+## Docker
+
+The repository includes a Docker Compose stack for the API, the web portal, and the portable app's browser build. From the repository root, start all three with Docker Compose v2.24.0 or newer:
+
+```powershell
+# Optional: configure OTP delivery, AI provider keys, and other backend settings.
+if (-not (Test-Path backend/.env)) { Copy-Item backend/.env.example backend/.env }
+# Edit backend/.env, then:
+docker compose up --build
+```
+
+Open the web portal at <http://localhost:8080>, the portable app's browser build at <http://localhost:8081>, and the backend API at <http://localhost:8000> (development API docs at `/docs`). The two web containers proxy `/api`, `/media`, and `/ads.txt` to the backend. SQLite data and binary uploads persist in the database volume; the legacy photo volume and any existing `backend/media/uploads` files are imported at startup for compatibility. `docker compose down` stops the stack; `docker compose down -v` deletes the database and legacy volumes.
+
+The backend Docker build excludes generated master-plan raster files to keep the application image smaller. Compose mounts `backend/media/masterplans` read-only at runtime; preserve/provision this directory on the deployment host. Knowledge refreshes are stored in the database. The first backend start imports vector/OSM sources into the database and may take longer.
+
+The Compose defaults are for local development, including seeded demo data and API docs. For deployment, set `PORTAL_ENV=production`, configure `PORTAL_ALLOWED_HOSTS`, `PORTAL_CORS_ORIGINS`, and `PORTAL_MCP_TOKEN` in `backend/.env`, and configure the required OTP and AI providers. Production disables demo accounts and docs by default. Keep secrets in the ignored `backend/.env`; do not bake them into images. Use HTTPS through a reverse proxy for public access. Back up the active database volume (`portal-data` for SQLite or `postgres-data` for PostgreSQL); keep `portal-uploads` until you have confirmed its legacy files were imported.
+
+The portable Docker image serves its Vite browser build. Electron installers and Capacitor Android/iOS packages remain built with their respective platform toolchains.
+
+
+### PostgreSQL / PostGIS option
+
+SQLite remains the default for a quick local start. To run the stack with PostgreSQL + PostGIS instead, set a private `POSTGRES_PASSWORD` in the repository-root `.env` file (use a long, unique URL-safe alphanumeric value outside local development), then start with the overlay:
+
+```powershell
+docker compose -f compose.yaml -f compose.postgres.yaml up --build
+```
+
+The backend writes portal state and AI/user memory to PostgreSQL `JSONB`; uploaded property photos and original GIS uploads are stored in `portal_assets` (`BYTEA`). The PostGIS image initializes spatial extensions, and PostgreSQL data persists in a separate `postgres-data` volume. On first start, the backend imports bundled vector/OSM reference sources into that asset table. The development password fallback is only for a local throwaway setup. For an existing SQLite deployment, changing `DATABASE_URL` does not copy its rows or binary assets. Stop the stack, start only PostgreSQL with `docker compose -f compose.yaml -f compose.postgres.yaml up -d postgres`, then run `docker compose -f compose.yaml -f compose.postgres.yaml run --rm --no-deps backend python migrate_storage.py` before starting the full stack. The command refuses a non-empty PostgreSQL target and copies `portal_rows`, `portal_kv`, and `portal_assets`.
+
+Generated master-plan raster tiles (about 3.7 GiB) remain filesystem cache assets for efficient map-tile serving; Compose mounts them read-only from the deployment host rather than baking them into the backend image. The editable GIS layer geometries, uploaded GIS originals, and smaller vector/OSM reference datasets are database-backed. Include `portal_assets` in PostgreSQL backups.

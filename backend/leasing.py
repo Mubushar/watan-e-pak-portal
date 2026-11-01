@@ -79,6 +79,8 @@ class Application(BaseModel):
     id: str = Field(default_factory=lambda: "app_" + uuid.uuid4().hex[:8])
     unit_id: Optional[str] = None
     applicant: str = ""
+    email: Optional[str] = None
+    phone: Optional[str] = None
     monthly_income: float = 0.0
     employment: str = "salaried"  # salaried | self_employed | business | retired | student
     references_count: int = 0

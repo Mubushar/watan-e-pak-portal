@@ -1,0 +1,63 @@
+name: watanepak
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      PORTAL_HOST: 0.0.0.0
+      PORTAL_PORT: "8000"
+      PORTAL_DB_PATH: /app/backend/data/portal.sqlite3
+      PORTAL_LEGACY_UPLOAD_DIR: /legacy-uploads
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - portal-data:/app/backend/data
+      - portal-uploads:/app/backend/media/uploads
+      - ./backend/media/uploads:/legacy-uploads:ro
+      - type: bind
+        source: ./backend/media/masterplans
+        target: /app/backend/media/masterplans
+        read_only: true
+        bind:
+          create_host_path: false
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 180s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    restart: unless-stopped
+
+  portable:
+    build:
+      context: ./portable
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE: /api
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${PORTABLE_PORT:-8081}:80"
+    restart: unless-stopped
+
+volumes:
+  portal-data:
+  portal-uploads:
+

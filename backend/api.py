@@ -45,6 +45,7 @@ import ads_network
 import geo
 import gis
 import gis_import
+import gis_ingest
 import masterplan
 import mapread
 import mapfind
@@ -58,6 +59,7 @@ import megaprojects
 import roads
 import access
 import knowledge
+import semantic_retrieval
 import memory as user_memory
 import portal_env
 import priority
@@ -67,6 +69,7 @@ import prompts
 import property_admin
 import storage
 import basedata
+import leasing
 import crm_ai
 import crm_channels
 import water
@@ -97,12 +100,24 @@ async def lifespan(app: FastAPI):
     # Durable storage: load the database over the seeded sample data (or save the seed on the
     # first run) and keep writing changes in the background; flush once more on shutdown.
     storage_state = storage.start()
+    # Import older filesystem photo uploads into the database; retain files as a recovery copy.
+    storage.import_assets_from_directory(UPLOAD_DIR)
+    legacy_upload_dir = os.getenv("PORTAL_LEGACY_UPLOAD_DIR", "")
+    if legacy_upload_dir and os.path.abspath(legacy_upload_dir) != os.path.abspath(UPLOAD_DIR):
+        storage.import_assets_from_directory(legacy_upload_dir)
+    seed_asset_count = storage.import_seed_assets(os.path.dirname(os.path.abspath(__file__)))
+    if seed_asset_count:
+        logging.getLogger("portal").info("storage: imported %d bundled GIS/source assets", seed_asset_count)
     core.ensure_builtin_layers()  # overlays added in a newer version join the saved ones (unpublished)
     core.publish_master_plans_once(storage.instance())  # DHA master plans are attached by default
     if basedata.add_missing_schemes():                     # societies added to the data file since the save
         storage.mark_dirty()
     if core.add_missing_master_plans():                    # master plans (Bahria, societies…) built since the save
         storage.mark_dirty()
+    db = storage.instance()
+    if db and db.gis_storage_status().get("spatial"):
+        synced = db.sync_gis_layers(gis.GIS_LAYERS)
+        logging.getLogger("portal").info("storage: synchronized %d GIS layers into PostGIS", synced)
     project_inventory.sync()      # project inventories from the data file: new units in, sold ones marked
     seed_media.apply()            # credited photos for cities / schemes that have none yet
     logging.getLogger("portal").info("storage: %s", storage_state)
@@ -156,9 +171,9 @@ _link_demo_agent()
 basedata.load_seed()  # researched cities & housing schemes (geodata/pk_*_basedata / housing_schemes)
 
 
-# ------------------------------------------------------------------ base data admin (basedata.manage)
+# ------------------------------------------------------------------ base data admin (basedata.manage); landmark records also require projects.manage
 
-_BASEDATA_TABLES = ("cities", "schemes", "blocks")
+_BASEDATA_TABLES = ("cities", "schemes", "blocks", "landmarks")
 
 
 def _basedata_table(table: str) -> str:
@@ -172,6 +187,71 @@ def basedata_overview() -> Any:
     """The base-data tables with their row counts and editable fields."""
     return {"tables": [{"table": t, "count": len(basedata.rows(t)), "fields": basedata.fields(t)} for t in _BASEDATA_TABLES],
             "approval_statuses": basedata.APPROVAL_STATUSES, "development_statuses": basedata.DEVELOPMENT_STATUSES}
+
+
+def _require_landmark_user(authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
+    user = core.auth.current_user(_bearer_token(authorization))
+    if user is None:
+        raise HTTPException(status_code=401, detail="Missing or invalid bearer token",
+                            headers={"WWW-Authenticate": "Bearer"})
+    public = core.auth.public_user(user)
+    if "projects.manage" not in core.auth.user_permissions(user):
+        raise HTTPException(status_code=403, detail="Landmark management requires the projects.manage permission")
+    return public
+
+
+@app.get("/admin/basedata/landmarks", tags=["admin"])
+def basedata_landmarks_list(q: Optional[str] = None, city_id: Optional[str] = None,
+                            user: Dict[str, Any] = Depends(_require_landmark_user)) -> Any:
+    rows = basedata.rows("landmarks", q=q, city_id=city_id)
+    return {"table": "landmarks", "count": len(rows), "rows": rows}
+
+
+@app.post("/admin/basedata/landmarks", tags=["admin"], status_code=201)
+def basedata_landmarks_create(payload: Dict[str, Any], user: Dict[str, Any] = Depends(_require_landmark_user)) -> Any:
+    try:
+        row = basedata.create("landmarks", payload)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors()[0].get("msg", "Invalid value"))
+    storage.mark_dirty()
+    return row
+
+
+@app.get("/admin/basedata/landmarks/{record_id}", tags=["admin"])
+def basedata_landmarks_get(record_id: str, user: Dict[str, Any] = Depends(_require_landmark_user)) -> Any:
+    row = basedata.get("landmarks", record_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    return row
+
+
+@app.put("/admin/basedata/landmarks/{record_id}", tags=["admin"])
+def basedata_landmarks_update(record_id: str, payload: Dict[str, Any], user: Dict[str, Any] = Depends(_require_landmark_user)) -> Any:
+    try:
+        row = basedata.update("landmarks", record_id, payload)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors()[0].get("msg", "Invalid value"))
+    if row is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    storage.mark_dirty()
+    return row
+
+
+@app.delete("/admin/basedata/landmarks/{record_id}", tags=["admin"])
+def basedata_landmarks_delete(record_id: str, user: Dict[str, Any] = Depends(_require_landmark_user)) -> Any:
+    dependents = basedata.dependents("landmarks", record_id)
+    if dependents.get("listings"):
+        raise HTTPException(status_code=409, detail=f"Still in use by {dependents['listings']} listings — move those listings first")
+    result = core.delete_big_project(record_id)
+    payload = json.loads(result)
+    if payload.get("error"):
+        raise HTTPException(status_code=404, detail=payload["error"])
+    storage.mark_dirty()
+    return payload
 
 
 @app.get("/admin/basedata/{table}", tags=["admin"])
@@ -221,6 +301,7 @@ def basedata_delete(table: str, record_id: str) -> Any:
         parts = ", ".join(f"{v} {k}" for k, v in res["dependents"].items())
         raise HTTPException(status_code=409, detail=f"Still in use by {parts} — move or delete those first")
     return res
+
 
 # Compress JSON / GeoJSON / HTML over 1 KB (map layers and lists are large).
 app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)
@@ -359,6 +440,13 @@ class PropertyCreate(BaseModel):
     title: str
     price: float
     city_id: str
+    listing_purpose: str = "sale"
+    security_deposit: Optional[float] = None
+    advance_months: Optional[int] = None
+    lease_term_months: Optional[int] = None
+    rent_frequency: str = "monthly"
+    furnishing_status: Optional[str] = None
+    tenant_preference: Optional[str] = None
     description: Optional[str] = None
     use_type: str = "residential"
     category: str = "house"
@@ -380,6 +468,13 @@ class PropertyUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     price: Optional[float] = None
+    listing_purpose: Optional[str] = None
+    security_deposit: Optional[float] = None
+    advance_months: Optional[int] = None
+    lease_term_months: Optional[int] = None
+    rent_frequency: Optional[str] = None
+    furnishing_status: Optional[str] = None
+    tenant_preference: Optional[str] = None
     use_type: Optional[str] = None
     category: Optional[str] = None
     status: Optional[str] = None
@@ -474,13 +569,14 @@ def fastapi_info() -> Any:
 
 
 @app.get("/properties", tags=["properties"])
-def list_properties(limit: int = 50) -> Any:
-    return j(core.search_properties(limit=limit))
+def list_properties(limit: int = 50, purpose: Optional[str] = None) -> Any:
+    return j(core.search_properties(limit=limit, purpose=purpose))
 
 
 @app.get("/search", tags=["properties"])
 def search(
     city: Optional[str] = None,
+    purpose: Optional[str] = None,
     use_type: Optional[str] = None,
     category: Optional[str] = None,
     min_price: Optional[float] = None,
@@ -499,6 +595,7 @@ def search(
     return j(
         core.search_properties(
             city=city,
+            purpose=purpose,
             use_type=use_type,
             category=category,
             min_price=min_price,
@@ -778,8 +875,9 @@ _PK_FILES: Dict[str, Any] = {}
 
 def _pk_file(name: str) -> Any:
     if name not in _PK_FILES:
-        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "geodata", name), encoding="utf-8") as fh:
-            _PK_FILES[name] = json.load(fh)
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "geodata", name)
+        raw = storage.read_seed_asset(f"geodata/{name}", path)
+        _PK_FILES[name] = json.loads(raw.decode("utf-8")) if raw else {}
     return _PK_FILES[name]
 
 
@@ -829,12 +927,12 @@ def geo_districts(request: Request) -> Any:
     Islamabad Capital Territory, which has no districts, is included as one."""
     if (hidden := _unpublished("builtin:districts", {**_EMPTY_FC, "count": 0})) is not None:
         return hidden
-    if not os.path.exists(_DISTRICTS_FILE):
+    raw_districts = storage.read_seed_asset("media/boundaries/pk_districts.geojson", _DISTRICTS_FILE)
+    if not raw_districts:
         return {"type": "FeatureCollection", "features": [], "missing": True,
                 "hint": "District data not built yet: run build_districts.py (see backend/README.md)."}
     if "data" not in _DISTRICTS:
-        with open(_DISTRICTS_FILE, encoding="utf-8") as fh:
-            data = json.load(fh)
+        data = json.loads(raw_districts.decode("utf-8"))
         for f in _pk_file("pk_provinces.geojson")["features"]:
             if f["properties"]["name"] == "Islamabad Capital Territory":
                 data["features"].append({"type": "Feature", "geometry": f["geometry"], "properties": {
@@ -1357,6 +1455,10 @@ class MemoryNote(BaseModel):
     text: str = Field(..., min_length=2, max_length=300)
 
 
+class MemoryCorrection(BaseModel):
+    value: str = Field(..., min_length=2, max_length=300)
+
+
 class MemorySettings(BaseModel):
     enabled: bool
 
@@ -1411,6 +1513,21 @@ def ai_knowledge_search(payload: KnowledgeSearchRequest) -> Any:
     return knowledge.search(payload.query, k=payload.k, types=payload.types)
 
 
+@app.get("/ai/knowledge/semantic/status", tags=["ai"])
+def ai_knowledge_semantic_status() -> Any:
+    """Read pgvector and embedding-provider readiness; never returns secrets."""
+    return semantic_retrieval.status()
+
+
+@app.post("/ai/knowledge/semantic/rebuild", tags=["ai"])
+def ai_knowledge_semantic_rebuild() -> Any:
+    """Re-embed portal knowledge into the PostgreSQL vector index (settings managers only)."""
+    try:
+        return semantic_retrieval.rebuild()
+    except semantic_retrieval.SemanticUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 @app.get("/me/memory", tags=["me"])
 def me_memory() -> Any:
     """What the assistant remembers about me (only I can see this)."""
@@ -1422,6 +1539,21 @@ def me_memory_add(payload: MemoryNote) -> Any:
     result = user_memory.remember(_me_or_401()["id"], payload.text)
     if "error" in result:
         raise HTTPException(status_code=409, detail=result["error"])
+    return result
+
+
+# Declared before PUT /me/memory/{memory_id}, which would otherwise capture "settings".
+@app.put("/me/memory/settings", tags=["me"])
+def me_memory_settings(payload: MemorySettings) -> Any:
+    return user_memory.set_enabled(_me_or_401()["id"], payload.enabled)
+
+
+@app.put("/me/memory/{memory_id}", tags=["me"])
+def me_memory_correct(memory_id: str, payload: MemoryCorrection) -> Any:
+    result = user_memory.correct(_me_or_401()["id"], memory_id, payload.value)
+    if "error" in result:
+        raise HTTPException(status_code=404 if result["error"] == "No such memory" else 409,
+                            detail=result["error"])
     return result
 
 
@@ -1437,11 +1569,6 @@ def me_memory_delete(memory_id: str) -> Any:
 def me_memory_clear() -> Any:
     """Forget everything the assistant remembers about me, including recent conversations."""
     return user_memory.forget(_me_or_401()["id"])
-
-
-@app.put("/me/memory/settings", tags=["me"])
-def me_memory_settings(payload: MemorySettings) -> Any:
-    return user_memory.set_enabled(_me_or_401()["id"], payload.enabled)
 
 
 @app.post("/ai/realtime/session", tags=["ai"])
@@ -1664,7 +1791,7 @@ class GeoLayerUpdate(BaseModel):
 
 
 class GeoLayerUpload(BaseModel):
-    """An uploaded GIS file (GeoJSON, KML, GPX or CSV) to become a layer, or to replace one's geometry."""
+    """An uploaded vector or raster GIS source, optionally corrected with ground control points."""
     filename: str = Field(..., max_length=200)
     content: Optional[str] = None          # text files
     content_base64: Optional[str] = None   # or the raw file, base64
@@ -1679,6 +1806,9 @@ class GeoLayerUpload(BaseModel):
     source_url: Optional[str] = None
     replace_layer_id: Optional[str] = None  # replace this layer's geometry instead of adding a layer
     dry_run: bool = False                   # read and check the file, save nothing
+    source_crs: Optional[str] = Field(default=None, max_length=120)
+    georeference_mode: str = "auto"         # auto | assisted | manual
+    control_points: Optional[List[Dict[str, Any]]] = None
 
 
 class MasterPlanCreate(BaseModel):
@@ -1705,6 +1835,13 @@ class PolygonQuery(BaseModel):
 @app.get("/gis/base-maps", tags=["gis"])
 def gis_base_maps() -> Any:
     return j(core.gis_list_base_maps())
+
+
+@app.get("/gis/storage", tags=["gis"])
+def gis_storage_status() -> Any:
+    """Report whether this deployment stores vector features in native PostGIS geometry tables."""
+    db = storage.instance()
+    return db.gis_storage_status() if db else {"backend": "starting", "spatial": False}
 
 
 @app.get("/gis/base-maps/{base_map_id}", tags=["gis"])
@@ -1743,30 +1880,151 @@ def gis_get_layer(layer_id: str) -> Any:
 
 @app.post("/gis/layers/upload", tags=["gis"], status_code=201)
 def gis_upload_layer(payload: GeoLayerUpload) -> Any:
-    """Upload a GeoJSON / KML / GPX / CSV file as a new layer (or as the new geometry of
-    ``replace_layer_id``). ``dry_run`` only reads and checks the file and returns what it found."""
+    """Import vector/raster GIS formats; raster scans can be georeferenced with control points."""
     try:
-        collection, stats = gis_import.read(payload.filename, payload.content, payload.content_base64)
+        raw_source = gis_import.decode(payload.content, payload.content_base64)
+        imported = gis_ingest.ingest(payload.filename, raw_source, payload.source_crs,
+                                     payload.georeference_mode, payload.control_points, payload.dry_run)
     except gis_import.ImportError_ as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    stats = imported.get("import") or {}
     if payload.dry_run:
-        return {"dry_run": True, "import": stats}
+        imported.pop("warped_geotiff", None)
+        imported.pop("preview_png", None)
+        return {"dry_run": True, **imported}
+
+    source_type = _gis_source_media_type(payload.filename)
+    collection = imported.get("geojson") or {"type": "FeatureCollection", "features": []}
     if payload.replace_layer_id:
+        layer = gis.find_layer(payload.replace_layer_id)
+        if not layer:
+            raise HTTPException(status_code=404, detail=f"Layer not found: {payload.replace_layer_id}")
         result = j(core.gis_update_layer(payload.replace_layer_id, geojson=collection))
         if "error" in result:
             raise HTTPException(status_code=404, detail=result["error"])
-        layer = gis.find_layer(payload.replace_layer_id)
-        if layer:
-            layer.source_file = payload.filename
-        return {**result, "import": stats, "replaced": True}
+        asset_key = _save_gis_source(raw_source, source_type)
+        old_asset_key = layer.source_asset_id
+        old_raster_assets = (layer.raster_asset_id, layer.raster_preview_asset_id)
+        layer.source_file = payload.filename
+        layer.source_asset_id = asset_key
+        db = storage.instance()
+        if db:
+            db.sync_gis_layer(layer)
+        warning = None
+        if imported.get("kind") == "raster":
+            warning = _attach_gis_raster(layer, imported)
+            for old_key in old_raster_assets:
+                if old_key:
+                    storage.delete_asset(old_key)
+        else:
+            _clear_gis_raster(layer)
+        storage.mark_dirty()
+        if old_asset_key:
+            storage.delete_asset(old_asset_key)
+        return {**result, "source_asset_id": asset_key, "import": stats, "replaced": True,
+                "raster_warning": warning}
+
     name = payload.name or os.path.splitext(os.path.basename(payload.filename))[0].replace("_", " ").strip() or "Uploaded layer"
+    asset_key = _save_gis_source(raw_source, source_type)
     result = j(core.gis_add_layer(
         entity_type=payload.entity_type, entity_id=payload.entity_id, name=name, geojson=collection,
         layer_type=payload.layer_type, description=payload.description, style=payload.style,
-        source_url=payload.source_url, visible=payload.visible, published=payload.published, source_file=payload.filename))
+        source_url=payload.source_url, visible=payload.visible, published=payload.published,
+        source_file=payload.filename, source_asset_id=asset_key))
     if "error" in result:
+        if asset_key:
+            storage.delete_asset(asset_key)
         raise HTTPException(status_code=400, detail=result["error"])
-    return {**result, "import": stats}
+    layer = gis.find_layer(result.get("id"))
+    warning = _attach_gis_raster(layer, imported) if layer and imported.get("kind") == "raster" else None
+    if layer and imported.get("kind") == "raster":
+        result = {**result, **layer.model_dump(mode="json")}
+    storage.mark_dirty()
+    return {**result, "source_asset_id": asset_key, "import": stats, "raster_warning": warning}
+
+
+def _attach_gis_raster(layer: Any, imported: Dict[str, Any]) -> Optional[str]:
+    db = storage.instance()
+    tif, preview = imported.get("warped_geotiff"), imported.get("preview_png")
+    if not tif or not preview:
+        raise HTTPException(status_code=400, detail="Raster conversion did not produce a map image")
+    raster_key = f"gis-rasters/{uuid.uuid4().hex}"
+    preview_key = f"gis-previews/{uuid.uuid4().hex}"
+    storage.put_asset(raster_key, "image/tiff", tif)
+    storage.put_asset(preview_key, "image/png", preview)
+    layer.raster_asset_id = raster_key
+    layer.raster_preview_asset_id = preview_key
+    layer.raster_bounds = imported["import"]["bounds"]
+    layer.raster_crs = "EPSG:4326"
+    layer.georeference_method = (imported.get("georeference_mode") if imported.get("georeference") else "embedded")
+    layer.georeference_rmse_m = (imported.get("georeference") or {}).get("rmse_m")
+    warning = None
+    if db:
+        db.sync_gis_layer(layer)
+        try:
+            if not db.sync_gis_raster(layer.id, tif):
+                warning = "Raster preview is stored for map display; native PostGIS raster extension is unavailable."
+        except Exception as exc:
+            warning = f"Raster preview is stored for map display, but PostGIS raster import failed: {type(exc).__name__}."
+    return warning
+
+
+def _clear_gis_raster(layer: Any) -> None:
+    db = storage.instance()
+    for key in (layer.raster_asset_id, layer.raster_preview_asset_id):
+        if key:
+            storage.delete_asset(key)
+    layer.raster_asset_id = None
+    layer.raster_preview_asset_id = None
+    layer.raster_bounds = None
+    layer.raster_crs = None
+    layer.georeference_method = None
+    layer.georeference_rmse_m = None
+    if db:
+        db.delete_gis_raster(layer.id)
+
+
+def _gis_source_media_type(filename: str) -> str:
+    return {".geojson": "application/geo+json", ".json": "application/geo+json",
+            ".kml": "application/vnd.google-earth.kml+xml", ".gpx": "application/gpx+xml",
+            ".csv": "text/csv; charset=utf-8", ".png": "image/png", ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg", ".tif": "image/tiff", ".tiff": "image/tiff",
+            ".pdf": "application/pdf"}.get(os.path.splitext(filename.lower())[1], "application/octet-stream")
+
+
+def _save_gis_source(raw: bytes, media_type: str) -> Optional[str]:
+    if not storage.instance():
+        return None  # in-memory/test mode keeps the parsed GeoJSON in the layer only
+    asset_key = f"gis-sources/{uuid.uuid4().hex}"
+    storage.put_asset(asset_key, media_type, raw)
+    return asset_key
+
+
+@app.get("/gis/layers/{layer_id}/source", tags=["gis"], include_in_schema=False)
+def gis_layer_source(layer_id: str) -> Any:
+    """Download the original uploaded GIS file; only GIS managers may access source files."""
+    if not access.can(access.current(), "gis.manage"):
+        raise HTTPException(status_code=403, detail="GIS manager permission required")
+    layer = gis.find_layer(layer_id)
+    asset = storage.get_asset(layer.source_asset_id) if layer and layer.source_asset_id else None
+    if not asset:
+        raise HTTPException(status_code=404, detail="Original source file not found")
+    raw, media_type = asset
+    return Response(content=raw, media_type=media_type,
+                    headers={"Content-Disposition": 'attachment; filename="gis-source"',
+                             "Cache-Control": "private, no-store"})
+
+
+@app.get("/gis/layers/{layer_id}/raster-preview", tags=["gis"], include_in_schema=False)
+def gis_layer_raster_preview(layer_id: str) -> Any:
+    layer = gis.find_layer(layer_id)
+    if not layer or (layer.published is False and not access.can(access.current(), "gis.manage")):
+        raise HTTPException(status_code=404, detail="Raster layer not found")
+    asset = storage.get_asset(layer.raster_preview_asset_id) if layer.raster_preview_asset_id else None
+    if not asset:
+        raise HTTPException(status_code=404, detail="Raster preview not found")
+    return Response(content=asset[0], media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=300" if layer.published else "private, no-store"})
 
 
 @app.put("/gis/layers/{layer_id}", tags=["gis"])
@@ -1807,10 +2065,21 @@ def gis_publish_layers(payload: LayerPublish) -> Any:
                 "uploaded": not ref}.get(payload.scope, True)
 
     changed = 0
+    changed_layers = []
     for l in gis.GIS_LAYERS:
         if in_scope(l) and l.published != payload.published:
+            changed_layers.append((l, l.published, l.updated_at))
             l.published, l.updated_at = payload.published, datetime.now()
             changed += 1
+    db = storage.instance()
+    if db and db.gis_storage_status().get("spatial"):
+        try:
+            for layer, _, _ in changed_layers:
+                db.sync_gis_layer(layer)
+        except Exception as exc:
+            for layer, was_published, was_updated in changed_layers:
+                layer.published, layer.updated_at = was_published, was_updated
+            raise HTTPException(status_code=503, detail=f"Could not synchronize PostGIS layer catalog: {exc}")
     return {"changed": changed, "published": payload.published,
             "now_published": sum(1 for l in gis.GIS_LAYERS if l.published), "layers": len(gis.GIS_LAYERS)}
 
@@ -2091,6 +2360,14 @@ def gis_report(
         lang=lang, theme=theme,
     )
     return HTMLResponse(content=html)
+
+
+@app.get("/gis/report/rentals/city/{city_id}", tags=["gis-analysis"], response_class=HTMLResponse)
+def gis_rental_report(city_id: str, include_map: bool = True,
+                      lang: str = Depends(ui_lang), theme: str = Depends(ui_theme)) -> HTMLResponse:
+    """Printable rental inventory, rent-band and property-type report for a city."""
+    return HTMLResponse(content=core.gis_rental_market_report(city_id, include_map=include_map,
+                                                              lang=lang, theme=theme))
 
 
 @app.get("/gis/analysis/{entity_type}/{entity_id}/cost-development", tags=["gis-analysis"])
@@ -2547,10 +2824,12 @@ def _save_upload(data_url: str) -> str:
     ext = next((e for sig, e in _IMAGE_SIGNATURES.items() if raw.startswith(sig)), None)
     if ext is None or (ext == "webp" and raw[8:12] != b"WEBP"):
         raise HTTPException(status_code=415, detail="Only JPEG, PNG or WebP photos are accepted")
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
     name = f"{core.uuid.uuid4().hex}.{ext}"
-    with open(os.path.join(UPLOAD_DIR, name), "wb") as fh:
-        fh.write(raw)
+    media_type = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}[ext]
+    if not storage.put_asset(name, media_type, raw):
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        with open(os.path.join(UPLOAD_DIR, name), "wb") as fh:
+            fh.write(raw)
     return f"/media/uploads/{name}"
 
 
@@ -2626,10 +2905,21 @@ def uploaded_media(name: str) -> Any:
     """Serve a photo uploaded through ``/me/listings/{id}/photos``."""
     if not re.fullmatch(r"[0-9a-f]{32}\.(jpg|png|webp)", name):
         raise HTTPException(status_code=404, detail="Not found")
+    asset = storage.get_asset(name)
+    if asset:
+        raw, media_type = asset
+        return Response(content=raw, media_type=media_type,
+                        headers={"Cache-Control": "public, max-age=31536000, immutable"})
+    # Backward compatibility for older containers: serve and lazily import legacy volume files.
     path = os.path.join(UPLOAD_DIR, name)
     if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="Not found")
-    return FileResponse(path, headers={"Cache-Control": "public, max-age=31536000, immutable"})
+    with open(path, "rb") as fh:
+        raw = fh.read()
+    media_type = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}[name.rsplit(".", 1)[-1]]
+    storage.put_asset(name, media_type, raw)
+    return Response(content=raw, media_type=media_type,
+                    headers={"Cache-Control": "public, max-age=31536000, immutable"})
 
 
 # ------------------------------------------------------------------
@@ -3821,12 +4111,12 @@ class PropertyImport(BaseModel):
 
 @app.get("/admin/properties", tags=["admin"])
 def admin_properties(q: str = "", city_id: str = "", scheme_id: str = "", status: str = "", category: str = "",
-                     use_type: str = "", featured: Optional[bool] = None, agent_id: str = "", located: Optional[bool] = None,
+                     use_type: str = "", purpose: str = "", featured: Optional[bool] = None, agent_id: str = "", located: Optional[bool] = None,
                      min_price: Optional[float] = None, max_price: Optional[float] = None, sort: str = "updated",
                      order: str = "desc", page: int = 1, page_size: int = 25) -> Any:
     """Every listing with every field: search, filters, sorting, paging and facet counts."""
     return property_admin.query(q, city_id, scheme_id, status, category, use_type, featured, agent_id, located,
-                                min_price, max_price, sort, order, page, page_size)
+                                min_price, max_price, sort, order, page, page_size, purpose=purpose)
 
 
 @app.get("/admin/properties/meta", tags=["admin"])
@@ -3834,6 +4124,8 @@ def admin_properties_meta() -> Any:
     """Choices for the property form: statuses, categories, cities, schemes, blocks and agents."""
     return {
         "statuses": property_admin.STATUSES, "categories": property_admin.CATEGORIES, "use_types": property_admin.USE_TYPES,
+        "purposes": property_admin.PURPOSES, "rent_frequencies": property_admin.RENT_FREQUENCIES,
+        "furnishing_statuses": property_admin.FURNISHING_STATUSES,
         "cities": [{"id": c.id, "name": c.name} for c in priority.sort_cities(list(core.cities_db))],
         "schemes": [{"id": s.id, "name": s.name, "city_id": s.city_id}
                     for s in sorted(core.housing_schemes_db, key=priority.society_sort_key_for(core))],
@@ -3843,15 +4135,15 @@ def admin_properties_meta() -> Any:
 
 
 @app.get("/admin/properties/export.csv", tags=["admin"])
-def admin_properties_export(q: str = "", city_id: str = "", status: str = "", category: str = "") -> Any:
+def admin_properties_export(q: str = "", city_id: str = "", status: str = "", category: str = "", purpose: str = "") -> Any:
     """The (filtered) catalogue as a spreadsheet; re-import it after editing."""
-    rows = property_admin.query(q, city_id, "", status, category, page_size=200, page=1)
+    rows = property_admin.query(q, city_id, "", status, category, page_size=200, page=1, purpose=purpose)
     everything: List[Dict[str, Any]] = list(rows["rows"])
     for page in range(2, rows["pages"] + 1):
-        everything += property_admin.query(q, city_id, "", status, category, page_size=200, page=page)["rows"]
+        everything += property_admin.query(q, city_id, "", status, category, page_size=200, page=page, purpose=purpose)["rows"]
     stamp = datetime.now().strftime("%Y%m%d-%H%M")
     return Response(content=property_admin.export_csv(everything), media_type="text/csv; charset=utf-8",
-                    headers={"Content-Disposition": f'attachment; filename="arzepak-properties-{stamp}.csv"'})
+                    headers={"Content-Disposition": f'attachment; filename="watanepak-properties-{stamp}.csv"'})
 
 
 @app.post("/admin/properties/import", tags=["admin"])
@@ -5038,6 +5330,7 @@ class AgentRunRequest(AgentPlanRequest):
     text: Optional[str] = None
     approve: bool = False
     extra: Optional[Dict[str, Any]] = None
+    idempotency_key: Optional[str] = Field(default=None, min_length=8, max_length=128)
 
 
 class AgentOrchestrateRequest(BaseModel):
@@ -5074,7 +5367,10 @@ def agent_runs(agent_key: Optional[str] = None, status: Optional[str] = None) ->
 @app.get("/agents/runs/{run_id}", tags=["agents"])
 def agent_run_get(run_id: str) -> Any:
     """One agent run with its steps, outputs and approvals."""
-    return j(core.agent_run_get(run_id))
+    result = j(core.agent_run_get(run_id))
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
 
 
 @app.get("/agents/smart-actions", tags=["agents"])
@@ -5108,13 +5404,22 @@ def agent_plan(payload: AgentPlanRequest) -> Any:
 @app.post("/agents/run", tags=["agents"])
 def agent_run(payload: AgentRunRequest) -> Any:
     """Execute an agent run against the live portal."""
-    return j(core.agent_run(**payload.model_dump(exclude_none=True)))
+    result = j(core.agent_run(**payload.model_dump(exclude_none=True)))
+    if "error" in result:
+        status = 403 if "requires " in result["error"] or "Pre-approving" in result["error"] else 409
+        raise HTTPException(status_code=status, detail=result["error"])
+    return result
 
 
 @app.post("/agents/runs/{run_id}/approve", tags=["agents"])
-def agent_approve(run_id: str, approver: str = "user", execute: bool = True) -> Any:
+def agent_approve(run_id: str, execute: bool = True) -> Any:
     """Approve a paused agent run (human-in-the-loop gate)."""
-    return j(core.agent_approve(run_id, approver=approver, execute=execute))
+    result = j(core.agent_approve(run_id, execute=execute))
+    if "error" in result:
+        status = (404 if result["error"] == f"Unknown run: {run_id}" else
+                  403 if "requires " in result["error"] else 409)
+        raise HTTPException(status_code=status, detail=result["error"])
+    return result
 
 
 @app.post("/agents/orchestrate", tags=["agents"])
@@ -5498,6 +5803,8 @@ class LeasingInquiryRequest(BaseModel):
 class LeasingApplicationRequest(BaseModel):
     applicant: str
     monthly_income: float
+    email: Optional[str] = None
+    phone: Optional[str] = None
     unit_id: Optional[str] = None
     employment: str = "salaried"
     references_count: int = 0
@@ -5548,6 +5855,40 @@ def leasing_inquiries(unit_id: Optional[str] = None, intent: Optional[str] = Non
 def leasing_screen_application(payload: LeasingApplicationRequest) -> Any:
     """Screen a rental application."""
     return j(core.leasing_screen_application(**payload.model_dump(exclude_none=True)))
+
+
+@app.post("/properties/{property_id}/rental-applications", tags=["leasing"], status_code=201)
+def property_rental_application(property_id: str, payload: LeasingApplicationRequest) -> Any:
+    """Submit a tenant application against an advertised rental property."""
+    prop = core.find_property(property_id)
+    if not prop or getattr(prop, "listing_purpose", "sale") != "rent":
+        raise HTTPException(status_code=404, detail="Rental listing not found")
+    if prop.status != "active":
+        raise HTTPException(status_code=409, detail="This rental is no longer accepting applications")
+    if not payload.applicant.strip() or not (payload.email or payload.phone):
+        raise HTTPException(status_code=422, detail="Provide your name and an email address or mobile number")
+    data = payload.model_dump(exclude_none=True)
+    data["applicant"] = payload.applicant.strip()
+    data["unit_id"] = property_id
+    result = j(core.leasing_screen_application(**data))
+    storage.mark_dirty()
+    return {"submitted": True, "application_id": result.get("application_id"),
+            "message": "Application received. The property team will contact you."}
+
+
+@app.get("/leasing/applications", tags=["leasing"])
+def leasing_applications(property_id: Optional[str] = None) -> Any:
+    """Rental applications and the leasing agent's preliminary screening for managers."""
+    if not access.can(access.current(), "properties.manage"):
+        raise HTTPException(status_code=403, detail="Rental application management requires properties.manage")
+    apps = [a for a in leasing.applications_db if not property_id or a.unit_id == property_id]
+    rows = []
+    for application in apps:
+        unit = next((u for u in leasing.units_db if u.id == application.unit_id), None)
+        unit = unit or core._rental_unit_for_property(application.unit_id or "")
+        rows.append({**application.model_dump(mode="json"), "property_title": unit.title if unit else None,
+                     "screening": leasing.screen_application(application, unit)})
+    return {"count": len(rows), "applications": rows}
 
 
 @app.get("/leasing/renewals", tags=["leasing"])

@@ -76,7 +76,7 @@ def status() -> Dict[str, Any]:
 
 
 def _whatsapp_text(to: str, body: str) -> Dict[str, Any]:
-    version = _env("PORTAL_WHATSAPP_API_VERSION", "v21.0")
+    version = _env("PORTAL_WHATSAPP_API_VERSION", "v23.0")
     template = _env("PORTAL_WHATSAPP_CRM_TEMPLATE")
     if template:
         payload: Dict[str, Any] = {

@@ -126,9 +126,9 @@ export const LISTING_ICONS: Record<string, LucideIcon> = {
   house: Home, villa: Home, farmhouse: Home, apartment: Building2, flat: Building2, plot: LandPlot,
   shop: Store, office: Briefcase, floor: Layers, portion: Layers, building: Building, space: Warehouse, warehouse: Warehouse, shed: Warehouse,
 };
-export function listingPin(p: { category?: string | null; use_type?: string | null; featured?: boolean | null }, opts: { size?: number; label?: string } = {}): L.DivIcon {
+export function listingPin(p: { category?: string | null; use_type?: string | null; featured?: boolean | null; listing_purpose?: string | null }, opts: { size?: number; label?: string } = {}): L.DivIcon {
   const cat = (p.category ?? "").toLowerCase();
-  const color = p.featured ? "#b8860b" : cat === "plot" ? "#8a5a35" : p.use_type === "commercial" ? "#2c7fb8" : "#0f5a39";
+  const color = p.featured ? "#b8860b" : p.listing_purpose === "rent" ? "#7c3aed" : cat === "plot" ? "#8a5a35" : p.use_type === "commercial" ? "#2c7fb8" : "#0f5a39";
   return iconPin(color, LISTING_ICONS[cat] ?? MapPin, { ...opts, star: !!p.featured });
 }
 

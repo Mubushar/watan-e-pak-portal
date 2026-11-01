@@ -21,6 +21,17 @@ This guide walks you through migrating the Watan-e-Pak real-estate portal's in-m
 
 The migration is **lossless**: nested models (`JournalEntry.lines`, `Transaction.milestones`, `AgentRun.steps`, `Invoice.lines`, `PmInspection.checklist`) are embedded as JSONB, and every Python type maps to a Postgres type (str → TEXT, int → BIGINT, float → DOUBLE PRECISION, bool → BOOLEAN, datetime → TIMESTAMPTZ, date → DATE). List-of-scalars become TEXT[] and list-of-models becomes JSONB.
 
+### Copy live SQLite storage to PostgreSQL
+
+For the running portal's durable storage layout (rather than the separate normalized reporting schema above), stop the backend and copy the live tables to an empty PostgreSQL database:
+
+```powershell
+# With the PostGIS service running and the backend stopped:
+docker compose -f compose.yaml -f compose.postgres.yaml run --rm --no-deps backend python migrate_storage.py
+```
+
+The command uses `PORTAL_DB_PATH` as its SQLite source and `DATABASE_URL` as its PostgreSQL destination. It copies `portal_rows`, `portal_kv`, and `portal_assets` (including uploaded photo bytes and GIS source files), and refuses to overwrite a non-empty target. Start the backend with the PostgreSQL overlay after it succeeds. For a local non-Docker run, pass `--from-sqlite <path>` and `--to-postgres <dsn>` explicitly. Back up both databases first.
+
 ## Prerequisites
 
 - Python 3.11+ with the portal's dependencies installed (`uv sync`).

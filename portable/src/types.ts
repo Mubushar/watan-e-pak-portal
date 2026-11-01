@@ -5,6 +5,13 @@ export interface Property {
   title: string;
   description?: string | null;
   price: number;
+  listing_purpose?: "sale" | "rent" | string;
+  security_deposit?: number | null;
+  advance_months?: number | null;
+  lease_term_months?: number | null;
+  rent_frequency?: "monthly" | "weekly" | string;
+  furnishing_status?: string | null;
+  tenant_preference?: string | null;
   currency?: string;
   use_type: string;
   category: string;

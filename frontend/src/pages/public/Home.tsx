@@ -545,11 +545,11 @@ function MegaProjects() {
   return (
     <Section
       eyebrow="Landmark developments"
-      title="Mega projects"
-      subtitle="Malls, towers, mixed-use plazas and gated compounds shaping Pakistan’s skylines."
+      title="Landmarks"
+      subtitle="Notable malls, towers, mixed-use plazas and compounds shaping Pakistan’s skylines."
       action={
         <Link to="/projects" className="btn btn-outline">
-          All projects <ArrowRight className="h-4 w-4 rtl:rotate-180" />
+          Explore landmarks <ArrowRight className="h-4 w-4 rtl:rotate-180" />
         </Link>
       }
     >

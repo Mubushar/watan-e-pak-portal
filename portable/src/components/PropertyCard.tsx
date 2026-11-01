@@ -62,7 +62,7 @@ export function PropertyCard({ p, className, compact }: { p: Property; className
         </div>
         <FavoriteButton id={p.id} className="absolute end-3 top-3" />
         <div className="absolute bottom-3 start-3 end-3 flex items-end justify-between text-white">
-          <p className="font-display text-xl font-bold drop-shadow">{pkrShort(p.price)}</p>
+          <p className="font-display text-xl font-bold drop-shadow">{pkrShort(p.price)}{p.listing_purpose === "rent" ? (p.rent_frequency === "weekly" ? "/wk" : "/mo") : ""}</p>
           <span className="chip bg-black/40 text-white backdrop-blur">{titleCase(p.use_type)}</span>
         </div>
       </div>
@@ -117,7 +117,7 @@ export function PropertyRow({ p, extra, to, className }: { p: Property; extra?: 
         </p>
         <NearbyNote p={p} className="mt-0" />
         <div className="mt-1 flex items-center gap-2">
-          <span className="font-display text-sm font-bold text-brand-700 dark:text-brand-300">{pkrShort(p.price)}</span>
+          <span className="font-display text-sm font-bold text-brand-700 dark:text-brand-300">{pkrShort(p.price)}{p.listing_purpose === "rent" ? (p.rent_frequency === "weekly" ? "/wk" : "/mo") : ""}</span>
           {p.status && p.status !== "active" && <Badge tone={statusTone(p.status)}>{titleCase(p.status)}</Badge>}
         </div>
       </div>

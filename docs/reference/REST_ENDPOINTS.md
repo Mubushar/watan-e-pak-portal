@@ -172,7 +172,7 @@ Auto-generated from the FastAPI app — **649 routes** across **39 tags**. Every
 | POST | `/auth/login` | Password login. Returns `401` for bad credentials and `403` for unverified accounts. |
 | POST | `/auth/logout` | Revoke the bearer token. |
 | GET | `/auth/me` | Return the authenticated account (Bearer token required). |
-| GET | `/auth/notifications` | The simulated SMS/e-mail outbox. |
+| GET | `/auth/notifications` | The simulated WhatsApp/e-mail outbox. |
 | POST | `/auth/otp/request` | Start a passwordless login by sending an OTP. |
 | POST | `/auth/otp/verify` | Complete a passwordless login with the OTP. |
 | GET | `/auth/otps` | Dev view of outstanding verification codes (plaintext only when exposed). |

@@ -18,6 +18,7 @@ Data © OpenStreetMap contributors (ODbL); population © Kontur (CC BY 4.0).
 from __future__ import annotations
 
 import gzip
+import io
 import json
 import math
 import os
@@ -30,6 +31,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tupl
 
 import httpx
 
+import storage
 import envfile  # noqa: F401  (loads backend/.env)
 
 DATA_DIR = Path(__file__).resolve().parent / "geodata"
@@ -251,9 +253,10 @@ def _key(lat: float, lon: float) -> Tuple[int, int]:
 
 def _read(name: str) -> Optional[Dict[str, Any]]:
     path = DATA_DIR / name
-    if not path.exists():
+    raw = storage.read_seed_asset(f"geodata/{name}", str(path))
+    if not raw:
         return None
-    with gzip.open(path, "rt", encoding="utf-8") as f:
+    with gzip.open(io.BytesIO(raw), "rt", encoding="utf-8") as f:
         return json.load(f)
 
 

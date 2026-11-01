@@ -14,15 +14,15 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+import storage
+
 DATA = Path(__file__).with_name("geodata") / "pk_seed_media.json"
 
 
 @lru_cache(maxsize=1)
 def load() -> Dict[str, Any]:
-    if not DATA.exists():
-        return {}
-    with DATA.open(encoding="utf-8") as fh:
-        return json.load(fh)
+    raw = storage.read_seed_asset("geodata/pk_seed_media.json", str(DATA))
+    return json.loads(raw.decode("utf-8")) if raw else {}
 
 
 def credit(kind: str, key: str) -> Optional[Dict[str, Any]]:

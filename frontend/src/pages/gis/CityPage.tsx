@@ -117,7 +117,7 @@ export default function CityPage() {
             {[
               ["Listings", d.property_count],
               ["Societies", d.schemes.length],
-              ["Mega projects", d.big_projects],
+              ["Landmarks", d.big_projects],
               ["Places mapped", pois.length],
             ].map(([l, v]) => (
               <div key={String(l)} className="glass-dark min-w-[110px] rounded-2xl px-4 py-2.5">

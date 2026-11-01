@@ -86,14 +86,14 @@ export default function Projects() {
     <div className="pb-16">
       <PageHeader
         image={HERO.panorama}
-        eyebrow="Mega projects"
+        eyebrow="Landmarks"
         title={
           <>
-            Landmark <span className="text-gradient">developments</span> reshaping Pakistan
+            Major <span className="text-gradient">developments</span> shaping Pakistan’s cities
           </>
         }
-        subtitle="Malls, towers, mixed-use plazas and gated compounds — with live construction status, floor counts and occupancy."
-        crumbs={[{ label: "Home", to: "/" }, { label: "Mega projects" }]}
+        subtitle="Explore notable malls, towers, mixed-use plazas and compounds with development status, floor counts and occupancy."
+        crumbs={[{ label: "Home", to: "/" }, { label: "Landmarks" }]}
       />
 
       <div className="container -mt-10 relative z-10 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -101,7 +101,7 @@ export default function Projects() {
           Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28" />)
         ) : (
           <>
-            <StatCard label="Projects" value={projects.length} icon={<Building2 className="h-5 w-5" />} hint={`${facets.cities.length} cities`} />
+            <StatCard label="Landmarks" value={projects.length} icon={<Building2 className="h-5 w-5" />} hint={`${facets.cities.length} cities`} />
             <StatCard label="Under construction" value={projects.filter((p) => p.status === "under_construction").length} icon={<Construction className="h-5 w-5" />} tone="gold" />
             <StatCard label="Total floor area" value={fmtArea(totalArea)} icon={<Ruler className="h-5 w-5" />} tone="blue" />
             <StatCard label="Avg occupancy" value={occ.length ? pct(occ.reduce((a, p) => a + (p.occupancy_rate ?? 0), 0) / occ.length, 0) : "—"} icon={<Users className="h-5 w-5" />} tone="purple" hint={`${occ.length} reporting`} />

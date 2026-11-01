@@ -27,6 +27,9 @@ export default function MyListings() {
   const all = q.data?.results ?? [];
   const shown = all.filter((p) => (tab === "active" ? !isClosed(p) : isClosed(p)));
   const active = all.filter((p) => p.status === "active");
+  const activeSales = active.filter((p) => (p.listing_purpose ?? "sale") !== "rent");
+  const activeRentals = active.filter((p) => p.listing_purpose === "rent");
+  const monthlyRent = activeRentals.reduce((sum, p) => sum + (p.rent_frequency === "weekly" ? p.price * 52 / 12 : p.price), 0);
 
   const setStatus = useMutate((v: { id: string; status: string }) => put<Property>(`/me/listings/${v.id}`, { status: v.status }), {
     invalidate: INVALIDATE,
@@ -47,10 +50,11 @@ export default function MyListings() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Active" value={active.length} icon={<Building2 className="h-5 w-5" />} />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Active for sale" value={activeSales.length} icon={<Building2 className="h-5 w-5" />} />
+        <StatCard label="Active rentals" value={activeRentals.length} icon={<Building2 className="h-5 w-5" />} tone="blue" />
         <StatCard label="Sold / rented" value={all.filter(isClosed).length} icon={<CheckCircle2 className="h-5 w-5" />} tone="gold" />
-        <StatCard label="Active value" value={active.length ? pkrShort(active.reduce((s, p) => s + p.price, 0), false) : "—"} icon={<Wallet className="h-5 w-5" />} tone="blue" />
+        <StatCard label="Asking value / monthly rent" value={activeSales.length || activeRentals.length ? `${pkrShort(activeSales.reduce((s, p) => s + p.price, 0), false)} · ${pkrShort(monthlyRent, false)}/mo` : "—"} icon={<Wallet className="h-5 w-5" />} tone="purple" />
       </div>
 
       <Segmented
@@ -151,7 +155,7 @@ function ListingRow({ p, onEdit, onDelete, onStatus, busy }: { p: Property; onEd
           </div>
           <p className="mt-1 truncate font-semibold">{p.title}</p>
           <p className="truncate text-xs text-ink-mute">{where || "—"}</p>
-          <p className="mt-0.5 font-display font-bold text-brand-700 dark:text-gold-300">{pkrShort(p.price)}</p>
+          <p className="mt-0.5 font-display font-bold text-brand-700 dark:text-gold-300">{pkrShort(p.price)}{p.listing_purpose === "rent" ? (p.rent_frequency === "weekly" ? "/wk" : "/mo") : ""}</p>
         </div>
       </Link>
       <input
@@ -197,10 +201,10 @@ function ListingRow({ p, onEdit, onDelete, onStatus, busy }: { p: Property; onEd
 }
 
 function EditModal({ p, onClose }: { p: Property; onClose: () => void }) {
-  const [f, setF] = useState({ title: p.title, price: String(p.price), description: p.description ?? "", amenities: (p.amenities ?? []).join(", ") });
+  const [f, setF] = useState({ title: p.title, price: String(p.price), description: p.description ?? "", amenities: (p.amenities ?? []).join(", "), security_deposit: String(p.security_deposit ?? 0), advance_months: String(p.advance_months ?? 1), lease_term_months: String(p.lease_term_months ?? 12), rent_frequency: p.rent_frequency ?? "monthly", furnishing_status: p.furnishing_status ?? "unfurnished", tenant_preference: p.tenant_preference ?? "" });
   const amenities = f.amenities.split(/[,،\n]/).map((a) => a.trim()).filter(Boolean);
   const save = useMutate(
-    () => put(`/me/listings/${p.id}`, { title: f.title.trim(), price: Number(f.price), description: f.description, amenities }),
+    () => put(`/me/listings/${p.id}`, { title: f.title.trim(), price: Number(f.price), description: f.description, amenities, ...(p.listing_purpose === "rent" ? { security_deposit: Number(f.security_deposit), advance_months: Number(f.advance_months), lease_term_months: Number(f.lease_term_months), rent_frequency: f.rent_frequency, furnishing_status: f.furnishing_status, tenant_preference: f.tenant_preference } : {}) }),
     { invalidate: INVALIDATE, success: "Listing updated", onSuccess: onClose },
   );
   const valid = f.title.trim().length >= 5 && Number(f.price) > 0;
@@ -208,7 +212,7 @@ function EditModal({ p, onClose }: { p: Property; onClose: () => void }) {
     <Modal
       open
       onClose={onClose}
-      title="Edit listing"
+      title={p.listing_purpose === "rent" ? "Edit rental listing" : "Edit listing"}
       subtitle={`Status: ${titleCase(p.status)}`}
       footer={
         <>
@@ -228,6 +232,13 @@ function EditModal({ p, onClose }: { p: Property; onClose: () => void }) {
         <Field label="Price (PKR)" hint={Number(f.price) > 0 ? pkrShort(Number(f.price)) : undefined}>
           <Input inputMode="numeric" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value.replace(/\D/g, "") })} />
         </Field>
+        {p.listing_purpose === "rent" && <>
+          <Field label="Rent frequency"><select className="input" value={f.rent_frequency} onChange={(e) => setF({ ...f, rent_frequency: e.target.value })}><option value="monthly">Monthly</option><option value="weekly">Weekly</option></select></Field>
+          <Field label="Security deposit (PKR)"><Input type="number" min={0} value={f.security_deposit} onChange={(e) => setF({ ...f, security_deposit: e.target.value })} /></Field>
+          <div className="grid grid-cols-2 gap-3"><Field label="Advance months"><Input type="number" min={0} max={120} value={f.advance_months} onChange={(e) => setF({ ...f, advance_months: e.target.value })} /></Field><Field label="Lease term (months)"><Input type="number" min={0} max={120} value={f.lease_term_months} onChange={(e) => setF({ ...f, lease_term_months: e.target.value })} /></Field></div>
+          <Field label="Furnishing"><select className="input" value={f.furnishing_status} onChange={(e) => setF({ ...f, furnishing_status: e.target.value })}><option value="unfurnished">Unfurnished</option><option value="semi_furnished">Semi furnished</option><option value="furnished">Furnished</option></select></Field>
+          <Field label="Tenant preference (optional)"><Input maxLength={500} value={f.tenant_preference} onChange={(e) => setF({ ...f, tenant_preference: e.target.value })} /></Field>
+        </>}
         <Field label="Description">
           <Textarea rows={4} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
         </Field>

@@ -186,6 +186,13 @@ class Property(MediaMixin):
     description: Optional[str] = None
     price: float
     currency: str = "PKR"
+    listing_purpose: str = "sale"  # sale | rent
+    security_deposit: Optional[float] = None
+    advance_months: Optional[int] = None
+    lease_term_months: Optional[int] = None
+    rent_frequency: str = "monthly"  # monthly | weekly
+    furnishing_status: Optional[str] = None  # furnished | semi_furnished | unfurnished
+    tenant_preference: Optional[str] = None
     use_type: str = "residential"  # residential | commercial | mix
     category: str = "house"  # plot | house | building | apartment | office | shop | floor | space | warehouse | shed
     status: str = "active"  # active | sold | rented | pending
@@ -928,6 +935,13 @@ def add_property(
     title: str,
     price: float,
     city_id: str,
+    listing_purpose: str = "sale",
+    security_deposit: Optional[float] = None,
+    advance_months: Optional[int] = None,
+    lease_term_months: Optional[int] = None,
+    rent_frequency: str = "monthly",
+    furnishing_status: Optional[str] = None,
+    tenant_preference: Optional[str] = None,
     description: Optional[str] = None,
     use_type: str = "residential",
     category: str = "house",
@@ -952,6 +966,12 @@ def add_property(
     amenities: Optional[List[str]] = None,
 ) -> str:
     """Create a property. Areas auto-derive between total_area / marla / kanal."""
+    if listing_purpose not in ("sale", "rent"):
+        return dump({"error": "listing_purpose must be sale or rent"})
+    if rent_frequency not in ("monthly", "weekly"):
+        return dump({"error": "rent_frequency must be monthly or weekly"})
+    if security_deposit is not None and security_deposit < 0:
+        return dump({"error": "Security deposit cannot be negative"})
     if not find_city(city_id):
         return dump({"error": f"City not found: {city_id}"})
     p = Property(
@@ -959,6 +979,13 @@ def add_property(
         description=description,
         price=price,
         city_id=city_id,
+        listing_purpose=listing_purpose,
+        security_deposit=security_deposit,
+        advance_months=advance_months,
+        lease_term_months=lease_term_months,
+        rent_frequency=rent_frequency,
+        furnishing_status=furnishing_status,
+        tenant_preference=tenant_preference,
         use_type=use_type,
         category=category,
         scheme_id=scheme_id,
@@ -1034,6 +1061,13 @@ def update_property(
     title: Optional[str] = None,
     description: Optional[str] = None,
     price: Optional[float] = None,
+    listing_purpose: Optional[str] = None,
+    security_deposit: Optional[float] = None,
+    advance_months: Optional[int] = None,
+    lease_term_months: Optional[int] = None,
+    rent_frequency: Optional[str] = None,
+    furnishing_status: Optional[str] = None,
+    tenant_preference: Optional[str] = None,
     use_type: Optional[str] = None,
     category: Optional[str] = None,
     status: Optional[str] = None,
@@ -1051,10 +1085,23 @@ def update_property(
     p = find_property(property_id)
     if not p:
         return dump({"error": f"Property not found: {property_id}"})
+    if listing_purpose is not None and listing_purpose not in ("sale", "rent"):
+        return dump({"error": "listing_purpose must be sale or rent"})
+    if rent_frequency is not None and rent_frequency not in ("monthly", "weekly"):
+        return dump({"error": "rent_frequency must be monthly or weekly"})
+    if security_deposit is not None and security_deposit < 0:
+        return dump({"error": "Security deposit cannot be negative"})
     fields = {
         "title": title,
         "description": description,
         "price": price,
+        "listing_purpose": listing_purpose,
+        "security_deposit": security_deposit,
+        "advance_months": advance_months,
+        "lease_term_months": lease_term_months,
+        "rent_frequency": rent_frequency,
+        "furnishing_status": furnishing_status,
+        "tenant_preference": tenant_preference,
         "use_type": use_type,
         "category": category,
         "status": status,
@@ -1090,6 +1137,7 @@ def delete_property(property_id: str) -> str:
 @mcp.tool()
 def search_properties(
     city: Optional[str] = None,
+    purpose: Optional[str] = None,
     scheme: Optional[str] = None,
     use_type: Optional[str] = None,
     category: Optional[str] = None,
@@ -1122,6 +1170,8 @@ def search_properties(
     near_hits: Dict[str, Dict[str, Any]] = {}
     results = []
     for p in properties_db:
+        if purpose and getattr(p, "listing_purpose", "sale") != purpose:
+            continue
         if c and p.city_id != c.id:
             continue
         if s and p.scheme_id != s.id:
@@ -1638,6 +1688,7 @@ def gis_add_layer(
     published: bool = True,
     opacity: float = 1.0,
     source_file: Optional[str] = None,
+    source_asset_id: Optional[str] = None,
 ) -> str:
     """Add a GeoJSON layer (master plan / boundary / zone / plot layout / road) to an entity.
     The geometry is validated (coordinates, geometry types; [lat, lon] for Pakistan is flipped)."""
@@ -1647,7 +1698,8 @@ def gis_add_layer(
         return dump({"error": str(exc)})
     me = access.current()
     layer = gis.GeoLayer(
-        visible=visible, published=published, opacity=max(0.0, min(float(opacity), 1.0)), source_file=source_file,
+        visible=visible, published=published, opacity=max(0.0, min(float(opacity), 1.0)),
+        source_file=source_file, source_asset_id=source_asset_id,
         created_by=(me.get("name") or me.get("email")) if me else None,
         name=name,
         layer_type=layer_type,
@@ -1662,6 +1714,13 @@ def gis_add_layer(
         **({"style": style} if style else {}),
     )
     gis.add_layer(layer)
+    db = storage.instance()
+    if db:
+        try:
+            db.sync_gis_layer(layer)
+        except Exception as exc:
+            gis.delete_layer(layer.id)
+            raise ValueError(f"Could not write GIS features to PostGIS: {exc}") from exc
     return dump({**model_dict(layer), "import": stats})
 
 
@@ -1672,6 +1731,10 @@ def _layer_summary(l: Any) -> Dict[str, Any]:
         "features": len(l.geojson.get("features", [])), "image_url": l.image_url, "description": l.description,
         "z_index": l.z_index, "opacity": l.opacity, "style": l.style, "source_url": l.source_url,
         "source_file": getattr(l, "source_file", None), "created_by": getattr(l, "created_by", None),
+        "raster_bounds": getattr(l, "raster_bounds", None),
+        "has_raster": bool(getattr(l, "raster_preview_asset_id", None)),
+        "georeference_method": getattr(l, "georeference_method", None),
+        "georeference_rmse_m": getattr(l, "georeference_rmse_m", None),
         "derived": str(getattr(l, "geojson_ref", "") or "").startswith("masterplan"),
         "builtin": (l.geojson_ref[len("builtin:"):] if str(getattr(l, "geojson_ref", "") or "").startswith("builtin:") else None),
         "updated_at": l.updated_at.isoformat(timespec="seconds"),
@@ -1722,6 +1785,7 @@ def gis_update_layer(
     l = gis.find_layer(layer_id)
     if not l:
         return dump({"error": f"Layer not found: {layer_id}"})
+    before = l.model_copy(deep=True)
     if geojson is not None:
         try:
             geojson, _stats = gis_import.from_payload(geojson)
@@ -1748,6 +1812,14 @@ def gis_update_layer(
         if value is not None:
             setattr(l, key, value)
     l.updated_at = datetime.now()
+    db = storage.instance()
+    if db:
+        try:
+            db.sync_gis_layer(l)
+        except Exception as exc:
+            index = gis.GIS_LAYERS.index(l)
+            gis.GIS_LAYERS[index] = before
+            return dump({"error": f"Could not write GIS features to PostGIS: {exc}"})
     return dump_model(l)
 
 
@@ -1757,7 +1829,21 @@ def gis_delete_layer(layer_id: str) -> str:
     l = gis.find_layer(layer_id)
     if l and str(getattr(l, "geojson_ref", "") or "").startswith("builtin:"):
         return dump({"deleted": False, "error": "Built-in map overlays can't be deleted; unpublish it instead"})
+    asset_key = getattr(l, "source_asset_id", None) if l else None
+    raster_assets = [getattr(l, key, None) for key in ("raster_asset_id", "raster_preview_asset_id")] if l else []
+    db = storage.instance()
+    if l and db:
+        try:
+            db.delete_gis_layer(layer_id)
+        except Exception as exc:
+            return dump({"deleted": False, "error": f"Could not delete GIS features from PostGIS: {exc}"})
     ok = gis.delete_layer(layer_id)
+    if ok and asset_key:
+        storage.delete_asset(asset_key)
+    if ok:
+        for raster_key in raster_assets:
+            if raster_key:
+                storage.delete_asset(raster_key)
     return dump({"deleted": ok, "layer_id": layer_id, "remaining": len(gis.GIS_LAYERS)})
 
 
@@ -1801,6 +1887,13 @@ def gis_add_master_plan(
         **({"style": style} if style else {}),
     )
     gis.add_layer(layer)
+    db = storage.instance()
+    if db:
+        try:
+            db.sync_gis_layer(layer)
+        except Exception as exc:
+            gis.delete_layer(layer.id)
+            return dump({"error": f"Could not write GIS layer to PostGIS: {exc}"})
 
     # Anchor the entity if it has no coordinates yet.
     centroid = gis.polygon_centroid(feature["geometry"]["coordinates"][0])
@@ -3086,6 +3179,43 @@ def gis_area_report(
         lang=lang,
         theme=theme,
     )
+
+
+def gis_rental_market_report(city_id: str, include_map: bool = True,
+                            lang: str = gis.DEFAULT_LANGUAGE,
+                            theme: str = gis.DEFAULT_THEME) -> str:
+    """Printable city rental-market report with active inventory and advertised lease terms."""
+    city = find_city(city_id)
+    if not city:
+        return gis.build_report_html(title="Rental market report", subtitle="City not found",
+                                     sections=[{"heading": "Rental inventory", "kind": "text", "text": "The selected city is not registered in the portal."}], lang=lang, theme=theme)
+    rows = [p for p in properties_db if p.city_id == city_id and p.status == "active"
+            and getattr(p, "listing_purpose", "sale") == "rent"]
+    monthly = sorted(float(p.price) * (52 / 12 if getattr(p, "rent_frequency", "monthly") == "weekly" else 1) for p in rows)
+    median = statistics.median(monthly) if monthly else 0
+    counts: Dict[str, int] = {}
+    for p in rows:
+        counts[p.category] = counts.get(p.category, 0) + 1
+    label = lambda value: str(value).replace("_", " ").title()
+    sections = [
+        {"heading": "Rental market snapshot", "kind": "cards", "items": [
+            ["Active rental listings", f"{len(rows):,}", city.name],
+            ["Average monthly rent (PKR)", f"{(sum(monthly) / len(monthly) if monthly else 0):,.0f}", "weekly rents converted to monthly equivalent"],
+            ["Median monthly rent (PKR)", f"{median:,.0f}", "asking rent, not a completed transaction"],
+            ["Monthly rent range (PKR)", f"{(monthly[0] if monthly else 0):,.0f} – {(monthly[-1] if monthly else 0):,.0f}", "active listings"],
+        ]},
+        {"heading": "Inventory by property type", "kind": "table", "columns": ["Property type", "Active rentals"],
+         "numeric": ["Active rentals"], "rows": [[label(k), str(v)] for k, v in sorted(counts.items())]},
+        {"heading": "Available rental listings", "kind": "table", "columns": ["Listing", "Type", "Society", "Rent / period (PKR)", "Security deposit (PKR)", "Furnishing"],
+         "numeric": ["Rent / period (PKR)", "Security deposit (PKR)"],
+         "rows": [[p.title, label(p.category), (find_scheme(p.scheme_id).name if p.scheme_id and find_scheme(p.scheme_id) else "—"),
+                   f"{p.price:,.0f} / {getattr(p, 'rent_frequency', 'monthly')}", f"{(getattr(p, 'security_deposit', None) or 0):,.0f}",
+                   label(getattr(p, "furnishing_status", None) or "not specified")] for p in rows]},
+    ]
+    map_html = gis_map_preview("city", city_id, lang=lang, theme=theme, lang_links=False) if include_map else None
+    return gis.build_report_html(title=f"{city.name} — rental market report",
+                                 subtitle=f"{len(rows):,} active rental listings · advertised rents · generated from portal inventory",
+                                 sections=sections, map_html=map_html, lang=lang, theme=theme)
 
 
 # ---------- GIS analysis: cost/development, factors, forecasting, news ----------
@@ -10466,8 +10596,11 @@ def _lead_features(l: Lead) -> Dict[str, Any]:
 def _smart_action_signals() -> List[Dict[str, Any]]:
     """Assemble prioritised signals from across the portal for the Smart Actions list."""
     today = datetime.now().date()
+    mine = access.agent_scope()
     signals: List[Dict[str, Any]] = []
     for d in deals_db:
+        if mine and d.agent_id != mine:
+            continue
         if d.expected_close_date and d.stage not in ("closed_won", "closed_lost"):
             try:
                 due = datetime.strptime(d.expected_close_date, "%Y-%m-%d")
@@ -10481,6 +10614,8 @@ def _smart_action_signals() -> List[Dict[str, Any]]:
                                 "reason": f"stage {d.stage}, {d.probability}% probability",
                                 "suggested_agent": "transaction_agent"})
     for t in tasks_db:
+        if mine and t.assigned_agent_id != mine:
+            continue
         if t.status in ("open", "in_progress") and t.due_date:
             try:
                 due = datetime.strptime(t.due_date, "%Y-%m-%d")
@@ -10493,6 +10628,8 @@ def _smart_action_signals() -> List[Dict[str, Any]]:
                                 "impact": {"urgent": 5, "high": 4}.get(t.priority, 3), "urgency": 4,
                                 "reason": f"{t.priority} priority", "suggested_agent": "crm_agent"})
     for tx in transactions.transactions_db:
+        if mine and mine not in (tx.listing_agent_id, tx.selling_agent_id):
+            continue
         if tx.status != "open":
             continue
         prog = transactions.transaction_progress(tx.id)
@@ -10511,6 +10648,8 @@ def _smart_action_signals() -> List[Dict[str, Any]]:
                             "reason": f"{nd['days_left']} days left",
                             "suggested_agent": "transaction_agent"})
     for lease in accounting.leases_db:
+        if mine:
+            continue
         if lease.status != "active":
             continue
         if lease.end_date:
@@ -10523,6 +10662,8 @@ def _smart_action_signals() -> List[Dict[str, Any]]:
                             "impact": 4, "urgency": 3, "reason": f"{days} days to expiry",
                             "suggested_agent": "renewal_agent"})
     for inv in accounting.invoices_db:
+        if mine:
+            continue
         if inv.balance and inv.balance > 0 and inv.due_date and inv.due_date < today:
             signals.append({"kind": "collection",
                             "title": f"Overdue invoice {inv.number} ({inv.counterparty})",
@@ -10531,6 +10672,8 @@ def _smart_action_signals() -> List[Dict[str, Any]]:
                             "impact": 4, "urgency": 4, "reason": f"balance {inv.balance:,.0f}",
                             "suggested_agent": "accounting_agent"})
     for l in leads_db:
+        if mine and l.assigned_agent_id != mine:
+            continue
         ml = agents.move_likelihood(_lead_features(l))
         if ml["band"] in ("very_high", "high"):
             signals.append({"kind": "lead", "title": f"Warm lead: {l.name}",
@@ -10538,6 +10681,8 @@ def _smart_action_signals() -> List[Dict[str, Any]]:
                             "impact": 4, "urgency": 3, "reason": ml["reasons"][0],
                             "suggested_agent": "crm_agent"})
     for w in maintenance.work_orders_db:
+        if mine:
+            continue
         if w.status == "open" and w.priority in ("urgent", "soon"):
             signals.append({"kind": "maintenance", "title": f"Work order: {w.title}",
                             "entity_type": "work_order", "entity_id": w.id,
@@ -10590,8 +10735,65 @@ def _screen_over_properties(criteria: Optional[Dict[str, Any]] = None) -> Dict[s
     return intelligence.screen_investments(cands, crit)
 
 
+def _agent_tool_permission(name: str) -> Optional[str]:
+    """Required privilege for a tool called from an agent workflow."""
+    write = bool(agents.WRITE_TOOL.search(name))
+    if name == "bill_account":
+        return "finance.manage"
+    if name == "rent_collection":
+        return "payments.view"
+    if name.startswith("accounting_"):
+        return "accounting.manage" if write else "accounting.view"
+    if name == "revenue_share":
+        return "finance.view"
+    if name.startswith("transaction_") or name in ("create_offer", "schedule_viewing"):
+        return "crm.manage" if write else "crm.view"
+    if name.startswith(("marketing_",)) or name in ("campaign_plan", "marketing_campaign_plan",
+                                                       "search_contacts", "smart_actions",
+                                                       "move_likelihood", "outreach_draft",
+                                                       "commission_projection", "get_commission_projection",
+                                                       "score_seller_intent"):
+        return "crm.manage" if write else "crm.view"
+    if name.startswith("leasing_"):
+        return "listings.manage" if write else "crm.view"
+    if name in ("rent_floor", "renewal"):
+        return "listings.view" if name == "rent_floor" else "payments.view"
+    if name.startswith("maintenance_"):
+        return "listings.manage" if write else "listings.view"
+    if name.startswith(("construction_", "pm_")):
+        return "projects.manage" if write else "projects.view"
+    if name.startswith(("investment_",)) or name in ("market_intelligence", "get_market_intelligence"):
+        return "finance.manage" if write else "finance.view"
+    if name.startswith("gis_") or name == "analyze_property_gis":
+        return "gis.manage" if write else "gis.view"
+    if name.startswith(("buyer_", "seller_", "pricing_")) or name in (
+            "recommend_property", "affordability", "create_listing_draft",
+            "anomaly_scan", "compliance_check"):
+        return "properties.manage" if write else "properties.view"
+    return None
+
+
 def _agent_tool_dispatch(name: str, ctx: Dict[str, Any]) -> Any:
     """Execute a real portal function for an agent step — the MCP-for-brokers loop."""
+    me = access.current()
+    if me and not access.is_admin(me):
+        required = _agent_tool_permission(name)
+        if required is None:
+            raise PermissionError(f"No permission policy is defined for agent tool '{name}'")
+        if not access.can(me, required):
+            raise PermissionError(f"Agent tool '{name}' requires {required}")
+    mine = access.agent_scope(me)
+    if mine:
+        for contact_id in (ctx.get("lead_id"), ctx.get("contact_id")):
+            if contact_id:
+                contact = _contact_from_id(str(contact_id))
+                if not contact or contact.get("assigned_agent_id") != mine:
+                    raise PermissionError("This CRM contact is outside your assigned book")
+        transaction_id = ctx.get("transaction_id") or ctx.get("tx_id")
+        if transaction_id:
+            tx = transactions.get_transaction(str(transaction_id))
+            if not tx or mine not in (tx.listing_agent_id, tx.selling_agent_id):
+                raise PermissionError("This transaction is outside your assigned book")
     text = ctx.get("text") or ctx.get("objective") or ""
     if name in ("buyer_parse_requirement",):
         return intelligence.parse_requirement(text, known_cities=[c.name for c in cities_db])
@@ -10601,9 +10803,15 @@ def _agent_tool_dispatch(name: str, ctx: Dict[str, Any]) -> Any:
         return intelligence.anomaly_scan([_property_candidate(p) for p in properties_db])
     if name in ("buyer_affordability", "affordability"):
         price = float(ctx.get("price") or ctx.get("budget_max") or 0.0)
+        if price <= 0 and text:  # take the budget from the brief ("budget 3 crore …")
+            price = float(intelligence.parse_requirement(text).get("budget_max") or 0.0)
+        if price <= 0:
+            return {"skipped": True, "reason": "No price or budget given; affordability needs one."}
         return intelligence.affordability(price, monthly_income=ctx.get("monthly_income"))
     if name in ("seller_cma", "pricing_cma"):
-        pid = ctx.get("property_id") or next((p.id for p in properties_db), None)
+        pid = ctx.get("property_id")
+        if not pid:
+            return {"error": "A property_id is required for comparative market analysis"}
         return _seller_cma_impl(pid) if pid else {"error": "no property"}
     if name == "seller_net_proceeds":
         return intelligence.net_proceeds(float(ctx.get("price") or 0.0),
@@ -10632,8 +10840,11 @@ def _agent_tool_dispatch(name: str, ctx: Dict[str, Any]) -> Any:
                                      engagement=(lead.score if lead else 40))
         return marketing.qualify_lead(ml)
     if name in ("marketing_route_lead",):
-        lead = next((l for l in leads_db if l.id == ctx.get("lead_id")), None)
-        ml = marketing.MarketingLead(name=lead.name if lead else "", channel=(lead.source if lead else "website"),
+        lead_id = ctx.get("lead_id")
+        lead = next((l for l in leads_db if l.id == lead_id), None) if lead_id else None
+        if not lead:
+            return {"error": "A valid lead_id is required for lead routing"}
+        ml = marketing.MarketingLead(name=lead.name, channel=lead.source,
                                      city=(city_name(lead.city_id) if lead else None))
         marketing.qualify_lead(ml)
         return marketing.route_lead(ml)
@@ -10645,12 +10856,15 @@ def _agent_tool_dispatch(name: str, ctx: Dict[str, Any]) -> Any:
                                            float(ctx.get("budget") or 100000.0),
                                            ctx.get("channels") or ["whatsapp", "website"]).model_dump()
         pid = ctx.get("property_id")
-        p = find_property(pid) if pid else (properties_db[0] if properties_db else None)
+        if pid and not find_property(pid):
+            return {"error": f"Unknown property: {pid}"}
+        p = find_property(pid) if pid else None
         listing = {"id": p.id, "title": p.title, "city": city_name(p.city_id), "price": p.price} if p else {}
         return marketing.generate_content(ctx.get("kind", "market_report"), listing=listing).model_dump()
     if name in ("leasing_inquiry",):
-        unit = next((u for u in leasing.units_db if u.id == ctx.get("unit_id")), None) \
-            or (leasing.units_db[0] if leasing.units_db else None)
+        unit = next((u for u in leasing.units_db if u.id == ctx.get("unit_id")), None)
+        if ctx.get("unit_id") and not unit:
+            return {"error": f"Unknown rental unit: {ctx.get('unit_id')}"}
         return leasing.handle_inquiry(unit, text, channel=ctx.get("channel", "web_chat"),
                                       lang=ctx.get("lang", "en")).model_dump()
     if name == "leasing_screen_application":
@@ -10671,11 +10885,19 @@ def _agent_tool_dispatch(name: str, ctx: Dict[str, Any]) -> Any:
     if name in ("smart_actions",):
         return agents.prioritise_actions(_smart_action_signals(), limit=10)
     if name in ("move_likelihood",):
-        lead = next((l for l in leads_db if l.id == ctx.get("lead_id")), None)
+        lead_id = ctx.get("lead_id")
+        lead = next((l for l in leads_db if l.id == lead_id), None) if lead_id else None
+        if lead_id and not lead:
+            return {"error": f"Unknown lead: {lead_id}"}
+        if not lead and not any(k in ctx for k in ("life_event", "tenure", "engagement",
+                                                    "financial_ready", "market_signal", "recency")):
+            return {"error": "A lead_id or explicit scoring signals are required"}
         return agents.move_likelihood(_lead_features(lead) if lead else ctx)
     if name == "score_seller_intent":
         cid = ctx.get("contact_id") or ctx.get("lead_id")
-        if cid and _contact_from_id(cid):
+        if cid:
+            if not _contact_from_id(cid):
+                return {"error": f"Unknown contact: {cid}"}
             return json.loads(score_seller_intent(cid))
         return agents.seller_intent_score(ctx)
     if name in ("transaction_terms_extract",):
@@ -10685,10 +10907,20 @@ def _agent_tool_dispatch(name: str, ctx: Dict[str, Any]) -> Any:
     if name == "transaction_progress":
         return transactions.transaction_progress(ctx.get("transaction_id") or ctx.get("tx_id"))
     if name == "transaction_verify_signatures":
-        return transactions.verify_signatures(ctx.get("transaction_id") or "")
+        if not (ctx.get("transaction_id") or ctx.get("tx_id")):
+            return {"skipped": True, "reason": "No transaction selected yet; signatures are checked once one exists."}
+        return transactions.verify_signatures(ctx.get("transaction_id") or ctx.get("tx_id"))
     if name == "transaction_create":
-        tx = transactions.create_transaction(price=float(ctx.get("price") or 0.0),
-                                             property_title=ctx.get("property_title"),
+        price = float(ctx.get("price") or 0.0)
+        if price <= 0 or not (ctx.get("property_title") or ctx.get("property_id")):
+            return {"error": "transaction_create requires a positive price and a property_id or property_title"}
+        property_title = ctx.get("property_title")
+        if ctx.get("property_id"):
+            prop = find_property(ctx["property_id"])
+            if not prop:
+                return {"error": f"Unknown property: {ctx['property_id']}"}
+            property_title = property_title or prop.title
+        tx = transactions.create_transaction(price=price, property_title=property_title,
                                              transaction_type=ctx.get("transaction_type", "sale"))
         return transactions.txn_view(tx)
     if name == "create_offer":
@@ -10697,7 +10929,9 @@ def _agent_tool_dispatch(name: str, ctx: Dict[str, Any]) -> Any:
         return json.loads(get_commission_projection(agent_id=ctx.get("agent_id")))
     if name == "accounting_snapshot":
         pid = ctx.get("property_id")
-        if pid and find_property(pid):
+        if pid:
+            if not find_property(pid):
+                return {"error": f"Unknown property: {pid}"}
             return json.loads(get_accounting_snapshot(pid))
         return accounting.accounting_dashboard()
     if name in ("market_intelligence", "get_market_intelligence"):
@@ -10747,18 +10981,31 @@ def _agent_tool_dispatch(name: str, ctx: Dict[str, Any]) -> Any:
         return transactions.revenue_share(float(ctx.get("commission_gross") or 0.0))
     if name in ("bill_account",):
         return commercial.bill_account(ctx.get("account", "brokerco"))
+    if name == "marketing_campaign_plan":
+        return marketing.campaign_plan(ctx.get("objective", "campaign"),
+                                       float(ctx.get("budget") or 100000.0),
+                                       ctx.get("channels") or ["whatsapp", "website"],
+                                       days=int(ctx.get("days") or 14),
+                                       audience=ctx.get("audience")).model_dump()
+    if name == "rent_collection":
+        leases = [{"id": l.id, "tenant": l.tenant, "unit_label": l.unit_label}
+                  for l in accounting.leases_db if l.status == "active"]
+        invoices = [{"lease_id": inv.lease_id, "balance": inv.balance}
+                    for inv in accounting.invoices_db if inv.lease_id]
+        return leasing.rent_collection_status(leases, invoices)
     if name in ("outreach_draft",):
         return {"draft": f"Hi {ctx.get('name', 'there')}, following up on your property search — "
                          f"shall I send 3 new matches?"}
     if name == "create_listing_draft":
         pid = ctx.get("property_id")
-        if pid and find_property(pid):
-            return json.loads(create_listing_draft(pid, lang=ctx.get("lang", "en")))
-        return {"note": "create_listing_draft queued for human confirmation", "status": "pending"}
+        if not pid:
+            return {"error": "A property_id is required to draft a listing"}
+        if not find_property(pid):
+            return {"error": f"Unknown property: {pid}"}
+        return json.loads(create_listing_draft(pid, lang=ctx.get("lang", "en")))
     if name == "schedule_viewing":
-        return {"note": "schedule_viewing queued for human confirmation", "status": "pending"}
-    return {"note": f"no dispatcher binding for '{name}' — step recorded for the audit trail",
-            "dispatched": False}
+        raise ValueError("Viewing scheduling is not connected to a calendar; no appointment was created")
+    raise ValueError(f"No dispatcher binding for agent tool '{name}'")
 
 
 @mcp.tool()
@@ -10807,7 +11054,8 @@ def agent_plan(agent_key: str, objective: str = "", subject_type: Optional[str] 
 @mcp.tool()
 def agent_run(agent_key: str, objective: str = "", text: Optional[str] = None,
               subject_type: Optional[str] = None, subject_id: Optional[str] = None,
-              approve: bool = False, extra: Optional[Dict[str, Any]] = None) -> str:
+              approve: bool = False, extra: Optional[Dict[str, Any]] = None,
+              idempotency_key: Optional[str] = None) -> str:
     """Execute an agent run against the live portal.
 
     The run engine calls the real portal functions bound to the agent, recording every
@@ -10821,21 +11069,42 @@ def agent_run(agent_key: str, objective: str = "", text: Optional[str] = None,
     if subject_id:
         ctx.setdefault("property_id" if subject_type == "property" else
                        "transaction_id" if subject_type == "transaction" else "lead_id", subject_id)
+    me = access.current()
+    if approve and me is None:
+        return dump({"error": "Pre-approving a run requires a signed-in user; use the approval endpoint"})
+    if approve and me and not access.is_admin(me):
+        definition = agents.find_agent(agent_key)
+        for step in agents._workflow(definition) if definition else []:
+            if not step.get("requires_approval"):
+                continue
+            required = _agent_tool_permission(step.get("tool")) if step.get("tool") else "crm.manage"
+            if required and not access.can(me, required):
+                return dump({"error": f"Pre-approving this run requires {required}; use the approval endpoint"})
+    if idempotency_key and len(idempotency_key) > 128:
+        raise ValueError("idempotency_key must be at most 128 characters")
+    if idempotency_key and len(idempotency_key) < 8:
+        raise ValueError("idempotency_key must be at least 8 characters")
     return dump(agents.run_agent(agent_key, objective, dispatch=_agent_tool_dispatch, context=ctx,
-                                 subject_type=subject_type, subject_id=subject_id, approve=approve))
+                                 subject_type=subject_type, subject_id=subject_id, approve=approve,
+                                 owner_user_id=me.get("id") if me else None,
+                                 idempotency_key=(idempotency_key or None)))
 
 
 @mcp.tool()
 def agent_runs(agent_key: Optional[str] = None, status: Optional[str] = None) -> str:
     """Recorded agent runs (the audit trail), optionally filtered by agent or status."""
-    rows = agents.list_runs(agent_key, status)
+    me = access.current()
+    owner_id = me.get("id") if me and not access.is_admin(me) else None
+    rows = agents.list_runs(agent_key, status, owner_user_id=owner_id)
     return dump({"count": len(rows), "runs": [agents.run_view(r) for r in rows]})
 
 
 @mcp.tool()
 def agent_run_get(run_id: str) -> str:
     """One agent run with its steps, outputs, approvals and metrics."""
-    r = agents.get_run(run_id)
+    me = access.current()
+    owner_id = me.get("id") if me and not access.is_admin(me) else None
+    r = agents.get_run(run_id, owner_user_id=owner_id)
     if not r:
         return dump({"error": f"Unknown run: {run_id}"})
     return dump(agents.run_view(r))
@@ -10847,8 +11116,21 @@ def agent_approve(run_id: str, approver: str = "user", execute: bool = True) -> 
     is recorded under the signed-in user's name; ``approver`` is only used by token-based MCP clients."""
     me = access.current()
     who = f"{me.get('name') or me.get('email')} ({me.get('id')})" if me else f"mcp:{(approver or 'client')[:40]}"
+    run = agents.get_run(run_id)
+    if not run:
+        return dump({"error": f"Unknown run: {run_id}"})
+    if me and not access.is_admin(me):
+        if run.owner_user_id != me.get("id"):
+            return dump({"error": f"Unknown run: {run_id}"})
+        for step in run.steps:
+            if step.status != "awaiting_approval":
+                continue
+            required = _agent_tool_permission(step.tool) if step.tool else "crm.manage"
+            if required and not access.can(me, required):
+                return dump({"error": f"Approving this step requires {required}"})
     dispatch = _agent_tool_dispatch if execute else None
-    return dump(agents.approve_run(run_id, approver=who, dispatch=dispatch))
+    return dump(agents.approve_run(run_id, approver=who, dispatch=dispatch,
+                                   owner_user_id=me.get("id") if me and not access.is_admin(me) else None))
 
 
 @mcp.tool()
@@ -11338,12 +11620,31 @@ def investment_report(city: Optional[str] = None, rental_yield: float = 0.045,
                                  ticker_html=_portal_ticker(lang), lang=lang, theme=theme)
 
 
+def _rental_unit_for_property(property_id: str) -> Optional[Any]:
+    """Build the leasing-agent view of an active rental listing from the canonical property row."""
+    p = find_property(property_id)
+    if not p or getattr(p, "listing_purpose", "sale") != "rent":
+        return None
+    scheme = find_scheme(p.scheme_id)
+    monthly = p.price if getattr(p, "rent_frequency", "monthly") == "monthly" else p.price * 52 / 12
+    unit = leasing.RentalUnit(
+        id=p.id, property_ref=p.id, title=p.title, city=city_name(p.city_id),
+        scheme=scheme.name if scheme else None, rent=monthly,
+        deposit=getattr(p, "security_deposit", None) or 0, bedrooms=p.bedrooms,
+        area=p.total_area, status="listed" if p.status == "active" else "off_market",
+        amenities=p.amenities or [], latitude=p.latitude, longitude=p.longitude,
+    )
+    return unit
+
+
 @mcp.tool()
 def leasing_units(status: Optional[str] = None, city: Optional[str] = None,
                   limit: int = 50) -> str:
     """Rental units available to the autonomous leasing agent (net of registered units and
     let-able listings), with rent, floor rent and holding cost."""
     rows = list(leasing.units_db)
+    known = {u.property_ref or u.id for u in rows}
+    rows.extend(u for p in properties_db if p.id not in known and (u := _rental_unit_for_property(p.id)) is not None)
     if city:
         c = resolve_city(city)
         if c:
@@ -11356,7 +11657,7 @@ def leasing_units(status: Optional[str] = None, city: Optional[str] = None,
 @mcp.tool()
 def leasing_unit(unit_id: str) -> str:
     """One rental unit by id."""
-    u = next((x for x in leasing.units_db if x.id == unit_id), None)
+    u = next((x for x in leasing.units_db if x.id == unit_id), None) or _rental_unit_for_property(unit_id)
     if not u:
         return dump({"error": f"Unknown unit: {unit_id}"})
     return dump(u.model_dump())
@@ -11388,7 +11689,7 @@ def leasing_inquiry(message: str, unit_id: Optional[str] = None, channel: str = 
                     lang: str = "en") -> str:
     """Autonomous leasing agent: classify a tenant inquiry, draft a reply and decide whether
     it is auto-handled — across web chat, WhatsApp, SMS, e-mail and voice."""
-    unit = next((u for u in leasing.units_db if u.id == unit_id), None)
+    unit = next((u for u in leasing.units_db if u.id == unit_id), None) or (_rental_unit_for_property(unit_id) if unit_id else None)
     if unit_id and not unit:
         return dump({"error": f"Unknown unit: {unit_id}"})
     if unit is None and leasing.units_db:
@@ -11410,13 +11711,14 @@ def leasing_inquiries(unit_id: Optional[str] = None, intent: Optional[str] = Non
 @mcp.tool()
 def leasing_screen_application(applicant: str, monthly_income: float,
                                unit_id: Optional[str] = None, employment: str = "salaried",
+                               email: Optional[str] = None, phone: Optional[str] = None,
                                references_count: int = 0, credit_proxy: int = 70,
                                occupants: int = 1, pets: bool = False,
                                move_in_days: int = 15) -> str:
     """Screen a rental application: income-to-rent, references, credit proxy and employment
     → approve / conditional / decline with conditions and a recommended deposit."""
-    unit = next((u for u in leasing.units_db if u.id == unit_id), None)
-    app = leasing.Application(unit_id=unit_id, applicant=applicant, monthly_income=monthly_income,
+    unit = next((u for u in leasing.units_db if u.id == unit_id), None) or (_rental_unit_for_property(unit_id) if unit_id else None)
+    app = leasing.Application(unit_id=unit_id, applicant=applicant, email=email, phone=phone, monthly_income=monthly_income,
                               employment=employment, references_count=references_count,
                               credit_proxy=credit_proxy, occupants=occupants, pets=pets,
                               move_in_days=move_in_days)
@@ -12157,7 +12459,10 @@ def search_contacts(query: Optional[str] = None, status: Optional[str] = None,
     """
     rows: List[Dict[str, Any]] = []
     needle = (query or "").lower().strip()
+    mine = access.agent_scope()
     for l in leads_db:
+        if mine and l.assigned_agent_id != mine:
+            continue
         hay = " ".join(filter(None, [l.name, l.email, l.phone])).lower()
         if needle and needle not in hay:
             continue
@@ -14678,12 +14983,17 @@ def _layer_geojson_from_ref(ref: str) -> Dict[str, Any]:
     return {"type": "FeatureCollection", "features": []}
 
 
-def _slim_layer(layer: Any) -> Optional[set]:  # builtin:* overlays have no geometry of their own
+def _slim_layer(layer: Any) -> Optional[set]:
+    # Master-plan label geometry (geojson_ref layers, ~30 MB) is derived data: it is rebuilt on
+    # load from its source files, which storage.import_seed_assets keeps in portal_assets, so the
+    # rows store only the layer's settings.
     return {"geojson"} if getattr(layer, "geojson_ref", None) else None
 
 
 def _restore_layer(row: Dict[str, Any]) -> Dict[str, Any]:
-    return {**row, "geojson": _layer_geojson_from_ref(row["geojson_ref"])} if row.get("geojson_ref") else row
+    if row.get("geojson_ref") and not row.get("geojson"):
+        return {**row, "geojson": _layer_geojson_from_ref(row["geojson_ref"])}
+    return row
 
 
 storage.register_codec("gis.GIS_LAYERS", _slim_layer, _restore_layer)

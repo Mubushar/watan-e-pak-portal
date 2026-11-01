@@ -258,8 +258,9 @@ The portal works on in-memory stores (`properties_db`, `leads_db`, `GIS_LAYERS` 
   `JSONB`); otherwise SQLite at `PORTAL_DB_PATH` (default `backend/data/portal.sqlite3`,
   git-ignored). If `DATABASE_URL` points at PostgreSQL but `psycopg` is missing, the log
   says so and SQLite is used.
-* **Tables** — `portal_rows(store, key, ord, data, updated_at)`, one row per item, and
-  `portal_kv` for bookkeeping.
+* **Tables** — `portal_rows(store, key, ord, data, updated_at)`, one row per item; `portal_kv`
+  for bookkeeping; and `portal_assets(asset_key, media_type, data, updated_at)` for binary assets
+  (SQLite `BLOB`, PostgreSQL `BYTEA`).
 * **First run** — the sample data is seeded as usual and saved in full.
 * **Every later start** — the saved rows replace the seed, so ids stay consistent across
   stores. A store added in a newer version keeps its seed until it is first saved.
@@ -267,8 +268,11 @@ The portal works on in-memory stores (`properties_db`, `leads_db`, `GIS_LAYERS` 
   minute regardless, and at shutdown. Each save hashes every item and writes only what
   changed or was removed.
 * **Not saved** — one-time codes, Telegram link codes and messaging rate counters (they
-  expire within minutes). Master-plan label geometry is rebuilt from the plan files on start,
-  so only the layer's settings are stored.
+  expire within minutes). Master-plan label geometry is rebuilt from source data, whose vector
+  files are stored in `portal_assets`; generated master-plan raster tiles remain filesystem caches.
+* **Assets** — uploaded property photos and original GIS upload files are stored in `portal_assets`.
+  Legacy photo files are imported at startup. Smaller bundled vector/OSM sources are imported once;
+  the large generated master-plan tile cache is not duplicated in the database.
 * **A store that fails to load** (for example after an incompatible model change) keeps its
   sample data, is reported as `frozen`, and is never written, so the saved rows stay intact
   until you fix the cause and restart.
@@ -287,7 +291,7 @@ uvicorn workers would overwrite each other's changes.
 
 | Endpoint | Needs | Returns |
 | --- | --- | --- |
-| `GET /portal/storage` | `settings.manage` | `backend`, `location` (password hidden), `loaded_from_database`, `last_flush`, `last_error`, `frozen`, `stores`, `rows`, `rows_by_store`. With `PORTAL_PERSIST=0`: `{"enabled": false}`. |
+| `GET /portal/storage` | `settings.manage` | `backend`, `location` (password hidden), `loaded_from_database`, `last_flush`, `last_error`, `frozen`, `stores`, `rows`, `rows_by_store`, binary asset count and bytes. With `PORTAL_PERSIST=0`: `{"enabled": false}`. |
 | `POST /portal/storage/flush` | `settings.manage` | Saves every pending change now: `{"saved": true, "written": n, "removed": n}`. `409` when persistence is off. |
 
 ### 3.3 Backups and restore
@@ -296,7 +300,7 @@ uvicorn workers would overwrite each other's changes.
   backup: `sqlite3 backend/data/portal.sqlite3 ".backup portal-YYYYMMDD.sqlite3"`. The
   database runs in WAL mode, so a plain file copy is only safe with the backend stopped
   (copy `portal.sqlite3` together with any `-wal` and `-shm` files).
-* **PostgreSQL** — `pg_dump --format=custom --table=portal_rows --table=portal_kv --file=portal.dump "<DATABASE_URL>"`,
+* **PostgreSQL** — `pg_dump --format=custom --table=portal_rows --table=portal_kv --table=portal_assets --file=portal.dump "<DATABASE_URL>"`,
   plus your provider's daily backups and point-in-time recovery.
 * **Restore** — stop the backend, put the file back (or `pg_restore` the dump), start it.
   The rows are loaded on start.

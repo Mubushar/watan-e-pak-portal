@@ -37,6 +37,7 @@ MAX_TURNS = 200
 TURN_DAYS = 14
 MAX_MEMORIES = 150
 MAX_TEXT = 1200
+INFERRED_MEMORY_TTL_DAYS = 180
 
 
 class ConversationTurn(BaseModel):
@@ -200,6 +201,24 @@ def remember(user_id: str, note: str) -> Dict[str, Any]:
     return {"remembered": True, "id": m.id, "value": m.value}
 
 
+def correct(user_id: str, memory_id: str, value: str) -> Dict[str, Any]:
+    """Let the user correct a stored fact and mark the corrected value as explicit."""
+    value = (value or "").strip()[:300]
+    if len(value) < 2:
+        return {"error": "Memory must contain at least two characters"}
+    if _SENSITIVE.search(value):
+        return {"error": "That looks like an ID, card number or password; it isn't stored."}
+    item = next((m for m in memories_db if m.id == memory_id and m.user_id == user_id), None)
+    if not item:
+        return {"error": "No such memory"}
+    item.value = value
+    item.source = "explicit"
+    item.updated_at = datetime.now()
+    item.hits += 1
+    return {"corrected": True, "id": item.id, "kind": item.kind, "value": item.value,
+            "source": item.source, "updated": item.updated_at.date().isoformat()}
+
+
 def forget(user_id: str, memory_id: Optional[str] = None) -> Dict[str, Any]:
     before = len(memories_db)
     if memory_id:
@@ -233,6 +252,8 @@ def recall(user_id: str, query: str = "", limit: int = 8) -> List[Dict[str, Any]
             continue
         overlap = len(q & set(knowledge.tokens(m.value)))
         age_days = max(0.0, (now - m.updated_at).total_seconds() / 86400)
+        if m.source != "explicit" and age_days > INFERRED_MEMORY_TTL_DAYS:
+            continue
         recency = 1 / (1 + age_days / 30)
         score = KIND_WEIGHT.get(m.kind, 1.0) * (1 + 2 * overlap + 0.2 * min(m.hits, 5)) * recency
         if m.kind in ALWAYS or overlap or m.source == "explicit":

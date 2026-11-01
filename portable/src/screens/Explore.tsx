@@ -17,7 +17,7 @@ const AD_EVERY = 6;
 const CATEGORIES = ["house", "apartment", "plot", "shop", "office", "floor", "building"];
 const PRICE_STEPS = [0, 2_500_000, 5_000_000, 10_000_000, 20_000_000, 35_000_000, 50_000_000, 100_000_000, 250_000_000];
 /** Every /search filter, so links from the assistant ("See all …") show exactly what it found. */
-const FILTER_KEYS = ["city", "category", "use_type", "bedrooms", "min_bathrooms", "min_price", "max_price", "min_marla", "max_marla", "featured", "feature", "near", "near_km", "near_place"] as const;
+const FILTER_KEYS = ["purpose", "city", "category", "use_type", "bedrooms", "min_bathrooms", "min_price", "max_price", "min_marla", "max_marla", "featured", "feature", "near", "near_km", "near_place"] as const;
 type Filters = Partial<Record<(typeof FILTER_KEYS)[number], string>>;
 /** `near=` kinds the backend understands. */
 const NEAR_KINDS = ["school", "mosque", "hospital", "market", "park", "transport"];
@@ -122,6 +122,9 @@ export default function Explore() {
         }
       />
       <div className="screen pt-4">
+        <div className="mb-3 flex gap-2">
+          {[{ value: undefined, label: "Buy" }, { value: "rent", label: "Rent" }].map((o) => <button key={o.label} onClick={() => apply({ ...filters, purpose: o.value })} className={`chip px-4 py-2 text-sm ${filters.purpose === o.value ? "bg-brand-700 text-white" : "bg-white text-brand-800 ring-1 ring-black/5 dark:bg-white/5 dark:text-brand-100"}`}>{o.label}</button>)}
+        </div>
         <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
           <button onClick={() => apply({ ...filters, category: undefined })} className={`chip shrink-0 px-3.5 py-2 text-sm ${!filters.category ? "bg-brand-700 text-white" : "bg-white text-brand-800 ring-1 ring-black/5 dark:bg-white/5 dark:text-brand-100"}`}>
             All

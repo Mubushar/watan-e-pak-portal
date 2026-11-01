@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import L from "leaflet";
 import type { GeoJsonObject } from "geojson";
-import { Circle, CircleMarker, GeoJSON, Marker, Polyline, Popup, Tooltip } from "react-leaflet";
+import { Circle, CircleMarker, GeoJSON, ImageOverlay, Marker, Polyline, Popup, Tooltip } from "react-leaflet";
 import {
   ArrowRight,
   Bot,
@@ -23,6 +23,7 @@ import {
   Grid2x2,
   Home,
   Hexagon,
+  KeyRound,
   LandPlot,
   Layers3,
   Map as MapIcon,
@@ -184,6 +185,7 @@ export default function MapExplorer() {
   // -------------------------------------------------------------- property filters
   const [useType, setUseType] = useState("all");
   const [category, setCategory] = useState("all");
+  const [listingPurpose, setListingPurpose] = useState<"all" | "sale" | "rent">("all");
   const [featuredOnly, setFeaturedOnly] = useState(false);
   const [search, setSearch] = useState("");
   const filtered = useMemo(() => {
@@ -191,11 +193,12 @@ export default function MapExplorer() {
     return properties.filter(
       (p) =>
         (useType === "all" || p.use_type === useType) &&
+        (listingPurpose === "all" || (p.listing_purpose ?? "sale") === listingPurpose) &&
         (category === "all" || p.category === category) &&
         (!featuredOnly || p.featured) &&
         (!s || [p.title, p.city_name, p.sector, p.street_address].some((x) => x?.toLowerCase().includes(s))),
     );
-  }, [properties, useType, category, featuredOnly, search]);
+  }, [properties, useType, category, listingPurpose, featuredOnly, search]);
   // Listings at the same spot (units of one tower) share one pin: hundreds of stacked markers
   // looked like one anyway and made every pan / zoom frame slow.
   const listingGroups = useMemo(() => {
@@ -934,10 +937,15 @@ export default function MapExplorer() {
         {vis.layers &&
           gisLayers.map((l) => {
             const d = details.get(l.id);
-            if (!d?.geojson || hidden.has(l.id)) return null;
+            if (!d || hidden.has(l.id)) return null;
+            const o = layerOpacity / 100;
+            if (d.raster_preview_asset_id && d.raster_bounds) {
+              return <ImageOverlay key={l.id} url={`${API_BASE}/gis/layers/${l.id}/raster-preview`}
+                bounds={d.raster_bounds} opacity={o} zIndex={d.z_index ?? 1} />;
+            }
+            if (!d.geojson) return null;
             const color = LAYER_COLORS[l.layer_type] ?? d.style?.color ?? "#146f45";
             const isLine = l.layer_type === "road";
-            const o = layerOpacity / 100;
             return (
               <GeoJSON
                 key={l.id}
@@ -1169,7 +1177,7 @@ export default function MapExplorer() {
             title: "Portal data",
             icon: Home,
             items: [
-              { key: "props", label: "Listings", hint: `${filtered.length} properties for sale & rent`, icon: Home, on: vis.props, onChange: (v) => setVis((x) => ({ ...x, props: v })) },
+              { key: "props", label: "Listings", hint: `${filtered.filter((p) => (p.listing_purpose ?? "sale") !== "rent").length} sale · ${filtered.filter((p) => p.listing_purpose === "rent").length} rent`, icon: Home, on: vis.props, onChange: (v) => setVis((x) => ({ ...x, props: v })) },
               { key: "pois", label: "Featured places", hint: "Curated places with ratings", icon: Star, on: vis.pois, onChange: (v) => setVis((x) => ({ ...x, pois: v })) },
               { key: "aois", label: "Areas of interest", hint: "Saved study areas", icon: Square, on: vis.aois, onChange: (v) => setVis((x) => ({ ...x, aois: v })) },
             ],
@@ -1347,6 +1355,7 @@ export default function MapExplorer() {
             })),
           },
         ])}
+        manageLayersHref={can("gis.manage") ? "/app/admin/gis-layers" : undefined}
       />
 
       {/* ------------------------------------------------------- search bar / route finder */}
@@ -1473,7 +1482,7 @@ export default function MapExplorer() {
             <span className="min-w-0">
               <span className="block font-display text-base font-bold leading-tight text-brand-900 dark:text-white">GIS Explorer</span>
               <span className="block truncate text-[11px] text-ink-mute dark:text-slate-400">
-                {properties.length} listings · {poiQ.data?.pois.length ?? 0} places · {gisLayers.length + (plansQ.data?.count ?? 0)} layers
+                {properties.length} listings ({properties.filter((p) => p.listing_purpose === "rent").length} rentals) · {poiQ.data?.pois.length ?? 0} places · {gisLayers.length + (plansQ.data?.count ?? 0)} layers
               </span>
             </span>
           </button>
@@ -1502,6 +1511,11 @@ export default function MapExplorer() {
                   {tab === "properties" && (
                     <div className="space-y-3">
                       <Input icon={<Search className="h-4 w-4" />} placeholder="Search title, city, sector…" value={search} onChange={(e) => setSearch(e.target.value)} />
+                      <ChipRow>
+                        <FilterChip active={listingPurpose === "all"} onClick={() => setListingPurpose("all")}>Sale + rent</FilterChip>
+                        <FilterChip active={listingPurpose === "sale"} onClick={() => setListingPurpose("sale")} color="#0f5a39" count={properties.filter((p) => (p.listing_purpose ?? "sale") === "sale").length}>For sale</FilterChip>
+                        <FilterChip active={listingPurpose === "rent"} onClick={() => setListingPurpose("rent")} color="#7c3aed" count={properties.filter((p) => p.listing_purpose === "rent").length}>For rent</FilterChip>
+                      </ChipRow>
                       <ChipRow>
                         <FilterChip active={useType === "all"} onClick={() => setUseType("all")}>
                           All uses
@@ -1555,7 +1569,7 @@ export default function MapExplorer() {
                                 <p className="truncate text-[11px] text-ink-mute">
                                   {[p.sector, p.city_name].filter(Boolean).join(", ")} · {titleCase(p.category)}
                                 </p>
-                                <p className="text-sm font-bold text-brand-700 dark:text-brand-300">{pkrShort(p.price)}</p>
+                                <p className="text-sm font-bold text-brand-700 dark:text-brand-300">{pkrShort(p.price)}{p.listing_purpose === "rent" ? (p.rent_frequency === "weekly" ? "/wk" : "/mo") : ""}</p>
                               </div>
                               <Navigation className="h-4 w-4 shrink-0 text-ink-mute opacity-0 transition group-hover:opacity-100" />
                             </motion.button>
@@ -1930,7 +1944,7 @@ function PropertyPopup({ p }: { p: Property }) {
       <div className="relative h-28 overflow-hidden">
         <img src={coverImage(p)} alt="" className="h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-        <p className="absolute bottom-2 start-3 font-display text-lg font-bold text-white drop-shadow">{pkrShort(p.price)}</p>
+        <p className="absolute bottom-2 start-3 font-display text-lg font-bold text-white drop-shadow">{pkrShort(p.price)}{p.listing_purpose === "rent" ? (p.rent_frequency === "weekly" ? "/wk" : "/mo") : ""}</p>
         {p.featured && (
           <span className="chip absolute end-2 top-2 bg-gold-gradient text-brand-950">
             <Sparkles className="h-3 w-3" /> Featured
@@ -1938,7 +1952,7 @@ function PropertyPopup({ p }: { p: Property }) {
         )}
       </div>
       <div className="p-3">
-        <p className="line-clamp-1 text-sm font-semibold">{p.title}</p>
+        <p className="line-clamp-1 text-sm font-semibold">{p.title} {p.listing_purpose === "rent" && <Badge tone="purple">For rent</Badge>}</p>
         <p className="mt-0.5 line-clamp-1 text-[11px] text-ink-mute">
           {[p.sector, p.city_name].filter(Boolean).join(", ")} · {titleCase(p.category)} · {titleCase(p.use_type)}
         </p>
@@ -2156,6 +2170,8 @@ function ReportsCard({ properties, cities, schemes, onOpen }: { properties: Prop
   const pid = propId || properties[0]?.id || "";
   const cid = cityId || cities[0]?.id || "";
   const sid = schemeId || schemes[0]?.id || "";
+  const rentals = properties.filter((p) => p.listing_purpose === "rent" && p.status === "active");
+  const averageMonthlyRent = rentals.length ? rentals.reduce((sum, p) => sum + (p.rent_frequency === "weekly" ? p.price * 52 / 12 : p.price), 0) / rentals.length : 0;
   return (
     <div className="rounded-2xl border border-black/5 bg-white/70 p-4 dark:border-white/10 dark:bg-white/5">
       <div className="mb-3 flex items-center gap-2">
@@ -2163,6 +2179,14 @@ function ReportsCard({ properties, cities, schemes, onOpen }: { properties: Prop
         <p className="font-display text-sm font-bold text-ink dark:text-white">Live GIS reports</p>
       </div>
       <div className="space-y-3">
+        <div className="rounded-xl border border-violet-200 bg-violet-50/70 p-3 dark:border-violet-400/20 dark:bg-violet-500/10">
+          <p className="text-xs font-bold uppercase tracking-wide text-violet-800 dark:text-violet-200">Rental inventory · mapped listings</p>
+          <p className="mt-1 font-display text-lg font-bold text-violet-950 dark:text-white">{rentals.length} active rentals</p>
+          <p className="text-xs text-violet-800/80 dark:text-violet-200/80">Average asking rent {pkrShort(averageMonthlyRent)}/mo · weekly rates converted</p>
+          <ReportButton disabled={!cid} onClick={() => cid && onOpen({ title: `${cities.find((c) => c.id === cid)?.name ?? "City"} — rental market report`, path: `/gis/report/rentals/city/${cid}` })} icon={<KeyRound className="h-4 w-4" />}>
+            Rental market report
+          </ReportButton>
+        </div>
         <div className="space-y-1.5">
           <Select value={pid} onChange={(e) => setPropId(e.target.value)} options={properties.map((p) => ({ value: p.id, label: p.title }))} />
           <ReportButton disabled={!pid} onClick={() => pid && onOpen({ title: "Property GIS report", path: `/gis/report/property/${pid}`, query: { include_outlook: true } })} icon={<Building2 className="h-4 w-4" />}>

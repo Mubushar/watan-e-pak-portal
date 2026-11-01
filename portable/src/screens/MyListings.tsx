@@ -7,7 +7,7 @@ import { del, post, put } from "@/lib/api";
 import { compressImage } from "@/lib/images";
 import { pkrShort, titleCase } from "@/lib/format";
 import { useAuth, roleLabel } from "@/store/auth";
-import { Button, EmptyState, Field, Input, Segmented, Sheet, Skeleton, Textarea, TopBar } from "@/components/ui";
+import { Button, EmptyState, Field, Input, Segmented, Select, Sheet, Skeleton, Textarea, TopBar } from "@/components/ui";
 import { PropertyRow } from "@/components/PropertyCard";
 
 type Tab = "active" | "closed";
@@ -20,7 +20,10 @@ export default function MyListings() {
   const q = useApi<PropertyList>("/me/listings");
   const all = q.data?.results ?? [];
   const shown = all.filter((p) => (tab === "active" ? p.status === "active" || p.status === "pending" : p.status === "sold" || p.status === "rented"));
-  const value = all.filter((p) => p.status === "active").reduce((s, p) => s + p.price, 0);
+  const active = all.filter((p) => p.status === "active");
+  const activeSales = active.filter((p) => p.listing_purpose !== "rent");
+  const activeRentals = active.filter((p) => p.listing_purpose === "rent");
+  const monthlyRent = activeRentals.reduce((s, p) => s + (p.rent_frequency === "weekly" ? p.price * 52 / 12 : p.price), 0);
 
   const setStatus = useMutate((v: { id: string; status: string }) => put(`/me/listings/${v.id}`, { status: v.status }), {
     invalidate: ["/me/listings", "/search", "/properties"],
@@ -52,11 +55,12 @@ export default function MyListings() {
         }
       />
       <div className="screen pt-4">
-        <div className="grid grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-2 gap-2.5">
           {[
-            ["Active", all.filter((p) => p.status === "active").length],
+            ["Active for sale", activeSales.length],
+            ["Active rentals", activeRentals.length],
             ["Closed", all.filter((p) => p.status === "sold" || p.status === "rented").length],
-            ["Active value", pkrShort(value, false) || "0"],
+            ["Monthly rent", `${pkrShort(monthlyRent, false) || "0"}/mo`],
           ].map(([l, v]) => (
             <div key={l} className="card p-3">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-mute">{l}</p>
@@ -191,22 +195,29 @@ export default function MyListings() {
 }
 
 function EditSheet({ p, onClose }: { p: Property; onClose: () => void }) {
-  const [f, setF] = useState({ title: p.title, price: String(p.price), description: p.description ?? "", amenities: (p.amenities ?? []).join(", ") });
+  const [f, setF] = useState({ title: p.title, price: String(p.price), description: p.description ?? "", amenities: (p.amenities ?? []).join(", "), security_deposit: String(p.security_deposit ?? 0), advance_months: String(p.advance_months ?? 1), lease_term_months: String(p.lease_term_months ?? 12), rent_frequency: p.rent_frequency ?? "monthly", furnishing_status: p.furnishing_status ?? "unfurnished", tenant_preference: p.tenant_preference ?? "" });
   const amenities = f.amenities.split(/[,،\n]/).map((a) => a.trim()).filter(Boolean);
-  const save = useMutate(() => put(`/me/listings/${p.id}`, { title: f.title.trim(), price: Number(f.price), description: f.description, amenities }), {
+  const save = useMutate(() => put(`/me/listings/${p.id}`, { title: f.title.trim(), price: Number(f.price), description: f.description, amenities, ...(p.listing_purpose === "rent" ? { security_deposit: Number(f.security_deposit), advance_months: Number(f.advance_months), lease_term_months: Number(f.lease_term_months), rent_frequency: f.rent_frequency, furnishing_status: f.furnishing_status, tenant_preference: f.tenant_preference } : {}) }), {
     invalidate: ["/me/listings", "/search", "/properties"],
     success: "Listing updated",
     onSuccess: onClose,
   });
   return (
-    <Sheet open onClose={onClose} title="Edit listing">
+    <Sheet open onClose={onClose} title={p.listing_purpose === "rent" ? "Edit rental listing" : "Edit listing"}>
       <div className="space-y-4">
         <Field label="Title">
           <Input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />
         </Field>
-        <Field label="Price (PKR)" hint={Number(f.price) > 0 ? pkrShort(Number(f.price)) : undefined}>
+        <Field label={p.listing_purpose === "rent" ? `Rent per ${f.rent_frequency === "weekly" ? "week" : "month"} (PKR)` : "Price (PKR)"} hint={Number(f.price) > 0 ? pkrShort(Number(f.price)) : undefined}>
           <Input inputMode="numeric" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value.replace(/\D/g, "") })} />
         </Field>
+        {p.listing_purpose === "rent" && <>
+          <Field label="Rent frequency"><Select value={f.rent_frequency} onChange={(e) => setF({ ...f, rent_frequency: e.target.value })}><option value="monthly">Monthly</option><option value="weekly">Weekly</option></Select></Field>
+          <Field label="Security deposit (PKR)"><Input inputMode="numeric" value={f.security_deposit} onChange={(e) => setF({ ...f, security_deposit: e.target.value.replace(/\D/g, "") })} /></Field>
+          <div className="grid grid-cols-2 gap-3"><Field label="Advance months"><Input inputMode="numeric" value={f.advance_months} onChange={(e) => setF({ ...f, advance_months: e.target.value.replace(/\D/g, "") })} /></Field><Field label="Lease term (months)"><Input inputMode="numeric" value={f.lease_term_months} onChange={(e) => setF({ ...f, lease_term_months: e.target.value.replace(/\D/g, "") })} /></Field></div>
+          <Field label="Furnishing"><Select value={f.furnishing_status} onChange={(e) => setF({ ...f, furnishing_status: e.target.value })}><option value="unfurnished">Unfurnished</option><option value="semi_furnished">Semi furnished</option><option value="furnished">Furnished</option></Select></Field>
+          <Field label="Tenant preference (optional)"><Input value={f.tenant_preference} onChange={(e) => setF({ ...f, tenant_preference: e.target.value })} maxLength={500} /></Field>
+        </>}
         <Field label="Description">
           <Textarea value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
         </Field>

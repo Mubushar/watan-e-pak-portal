@@ -70,6 +70,7 @@ export function useDashboardNav(unread: number): { title: string; items: NavItem
         { to: "/app/crm", label: "CRM", icon: Users, perm: "crm.view" },
         { to: "/app/listings", label: "My listings", icon: Building2, end: true },
         { to: "/app/listings/new", label: "List a property", icon: PlusSquare },
+        { to: "/app/rentals", label: "Rental listings", icon: KeyRound, perm: "properties.manage" },
         { to: "/app/transactions", label: "Transactions", icon: FileSignature, perm: "crm.view" },
         { to: "/app/leasing", label: "Leasing", icon: KeyRound },
         { to: "/app/marketing", label: "Marketing", icon: Target, perm: "crm.view" },

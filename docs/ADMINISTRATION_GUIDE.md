@@ -142,6 +142,7 @@ What each one opens:
 | Permission | Opens | Roles that have it (besides super_admin) |
 | --- | --- | --- |
 | `basedata.manage` | Administration › Base data; writes to `/cities`, `/schemes`, `/blocks` | admin |
+| `projects.manage` | Landmark records in Administration › Base data | admin, developer |
 | `properties.manage` | Administration › Property database; writes to `/properties` | admin, developer |
 | `gis.manage` | Administration › GIS layers; every GIS write; unpublished layers | admin, valuer |
 | `listings.manage` | images, leasing and maintenance writes | admin, moderator, developer, agency_manager, agent, seller, landlord |
@@ -196,10 +197,11 @@ with its permission:
 | Property database | `/app/admin/properties` | `properties.manage` |
 | GIS layers | `/app/admin/gis-layers` | `gis.manage` |
 
-**Base data** — cities, housing societies / societies and blocks / zones
-(`/admin/basedata/{cities|schemes|blocks}`): add, edit and delete with validation (unique
-names, known approval statuses, sources). A city or scheme that is still in use can't be
-deleted (`409`). See `backend/README.md` › *Base data* for where the seed data comes from.
+**Base data** — cities, housing societies / societies, blocks / zones and landmarks
+(`/admin/basedata/{cities|schemes|blocks|landmarks}`): add, edit and delete with validation
+(unique names, known approval statuses, sources). Landmark records use `projects.manage`;
+landmarks linked to listings can't be deleted (`409`). A city or scheme that is still in use
+can't be deleted (`409`). See `backend/README.md` › *Base data* for seed data details.
 
 **Property database** — every listing with every field (`/admin/properties*`):
 

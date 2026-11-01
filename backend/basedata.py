@@ -1,5 +1,5 @@
 """
-Base data: the portal's cities, housing schemes / societies and their blocks / zones.
+Base data: the portal's cities, housing schemes / societies, blocks / zones and landmarks.
 
 * ``create`` / ``update`` / ``delete`` / ``get`` / ``rows`` for the admin screens
   (``/admin/basedata/{table}``), validated against the models; a record that others depend on
@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import server as core
+import storage
 
 GEODATA = Path(__file__).with_name("geodata")
 CITIES_FILE = GEODATA / "pk_cities_basedata.json"
@@ -33,6 +34,7 @@ def _tables() -> Dict[str, Tuple[Any, List[Any]]]:
         "cities": (core.City, core.cities_db),
         "schemes": (core.HousingScheme, core.housing_schemes_db),
         "blocks": (core.BlockZoneArea, core.block_zone_areas_db),
+        "landmarks": (core.BigProject, core.big_projects_db),
     }
 
 
@@ -63,6 +65,9 @@ def _row(table: str, rec: Any) -> Dict[str, Any]:
     elif table == "blocks":
         sch = core.find_scheme(rec.scheme_id)
         d["scheme"] = sch.name if sch else None
+    elif table == "landmarks":
+        d["city"] = core.city_name(rec.city_id)
+        d["listings"] = sum(1 for p in core.properties_db if getattr(p, "project_id", None) == rec.id)
     return d
 
 
@@ -74,7 +79,7 @@ def rows(table: str, q: Optional[str] = None, city_id: Optional[str] = None, sch
             continue
         if scheme_id and getattr(r, "scheme_id", None) != scheme_id:
             continue
-        if q and _norm(q) not in _norm(f"{r.name} {getattr(r, 'name_ur', '') or ''} {getattr(r, 'developer', '') or ''} {getattr(r, 'state', '') or ''}"):
+        if q and _norm(q) not in _norm(f"{r.name} {getattr(r, 'name_ur', '') or ''} {getattr(r, 'developer', '') or ''} {getattr(r, 'state', '') or ''} {getattr(r, 'project_type', '') or ''} {getattr(r, 'status', '') or ''}"):
             continue
         out.append(_row(table, r))
     # the portal's order: Islamabad first, the DHA / Bahria phases first among societies
@@ -112,6 +117,15 @@ def _clean(table: str, data: Dict[str, Any]) -> Dict[str, Any]:
             raise ValueError("City not found")
     if table == "blocks" and "scheme_id" in clean and not core.find_scheme(clean["scheme_id"]):
         raise ValueError("Housing scheme not found")
+    if table == "landmarks":
+        if not clean.get("city_id") or not core.find_city(clean["city_id"]):
+            raise ValueError("Choose a valid city")
+        if clean.get("scheme_id"):
+            scheme = core.find_scheme(clean["scheme_id"])
+            if not scheme:
+                raise ValueError("Housing scheme not found")
+            if scheme.city_id != clean["city_id"]:
+                raise ValueError("Choose a housing society in the selected city")
     return clean
 
 
@@ -152,6 +166,8 @@ def dependents(table: str, record_id: str) -> Dict[str, int]:
     if table == "schemes":
         return {"blocks": sum(1 for b in core.block_zone_areas_db if b.scheme_id == record_id),
                 "properties": sum(1 for p in core.properties_db if getattr(p, "scheme_id", None) == record_id)}
+    if table == "landmarks":
+        return {"listings": sum(1 for p in core.properties_db if getattr(p, "project_id", None) == record_id)}
     return {"properties": sum(1 for p in core.properties_db if getattr(p, "block_zone_area_id", None) == record_id)}
 
 
@@ -181,10 +197,11 @@ def _city_by_name(name: str) -> Optional[Any]:
 def add_missing_schemes() -> int:
     """After the database is loaded: add researched societies it doesn't have yet (a newer data file).
     Only adds — never changes a society an admin may have edited."""
-    if not SCHEMES_FILE.exists():
+    if not SCHEMES_FILE.exists() and not storage.has_asset("seed/geodata/pk_housing_schemes.json"):
         return 0
     added = 0
-    for row in json.loads(SCHEMES_FILE.read_text(encoding="utf-8")):
+    raw_schemes = storage.read_seed_asset("geodata/pk_housing_schemes.json", str(SCHEMES_FILE)) or b"[]"
+    for row in json.loads(raw_schemes.decode("utf-8")):
         city = _city_by_name(row.get("city") or "")
         if city is None:
             continue
@@ -211,8 +228,9 @@ def add_missing_schemes() -> int:
 def load_seed() -> Dict[str, int]:
     """Merge the researched cities and schemes into the tables (idempotent)."""
     stats = {"cities_added": 0, "cities_updated": 0, "schemes_added": 0, "schemes_updated": 0}
-    if CITIES_FILE.exists():
-        for row in json.loads(CITIES_FILE.read_text(encoding="utf-8")):
+    raw_cities = storage.read_seed_asset("geodata/pk_cities_basedata.json", str(CITIES_FILE))
+    if raw_cities:
+        for row in json.loads(raw_cities.decode("utf-8")):
             data = {
                 "name": row["name"], "name_ur": row.get("name_ur"), "state": row.get("province"), "district": row.get("district"),
                 "latitude": row.get("latitude"), "longitude": row.get("longitude"), "description": row.get("description"),
@@ -230,8 +248,9 @@ def load_seed() -> Dict[str, int]:
             else:
                 core.cities_db.append(core.City(**data))
                 stats["cities_added"] += 1
-    if SCHEMES_FILE.exists():
-        for row in json.loads(SCHEMES_FILE.read_text(encoding="utf-8")):
+    raw_schemes = storage.read_seed_asset("geodata/pk_housing_schemes.json", str(SCHEMES_FILE))
+    if raw_schemes:
+        for row in json.loads(raw_schemes.decode("utf-8")):
             city = _city_by_name(row.get("city") or "")
             if city is None:
                 continue

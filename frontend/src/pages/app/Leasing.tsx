@@ -20,6 +20,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { post } from "@/lib/api";
+import { useAuth } from "@/store/auth";
 import { useApi, useMutate } from "@/hooks/useApi";
 import { coverImage } from "@/lib/images";
 import { num, pct, pkr, pkrShort, timeAgo, titleCase } from "@/lib/format";
@@ -451,6 +452,8 @@ function AgentSimulator({ units, funnel }: { units: Unit[]; funnel: ReturnType<t
 
 // ================================================================== screening
 function ScreeningForm({ units }: { units: Unit[] }) {
+  const canManage = useAuth((s) => s.can("properties.manage"));
+  const applications = useApi<{ count: number; applications: { id: string; applicant: string; email?: string; phone?: string; property_title?: string; monthly_income: number; created_at: string; screening?: { decision?: string; score?: number; explanation?: string[] } }[] }>(canManage ? "/leasing/applications" : null);
   const [f, set] = useFormState({ applicant: "", monthly_income: "", unit_id: "", employment: "salaried", references_count: "2", credit_proxy: 70, occupants: "2", pets: false, move_in_days: "15" });
   useEffect(() => {
     if (!f.unit_id && units.length) set("unit_id")(units[0].id);
@@ -572,6 +575,11 @@ function ScreeningForm({ units }: { units: Unit[] }) {
           </Card>
         )}
       </div>
+      {canManage && <div className="lg:col-span-5">
+        <Panel title="Submitted tenant applications" subtitle="Applications received from public rental listings, with a preliminary screening summary." icon={<ClipboardCheck className="h-4 w-4" />}>
+          {applications.isLoading ? <Skeleton className="h-24" /> : applications.error ? <p className="text-sm text-red-600">Could not load applications: {String(applications.error)}</p> : !(applications.data?.applications.length) ? <p className="text-sm text-ink-mute">No online tenant applications yet.</p> : <div className="space-y-3">{applications.data.applications.map((a) => <div key={a.id} className="flex flex-col gap-2 rounded-xl border border-black/5 p-4 sm:flex-row sm:items-center dark:border-white/10"><div className="min-w-0 flex-1"><p className="font-semibold">{a.applicant}</p><p className="text-xs text-ink-mute">{a.property_title ?? "Rental listing"} · {a.email || a.phone || "No contact"} · {a.created_at ? new Date(a.created_at).toLocaleDateString() : ""}</p></div><p className="text-sm">Income {pkrShort(a.monthly_income, false)} / mo</p><Badge tone={a.screening?.decision === "approve" ? "green" : a.screening?.decision === "decline" ? "red" : "gold"}>{titleCase(a.screening?.decision ?? "pending review")} · {a.screening?.score ?? "—"}</Badge></div>)}</div>}
+        </Panel>
+      </div>}
     </div>
   );
 }

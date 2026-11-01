@@ -29,6 +29,9 @@ interface Meta {
   statuses: string[];
   categories: string[];
   use_types: string[];
+  purposes?: string[];
+  rent_frequencies?: string[];
+  furnishing_statuses?: string[];
   cities: { id: string; name: string }[];
   schemes: { id: string; name: string; city_id: string }[];
   blocks: { id: string; name: string; scheme_id: string }[];
@@ -52,15 +55,16 @@ const STATUS_TONE: Record<string, "green" | "blue" | "gold" | "gray" | "red" | "
   withdrawn: "gray",
   draft: "orange",
 };
-const EMPTY: Row = { title: "", price: "", status: "active", use_type: "residential", category: "house", featured: false, city_id: "", amenities: [] };
+const EMPTY: Row = { title: "", price: "", listing_purpose: "sale", status: "active", use_type: "residential", category: "house", featured: false, city_id: "", amenities: [] };
 
-export default function PropertiesAdmin() {
+export default function PropertiesAdmin({ rentalOnly = false }: { rentalOnly?: boolean } = {}) {
   const qc = useQueryClient();
   const meta = useApi<Meta>("/admin/properties/meta");
   const [q, setQ] = useState("");
   const [city, setCity] = useState("");
   const [status, setStatus] = useState("");
   const [category, setCategory] = useState("");
+  const [purpose, setPurpose] = useState("");
   const [featured, setFeatured] = useState("");
   const [located, setLocated] = useState("");
   const [sort, setSort] = useState("updated");
@@ -76,6 +80,7 @@ export default function PropertiesAdmin() {
     city_id: city || undefined,
     status: status || undefined,
     category: category || undefined,
+    purpose: rentalOnly ? "rent" : purpose || undefined,
     featured: featured === "" ? undefined : featured === "yes",
     located: located === "" ? undefined : located === "yes",
     sort,
@@ -128,10 +133,10 @@ export default function PropertiesAdmin() {
 
   const exportCsv = async () => {
     try {
-      const text = await get<string>("/admin/properties/export.csv", { q: q || undefined, city_id: city || undefined, status: status || undefined, category: category || undefined }, { text: true });
+      const text = await get<string>("/admin/properties/export.csv", { q: q || undefined, city_id: city || undefined, status: status || undefined, category: category || undefined, purpose: rentalOnly ? "rent" : purpose || undefined }, { text: true });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
-      a.download = `arzepak-properties-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `watanepak-properties-${new Date().toISOString().slice(0, 10)}.csv`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     } catch (e) {
@@ -159,8 +164,8 @@ export default function PropertiesAdmin() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Property database"
-        subtitle={`Every listing on the portal${data ? ` — ${num(data.catalogue)} in the catalogue` : ""}. Add, edit, publish or remove listings; changes are saved to the database.`}
+        title={rentalOnly ? "Rental listings" : "Property database"}
+        subtitle={`${rentalOnly ? "Rental homes and commercial spaces" : "Every listing on the portal"}${data ? ` — ${num(data.catalogue)} in the catalogue` : ""}. Add, edit, publish or remove listings; changes are saved to the database.`}
         actions={
           <>
             <Button size="sm" variant="soft" icon={<Download className="h-4 w-4" />} onClick={exportCsv}>
@@ -169,8 +174,8 @@ export default function PropertiesAdmin() {
             <Button size="sm" variant="soft" icon={<FileUp className="h-4 w-4" />} onClick={() => setImporting(true)}>
               Import CSV
             </Button>
-            <Button size="sm" icon={<Plus className="h-4 w-4" />} onClick={() => setEdit({ ...EMPTY })}>
-              Add listing
+            <Button size="sm" icon={<Plus className="h-4 w-4" />} onClick={() => setEdit({ ...EMPTY, listing_purpose: rentalOnly ? "rent" : "sale" })}>
+              {rentalOnly ? "Add rental" : "Add listing"}
             </Button>
           </>
         }
@@ -211,6 +216,7 @@ export default function PropertiesAdmin() {
               </option>
             ))}
           </Select>
+          {!rentalOnly && <Select value={purpose} onChange={(e) => setFilter(() => setPurpose(e.target.value))} className="!h-9 !w-auto !py-0 text-sm"><option value="">Sale and rent</option><option value="sale">For sale</option><option value="rent">For rent</option></Select>}
           <Select value={status} onChange={(e) => setFilter(() => setStatus(e.target.value))} className="!h-9 !w-auto !py-0 text-sm">
             <option value="">Any status</option>
             {(meta.data?.statuses ?? []).map((s) => (
@@ -296,7 +302,7 @@ export default function PropertiesAdmin() {
                   <SortHead k="title">Listing</SortHead>
                   <th className="px-2 py-2 text-start">Location</th>
                   <SortHead k="price" end>
-                    Price
+                    {rentalOnly ? "Rent / period" : "Price / rent"}
                   </SortHead>
                   <SortHead k="size" end>
                     Size
@@ -332,7 +338,7 @@ export default function PropertiesAdmin() {
                       </p>
                     </td>
                     <td className="px-2 py-2.5 text-end tabular-nums">
-                      {pkrShort(r.price)}
+                      {pkrShort(r.price)}{r.listing_purpose === "rent" ? <span className="text-[11px]">/{r.rent_frequency === "weekly" ? "wk" : "mo"}</span> : null}
                       {r.price_per_marla && <p className="text-[11px] text-ink-mute">{pkrShort(r.price_per_marla)}/marla</p>}
                     </td>
                     <td className="px-2 py-2.5 text-end tabular-nums">{r.marla_area ? `${num(r.marla_area)} marla` : r.total_area ? `${num(r.total_area)} sq ft` : "—"}</td>
@@ -375,7 +381,7 @@ export default function PropertiesAdmin() {
         )}
       </Card>
 
-      <PropertyForm record={edit} meta={meta.data} onClose={() => setEdit(null)} onSaved={refresh} />
+      <PropertyForm record={edit} meta={meta.data} rentalOnly={rentalOnly} onClose={() => setEdit(null)} onSaved={refresh} />
       <ImportDialog open={importing} onClose={() => setImporting(false)} onSaved={refresh} />
 
       <Modal
@@ -402,7 +408,7 @@ export default function PropertiesAdmin() {
 
 // ------------------------------------------------------------------ form
 
-function PropertyForm({ record, meta, onClose, onSaved }: { record: Row | null; meta?: Meta; onClose: () => void; onSaved: () => void }) {
+function PropertyForm({ record, meta, rentalOnly, onClose, onSaved }: { record: Row | null; meta?: Meta; rentalOnly: boolean; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState<Row | null>(null);
   const [saving, setSaving] = useState(false);
   const current = form && record && (form.id ?? "new") === (record.id ?? "new") ? form : record;
@@ -420,7 +426,7 @@ function PropertyForm({ record, meta, onClose, onSaved }: { record: Row | null; 
     if (!current) return;
     setSaving(true);
     const fields = [
-      "title", "description", "price", "use_type", "category", "status", "featured", "city_id", "scheme_id", "block_zone_area_id",
+      "title", "description", "price", "listing_purpose", "security_deposit", "advance_months", "lease_term_months", "rent_frequency", "furnishing_status", "tenant_preference", "use_type", "category", "status", "featured", "city_id", "scheme_id", "block_zone_area_id",
       "marla_area", "kanal_area", "total_area", "covered_area", "bedrooms", "bathrooms", "balconies", "floors",
       "street_address", "plot_number", "sector", "landmark", "latitude", "longitude", "agent_id", "available_from", "amenities",
     ];
@@ -464,7 +470,7 @@ function PropertyForm({ record, meta, onClose, onSaved }: { record: Row | null; 
             <Textarea rows={4} value={current.description ?? ""} onChange={(e) => set({ description: e.target.value })} />
           </Field>
           <div className="grid gap-3 sm:grid-cols-3">
-            {numField("price", "Price (PKR)", current.price ? pkrShort(Number(current.price)) : undefined, "1")}
+            {numField("price", current.listing_purpose === "rent" ? `Rent per ${current.rent_frequency === "weekly" ? "week" : "month"} (PKR)` : "Asking price (PKR)", current.price ? pkrShort(Number(current.price)) : undefined, "1")}
             <Field label="Status">
               <Select value={current.status} onChange={(e) => set({ status: e.target.value })}>
                 {(meta?.statuses ?? ["active"]).map((s) => (
@@ -480,6 +486,18 @@ function PropertyForm({ record, meta, onClose, onSaved }: { record: Row | null; 
               </div>
             </Field>
           </div>
+          {!rentalOnly && <Field label="Listing goal"><Select value={current.listing_purpose ?? "sale"} onChange={(e) => set({ listing_purpose: e.target.value })}><option value="sale">Sell / purchase</option><option value="rent">Rent out / lease</option></Select></Field>}
+          {current.listing_purpose === "rent" && <>
+            {section("Rental terms & tenant information")}
+            <div className="grid gap-3 sm:grid-cols-3">
+              {numField("security_deposit", "Security deposit (PKR)", undefined, "1")}
+              {numField("advance_months", "Advance months", undefined, "1")}
+              {numField("lease_term_months", "Lease term (months)", "Leave blank for flexible", "1")}
+              <Field label="Rent frequency"><Select value={current.rent_frequency ?? "monthly"} onChange={(e) => set({ rent_frequency: e.target.value })}><option value="monthly">Monthly</option><option value="weekly">Weekly</option></Select></Field>
+              <Field label="Furnishing"><Select value={current.furnishing_status ?? ""} onChange={(e) => set({ furnishing_status: e.target.value || null })}><option value="">Not specified</option>{(meta?.furnishing_statuses ?? ["furnished", "semi_furnished", "unfurnished"]).map((v) => <option key={v} value={v}>{titleCase(v)}</option>)}</Select></Field>
+            </div>
+            <Field label="Tenant preference" hint="Optional, factual eligibility details; avoid discriminatory language."><Textarea rows={2} maxLength={500} value={current.tenant_preference ?? ""} onChange={(e) => set({ tenant_preference: e.target.value })} placeholder="e.g. Family tenancy preferred; no smoking indoors" /></Field>
+          </>}
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Type">
               <Select value={current.category} onChange={(e) => set({ category: e.target.value })}>

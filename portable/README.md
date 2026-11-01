@@ -182,3 +182,9 @@ assets/       source logo for `npm run assets` (icons + splash screens)
 
 The theme tokens in `tailwind.config.js` and the component classes in `src/index.css`
 are copied from `frontend/`. Change both together to keep the apps identical.
+
+## Docker browser build
+
+The `portable/Dockerfile` builds and serves the browser version of the app. Run the full stack from the repository root with `docker compose up --build`; it is available at <http://localhost:8081> and proxies API and media requests to the backend. The container build uses `/api` as its backend base so it works behind the Compose Nginx proxy.
+
+This container is the browser build. Use the existing Electron and Capacitor build commands above to produce Windows/macOS installers or Android/iOS packages.
