@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Building2, LocateFixed, MapPin, Milestone, PencilLine, Plus, Spline, Square } from "lucide-react";
 import type { EditMode, EditRights } from "./GeoEditor";
-import { Check, ChevronDown, Circle, Globe, Hand, Undo2, Hexagon, Languages, Layers, Layers3, PencilRuler, RectangleHorizontal, Ruler, Search, Spline as SplineIcon, X, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, Circle, Globe, Hand, Undo2, Hexagon, Languages, Layers, Layers3, PencilRuler, RectangleHorizontal, Ruler, Search, Spline as SplineIcon, Upload, X, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
 import type { DrawMode } from "./AreaDraw";
 import type { MapLang } from "./PakistanLayers";
 import { BASE_MAPS, type BaseMapKey } from "@/components/map/PortalMap";
@@ -242,12 +242,15 @@ export function MapControls({
   onDraw,
   measureMode,
   onMeasure,
+  manageLayersHref,
 }: {
   drawMode?: DrawMode | null;
   onDraw?: (m: DrawMode | null) => void;
   /** Measure tool: a distance or an area, or off. */
   measureMode?: "distance" | "area" | null;
   onMeasure?: (m: "distance" | "area" | null) => void;
+  /** GIS managers can jump from the live map to the upload / publish / delete console. */
+  manageLayersHref?: string;
   lang: MapLang;
   onLang: (l: MapLang) => void;
   groups: LayerGroup[];
@@ -486,6 +489,11 @@ export function MapControls({
               <Section key={g.key} group={g} filter={filter} collapsed={!!collapsed[g.key]} onToggleCollapsed={() => toggleSection(g.key)} />
             ))}
           </div>
+          {manageLayersHref && (
+            <a href={manageLayersHref} className="flex items-center justify-center gap-2 border-t border-black/5 px-3 py-3 text-sm font-semibold text-brand-700 hover:bg-brand-50 dark:border-white/10 dark:text-brand-300 dark:hover:bg-white/5">
+              <Upload className="h-4 w-4" /> Manage map layers
+            </a>
+          )}
         </Popover>
       )}
     </div>

@@ -1,7 +1,7 @@
 /**
- * Arz-e-Pak desktop shell (Windows / macOS / Linux).
+ * Watan-e-Pak desktop shell (Windows / macOS / Linux).
  *
- * Production: serves the built web app (dist/) from a privileged `app://arzepak/`
+ * Production: serves the built web app (dist/) from a privileged `app://watanepak/`
  * scheme so fetch, media and storage behave like a normal secure origin.
  * Development: `npm run desktop:dev` points ELECTRON_DEV_URL at the Vite server.
  */
@@ -33,7 +33,7 @@ function createWindow() {
     height: 840,
     minWidth: 380,
     minHeight: 640,
-    title: "Arz-e-Pak",
+    title: "Watan-e-Pak",
     backgroundColor: "#07130d",
     icon: path.join(__dirname, "..", "build-resources", "icon.png"),
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
@@ -49,7 +49,7 @@ function createWindow() {
       // LAN (localhost is already allowed). Safe here: the window only ever runs the
       // bundled app — navigation elsewhere is blocked below.
       allowRunningInsecureContent: true,
-      additionalArguments: [`--arzepak-version=${app.getVersion()}`],
+      additionalArguments: [`--watanepak-version=${app.getVersion()}`],
     },
   });
   win.once("ready-to-show", () => win.show());
@@ -67,7 +67,7 @@ function createWindow() {
     }
   });
 
-  void win.loadURL(DEV_URL || "app://arzepak/index.html");
+  void win.loadURL(DEV_URL || "app://watanepak/index.html");
 }
 
 app.whenReady().then(async () => {

@@ -1,10 +1,10 @@
 {
-  "name": "arzepak-portable",
-  "productName": "Arz-e-Pak",
+  "name": "watanepak-portable",
+  "productName": "Watan-e-Pak",
   "private": true,
   "version": "1.0.0",
-  "description": "Arz-e-Pak AI Real Estate — portable app for Windows, macOS, Android and iOS",
-  "author": "Arz-e-Pak",
+  "description": "Watan-e-Pak AI Real Estate — portable app for Windows, macOS, Android and iOS",
+  "author": "Watan-e-Pak",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -70,8 +70,8 @@
     "wait-on": "^9.5.1"
   },
   "build": {
-    "appId": "pk.arzepak.app",
-    "productName": "Arz-e-Pak",
+    "appId": "pk.watanepak.app",
+    "productName": "Watan-e-Pak",
     "directories": {
       "output": "release",
       "buildResources": "build-resources"
@@ -105,7 +105,7 @@
       "entitlements": "build-resources/entitlements.mac.plist",
       "entitlementsInherit": "build-resources/entitlements.mac.plist",
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Arz-e-Pak uses the microphone so you can talk to the AI property assistant."
+        "NSMicrophoneUsageDescription": "Watan-e-Pak uses the microphone so you can talk to the AI property assistant."
       }
     },
     "linux": {

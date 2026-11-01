@@ -30,6 +30,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import envfile  # noqa: F401  (loads backend/.env)
 import geo
+import storage
 
 DIR = Path(os.getenv("MASTERPLANS_DIR") or Path(__file__).resolve().parent / "media" / "masterplans")
 ATTRIBUTION = "Master plan © DHA Islamabad-Rawalpindi"
@@ -79,12 +80,14 @@ def store() -> _Store:
             return _store
         s = _Store()
         meta_path, labels_path = DIR / "plans.json", DIR / "labels.json.gz"
-        if meta_path.exists():
-            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        raw_meta = storage.read_seed_asset("media/masterplans/plans.json", str(meta_path))
+        if raw_meta:
+            meta = json.loads(raw_meta.decode("utf-8"))
             s.built = meta.get("built")
             s.meta = {p["key"]: p for p in meta["plans"]}
-        if labels_path.exists():
-            with gzip.open(labels_path, "rt", encoding="utf-8") as f:
+        raw_labels = storage.read_seed_asset("media/masterplans/labels.json.gz", str(labels_path))
+        if raw_labels:
+            with gzip.open(io.BytesIO(raw_labels), "rt", encoding="utf-8") as f:
                 for key, rows in json.load(f)["plans"].items():
                     s.labels[key] = [tuple(r) for r in rows]  # type: ignore[misc]
                     grid: Dict[Tuple[int, int], List[int]] = defaultdict(list)
@@ -93,8 +96,9 @@ def store() -> _Store:
                     s.grid[key] = grid
                     s.tokens[key] = [geo.normalize(r[0]).split() for r in rows]
         kpath = DIR / "knowledge.json"
-        if kpath.exists():
-            s.knowledge = json.loads(kpath.read_text(encoding="utf-8"))
+        raw_knowledge = storage.read_seed_asset("media/masterplans/knowledge.json", str(kpath))
+        if raw_knowledge:
+            s.knowledge = json.loads(raw_knowledge.decode("utf-8"))
         _store = s
         return s
 
@@ -441,7 +445,9 @@ def collect_knowledge(keys: Optional[Iterable[str]] = None) -> Dict[str, Any]:
             out[k] = {"facts": r["answer"], "sources": r["sources"], "collected": time.strftime("%Y-%m-%d")}
         except Exception as exc:  # keep going; report per phase
             out[k] = {**out.get(k, {}), "error": str(exc)}
-    (DIR / "knowledge.json").write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
+    knowledge_bytes = json.dumps(out, ensure_ascii=False, indent=1).encode("utf-8")
+    if not storage.put_asset("seed/media/masterplans/knowledge.json", "application/json", knowledge_bytes):
+        (DIR / "knowledge.json").write_bytes(knowledge_bytes)
     s.knowledge = out
     return out
 

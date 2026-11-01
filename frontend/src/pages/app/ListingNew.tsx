@@ -64,6 +64,13 @@ export default function ListingNew() {
     bedrooms: 4,
     bathrooms: 4,
     price: 35_000_000,
+    listing_purpose: "sale",
+    security_deposit: 0,
+    advance_months: 1,
+    lease_term_months: 12,
+    rent_frequency: "monthly",
+    furnishing_status: "unfurnished",
+    tenant_preference: "",
     featured: false,
     amenities: [] as string[],
     photos: [] as string[],
@@ -126,6 +133,13 @@ export default function ListingNew() {
         title: f.title,
         description: f.description || undefined,
         price: f.price,
+        listing_purpose: f.listing_purpose,
+        security_deposit: f.listing_purpose === "rent" ? f.security_deposit : undefined,
+        advance_months: f.listing_purpose === "rent" ? f.advance_months : undefined,
+        lease_term_months: f.listing_purpose === "rent" ? f.lease_term_months : undefined,
+        rent_frequency: f.rent_frequency,
+        furnishing_status: f.listing_purpose === "rent" ? f.furnishing_status : undefined,
+        tenant_preference: f.listing_purpose === "rent" ? f.tenant_preference : undefined,
         city_id: f.city_id,
         scheme_id: f.scheme_id || undefined,
         block_zone_area_id: f.block_zone_area_id || undefined,
@@ -204,6 +218,9 @@ export default function ListingNew() {
               <motion.div key={step} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.2 }} className="space-y-5">
                 {step === 0 && (
                   <>
+                    <Field label="Listing purpose">
+                      <Select value={f.listing_purpose} onChange={(e) => set({ listing_purpose: e.target.value, price: e.target.value === "rent" ? 75_000 : 35_000_000 })} options={[{ value: "sale", label: "For sale / purchase" }, { value: "rent", label: "For rent / lease" }]} />
+                    </Field>
                     <div>
                       <p className="label">Property type</p>
                       <div className="grid grid-cols-4 gap-2">
@@ -304,14 +321,23 @@ export default function ListingNew() {
                     )}
                     <div>
                       <div className="mb-2 flex justify-between text-sm font-semibold">
-                        <span>Asking price</span>
+                        <span>{f.listing_purpose === "rent" ? `Rent per ${f.rent_frequency === "weekly" ? "week" : "month"}` : "Asking price"}</span>
                         <span className="text-brand-700 dark:text-gold-300">{pkrShort(f.price)}</span>
                       </div>
-                      <Slider value={f.price} min={1_000_000} max={500_000_000} step={500_000} onChange={(v) => set({ price: v })} />
+                      <Slider value={f.price} min={f.listing_purpose === "rent" ? 5_000 : 1_000_000} max={f.listing_purpose === "rent" ? 2_000_000 : 500_000_000} step={f.listing_purpose === "rent" ? 5_000 : 500_000} onChange={(v) => set({ price: v })} />
                       <Input className="mt-3" type="number" value={f.price} onChange={(e) => set({ price: Number(e.target.value) })} />
-                      <p className="mt-2 text-xs text-ink-mute">
+                      {f.listing_purpose === "rent" ? (
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                          <Field label="Rent frequency"><Select value={f.rent_frequency} onChange={(e) => set({ rent_frequency: e.target.value })} options={[{ value: "monthly", label: "Monthly" }, { value: "weekly", label: "Weekly" }]} /></Field>
+                          <Field label="Security deposit (PKR)"><Input type="number" min={0} value={f.security_deposit} onChange={(e) => set({ security_deposit: Number(e.target.value) })} /></Field>
+                          <Field label="Advance months"><Input type="number" min={0} max={120} value={f.advance_months} onChange={(e) => set({ advance_months: Number(e.target.value) })} /></Field>
+                          <Field label="Lease term (months)"><Input type="number" min={0} max={120} value={f.lease_term_months} onChange={(e) => set({ lease_term_months: Number(e.target.value) })} /></Field>
+                          <Field label="Furnishing"><Select value={f.furnishing_status} onChange={(e) => set({ furnishing_status: e.target.value })} options={["unfurnished", "semi_furnished", "furnished"].map((v) => ({ value: v, label: titleCase(v) }))} /></Field>
+                          <Field label="Tenant preference (optional)" hint="Use factual, lawful occupancy requirements only."><Input value={f.tenant_preference} onChange={(e) => set({ tenant_preference: e.target.value })} maxLength={500} placeholder="e.g. family-sized unit; references required" /></Field>
+                        </div>
+                      ) : <p className="mt-2 text-xs text-ink-mute">
                         {pkr(Math.round(f.price / f.marla_area))} per marla · {pkr(Math.round(f.price / (f.marla_area * MARLA_SQFT)))} per sqft
-                      </p>
+                      </p>}
                     </div>
                     <div>
                       <p className="label">Features & amenities</p>
@@ -378,7 +404,8 @@ export default function ListingNew() {
                         </div>
                         <p className="mt-3 font-display text-xl font-bold">{f.title}</p>
                         <p className="text-sm text-ink-mute">{[blocks.find((b) => b.id === f.block_zone_area_id)?.name, schemes.find((s) => s.id === f.scheme_id)?.name, city?.name].filter(Boolean).join(", ")}</p>
-                        <p className="mt-2 font-display text-2xl font-bold text-brand-700 dark:text-gold-300">{pkrShort(f.price)}</p>
+                        <p className="mt-2 font-display text-2xl font-bold text-brand-700 dark:text-gold-300">{pkrShort(f.price)}{f.listing_purpose === "rent" ? (f.rent_frequency === "weekly" ? "/week" : "/month") : ""}</p>
+                        {f.listing_purpose === "rent" && <p className="mt-1 text-xs text-ink-mute">Deposit {pkrShort(f.security_deposit)} · {f.advance_months} months advance · {f.lease_term_months || "Flexible"} month lease · {titleCase(f.furnishing_status)}</p>}
                         <p className="mt-3 text-sm text-ink-soft dark:text-slate-300">{f.description}</p>
                         {!!f.amenities.length && <p className="mt-2 text-sm text-ink-mute">{f.amenities.join(" · ")}</p>}
                         <p className="mt-2 text-xs text-ink-mute">{f.photos.length ? `${f.photos.length} photo${f.photos.length > 1 ? "s" : ""}` : "No photos yet — you can add them later from My listings"}</p>

@@ -14,6 +14,7 @@ const P: Record<string, ComponentType> = {
   // Public portal
   Home: lazy(() => import("@/pages/public/Home")),
   Properties: lazy(() => import("@/pages/public/Properties")),
+  Rentals: lazy(() => import("@/pages/public/Rentals")),
   PropertyDetail: lazy(() => import("@/pages/public/PropertyDetail")),
   Compare: lazy(() => import("@/pages/public/Compare")),
   Favorites: lazy(() => import("@/pages/public/Favorites")),
@@ -47,6 +48,7 @@ const P: Record<string, ComponentType> = {
   BaseData: lazy(() => import("@/pages/app/BaseData")),
   GisLayersAdmin: lazy(() => import("@/pages/app/GisLayersAdmin")),
   PropertiesAdmin: lazy(() => import("@/pages/app/PropertiesAdmin")),
+  RentalsAdmin: lazy(() => import("@/pages/app/RentalsAdmin")),
   Accounting: lazy(() => import("@/pages/app/Accounting")),
   Transactions: lazy(() => import("@/pages/app/Transactions")),
   Leasing: lazy(() => import("@/pages/app/Leasing")),
@@ -105,6 +107,7 @@ export default function App() {
           <Route element={<PublicLayout />}>
             <Route index element={<P.Home />} />
             <Route path="properties" element={<P.Properties />} />
+            <Route path="rentals" element={<P.Rentals />} />
             <Route path="properties/:id" element={<P.PropertyDetail />} />
             <Route path="compare" element={<P.Compare />} />
             <Route path="favorites" element={<P.Favorites />} />
@@ -137,6 +140,7 @@ export default function App() {
             <Route path="accounting" element={<RequirePermission perm="accounting.view" area="Accounting"><P.Accounting /></RequirePermission>} />
             <Route path="transactions" element={<RequirePermission perm="crm.view" area="Transactions"><P.Transactions /></RequirePermission>} />
             <Route path="leasing" element={<P.Leasing />} />
+            <Route path="rentals" element={<RequirePermission perm="properties.manage" area="rental listings"><P.RentalsAdmin /></RequirePermission>} />
             <Route path="maintenance" element={<P.Maintenance />} />
             <Route path="marketing" element={<RequirePermission perm="crm.view" area="Marketing"><P.Marketing /></RequirePermission>} />
             <Route path="pmo" element={<RequirePermission perm="projects.view" area="Projects (PMO)"><P.Pmo /></RequirePermission>} />

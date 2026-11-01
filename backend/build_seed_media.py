@@ -28,7 +28,7 @@ import httpx
 
 OUT = Path(__file__).with_name("geodata") / "pk_seed_media.json"
 API = "https://en.wikipedia.org/w/api.php"
-HEADERS = {"User-Agent": "ArzePakPortal/1.0 (https://github.com/Mubushar/arzepak-portal) build_seed_media.py httpx"}
+HEADERS = {"User-Agent": "WatanePakPortal/1.0 (https://github.com/Mubushar/watan-e-pak-portal) build_seed_media.py httpx"}
 THUMB = 1280
 # Images that are maps, flags, seals or logos rather than a picture of the place.
 NOT_A_PHOTO = re.compile(r"(map|locator|location|flag|seal|logo|emblem|coat_of_arms|\.svg$|district_|tehsil)", re.I)

@@ -1,4 +1,4 @@
-# Arz-e-Pak Portal — Agentic AI Guide
+# Watan-e-Pak Portal — Agentic AI Guide
 
 This guide is for **AI engineers and product owners** working with the portal's Agentic
 OS: the products, the 24-agent catalogue, the run engine, autonomy and approval gates, and
@@ -67,9 +67,10 @@ Every agent has an **autonomy level**, from the `agentic` settings group:
 | `autonomous` | Runs end-to-end without a gate. |
 
 An agent's `requires_approval` flag is derived from its level: agents at `suggest`/`assist`
-pause at the gate. Runs start with `approve=false`, so they pause **by default**; only the
-portal's own scheduled jobs pre-approve (`approve=true`). Autonomous agents (e.g.
-`routing_agent`, `anomaly_agent`, `renewal_agent`, `autonomous_leasing_agent`) run freely.
+also pause for a human review when their workflow has no write step. Every tool classified
+as a portal mutation or external action has its own approval gate, including in an agent
+catalogued as `autonomous`. Runs start with `approve=false`; trusted in-process scheduled
+jobs may call the engine directly with `approve=true`.
 
 You can tune the default level and the approval-required set at runtime through the
 `agentic` settings group (`GET/PUT /portal/settings`) or `portal_settings`.
@@ -92,7 +93,7 @@ output.
 | `agent_run` | `POST /agents/run` | Execute a run up to the gate (signed in). |
 | `agent_runs` | `GET /agents/runs` | The recorded run audit trail. |
 | `agent_run_get` | `GET /agents/runs/{run_id}` | One run with steps, outputs and approvals. |
-| `agent_approve` | `POST /agents/runs/{run_id}/approve` | Approve a paused run and run its approved steps (`crm.manage`). |
+| `agent_approve` | `POST /agents/runs/{run_id}/approve` | Approve a paused step using the permission required by that tool. |
 | `agent_orchestrate` | `POST /agents/orchestrate` | Plan a multi-agent hand-off chain. |
 | `agent_smart_actions` | `GET /agents/smart-actions` | The prioritised morning brief (`crm.view`). |
 | `agent_move_likelihood` | `GET /agents/move-likelihood/{lead_id}` | Score a lead's likelihood of moving (`crm.view`). |
@@ -113,7 +114,8 @@ This is the core safety mechanism. **Look first, act after the human gate:**
   check deadlines …) before the review step, and the tools that **create, send or change**
   something (names containing `create`, `send`, `update`, `delete`, `publish`, `assign`,
   `book`, `schedule`, `sign`, `post`, `dispatch`, `record`, `pay`, `notify`, `message`,
-  `email`, `whatsapp`, `add`, `apply`, `renew` …) only after it.
+  `email`, `whatsapp`, `add`, `apply`, `renew`, `close`, `complete`, `respond`, `screen`,
+  `inquiry`, `generate`, `route`, `qualify`, or `bill_account`) only after approval.
 * Runs start with `approve=false` (the default over MCP and REST). When a run reaches a step
   flagged `requires_approval` it **pauses** with status `awaiting_approval`; nothing that
   writes has run yet.
@@ -122,9 +124,17 @@ This is the core safety mechanism. **Look first, act after the human gate:**
 * The approval is recorded under the **signed-in user's** name and id (the `approver`
   argument is only used by token-based MCP clients that have no user). Approving a run that
   is not waiting returns an error.
-* Running an agent needs sign-in; approving needs `crm.manage`.
+* Running an agent needs sign-in; approving a step needs that tool's domain permission
+  (for example `crm.manage`, `accounting.manage`, or `listings.manage`).
 * An agent never silently falls back to some other record (for example the first listing)
   when the one it needs is missing.
+* Tool calls check the caller's domain permission; CRM agents are limited to their assigned
+  book. Runs and approvals are scoped to their owner, while administrators can review all runs.
+* Each approved step is fingerprinted with its run context and arguments. A changed pending
+  step cannot reuse an earlier approval. Dispatch errors stop later dependent steps.
+* REST callers can pass `idempotency_key` (8–128 characters) to make a retried run request
+  return the existing run instead of repeating its actions. Step duration and a trace ID are
+  included in the audit record.
 
 ```powershell
 $H = @{ Authorization = "Bearer $token" }
@@ -278,7 +288,7 @@ from the same server-side pieces:
 | --- | --- | --- |
 | Knowledge base | `knowledge.py` | BM25 search (a few milliseconds a query) over listings, housing societies with their approval status and sources, cities, mega projects, big projects, news and guide pages. Understands crore / lakh / arab, marla / kanal / sq ft, bedrooms, Urdu script and Roman Urdu, and "Phase II" = "phase 2"; prices, sizes and bedrooms become hard filters on listings. Every hit has a `[n]` citation. |
 | Trust tiers | `sources.py` | `official` (government, regulators, development authorities: `.gov.pk`, `.gop.pk`, `.gos.pk`, `.gkp.pk`, `.gob.pk`, SBP, SECP, DHA …), `verified` (checked by the portal), `reference` (Wikipedia, Dawn, Business Recorder …), `listing` (an owner's or agent's listing), `unverified` (everything else, including the sample news). Stronger tiers rank higher. |
-| Memory | `memory.py` | Per signed-in user, private: recent conversation turns (14 days) and long-term facts (budget, areas, size, type, bedrooms, purpose, language, explicit notes). Never stores CNIC, card or bank numbers. Users can see, delete, clear or switch it off (`/me/memory`). |
+| Memory | `memory.py` | Per signed-in user, private: recent conversation turns (14 days) and long-term facts (budget, areas, size, type, bedrooms, purpose, language, explicit notes). Inferred facts expire from recall after 180 days; explicit notes persist until removed. Users can inspect, correct, delete, clear or switch memory off (`/me/memory`). |
 | System prompt | `prompts.py` | One prompt for every app and channel (`chat` / `voice`): accuracy first, cite `[n]`, say plainly when a scheme is unapproved or illegal, no legal or investment advice. |
 
 **One call per question.** `POST /ai/context` returns the composed system prompt with the

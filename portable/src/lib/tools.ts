@@ -173,7 +173,7 @@ export async function runAgentTool(name: string, args: Record<string, unknown>, 
       city_id: p.city_id ?? undefined,
       scheme_id: p.scheme_id ?? undefined,
       assigned_agent_id: p.agent_id || undefined,
-      notes: `Call request from the Arz-e-Pak AI assistant.${when}${note}\n\nListing: ${p.title} (${p.id})`,
+      notes: `Call request from the Watan-e-Pak AI assistant.${when}${note}\n\nListing: ${p.title} (${p.id})`,
     });
     return {
       output: { ok: true, sent_to: "the owner / agent of this listing", they_will_contact: user.mobile ? "by phone" : "by e-mail" },

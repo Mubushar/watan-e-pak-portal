@@ -2,7 +2,7 @@
 Team Messaging & Notifications wing for the Real Estate Portal
 ==============================================================
 
-An in-house **team communication system** for Arz-e-Pak — the internal workspace
+An in-house **team communication system** for Watan-e-Pak — the internal workspace
 the "Messaging in Portal" brief asks for: conversations that stay tied to the
 properties, plans, customers and tasks the team is actually managing, with
 e-mail and Telegram used as **complementary notification channels** rather than
@@ -71,7 +71,7 @@ from pydantic import BaseModel, Field
 # ============================================================
 
 MESSAGING_CONFIG: Dict[str, Any] = {
-    "workspace": "Arz-e-Pak",
+    "workspace": "Watan-e-Pak",
     "currency": "PKR",
     "message_max_length": 4000,
     "edit_window_minutes": 15,
@@ -94,10 +94,10 @@ MESSAGING_CONFIG: Dict[str, Any] = {
         "urgent_priority": "high",
     },
     "email": {
-        "from": "no-reply@arzepak.pk",
-        "reply_to": "support@arzepak.pk",
+        "from": "no-reply@watanepak.pk",
+        "reply_to": "support@watanepak.pk",
         "digest": "instant",                 # instant | hourly | daily
-        "subject_prefix": "[Arz-e-Pak]",
+        "subject_prefix": "[Watan-e-Pak]",
     },
     "disclaimer": (
         "Notifications are queued and written to the outbox by the in-process "
@@ -603,7 +603,7 @@ def messaging_overview() -> Dict[str, Any]:
         by_kind[conv.kind] = by_kind.get(conv.kind, 0) + 1
     return {
         "workspace": MESSAGING_CONFIG["workspace"],
-        "principle": ("Keep business conversations and records inside Arz-e-Pak; "
+        "principle": ("Keep business conversations and records inside Watan-e-Pak; "
                       "use e-mail for formal communication and Telegram for optional "
                       "alerts or quick coordination."),
         "config": MESSAGING_CONFIG,
@@ -1974,7 +1974,7 @@ def _render_email(notif: NotificationRecord, profile: MsgProfile) -> Dict[str, A
     lines = [f"Hello {profile.display_name or 'there'},", "", notif.body or notif.title]
     if notif.deep_link:
         lines += ["", f"Open in {MESSAGING_CONFIG['workspace']}: {notif.deep_link}"]
-    lines += ["", "— Arz-e-Pak Portal (automated notification)"]
+    lines += ["", "— Watan-e-Pak Portal (automated notification)"]
     return {"to": profile.email, "subject": subject, "body": "\n".join(lines),
             "from": MESSAGING_CONFIG["email"]["from"],
             "reply_to": MESSAGING_CONFIG["email"]["reply_to"],
@@ -2256,7 +2256,7 @@ def telegram_alert(user_id: str, text: str, priority: str = "normal",
                    message_id: Optional[str] = None) -> Dict[str, Any]:
     """Queue and immediately dispatch a Telegram-only alert (sanitised, with deep link)."""
     notif = queue_notification(
-        user_id, "system", title="Arz-e-Pak alert", body=_telegram_safe(text),
+        user_id, "system", title="Watan-e-Pak alert", body=_telegram_safe(text),
         conversation_id=conversation_id, message_id=message_id, priority=priority,
         channels=["telegram"],
     )

@@ -34,6 +34,7 @@ const STEPS = [
 const MAX_PHOTOS = 8;
 
 interface Form {
+  listing_purpose: "sale" | "rent";
   title: string;
   description: string;
   category: string;
@@ -46,6 +47,12 @@ interface Form {
   bedrooms: number;
   bathrooms: number;
   price: number;
+  security_deposit: number;
+  advance_months: number;
+  lease_term_months: number;
+  rent_frequency: "monthly" | "weekly";
+  furnishing_status: string;
+  tenant_preference: string;
   /** Comma-separated: "Solar system, Basement, Gated community". */
   amenities: string;
   photos: string[];
@@ -65,6 +72,7 @@ export default function ListingForm() {
   const [busy, setBusy] = useState<string | null>(null);
   const [created, setCreated] = useState<Property | null>(null);
   const [f, setF] = useState<Form>({
+    listing_purpose: "sale",
     title: "",
     description: "",
     category: "house",
@@ -77,6 +85,12 @@ export default function ListingForm() {
     bedrooms: 3,
     bathrooms: 3,
     price: 0,
+    security_deposit: 0,
+    advance_months: 1,
+    lease_term_months: 12,
+    rent_frequency: "monthly",
+    furnishing_status: "unfurnished",
+    tenant_preference: "",
     amenities: "",
     photos: [],
     gps: null,
@@ -169,6 +183,7 @@ export default function ListingForm() {
       id: "preview",
       title: f.title || "Your listing",
       price: f.price,
+      listing_purpose: f.listing_purpose,
       category: f.category,
       use_type: f.use_type,
       status: "active",
@@ -217,6 +232,13 @@ export default function ListingForm() {
         bedrooms: isLand ? undefined : f.bedrooms,
         bathrooms: isLand ? undefined : f.bathrooms,
         price: f.price,
+        listing_purpose: f.listing_purpose,
+        security_deposit: f.listing_purpose === "rent" ? f.security_deposit : undefined,
+        advance_months: f.listing_purpose === "rent" ? f.advance_months : undefined,
+        lease_term_months: f.listing_purpose === "rent" ? f.lease_term_months : undefined,
+        rent_frequency: f.rent_frequency,
+        furnishing_status: f.listing_purpose === "rent" ? f.furnishing_status : undefined,
+        tenant_preference: f.listing_purpose === "rent" ? f.tenant_preference : undefined,
         amenities: amenityList.length ? amenityList : undefined,
         latitude: f.gps?.latitude,
         longitude: f.gps?.longitude,
@@ -242,7 +264,7 @@ export default function ListingForm() {
             <CheckCircle2 className="h-10 w-10" />
           </motion.span>
           <h1 className="mt-5 font-display text-2xl font-bold text-brand-900 dark:text-white">You're live! 🎉</h1>
-          <p className="mt-2 max-w-sm text-ink-mute">“{created.title}” is now searchable in the app, on the Arz-e-Pak portal and by every AI agent.</p>
+          <p className="mt-2 max-w-sm text-ink-mute">“{created.title}” is now searchable in the app, on the Watan-e-Pak portal and by every AI agent.</p>
           <div className="mt-8 grid w-full max-w-sm gap-3">
             <Link to={`/property/${created.id}`} className="btn btn-primary btn-lg">
               View listing
@@ -293,6 +315,9 @@ export default function ListingForm() {
                     <span className="block truncate text-xs text-white/80">{partial || "“Selling a 10 marla house in DHA Lahore, 4 beds, for 4.5 crore”"}</span>
                   </span>
                 </button>
+                <Field label="Listing purpose">
+                  <Segmented value={f.listing_purpose} onChange={(listing_purpose) => set({ listing_purpose, price: listing_purpose === "rent" ? 75_000 : 35_000_000 })} options={[{ value: "sale", label: "Sell" }, { value: "rent", label: "Rent out" }]} />
+                </Field>
                 <Field label="I want to">
                   <Segmented
                     value={f.use_type === "commercial" ? "commercial" : "residential"}
@@ -410,16 +435,23 @@ export default function ListingForm() {
                     <Stepper label="Bathrooms" value={f.bathrooms} onChange={(bathrooms) => set({ bathrooms })} />
                   </div>
                 )}
-                <Field label="Asking price (PKR)" hint={f.price > 0 ? `${pkrShort(f.price)} · ${pkr(f.price)}` : "Type the full amount, e.g. 45000000"}>
-                  <Input inputMode="numeric" value={f.price || ""} onChange={(e) => set({ price: Number(e.target.value.replace(/\D/g, "")) || 0 })} placeholder="45000000" />
+                <Field label={f.listing_purpose === "rent" ? `Rent per ${f.rent_frequency === "weekly" ? "week" : "month"} (PKR)` : "Asking price (PKR)"} hint={f.price > 0 ? `${pkrShort(f.price)} · ${pkr(f.price)}` : f.listing_purpose === "rent" ? "Enter rent for the selected period" : "Type the full amount, e.g. 45000000"}>
+                  <Input inputMode="numeric" value={f.price || ""} onChange={(e) => set({ price: Number(e.target.value.replace(/\D/g, "")) || 0 })} placeholder={f.listing_purpose === "rent" ? "75000" : "45000000"} />
                 </Field>
-                <div className="flex flex-wrap gap-2">
+                {f.listing_purpose === "rent" ? <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Rent frequency"><Select value={f.rent_frequency} onChange={(e) => set({ rent_frequency: e.target.value as "monthly" | "weekly" })}><option value="monthly">Monthly</option><option value="weekly">Weekly</option></Select></Field>
+                  <Field label="Security deposit (PKR)"><Input inputMode="numeric" value={f.security_deposit || ""} onChange={(e) => set({ security_deposit: Number(e.target.value.replace(/\D/g, "")) || 0 })} /></Field>
+                  <Field label="Advance months"><Input inputMode="numeric" value={f.advance_months} onChange={(e) => set({ advance_months: Number(e.target.value.replace(/\D/g, "")) || 0 })} /></Field>
+                  <Field label="Lease term (months)"><Input inputMode="numeric" value={f.lease_term_months} onChange={(e) => set({ lease_term_months: Number(e.target.value.replace(/\D/g, "")) || 0 })} /></Field>
+                  <Field label="Furnishing"><Select value={f.furnishing_status} onChange={(e) => set({ furnishing_status: e.target.value })}><option value="unfurnished">Unfurnished</option><option value="semi_furnished">Semi furnished</option><option value="furnished">Furnished</option></Select></Field>
+                  <Field label="Tenant preference (optional)" hint="Factual occupancy requirements only."><Input value={f.tenant_preference} onChange={(e) => set({ tenant_preference: e.target.value })} maxLength={500} /></Field>
+                </div> : <div className="flex flex-wrap gap-2">
                   {[5_000_000, 10_000_000, 25_000_000, 50_000_000, 100_000_000].map((v) => (
                     <button key={v} type="button" onClick={() => set({ price: v })} className="chip bg-brand-50 text-brand-800 dark:bg-white/10 dark:text-brand-100">
                       {pkrShort(v)}
                     </button>
                   ))}
-                </div>
+                </div>}
               </>
             )}
 
@@ -455,7 +487,8 @@ export default function ListingForm() {
                 <img src={coverImage(preview)} alt="" className="aspect-[16/9] w-full object-cover" />
                 <div className="space-y-3 p-4">
                   <div>
-                    <p className="font-display text-2xl font-bold text-brand-700 dark:text-brand-300">{pkrShort(f.price)}</p>
+                    <p className="font-display text-2xl font-bold text-brand-700 dark:text-brand-300">{pkrShort(f.price)}{f.listing_purpose === "rent" ? (f.rent_frequency === "weekly" ? "/week" : "/month") : ""}</p>
+                    {f.listing_purpose === "rent" && <p className="text-xs text-ink-mute">Deposit {pkrShort(f.security_deposit)} · {f.advance_months} months advance · {f.lease_term_months || "Flexible"} month term · {titleCase(f.furnishing_status)}</p>}
                     <p className="font-display text-lg font-bold">{f.title}</p>
                     <p className="text-sm text-ink-mute">
                       {[blocks.find((b) => b.id === f.block_zone_area_id)?.name, schemes.find((s) => s.id === f.scheme_id)?.name, city?.name].filter(Boolean).join(", ")}

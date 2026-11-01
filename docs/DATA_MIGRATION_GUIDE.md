@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide walks you through migrating the Arz-e-Pak real-estate portal's in-memory data stores to a PostgreSQL database. The portal stores everything in module-level containers (`*_db`, `GIS_LAYERS`, `image_storage`, etc.) that are seeded on startup. The goal is to preserve the exact state — including row counts, primary keys, and referential relationships — in a relational database that can be queried with standard SQL tools, connected to an ORM, or used as the backbone for future features (PostGIS spatial search, analytics, etc.).
+This guide walks you through migrating the Watan-e-Pak real-estate portal's in-memory data stores to a PostgreSQL database. The portal stores everything in module-level containers (`*_db`, `GIS_LAYERS`, `image_storage`, etc.) that are seeded on startup. The goal is to preserve the exact state — including row counts, primary keys, and referential relationships — in a relational database that can be queried with standard SQL tools, connected to an ORM, or used as the backbone for future features (PostGIS spatial search, analytics, etc.).
 
 > **Do you need this guide?** The running portal already saves its data: `backend/storage.py`
 > writes every store to PostgreSQL (`DATABASE_URL`) or a SQLite file (`backend/data/portal.sqlite3`)
@@ -20,6 +20,17 @@ This guide walks you through migrating the Arz-e-Pak real-estate portal's in-mem
 > process) — the CLI doesn't do that yet.
 
 The migration is **lossless**: nested models (`JournalEntry.lines`, `Transaction.milestones`, `AgentRun.steps`, `Invoice.lines`, `PmInspection.checklist`) are embedded as JSONB, and every Python type maps to a Postgres type (str → TEXT, int → BIGINT, float → DOUBLE PRECISION, bool → BOOLEAN, datetime → TIMESTAMPTZ, date → DATE). List-of-scalars become TEXT[] and list-of-models becomes JSONB.
+
+### Copy live SQLite storage to PostgreSQL
+
+For the running portal's durable storage layout (rather than the separate normalized reporting schema above), stop the backend and copy the live tables to an empty PostgreSQL database:
+
+```powershell
+# With the PostGIS service running and the backend stopped:
+docker compose -f compose.yaml -f compose.postgres.yaml run --rm --no-deps backend python migrate_storage.py
+```
+
+The command uses `PORTAL_DB_PATH` as its SQLite source and `DATABASE_URL` as its PostgreSQL destination. It copies `portal_rows`, `portal_kv`, and `portal_assets` (including uploaded photo bytes and GIS source files), and refuses to overwrite a non-empty target. Start the backend with the PostgreSQL overlay after it succeeds. For a local non-Docker run, pass `--from-sqlite <path>` and `--to-postgres <dsn>` explicitly. Back up both databases first.
 
 ## Prerequisites
 
@@ -79,7 +90,7 @@ You have two pathways:
 If you have ``psql`` on PATH (as you do with PostgreSQL 18), simply run:
 
 ```bash
-psql "postgresql://postgres:***@localhost:5432/arzepak" -f db/schema.sql -f db/data.sql
+psql "postgresql://postgres:***@localhost:5432/watanepak" -f db/schema.sql -f db/data.sql
 ```
 
 The ``apply`` command in the CLI also supports this path automatically (it falls back to ``psql`` when no ``psycopg`` driver is installed).
@@ -91,7 +102,7 @@ Install ``psycopg[binary]`` if you prefer an all-Python route (it is the backend
 
 ```bash
 uv sync --extra postgres
-uv run python migrate_to_postgres.py apply --dsn "postgresql://postgres:postgres@localhost:5432/arzepak"
+uv run python migrate_to_postgres.py apply --dsn "postgresql://postgres:postgres@localhost:5432/watanepak"
 ```
 
 ## Step 3 — Verify
@@ -99,7 +110,7 @@ uv run python migrate_to_postgres.py apply --dsn "postgresql://postgres:postgres
 After loading, confirm the import succeeded:
 
 ```bash
-uv run python migrate_to_postgres.py verify --dsn "postgresql://postgres:***@localhost:5432/arzepak"
+uv run python migrate_to_postgres.py verify --dsn "postgresql://postgres:***@localhost:5432/watanepak"
 ```
 
 The output will list per-table expected vs. actual row counts and any FK mismatches. If everything is ``ok`` you're done. If not, re‑run the generator and check that the PostgreSQL version and ``psql``/``COPY`` permissions match.
@@ -109,7 +120,7 @@ The output will list per-table expected vs. actual row counts and any FK mismatc
 If your deployment uses the portal's GIS search features, enable the geography rewrite after step 2:
 
 ```bash
-psql "postgresql://postgres:***@localhost:5432/arzepak" -f db/postgis.sql
+psql "postgresql://postgres:***@localhost:5432/watanepak" -f db/postgis.sql
 ```
 
 This adds a ``geography(Point,4326)`` column to the core entities that have lat/lon, populates them from the plain ``DOUBLE PRECISION`` columns, and creates a GiST index. The column name is the original column name suffixed with ``_geog`` (e.g. ``core_properties.geog``). Keep the original columns so existing queries continue to work.
@@ -168,18 +179,18 @@ Both omissions are documented in the manifest.json warnings array.
 
 ```text
 $ uv run python migrate_to_postgres.py all
-Migration bundle written to C:\Users\mubho\Desktop\alfaisal\arzepak\db
+Migration bundle written to C:\Users\mubho\Desktop\WatanePak\db
   tables        : 78
   rows          : 668
   foreign keys  : 71
   files         : 83
   warnings      : 2 (see manifest.json)
 
-$ psql "postgres:postgres@localhost:5432/arzepak" -f db/schema.sql -f db/data.sql
+$ psql "postgres:postgres@localhost:5432/watanepak" -f db/schema.sql -f db/data.sql
 psql -f schema.sql : ok
 psql -f data.sql : ok
 
-$ uv run python migrate_to_postgres.py verify --dsn "postgres:postgres@localhost:5432/arzepak"
+$ uv run python migrate_to_postgres.py verify --dsn "postgres:postgres@localhost:5432/watanepak"
 Verification: OK  (driver=psql)
   tables: 78   rows: 668
 ```

@@ -70,6 +70,7 @@ export function useDashboardNav(unread: number): { title: string; items: NavItem
         { to: "/app/crm", label: "CRM", icon: Users, perm: "crm.view" },
         { to: "/app/listings", label: "My listings", icon: Building2, end: true },
         { to: "/app/listings/new", label: "List a property", icon: PlusSquare },
+        { to: "/app/rentals", label: "Rental listings", icon: KeyRound, perm: "properties.manage" },
         { to: "/app/transactions", label: "Transactions", icon: FileSignature, perm: "crm.view" },
         { to: "/app/leasing", label: "Leasing", icon: KeyRound },
         { to: "/app/marketing", label: "Marketing", icon: Target, perm: "crm.view" },
@@ -112,7 +113,7 @@ function Sidebar({ collapsed, onToggle, unread }: { collapsed: boolean; onToggle
       <div className={cn("flex h-16 items-center border-b border-white/10 px-4", collapsed && "justify-center px-0")}>
         {collapsed ? (
           <Link to="/">
-            <img src="/brand/logo-mark.webp" className="h-9" alt="Arz-e-Pak" />
+            <img src="/brand/logo-mark.webp" className="h-9" alt="Watan-e-Pak" />
           </Link>
         ) : (
           <Logo light />

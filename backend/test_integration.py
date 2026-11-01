@@ -970,7 +970,7 @@ def run_access_checks(client: TestClient) -> None:
     check("basedata: signed out -> 401", client.get("/admin/basedata", headers=anon).status_code == 401)
     check("basedata: agent -> 403", client.get("/admin/basedata", headers=agent).status_code == 403)
     ov = client.get("/admin/basedata", headers=admin).json()
-    check("basedata: overview lists cities / schemes / blocks", [t["table"] for t in ov["tables"]] == ["cities", "schemes", "blocks"], str(ov)[:120])
+    check("basedata: overview lists cities / schemes / blocks / landmarks", [t["table"] for t in ov["tables"]] == ["cities", "schemes", "blocks", "landmarks"], str(ov)[:120])
     r = client.post("/admin/basedata/cities", headers=admin, json={"name": "Basedata Test City", "state": "Punjab", "population": 1000,
                                                                    "sources": [{"title": "t", "url": "https://example.com"}]})
     city_id = r.json().get("id")
@@ -1052,6 +1052,73 @@ def run_hardening_checks(client: TestClient) -> None:
     check("storage: admin sees the status (off in tests)", r.status_code == 200 and r.json().get("enabled") is False, r.text[:120])
 
 
+def run_sms_consent_checks(client: TestClient) -> None:
+    """Phone OTPs need the user's consent; codes go out through the SMS Gateway for Android."""
+    import httpx
+    import delivery
+
+    phone = "+923335550177"
+    for path, body in (("/auth/signup", {"mobile": phone, "name": "No Consent"}),
+                       ("/auth/otp/request", {"identifier": phone}),
+                       ("/auth/password/reset-request", {"identifier": phone}),
+                       ("/auth/resend-otp", {"identifier": phone, "code": ""})):
+        r = client.post(path, json=body)
+        detail = r.json().get("detail") if r.status_code == 422 else {}
+        check(f"{path} phone without consent -> 422", r.status_code == 422 and isinstance(detail, dict)
+              and detail.get("code") == "sms_consent_required", f"{r.status_code} {r.text[:100]}")
+    r = client.post("/auth/otp/request", json={"identifier": "nobody@portal.test"})
+    check("e-mail OTP needs no SMS consent", r.status_code == 200, f"{r.status_code} {r.text[:100]}")
+
+    seen: List[httpx.Request] = []
+    replies = {"status": 202}
+
+    def gateway(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(replies["status"], json={"id": "msg-1", "state": "Pending"}
+                              if replies["status"] < 400 else {"message": "Unauthorized"})
+
+    real_client = delivery.httpx.Client
+    env = {"PORTAL_SMS_PROVIDER": "smsgate", "SMSGATE_URL": "http://gateway.test:8080/message",
+           "SMSGATE_USERNAME": "sms", "SMSGATE_PASSWORD": "gate-pass", "SMSGATE_SIM_NUMBER": "2"}
+    saved = {k: os.environ.get(k) for k in env}
+    os.environ.update(env)
+    delivery.httpx.Client = lambda **kw: real_client(transport=httpx.MockTransport(gateway), **kw)  # type: ignore[assignment]
+    try:
+        check("smsgate provider configured", delivery.sms_provider() == "smsgate", delivery.sms_provider())
+        r = client.post("/auth/signup", json={"mobile": phone, "name": "Gateway User", "sms_consent": True})
+        sent = (r.json().get("verification") or {}) if r.status_code == 201 else {}
+        req = seen[-1] if seen else None
+        payload = json.loads(req.content) if req else {}
+        text = (payload.get("textMessage") or {}).get("text", "")
+        check("signup with consent -> SMS sent by the gateway phone", r.status_code == 201
+              and sent.get("delivery", {}).get(phone) == "sent" and not sent.get("dev_otp"), f"{r.status_code} {r.text[:120]}")
+        check("gateway request: URL, basic auth, number, SIM", req is not None
+              and str(req.url) == env["SMSGATE_URL"]
+              and req.headers.get("authorization") == "Basic " + base64.b64encode(b"sms:gate-pass").decode()
+              and payload.get("phoneNumbers") == [phone] and payload.get("simNumber") == 2, str(payload)[:160])
+        code = (re.search(r"\b(\d{6})\b", text) or [None, ""])[1]
+        check("SMS text carries a 6-digit code (SMS User Consent format)", bool(code) and "Watan-e-Pak" in text, text)
+        r = client.post("/auth/verify-otp", json={"identifier": phone, "code": code, "purpose": "signup"})
+        check("code from the gateway SMS verifies the account", r.status_code == 200 and bool(r.json().get("token")),
+              f"{r.status_code} {r.text[:100]}")
+        consented = [e for e in core.auth.auth_events_db if e.event == "sms_otp_consent" and e.identifier == phone]
+        check("consent recorded in the auth event log", len(consented) >= 1, str(len(consented)))
+        outbox = [n for n in core.auth.notifications_db if n.recipient == phone and n.status == "sent"]
+        check("sent code is masked in the outbox", bool(outbox) and code not in outbox[-1].body, outbox[-1].body if outbox else "")
+
+        replies["status"] = 401
+        r = client.post("/auth/otp/request", json={"identifier": phone, "sms_consent": True})
+        check("gateway failure -> 502 delivery_failed", r.status_code == 502
+              and r.json().get("detail", {}).get("code") == "delivery_failed", f"{r.status_code} {r.text[:120]}")
+    finally:
+        delivery.httpx.Client = real_client  # type: ignore[assignment]
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+
 def run_ai_checks(client: TestClient) -> None:
     """Knowledge base (BM25 + citations + trust), per-user memory, /ai/context, agent approvals."""
     import knowledge
@@ -1084,7 +1151,7 @@ def run_ai_checks(client: TestClient) -> None:
     check("POST /ai/knowledge/search (public)", r.status_code == 200 and r.json()["count"] > 0, r.text[:120])
     r = client.post("/ai/context", json={"query": "plots in Islamabad"}, headers=anon)
     body = r.json()
-    check("POST /ai/context (guest: prompt + knowledge, no memory)", r.status_code == 200 and "Arz-e-Pak AI" in body["system_prompt"]
+    check("POST /ai/context (guest: prompt + knowledge, no memory)", r.status_code == 200 and "Watan-e-Pak AI" in body["system_prompt"]
           and "KNOWLEDGE" in body["system_prompt"] and body["memory"]["enabled"] is False, r.text[:160])
 
     def login(ident: str, pw: str) -> Dict[str, str]:
@@ -1117,7 +1184,8 @@ def run_ai_checks(client: TestClient) -> None:
     check("DELETE /me/memory clears everything", client.delete("/me/memory", headers=buyer).json()["forgotten"] >= 1
           and not user_memory.recent(client.get("/auth/me", headers=buyer).json()["user"]["id"]))
 
-    r = client.post("/agents/run", json={"agent_key": "transaction_agent", "objective": "review a deal"})
+    r = client.post("/agents/run", json={"agent_key": "transaction_agent", "objective": "review a deal",
+                                         "extra": {"price": 25_000_000, "property_title": "Agent test 10 marla house"}})
     run = r.json()
     check("agents: runs pause at the approval gate by default", run.get("status") == "awaiting_approval", str(run.get("status")))
     create = next((st for st in run.get("steps", []) if st["name"] == "transaction_create"), {})
@@ -1127,10 +1195,10 @@ def run_ai_checks(client: TestClient) -> None:
     approved = [a for a in after.get("approvals", []) if a.get("approved_by") != "auto"]
     check("agents: approval is recorded under the signed-in user", approved and "Portal Admin" in approved[0]["approved_by"], str(approved)[:160])
     create = next((st for st in after.get("steps", []) if st["name"] == "transaction_create"), {})
-    check("agents: approving runs the write step", create.get("status") in ("done", "failed") and after.get("status") == "completed",
+    check("agents: approving runs the write step", create.get("status") == "done" and after.get("status") == "completed",
           str(create)[:200])
-    check("agents: approving twice is refused", "error" in client.post(f"/agents/runs/{run['id']}/approve").json()
-          or after.get("status") == "awaiting_approval")
+    again = client.post(f"/agents/runs/{run['id']}/approve")
+    check("agents: approving twice is refused (409)", again.status_code == 409, f"{again.status_code} {again.text[:120]}")
 
 
 def run_admin_crud_checks(client: TestClient) -> None:
@@ -1162,7 +1230,7 @@ def run_admin_crud_checks(client: TestClient) -> None:
     check("admin properties: bulk feature", client.post("/admin/properties/bulk", json={"ids": [pid], "action": "feature"}).json()["affected"] == 1
           and core.find_property(pid).featured)
     csv_text = client.get("/admin/properties/export.csv").text
-    check("GET /admin/properties/export.csv", csv_text.startswith("id,title,price") and "Admin CRUD house" in csv_text)
+    check("GET /admin/properties/export.csv", csv_text.startswith("id,title,listing_purpose,price,") and "Admin CRUD house" in csv_text, csv_text[:80])
     r = client.post("/admin/properties/import", json={"csv": csv_text, "dry_run": True}).json()
     check("admin properties: CSV re-import dry run is clean", r["errors"] == [] and r["would_update"] == len(core.properties_db), str(r)[:200])
     bad = "title,price,city\nNo city,100,Atlantis\n"
@@ -1593,7 +1661,7 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         auth_email = "integration@portal.test"
         r = client.post("/auth/signup", json={
             "email": auth_email, "mobile": "0345 555 0101",
-            "password": "Secret@123", "name": "Integration User",
+            "password": "Secret@123", "name": "Integration User", "sms_consent": True,
         })
         body = r.json() if r.status_code == 201 else {}
         otps = (body.get("verification") or {}).get("dev_otp") or {}
@@ -1663,7 +1731,8 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         check("POST /auth/login (seeded admin)", r.status_code == 200, str(r.status_code))
 
         # --- Portable app: passwordless signup, my listings, photos, CORS, AI helpers ---
-        r = client.post("/auth/signup", json={"mobile": "0333 555 0199", "name": "App Seller", "role": "seller"})
+        r = client.post("/auth/signup", json={"mobile": "0333 555 0199", "name": "App Seller", "role": "seller",
+                                             "sms_consent": True})
         sent = (r.json().get("verification") or {}) if r.status_code == 201 else {}
         check("POST /auth/signup (passwordless)", r.status_code == 201 and len(sent.get("sent_to", [])) == 1,
               f"{r.status_code} {r.text[:100]}")
@@ -1676,6 +1745,7 @@ def run_fastapi_checks(mcp_lead_id: str | None, mcp_layer_id: str | None) -> Non
         r = client.get("/auth/config")
         check("GET /auth/config delivery summary", r.json().get("delivery") == {"email": "simulated", "sms": "simulated"},
               str(r.json().get("delivery")))
+        run_sms_consent_checks(client)
         sh = {"Authorization": f"Bearer {seller_token}"}
 
         r = client.get("/me/listings")
@@ -3223,7 +3293,7 @@ def run_extract_checks(client: TestClient) -> None:
     def send(name: str, data: bytes, mime: str = "application/octet-stream") -> Any:
         return client.post("/ai/extract", json={"name": name, "data_url": f"data:{mime};base64," + base64.b64encode(data).decode()})
 
-    r = send("brochure.pdf", _tiny_pdf("Arz-e-Pak plot 42 Bahria Town"), "application/pdf")
+    r = send("brochure.pdf", _tiny_pdf("Watan-e-Pak plot 42 Bahria Town"), "application/pdf")
     body = r.json()
     check("POST /ai/extract (PDF text read back by pypdf)", r.status_code == 200 and body["kind"] == "pdf" and body["pages"] == 1
           and "--- page 1 ---" in body["text"] and "Bahria Town" in body["text"] and body["note"] is None, r.text[:200])
@@ -3282,7 +3352,7 @@ def run_chat_image_checks(client: TestClient) -> None:
     import openai_facade as facade
 
     photo = "data:image/jpeg;base64," + "A" * 1_000_000
-    msgs = [{"role": "system", "content": "You are Arz-e-Pak AI."},
+    msgs = [{"role": "system", "content": "You are Watan-e-Pak AI."},
             {"role": "user", "content": [{"type": "text", "text": "What does this plot map say?"},
                                          {"type": "image_url", "image_url": {"url": photo, "detail": "auto"}}]}]
     size = facade.measure_messages(msgs)

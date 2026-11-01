@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Activity, ArrowRight, BadgePercent, Banknote, BarChart3, Building2, Compass, Gauge, Landmark, LineChart, Newspaper, PieChart, Scale, Sparkles, Target, TrendingDown, TrendingUp, Trophy } from "lucide-react";
+import { Activity, ArrowRight, BadgePercent, Banknote, BarChart3, Building2, Compass, Gauge, KeyRound, Landmark, LineChart, Newspaper, PieChart, Scale, Sparkles, Target, TrendingDown, TrendingUp, Trophy } from "lucide-react";
 import type { City, PropertyList } from "@/types";
 import { useApi } from "@/hooks/useApi";
 import { compact, num, pct, pkrShort, titleCase } from "@/lib/format";
@@ -60,6 +60,13 @@ export default function Insights() {
   const screenQ = useApi<{ top_picks: InvestPick[]; considered: number; passed: number; pass_rate_pct: number }>("/intelligence/investment/screen", { limit: 10 });
   const propsQ = useApi<PropertyList>("/properties", { limit: 200 });
   const propById = useMemo(() => new Map((propsQ.data?.results ?? []).map((p) => [p.id, p])), [propsQ.data]);
+  const rentalSummary = useMemo(() => {
+    const rentals = (propsQ.data?.results ?? []).filter((p) => p.status === "active" && p.listing_purpose === "rent");
+    const monthly = rentals.map((p) => p.rent_frequency === "weekly" ? p.price * 52 / 12 : p.price);
+    const byCity = new Map<string, number>();
+    rentals.forEach((p) => byCity.set(p.city_name ?? "Other", (byCity.get(p.city_name ?? "Other") ?? 0) + 1));
+    return { count: rentals.length, average: monthly.length ? monthly.reduce((a, b) => a + b, 0) / monthly.length : 0, byCity: [...byCity.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5) };
+  }, [propsQ.data]);
 
   const t = trendsQ.data;
   const cityImg = cityImage(city);
@@ -112,6 +119,15 @@ export default function Insights() {
       <div className="container mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="min-w-0 space-y-6">
           {citiesQ.error && <ErrorState error={citiesQ.error} onRetry={() => citiesQ.refetch()} />}
+
+          <Card>
+            <CardHeader title="Rental market snapshot" subtitle="Active advertised rentals in the portal catalogue; weekly rent converted to monthly equivalent." icon={<KeyRound className="h-5 w-5" />} action={<ButtonLink to="/rentals" variant="outline" size="sm">Browse rentals</ButtonLink>} />
+            <CardBody className="grid gap-4 sm:grid-cols-[1fr_1fr_2fr]">
+              <div className="rounded-xl bg-violet-50 p-4 dark:bg-violet-500/10"><p className="text-xs font-semibold uppercase text-violet-800 dark:text-violet-200">Active rental listings</p><p className="mt-1 font-display text-2xl font-bold">{rentalSummary.count}</p></div>
+              <div className="rounded-xl bg-brand-50 p-4 dark:bg-white/5"><p className="text-xs font-semibold uppercase text-ink-mute">Average asking rent</p><p className="mt-1 font-display text-2xl font-bold">{pkrShort(rentalSummary.average)}/mo</p></div>
+              <div className="rounded-xl bg-black/[.025] p-4 dark:bg-white/[.04]"><p className="mb-2 text-xs font-semibold uppercase text-ink-mute">Mapped inventory by city</p>{rentalSummary.byCity.length ? <div className="space-y-2">{rentalSummary.byCity.map(([name, count]) => <div key={name} className="flex items-center gap-3 text-sm"><span className="w-28 truncate">{name}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-black/5 dark:bg-white/10"><div className="h-full rounded-full bg-violet-600" style={{ width: `${Math.max(6, (count / rentalSummary.count) * 100)}%` }} /></div><b className="w-7 text-end">{count}</b></div>)}</div> : <p className="text-sm text-ink-mute">No active rental listings are in the current catalogue.</p>}</div>
+            </CardBody>
+          </Card>
 
           {/* ---------------------------------------------------------- KPIs */}
           {trendsQ.isLoading || !city ? (

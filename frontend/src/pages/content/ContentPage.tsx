@@ -252,7 +252,7 @@ export default function ContentPage() {
         {/* side nav */}
         <aside className="lg:sticky lg:top-24 lg:self-start">
           <div className="card overflow-hidden">
-            <p className="border-b border-black/5 px-5 py-3 font-display font-semibold dark:border-white/10">Explore Arz-e-Pak</p>
+            <p className="border-b border-black/5 px-5 py-3 font-display font-semibold dark:border-white/10">Explore Watan-e-Pak</p>
             <nav className="max-h-[60vh] space-y-4 overflow-y-auto p-3">
               {nav.isLoading && <Skeleton className="h-60" />}
               {Object.entries(groups).map(([g, items]) => (

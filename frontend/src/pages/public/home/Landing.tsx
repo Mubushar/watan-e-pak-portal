@@ -17,7 +17,7 @@ import { groupProjectUnits, isGroup, priceRange } from "@/lib/projectGroups";
 import { cn } from "@/lib/utils";
 import { usePrefs } from "@/store/prefs";
 
-/** Islamabad, where Arz-e-Pak is based: real photos from Wikimedia Commons, credited. */
+/** Islamabad, where Watan-e-Pak is based: real photos from Wikimedia Commons, credited. */
 export const HERO_PHOTOS = [
   {
     img: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/Faisal_Mosque%2C_Islamabad%2C_Pakistan.jpg/1920px-Faisal_Mosque%2C_Islamabad%2C_Pakistan.jpg",
@@ -108,7 +108,7 @@ export function ComposerCard({ className }: { className?: string }) {
           <Bot className="h-5 w-5" />
         </span>
         <div>
-          <p className="font-display text-lg font-bold text-brand-900 dark:text-white">Ask Arz-e-Pak AI</p>
+          <p className="font-display text-lg font-bold text-brand-900 dark:text-white">Ask Watan-e-Pak AI</p>
           <p className="text-xs text-ink-mute">Describe it in English or Urdu — AI finds and checks it</p>
         </div>
       </div>
@@ -301,7 +301,7 @@ export function MarketShowcase({ props, loading }: { props: Property[]; loading:
 const TOGETHER: [string, string][] = [
   ["You describe the home, budget and area — in English or Urdu.", "AI searches every listing and new project and shortlists the best three."],
   ["You ask whether a society is approved.", "AI checks the authority’s list and shows the official source."],
-  ["You choose what matters: schools, commute, price per marla.", "AI compares them on the map, with ring roads and mega projects nearby."],
+  ["You choose what matters: schools, commute, price per marla.", "AI compares them on the map, with ring roads and major infrastructure nearby."],
   ["You decide to visit.", "AI sends the call request and remembers your budget for next time."],
 ];
 
@@ -310,7 +310,7 @@ export function Together() {
     <section className="container mt-14 grid gap-6 lg:grid-cols-3">
       <div className="card p-6 sm:p-8 lg:col-span-2">
         <p className="section-eyebrow">How we work together</p>
-        <h2 className="mt-1 font-display text-2xl font-bold text-brand-900 sm:text-3xl dark:text-white">You stay in charge. Arz-e-Pak AI does the legwork.</h2>
+        <h2 className="mt-1 font-display text-2xl font-bold text-brand-900 sm:text-3xl dark:text-white">You stay in charge. Watan-e-Pak AI does the legwork.</h2>
         <div className="mt-6 grid gap-x-5 gap-y-3 md:grid-cols-2">
           {TOGETHER.map(([you, ai], i) => (
             <div key={i} className="flex flex-col gap-2">
@@ -371,7 +371,7 @@ function TrustCard() {
       </div>
       <div className="min-h-6 flex-1" />
       <Link to="/ai" className="btn btn-gold justify-center">
-        <Sparkles className="h-4 w-4" /> Ask Arz-e-Pak AI
+        <Sparkles className="h-4 w-4" /> Ask Watan-e-Pak AI
       </Link>
     </motion.div>
   );

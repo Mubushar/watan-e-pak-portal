@@ -140,7 +140,7 @@ Read with the MCP tool `portal_settings(action='get')` or `GET /portal/settings`
     "default_country_code": "+92"
   },
   "content": {
-    "site_name": "Arz-e-Pak Real Estate Portal",
+    "site_name": "Watan-e-Pak Real Estate Portal",
     "tagline": "Pakistan's smart, data-driven property marketplace",
     "default_language": "en",
     "supported_languages": [
@@ -346,7 +346,7 @@ Read with the MCP tool `portal_settings(action='get')` or `GET /portal/settings`
     "disclaimer": "Planned/earned-value figures are indicative management information. Date arithmetic uses a six-day (Mon\u2013Sat) working week; align with the contract's own calendar before use in formal claims."
   },
   "messaging": {
-    "workspace": "Arz-e-Pak",
+    "workspace": "Watan-e-Pak",
     "currency": "PKR",
     "message_max_length": 4000,
     "edit_window_minutes": 15,
@@ -372,10 +372,10 @@ Read with the MCP tool `portal_settings(action='get')` or `GET /portal/settings`
       "urgent_priority": "high"
     },
     "email": {
-      "from": "no-reply@arzepak.pk",
-      "reply_to": "support@arzepak.pk",
+      "from": "no-reply@watanepak.pk",
+      "reply_to": "support@watanepak.pk",
       "digest": "instant",
-      "subject_prefix": "[Arz-e-Pak]"
+      "subject_prefix": "[Watan-e-Pak]"
     },
     "disclaimer": "Notifications are queued and written to the outbox by the in-process dispatcher; a production deployment runs the same queue from a background worker and hands e-mail/Telegram payloads to a provider. Telegram and e-mail payloads never carry attachments or confidential document content - only short text and an authenticated deep link."
   }

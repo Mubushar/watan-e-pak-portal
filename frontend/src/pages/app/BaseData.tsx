@@ -13,7 +13,7 @@ import { num, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Badge, Button, Card, Drawer, EmptyState, ErrorState, Field, Input, Modal, PageHeader, Select, Skeleton, Tabs, Textarea } from "@/components/ui";
 
-type Table = "cities" | "schemes" | "blocks";
+type Table = "cities" | "schemes" | "blocks" | "landmarks";
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 interface Source {
   title: string;
@@ -39,6 +39,7 @@ const EMPTY: Record<Table, Row> = {
   cities: { name: "", state: "Punjab", sources: [] },
   schemes: { name: "", approval_status: null, plot_sizes: [], utilities: [], sources: [] },
   blocks: { name: "", area_type: "residential" },
+  landmarks: { name: "", city_id: "", project_type: "mall", status: "planned", floor_count: 0 },
 };
 
 export default function BaseData() {
@@ -54,7 +55,7 @@ export default function BaseData() {
   const overview = useApi<{ tables: { table: Table; count: number }[] }>("/admin/basedata");
   const list = useApi<{ rows: Row[] }>(`/admin/basedata/${table}`, {
     q: q || undefined,
-    city_id: table === "schemes" ? cityFilter || undefined : undefined,
+    city_id: table === "schemes" || table === "landmarks" ? cityFilter || undefined : undefined,
     scheme_id: table === "blocks" ? schemeFilter || undefined : undefined,
   });
   const cities = useApi<{ rows: Row[] }>("/admin/basedata/cities");
@@ -79,10 +80,10 @@ export default function BaseData() {
     <div className="space-y-6">
       <PageHeader
         title="Base data"
-        subtitle="Cities, housing societies and their blocks — the reference data behind listings, maps and reports"
+        subtitle="Cities, housing societies, blocks and landmarks — the reference data behind listings, maps and reports"
         actions={
           <Button size="sm" icon={<Plus className="h-4 w-4" />} onClick={() => setEdit({ ...EMPTY[table] })}>
-            Add {table === "cities" ? "city" : table === "schemes" ? "scheme" : "block"}
+            Add {table === "cities" ? "city" : table === "schemes" ? "scheme" : table === "landmarks" ? "landmark" : "block"}
           </Button>
         }
       />
@@ -98,6 +99,7 @@ export default function BaseData() {
             { value: "cities", label: "Cities", icon: <Building className="h-4 w-4" />, count: count("cities") },
             { value: "schemes", label: "Housing societies", icon: <Landmark className="h-4 w-4" />, count: count("schemes") },
             { value: "blocks", label: "Blocks & zones", icon: <MapPinned className="h-4 w-4" />, count: count("blocks") },
+            { value: "landmarks", label: "Landmarks", icon: <Building className="h-4 w-4" />, count: count("landmarks") },
           ]}
         />
         <div className="flex flex-wrap items-center gap-2 border-b border-black/5 p-4 dark:border-white/10">
@@ -133,6 +135,12 @@ export default function BaseData() {
                   {s.name} · {s.city}
                 </option>
               ))}
+            </Select>
+          )}
+          {table === "landmarks" && (
+            <Select value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} className="!h-9 !w-auto !py-0 text-sm">
+              <option value="">All cities</option>
+              {(cities.data?.rows ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </Select>
           )}
           <span className="text-xs text-ink-mute">{rows.length} rows</span>
@@ -180,6 +188,7 @@ export default function BaseData() {
                       <th className="px-2 py-2 text-start">Type</th>
                     </>
                   )}
+                  {table === "landmarks" && <><th className="px-2 py-2 text-start">City</th><th className="px-2 py-2 text-start">Type</th><th className="px-2 py-2 text-start">Status</th><th className="px-2 py-2 text-start">Developer</th></>}
                   <th className="px-2 py-2 text-start">Sources</th>
                   <th className="px-4 py-2" />
                 </tr>
@@ -228,6 +237,7 @@ export default function BaseData() {
                         <td className="px-2 py-2.5 capitalize">{r.area_type}</td>
                       </>
                     )}
+                    {table === "landmarks" && <><td className="px-2 py-2.5">{r.city ?? "—"}</td><td className="px-2 py-2.5 capitalize">{titleCase(r.project_type ?? "")}</td><td className="px-2 py-2.5 capitalize">{titleCase(r.status ?? "")}</td><td className="max-w-[180px] truncate px-2 py-2.5 text-ink-soft">{r.developer ?? "—"}</td></>}
                     <td className="px-2 py-2.5 text-xs text-ink-mute">{r.sources?.length ? `${r.sources.length} source${r.sources.length > 1 ? "s" : ""}` : "—"}</td>
                     <td className="px-4 py-2.5 text-end" onClick={(e) => e.stopPropagation()}>
                       <button type="button" className="btn btn-ghost btn-icon h-8 w-8" title="Edit" onClick={() => setEdit(r)}>
@@ -251,7 +261,7 @@ export default function BaseData() {
         open={!!confirm}
         onClose={() => setConfirm(null)}
         title={`Delete “${confirm?.name ?? ""}”?`}
-        subtitle="This can't be undone. Records still used by societies, blocks or listings can't be deleted."
+        subtitle="This can't be undone. Records still used by listings or other base data can't be deleted."
         footer={
           <>
             <Button variant="ghost" onClick={() => setConfirm(null)}>
@@ -264,7 +274,7 @@ export default function BaseData() {
         }
       >
         <p className="text-sm text-ink-soft dark:text-slate-300">
-          {table === "cities" ? `${confirm?.schemes ?? 0} societies and ${confirm?.properties ?? 0} listings use this city.` : table === "schemes" ? `${confirm?.blocks ?? 0} blocks and ${confirm?.properties ?? 0} listings use this society.` : "Listings in this block keep their society and city."}
+          {table === "cities" ? `${confirm?.schemes ?? 0} societies and ${confirm?.properties ?? 0} listings use this city.` : table === "schemes" ? `${confirm?.blocks ?? 0} blocks and ${confirm?.properties ?? 0} listings use this society.` : table === "landmarks" ? `${confirm?.listings ?? 0} listings are associated with this landmark.` : "Listings in this block keep their society and city."}
         </p>
       </Modal>
     </div>
@@ -326,13 +336,13 @@ function RecordForm({ table, record, cities, schemes, onClose, onSaved }: { tabl
     }
   };
 
-  const title = `${isNew ? "Add" : "Edit"} ${table === "cities" ? "city" : table === "schemes" ? "housing society" : "block / zone"}`;
+  const title = `${isNew ? "Add" : "Edit"} ${table === "cities" ? "city" : table === "schemes" ? "housing society" : table === "landmarks" ? "landmark" : "block / zone"}`;
   return (
     <Drawer open={!!record} onClose={onClose} title={title} width="max-w-xl">
       <div className="space-y-4 pb-24">
         <div className="grid gap-3 sm:grid-cols-2">
           {text("name", "Name *")}
-          {table !== "blocks" && text("name_ur", "Name (Urdu)", { dir: "rtl" })}
+          {(table === "cities" || table === "schemes") && text("name_ur", "Name (Urdu)", { dir: "rtl" })}
         </div>
 
         {table === "cities" && (
@@ -437,6 +447,37 @@ function RecordForm({ table, record, cities, schemes, onClose, onSaved }: { tabl
           </div>
         )}
 
+        {table === "landmarks" && (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="City *">
+                <Select value={form.city_id ?? ""} onChange={(e) => set("city_id", e.target.value)}>
+                  <option value="">Choose a city</option>
+                  {cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </Select>
+              </Field>
+              <Field label="Landmark type">
+                <Select value={form.project_type ?? "mall"} onChange={(e) => set("project_type", e.target.value)}>
+                  {["mall", "tower", "mixed_use", "compound_living", "office_complex", "plaza"].map((v) => <option key={v} value={v}>{titleCase(v)}</option>)}
+                </Select>
+              </Field>
+              <Field label="Development status">
+                <Select value={form.status ?? "planned"} onChange={(e) => set("status", e.target.value)}>
+                  {["planned", "under_construction", "completed"].map((v) => <option key={v} value={v}>{titleCase(v)}</option>)}
+                </Select>
+              </Field>
+              {text("developer", "Developer")}
+              {number("floor_count", "Floors", "1")}
+              {number("total_area", "Total area (sq ft)")}
+              {number("total_units", "Total units", "1")}
+              {number("occupancy_rate", "Occupancy rate (%)")}
+              {text("address", "Address")}
+              {text("website", "Website", { placeholder: "https://…" })}
+              {text("completion_date", "Completion date", { placeholder: "YYYY-MM-DD" })}
+            </div>
+          </>
+        )}
+
         <div className="grid gap-3 sm:grid-cols-2">
           {number("latitude", "Latitude")}
           {number("longitude", "Longitude")}
@@ -473,7 +514,7 @@ function RecordForm({ table, record, cities, schemes, onClose, onSaved }: { tabl
         <Button variant="ghost" onClick={onClose}>
           Cancel
         </Button>
-        <Button loading={busy} disabled={!form.name?.trim() || (table === "schemes" && !form.city_id) || (table === "blocks" && !form.scheme_id)} onClick={save}>
+        <Button loading={busy} disabled={!form.name?.trim() || ((table === "schemes" || table === "landmarks") && !form.city_id) || (table === "blocks" && !form.scheme_id)} onClick={save}>
           {isNew ? "Add" : "Save"}
         </Button>
       </div>

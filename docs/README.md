@@ -1,6 +1,6 @@
-# Arz-e-Pak Portal — Documentation
+# Watan-e-Pak Portal — Documentation
 
-Documentation set for the Arz-e-Pak real-estate portal backend: a single in-house
+Documentation set for the Watan-e-Pak real-estate portal backend: a single in-house
 platform that powers property discovery, GIS/mapping, CRM, accounting, construction,
 maintenance, project management (PMO), team messaging and an agentic-AI layer — all
 exposed **both** as an **MCP server** and a **FastAPI REST API** from one source of truth.

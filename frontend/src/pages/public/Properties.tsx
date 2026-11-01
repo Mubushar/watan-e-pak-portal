@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Marker, Popup } from "react-leaflet";
-import { BedDouble, Briefcase, Building, Building2, ChevronDown, Grid3X3, Home as HomeIcon, KeyRound, LandPlot, Layers, List, Map as MapIcon, MapPin, Navigation, RotateCcw, Search, SlidersHorizontal, Sparkles, Store, Wand2, Warehouse, X } from "lucide-react";
+import { Briefcase, Building, Building2, ChevronDown, Grid3X3, Home as HomeIcon, LandPlot, Layers, List, Map as MapIcon, MapPin, Navigation, RotateCcw, Search, SlidersHorizontal, Sparkles, Store, Wand2, Warehouse, X } from "lucide-react";
 import type { City, Property, PropertyList } from "@/types";
 import { useApi } from "@/hooks/useApi";
 import { post } from "@/lib/api";
@@ -19,6 +19,7 @@ import { floorOf, groupProjectUnits, isGroup, priceRange, projectNameOf, unitTyp
 const CATEGORIES = ["house", "apartment", "plot", "shop", "office", "floor", "building", "space"];
 const USE_TYPES = ["residential", "commercial", "mix"];
 const MAX_PRICE = 200_000_000;
+const MAX_RENT = 2_000_000;
 /** `near=` kinds the backend understands (school, mosque, hospital, market, park, transport …). */
 const NEAR_KINDS = [
   { value: "school", label: "School" },
@@ -49,30 +50,19 @@ interface ParsedBrief {
   parsed_fields?: string[];
 }
 
-interface RentalUnit {
-  id: string;
-  title: string;
-  city: string;
-  scheme: string | null;
-  rent: number;
-  deposit: number;
-  bedrooms: number;
-  area: number;
-  status: string;
-  amenities: string[];
-}
-
-function useFilters() {
+function useFilters(presetPurpose?: "buy" | "rent") {
   const [sp, setSp] = useSearchParams();
+  const purpose = presetPurpose ?? sp.get("purpose") ?? "buy";
+  const defaultMaxPrice = purpose === "rent" ? MAX_RENT : MAX_PRICE;
   const f = {
     q: sp.get("q") ?? "",
     city: sp.get("city") ?? "",
     society: sp.get("society") ?? "",
     category: sp.get("category") ?? "",
     use_type: sp.get("use_type") ?? "",
-    purpose: sp.get("purpose") ?? "buy",
+    purpose,
     minPrice: Number(sp.get("min") ?? 0),
-    maxPrice: Number(sp.get("max") ?? MAX_PRICE),
+    maxPrice: Number(sp.get("max") ?? defaultMaxPrice),
     beds: Number(sp.get("beds") ?? 0),
     baths: Number(sp.get("baths") ?? 0),
     feature: sp.get("feature") ?? "",
@@ -91,7 +81,7 @@ function useFilters() {
     for (const [k, v] of Object.entries(patch)) {
       const key = keyMap[k] ?? k;
       const isDefault =
-        v === "" || v === false || v === 0 || (k === "maxPrice" && v === MAX_PRICE) || (k === "sort" && v === "relevance") || (k === "view" && v === "grid") || (k === "purpose" && v === "buy") || (k === "nearKm" && v === 2);
+        v === "" || v === false || v === 0 || (k === "maxPrice" && v === defaultMaxPrice) || (k === "sort" && v === "relevance") || (k === "view" && v === "grid") || (k === "purpose" && v === "buy") || (k === "nearKm" && v === 2);
       if (isDefault) next.delete(key);
       else next.set(key, v === true ? "1" : String(v));
     }
@@ -102,11 +92,13 @@ function useFilters() {
 }
 
 function matches(p: Property, f: ReturnType<typeof useFilters>["f"], societyId?: string | null) {
+  if ((p.listing_purpose ?? "sale") !== (f.purpose === "rent" ? "rent" : "sale")) return false;
   if (f.city && (p.city_name ?? "").toLowerCase() !== f.city.toLowerCase()) return false;
   if (f.society && p.scheme_id !== societyId) return false;
   if (f.category && p.category !== f.category) return false;
   if (f.use_type && p.use_type !== f.use_type) return false;
-  if (p.price < f.minPrice || p.price > f.maxPrice) return false;
+  const filterPrice = f.purpose === "rent" && p.rent_frequency === "weekly" ? p.price * 52 / 12 : p.price;
+  if (filterPrice < f.minPrice || filterPrice > f.maxPrice) return false;
   if (f.beds && (p.bedrooms ?? 0) < f.beds) return false;
   if (f.baths && (p.bathrooms ?? 0) < f.baths) return false;
   if (f.featured && !p.featured) return false;
@@ -139,6 +131,10 @@ const BUDGETS: [number, number, string][] = [
   [30_000_000, 50_000_000, "3 – 5 Crore"],
   [50_000_000, 100_000_000, "5 – 10 Crore"],
   [100_000_000, MAX_PRICE, "10 Crore +"],
+];
+const RENT_BUDGETS: [number, number, string][] = [
+  [0, 25_000, "Under PKR 25k / month"], [25_000, 50_000, "PKR 25k–50k / month"], [50_000, 100_000, "PKR 50k–1 lakh / month"],
+  [100_000, 200_000, "PKR 1–2 lakh / month"], [200_000, 500_000, "PKR 2–5 lakh / month"], [500_000, MAX_RENT, "PKR 5 lakh+ / month"],
 ];
 
 type Society = { id: string; name: string; city: string };
@@ -194,8 +190,10 @@ function FilterPanel({
   useEffect(() => {
     if (moreActive) setMore(true);
   }, [moreActive]);
-  const budget = BUDGETS.find(([lo, hi]) => lo === f.minPrice && hi === f.maxPrice);
-  const anyPrice = f.minPrice === 0 && f.maxPrice === MAX_PRICE;
+  const maxBudget = f.purpose === "rent" ? MAX_RENT : MAX_PRICE;
+  const budgets = f.purpose === "rent" ? RENT_BUDGETS : BUDGETS;
+  const budget = budgets.find(([lo, hi]) => lo === f.minPrice && hi === f.maxPrice);
+  const anyPrice = f.minPrice === 0 && f.maxPrice === maxBudget;
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -254,10 +252,10 @@ function FilterPanel({
 
       <Step n={3} title="What’s your budget?" hint="Tap a range, or drag the slider for an exact one.">
         <div className="grid grid-cols-2 gap-1.5">
-          <button onClick={() => set({ minPrice: 0, maxPrice: MAX_PRICE })} className={cn(choice(anyPrice), "col-span-2 px-2 py-1.5 text-xs")}>
+          <button onClick={() => set({ minPrice: 0, maxPrice: maxBudget })} className={cn(choice(anyPrice), "col-span-2 px-2 py-1.5 text-xs")}>
             Any budget
           </button>
-          {BUDGETS.map(([lo, hi, label], i) => (
+          {budgets.map(([lo, hi, label], i) => (
             <button key={label} onClick={() => set({ minPrice: lo, maxPrice: hi })} className={cn(choice(budget?.[2] === label), "flex items-center justify-between px-2 py-1.5 text-xs", budget?.[2] !== label && !facets.budgets[i] && "opacity-45")}>
               {label}
               <span className={cn("text-[10px] tabular-nums", budget?.[2] === label ? "text-white/80" : "text-ink-mute")}>{facets.budgets[i] ?? 0}</span>
@@ -265,7 +263,7 @@ function FilterPanel({
           ))}
         </div>
         <div onPointerUp={() => set({ minPrice: price[0], maxPrice: price[1] })} onKeyUp={() => set({ minPrice: price[0], maxPrice: price[1] })}>
-          <RangeSlider min={0} max={MAX_PRICE} step={2_500_000} value={price} onChange={setPrice} format={(v) => (v >= MAX_PRICE ? "20 Crore+" : pkrShort(v, false))} />
+          <RangeSlider min={0} max={maxBudget} step={f.purpose === "rent" ? 10_000 : 2_500_000} value={price} onChange={setPrice} format={(v) => (v >= maxBudget ? f.purpose === "rent" ? "PKR 20 lakh+" : "20 Crore+" : pkrShort(v, false))} />
         </div>
       </Step>
 
@@ -374,7 +372,7 @@ function ListRow({ p }: { p: Property }) {
                 <MapPin className="h-4 w-4 text-gold-600" /> {[p.block_name, p.scheme_name, p.city_name].filter(Boolean).join(", ")}
               </p>
             </div>
-            <p className="shrink-0 font-display text-xl font-bold text-brand-700 dark:text-gold-300">{pkrShort(p.price)}</p>
+            <p className="shrink-0 font-display text-xl font-bold text-brand-700 dark:text-gold-300">{pkrShort(p.price)}{p.listing_purpose === "rent" ? (p.rent_frequency === "weekly" ? "/wk" : "/mo") : ""}</p>
           </div>
           <NearbyNote p={p} />
           <p className="mt-3 line-clamp-2 text-sm text-ink-soft dark:text-slate-300">{p.description}</p>
@@ -382,7 +380,7 @@ function ListRow({ p }: { p: Property }) {
             <Badge tone="gray">{titleCase(p.category)}</Badge>
             <Badge tone="blue">{area(p)}</Badge>
             {!!p.bedrooms && <Badge tone="green">{p.bedrooms} beds</Badge>}
-            {!!p.price_per_sqft && <Badge tone="gold">{pkrShort(p.price_per_sqft)}/sqft</Badge>}
+            {p.listing_purpose !== "rent" && !!p.price_per_sqft && <Badge tone="gold">{pkrShort(p.price_per_sqft)}/sqft</Badge>}
             <span className="ms-auto flex gap-2">
               <FavoriteButton id={p.id} className="shadow-none ring-1 ring-black/10" />
               <CompareButton id={p.id} className="shadow-none ring-1 ring-black/10" />
@@ -394,53 +392,13 @@ function ListRow({ p }: { p: Property }) {
   );
 }
 
-function Rentals({ city }: { city: string }) {
-  const q = useApi<{ units: RentalUnit[] }>("/leasing/units");
-  const units = (q.data?.units ?? []).filter((u) => !city || u.city.toLowerCase() === city.toLowerCase());
-  if (!units.length) return null;
-  return (
-    <div className="mb-8">
-      <p className="mb-3 flex items-center gap-2 font-display text-lg font-semibold">
-        <KeyRound className="h-5 w-5 text-gold-600" /> Available for rent
-      </p>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {units.map((u) => (
-          <div key={u.id} className="card overflow-hidden">
-            <img src={coverImage({ id: u.id, title: u.title, category: u.bedrooms >= 3 ? "house" : "apartment" })} alt="" className="aspect-[16/9] w-full object-cover" />
-            <div className="p-4">
-              <p className="font-semibold">{u.title}</p>
-              <p className="text-xs text-ink-mute">{[u.scheme, u.city].filter(Boolean).join(", ")}</p>
-              <div className="mt-2 flex items-end justify-between">
-                <p className="font-display text-lg font-bold text-brand-700 dark:text-gold-300">
-                  {pkrShort(u.rent)}
-                  <span className="text-xs font-medium text-ink-mute">/month</span>
-                </p>
-                <span className="inline-flex items-center gap-1 text-xs text-ink-mute">
-                  <BedDouble className="h-3.5 w-3.5" /> {u.bedrooms} · {u.area} sqft
-                </span>
-              </div>
-              <div className="mt-2 flex flex-wrap gap-1">
-                {u.amenities.map((a) => (
-                  <span key={a} className="chip bg-brand-50 text-[10px] text-brand-700 dark:bg-white/5 dark:text-brand-200">
-                    {a}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-export default function Properties() {
-  const { f, set, reset } = useFilters();
+export default function Properties({ rentalOnly = false }: { rentalOnly?: boolean } = {}) {
+  const { f, set, reset } = useFilters(rentalOnly ? "rent" : undefined);
   // Place- and feature-aware filters run on the server (/search); everything else filters the full list here.
   const serverSearch = !!(f.near || f.nearPlace || f.feature);
   const q = useApi<PropertyList>(
     serverSearch ? "/search" : "/properties",
-    serverSearch ? { near: f.near, near_place: f.nearPlace, near_km: f.near || f.nearPlace ? f.nearKm : undefined, feature: f.feature, limit: 1000 } : { limit: 1000 },
+    serverSearch ? { near: f.near, near_place: f.nearPlace, near_km: f.near || f.nearPlace ? f.nearKm : undefined, feature: f.feature, purpose: f.purpose === "rent" ? "rent" : undefined, limit: 1000 } : { limit: 1000, purpose: f.purpose === "rent" ? "rent" : undefined },
   );
   const cities = useApi<{ cities: City[] }>("/cities");
   const schemesQ = useApi<{ schemes: Society[] }>("/schemes");
@@ -454,6 +412,8 @@ export default function Properties() {
 
   const all = q.data?.results ?? [];
   const facets = useMemo<Facets>(() => {
+    const maxBudget = f.purpose === "rent" ? MAX_RENT : MAX_PRICE;
+    const budgets = f.purpose === "rent" ? RENT_BUDGETS : BUDGETS;
     const without = (patch: Partial<typeof f>) => {
       const g = { ...f, ...patch };
       return all.filter((p) => matches(p, g, g.society ? societyId : null));
@@ -464,22 +424,26 @@ export default function Properties() {
         if (k) a[k] = (a[k] ?? 0) + 1;
         return a;
       }, {});
-    const byPrice = without({ minPrice: 0, maxPrice: MAX_PRICE });
+    const byPrice = without({ minPrice: 0, maxPrice: maxBudget });
     const byBeds = without({ beds: 0 });
     return {
       cities: tally(without({ city: "", society: "" }), (p) => p.city_name?.toLowerCase()),
       societies: tally(without({ society: "" }), (p) => p.scheme_id),
       types: tally(without({ category: "" }), (p) => p.category),
       uses: tally(without({ use_type: "" }), (p) => p.use_type),
-      budgets: BUDGETS.map(([lo, hi]) => byPrice.filter((p) => p.price >= lo && (hi >= MAX_PRICE || p.price <= hi)).length),
+      budgets: budgets.map(([lo, hi]) => byPrice.filter((p) => {
+        const price = f.purpose === "rent" && p.rent_frequency === "weekly" ? p.price * 52 / 12 : p.price;
+        return price >= lo && (hi >= maxBudget || price <= hi);
+      }).length),
       beds: [0, 1, 2, 3, 4, 5].map((b) => byBeds.filter((p) => (p.bedrooms ?? 0) >= b).length),
     };
   }, [all, f, societyId]);
   const results = useMemo(() => {
     const r = all.filter((p) => matches(p, f, societyId));
     const s = [...r];
-    if (f.sort === "price_asc") s.sort((a, b) => a.price - b.price);
-    else if (f.sort === "price_desc") s.sort((a, b) => b.price - a.price);
+    const price = (p: Property) => f.purpose === "rent" && p.rent_frequency === "weekly" ? p.price * 52 / 12 : p.price;
+    if (f.sort === "price_asc") s.sort((a, b) => price(a) - price(b));
+    else if (f.sort === "price_desc") s.sort((a, b) => price(b) - price(a));
     else if (f.sort === "size_desc") s.sort((a, b) => (b.total_area ?? 0) - (a.total_area ?? 0));
     else if (f.sort === "newest") s.sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
     else if (!f.near && !f.nearPlace) s.sort((a, b) => Number(!!b.featured) - Number(!!a.featured)); // near searches come back closest first
@@ -500,7 +464,7 @@ export default function Properties() {
         society: "",
         category: r.category ?? "",
         beds: r.bedrooms ?? 0,
-        maxPrice: r.budget_max ? Math.min(MAX_PRICE, Math.round(r.budget_max * 1.15)) : MAX_PRICE,
+        maxPrice: r.budget_max ? Math.min(f.purpose === "rent" ? MAX_RENT : MAX_PRICE, Math.round(r.budget_max * 1.15)) : (f.purpose === "rent" ? MAX_RENT : MAX_PRICE),
         minPrice: 0,
       });
     } catch {
@@ -523,7 +487,7 @@ export default function Properties() {
     f.near && { k: "near", label: `Near a ${NEAR_KINDS.find((k) => k.value === f.near)?.label.toLowerCase() ?? f.near} (${f.nearKm} km)` },
     f.nearPlace && { k: "nearPlace", label: `Within ${f.nearKm} km of ${nearPlace?.found && nearPlace.name ? nearPlace.name : f.nearPlace}` },
     f.feature && { k: "feature", label: `With “${f.feature}”` },
-    (f.minPrice > 0 || f.maxPrice < MAX_PRICE) && { k: "price", label: `${pkrShort(f.minPrice, false)} – ${pkrShort(f.maxPrice, false)}` },
+    (f.minPrice > 0 || f.maxPrice < (f.purpose === "rent" ? MAX_RENT : MAX_PRICE)) && { k: "price", label: `${pkrShort(f.minPrice, false)} – ${pkrShort(f.maxPrice, false)}${f.purpose === "rent" ? "/mo" : ""}` },
     f.featured && { k: "featured", label: "Featured" },
   ].filter(Boolean) as { k: string; label: string }[];
 
@@ -538,8 +502,8 @@ export default function Properties() {
         <img src={HERO.villa} alt="" className="absolute inset-0 -z-10 h-full w-full object-cover opacity-35" />
         <div className="absolute inset-0 -z-10 bg-gradient-to-r from-brand-950 via-brand-950/85 to-brand-900/40" />
         <div className="container py-10 sm:py-14">
-          <p className="section-eyebrow !text-gold-300">{f.purpose === "rent" ? "Homes for rent" : "Properties for sale"}</p>
-          <h1 className="mt-2 font-display text-3xl font-bold sm:text-4xl">Find your next property</h1>
+          <p className="section-eyebrow !text-gold-300">{rentalOnly || f.purpose === "rent" ? "Homes and spaces for rent" : "Properties for sale"}</p>
+          <h1 className="mt-2 font-display text-3xl font-bold sm:text-4xl">{rentalOnly ? "Find a place to rent" : "Find your next property"}</h1>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -573,8 +537,8 @@ export default function Properties() {
                     {m}
                   </span>
                 ))}
-                <Link to={`/ai/agents/conversational_buyer_agent?objective=${encodeURIComponent(text)}`} className="chip bg-gold-gradient text-brand-950">
-                  Let the Buyer Agent shortlist →
+                <Link to={`/ai/agents/${f.purpose === "rent" ? "autonomous_leasing_agent" : "conversational_buyer_agent"}?objective=${encodeURIComponent(text)}`} className="chip bg-gold-gradient text-brand-950">
+                  Let the {f.purpose === "rent" ? "Leasing Agent" : "Buyer Agent"} shortlist →
                 </Link>
                 <button onClick={() => setBrief(null)} className="text-white/60 hover:text-white" aria-label="Dismiss">
                   <X className="h-4 w-4" />
@@ -597,7 +561,7 @@ export default function Properties() {
             <Button variant="outline" size="sm" className="lg:hidden" icon={<SlidersHorizontal className="h-4 w-4" />} onClick={() => setMobileFilters(true)}>
               Filters
             </Button>
-            <Segmented size="sm" value={f.purpose} onChange={(v) => set({ purpose: v })} options={[{ value: "buy", label: "Buy" }, { value: "rent", label: "Rent" }]} />
+            {rentalOnly ? <Link to="/properties" className="btn btn-outline btn-sm">Browse properties for sale</Link> : <Segmented size="sm" value={f.purpose} onChange={(v) => set({ purpose: v })} options={[{ value: "buy", label: "Buy" }, { value: "rent", label: "Rent" }]} />}
             <p className="text-sm text-ink-mute">
               {serverSearch ? (
                 <>
@@ -636,7 +600,7 @@ export default function Properties() {
               {activeChips.map((c) => (
                 <button
                   key={c.k}
-                  onClick={() => (c.k === "price" ? set({ minPrice: 0, maxPrice: MAX_PRICE }) : set({ [c.k]: c.k === "beds" || c.k === "baths" ? 0 : c.k === "featured" ? false : "" } as never))}
+                  onClick={() => (c.k === "price" ? set({ minPrice: 0, maxPrice: f.purpose === "rent" ? MAX_RENT : MAX_PRICE }) : set({ [c.k]: c.k === "beds" || c.k === "baths" ? 0 : c.k === "featured" ? false : "" } as never))}
                   className="chip bg-brand-700 text-white"
                 >
                   {c.label} <X className="h-3 w-3" />
@@ -648,7 +612,6 @@ export default function Properties() {
             </div>
           )}
 
-          {f.purpose === "rent" && <Rentals city={f.city} />}
           {f.project && projectUnits.length > 0 && <ProjectInventorySummary units={projectUnits} active={f.unitType} onType={(unitType) => set({ unitType })} />}
 
           {q.error ? (
@@ -675,7 +638,7 @@ export default function Properties() {
           ) : !results.length ? (
             <EmptyState
               title="No properties match these filters"
-              hint="Loosen a filter, or let the AI buyer agent search the whole market for you."
+              hint={`Loosen a filter, or let the AI ${f.purpose === "rent" ? "leasing" : "buyer"} agent search the whole market for you.`}
               action={
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={reset}>
@@ -697,7 +660,7 @@ export default function Properties() {
                         <img src={coverImage(p)} alt="" className="h-28 w-full object-cover" />
                         <div className="p-3">
                           <p className="font-semibold text-ink">{p.title}</p>
-                          <p className="font-bold text-brand-700">{pkrShort(p.price)}</p>
+                          <p className="font-bold text-brand-700">{pkrShort(p.price)}{p.listing_purpose === "rent" ? (p.rent_frequency === "weekly" ? "/wk" : "/mo") : ""}</p>
                         </div>
                       </Link>
                     </Popup>

@@ -1,5 +1,5 @@
 /**
- * Thin fetch wrapper around the Arz-e-Pak FastAPI backend.
+ * Thin fetch wrapper around the Watan-e-Pak FastAPI backend.
  *
  * - Every call goes to `${API_BASE}${path}` (default `/api`, proxied by Vite).
  * - The bearer token from the auth store is attached automatically.

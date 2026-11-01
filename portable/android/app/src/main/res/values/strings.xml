@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Arz-e-Pak</string>
-    <string name="title_activity_main">Arz-e-Pak</string>
-    <string name="package_name">pk.arzepak.app</string>
-    <string name="custom_url_scheme">pk.arzepak.app</string>
+    <string name="app_name">Watan-e-Pak</string>
+    <string name="title_activity_main">Watan-e-Pak</string>
+    <string name="package_name">pk.watanepak.app</string>
+    <string name="custom_url_scheme">pk.watanepak.app</string>
 </resources>

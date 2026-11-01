@@ -42,36 +42,49 @@ type Row = {
 };
 interface ImportStats {
   format: string;
-  features: number;
-  dropped: number;
-  geometry_types: Record<string, number>;
-  vertices: number;
-  bbox: [number, number, number, number];
-  inside_pakistan_pct: number;
-  property_keys: string[];
-  warnings: string[];
+  features?: number;
+  dropped?: number;
+  geometry_types?: Record<string, number>;
+  vertices?: number;
+  bbox?: [number, number, number, number];
+  bounds?: [[number, number], [number, number]];
+  inside_pakistan_pct?: number;
+  property_keys?: string[];
+  warnings?: string[];
 }
+type GroundControlPoint = { image: [number, number]; geo: [number, number] };
+type UploadCheck = { kind: "vector" | "raster"; import: ImportStats; preview_base64?: string; alignment_preview_base64?: string | null; width?: number; height?: number; requires_control_points?: boolean; embedded_georeference?: boolean; georeference?: { rmse_m?: number; quality?: string } };
 interface Named {
   id: string;
   name: string;
   city?: string;
 }
+interface GisStorageStatus {
+  backend: string;
+  spatial: boolean;
+  format: string;
+  detail?: string;
+  catalog_table?: string;
+  feature_table?: string;
+}
 
-const LAYER_TYPES = ["zone", "boundary", "road", "green_area", "plot_layout", "master_plan", "annotation", "utility", "flood_risk", "other"];
+const LAYER_TYPES = ["zone", "boundary", "road", "green_area", "plot_layout", "master_plan", "annotation", "utility", "flood_risk", "elevation", "raster", "other"];
 const ENTITY_TYPES = ["city", "scheme", "block", "bigproject"];
-const MAX_MB = 25;
+// Request JSON/base64 expands data by roughly a third; stay under the default 30 MB body cap.
+const MAX_MB = 20;
 
 const readFile = (file: File) =>
   new Promise<string>((resolve, reject) => {
     const r = new FileReader();
-    r.onload = () => resolve(String(r.result ?? ""));
+    r.onload = () => resolve(String(r.result ?? "").split(",", 2)[1] ?? "");
     r.onerror = () => reject(new Error("Couldn't read the file"));
-    r.readAsText(file);
+    r.readAsDataURL(file);
   });
 
 export default function GisLayersAdmin() {
   const qc = useQueryClient();
   const list = useApi<{ layers: Row[] }>("/gis/layers");
+  const storage = useApi<GisStorageStatus>("/gis/storage");
   const cities = useApi<{ cities: Named[] }>("/cities");
   const schemes = useApi<{ schemes: Named[] }>("/schemes");
   const [q, setQ] = useState("");
@@ -168,6 +181,17 @@ export default function GisLayersAdmin() {
           </>
         }
       />
+      <Card className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+        <div>
+          <p className="font-semibold">Spatial database storage</p>
+          <p className="text-sm text-ink-mute">
+            {storage.data?.spatial
+              ? `PostGIS is active: geometries are indexed in ${storage.data.feature_table}; layer settings remain in the portal catalog.`
+              : storage.data?.detail ?? `Current store: ${storage.data?.backend ?? "checking"} · ${storage.data?.format ?? "checking capability"}.`}
+          </p>
+        </div>
+        <Badge tone={storage.data?.spatial ? "green" : "orange"}>{storage.data?.spatial ? "PostGIS enabled" : "Spatial store unavailable"}</Badge>
+      </Card>
       <Card className="overflow-hidden">
         <div className="flex flex-wrap items-center gap-2 border-b border-black/5 p-4 dark:border-white/10">
           <div className="flex min-w-[220px] flex-1 items-center gap-2 rounded-xl bg-black/5 px-3 dark:bg-white/10">
@@ -347,22 +371,23 @@ function StatsCard({ stats }: { stats: ImportStats }) {
   return (
     <div className="space-y-2 rounded-xl border border-black/5 bg-brand-50/40 p-3 text-sm dark:border-white/10 dark:bg-white/5">
       <p className="font-semibold">
-        {num(stats.features)} feature{stats.features === 1 ? "" : "s"} read from {stats.format.toUpperCase()}
+        {num(stats.features ?? 0)} feature{stats.features === 1 ? "" : "s"} read from {stats.format.toUpperCase()}
         {stats.dropped ? ` · ${stats.dropped} skipped` : ""}
       </p>
       <div className="flex flex-wrap gap-1.5">
-        {Object.entries(stats.geometry_types).map(([t, n]) => (
+        {Object.entries(stats.geometry_types ?? {}).map(([t, n]) => (
           <Badge key={t} tone="blue">
             {n} × {t}
           </Badge>
         ))}
-        <Badge tone={stats.inside_pakistan_pct >= 50 ? "green" : "orange"}>{stats.inside_pakistan_pct}% inside Pakistan</Badge>
+        {stats.inside_pakistan_pct !== undefined && <Badge tone={stats.inside_pakistan_pct >= 50 ? "green" : "orange"}>{stats.inside_pakistan_pct}% inside Pakistan</Badge>}
       </div>
-      <p className="text-[11px] text-ink-mute">
-        Box {stats.bbox.map((v) => v.toFixed(4)).join(", ")} · {num(stats.vertices)} vertices
-        {stats.property_keys.length ? ` · attributes: ${stats.property_keys.slice(0, 8).join(", ")}` : ""}
-      </p>
-      {stats.warnings.map((w) => (
+      {(stats.bbox || stats.bounds) && <p className="text-[11px] text-ink-mute">
+        {stats.bbox ? `Box ${stats.bbox.map((v) => v.toFixed(4)).join(", ")}` : `WGS84 bounds ${stats.bounds?.flat().map((v) => v.toFixed(5)).join(", ")}`}
+        {stats.vertices !== undefined && ` · ${num(stats.vertices)} vertices`}
+        {stats.property_keys?.length ? ` · attributes: ${stats.property_keys.slice(0, 8).join(", ")}` : ""}
+      </p>}
+      {(stats.warnings ?? []).map((w) => (
         <p key={w} className="text-[12px] text-orange-700 dark:text-orange-300">
           ⚠ {w}
         </p>
@@ -376,8 +401,14 @@ function StatsCard({ stats }: { stats: ImportStats }) {
 function UploadDrawer({ state, cities, schemes, onClose, onSaved }: { state: { replace?: Row } | null; cities: Named[]; schemes: Named[]; onClose: () => void; onSaved: () => void }) {
   const replace = state?.replace;
   const fileRef = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<{ name: string; text: string } | null>(null);
+  const [file, setFile] = useState<{ name: string; base64: string } | null>(null);
   const [stats, setStats] = useState<ImportStats | null>(null);
+  const [check, setCheck] = useState<UploadCheck | null>(null);
+  const [georeferenceMode, setGeoreferenceMode] = useState<"auto" | "assisted" | "manual">("auto");
+  const [controlPoints, setControlPoints] = useState<GroundControlPoint[]>([]);
+  const [pickedPixel, setPickedPixel] = useState<[number, number] | null>(null);
+  const [pointLatLon, setPointLatLon] = useState({ lat: "", lon: "" });
+  const [sourceCrs, setSourceCrs] = useState("");
   const [checking, setChecking] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", layer_type: "zone", entity_type: "city", entity_id: "pakistan", description: "", color: "#146f45", visible: true, published: true, source_url: "" });
@@ -386,11 +417,25 @@ function UploadDrawer({ state, cities, schemes, onClose, onSaved }: { state: { r
   const reset = () => {
     setFile(null);
     setStats(null);
+    setCheck(null);
+    setControlPoints([]);
+    setPickedPixel(null);
+    setGeoreferenceMode("auto");
+    setSourceCrs("");
     if (fileRef.current) fileRef.current.value = "";
   };
   const close = () => {
     reset();
     onClose();
+  };
+
+  const runCheck = async (selected: { name: string; base64: string }, mode = georeferenceMode, points = controlPoints, crs = sourceCrs) => {
+    const result = await post<UploadCheck>("/gis/layers/upload", {
+      filename: selected.name, content_base64: selected.base64, dry_run: true,
+      georeference_mode: mode, control_points: points, source_crs: crs || undefined,
+    });
+    setCheck(result);
+    setStats(result.import);
   };
 
   const choose = async (f: File | undefined) => {
@@ -401,12 +446,16 @@ function UploadDrawer({ state, cities, schemes, onClose, onSaved }: { state: { r
     }
     setChecking(true);
     setStats(null);
+    setControlPoints([]);
+    setPickedPixel(null);
+    setGeoreferenceMode("auto");
+    setSourceCrs("");
     try {
-      const text = await readFile(f);
-      setFile({ name: f.name, text });
+      const base64 = await readFile(f);
+      const selected = { name: f.name, base64 };
+      setFile(selected);
       if (!form.name && !replace) set({ name: f.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ") });
-      const r = await post<{ import: ImportStats }>("/gis/layers/upload", { filename: f.name, content: text, dry_run: true });
-      setStats(r.import);
+      await runCheck(selected, "auto", [], "");
     } catch (e) {
       toast.error((e as Error).message);
       setFile(null);
@@ -422,7 +471,10 @@ function UploadDrawer({ state, cities, schemes, onClose, onSaved }: { state: { r
       const style = { color: form.color, fillColor: form.color, fillOpacity: 0.25, weight: 2, opacity: 0.9 };
       await post("/gis/layers/upload", {
         filename: file.name,
-        content: file.text,
+        content_base64: file.base64,
+        georeference_mode: georeferenceMode,
+        control_points: controlPoints,
+        source_crs: sourceCrs || undefined,
         ...(replace
           ? { replace_layer_id: replace.id }
           : { name: form.name, layer_type: form.layer_type, entity_type: form.entity_type, entity_id: form.entity_id || "pakistan", description: form.description || undefined, style, visible: form.visible, published: form.published, source_url: form.source_url || undefined }),
@@ -450,9 +502,47 @@ function UploadDrawer({ state, cities, schemes, onClose, onSaved }: { state: { r
         >
           <FileUp className="h-7 w-7 text-brand-600" />
           <span className="text-sm font-semibold">{file ? file.name : "Choose or drop a file"}</span>
-          <span className="text-xs text-ink-mute">GeoJSON, KML, GPX or CSV (lat / lon columns) · WGS84 · up to {MAX_MB} MB. Shapefiles: export to GeoJSON in QGIS first.</span>
-          <input ref={fileRef} type="file" accept=".geojson,.json,.kml,.gpx,.csv" className="hidden" onChange={(e) => void choose(e.target.files?.[0])} />
+          <span className="text-xs text-ink-mute">GeoJSON, KML, GPX, CSV, images, georeferenced PDF, ECW, DWG/DGN, GeoPackage, or ZIP containing a shapefile/file geodatabase · up to {MAX_MB} MB. GDAL/OGR drivers are required; ECW/DWG drivers depend on the server build.</span>
+          <input ref={fileRef} type="file" accept=".geojson,.json,.kml,.gpx,.csv,.png,.jpg,.jpeg,.tif,.tiff,.ecw,.pdf,.dwg,.dgn,.zip,.gpkg" className="hidden" onChange={(e) => void choose(e.target.files?.[0])} />
         </label>
+        {file && check?.kind === "raster" && (
+          <div className="space-y-3 rounded-xl border border-black/5 p-3 dark:border-white/10">
+            <Field label="Georeferencing method">
+              <Select value={georeferenceMode} onChange={(e) => { const mode = e.target.value as typeof georeferenceMode; setGeoreferenceMode(mode); setStats(null); }}>
+                <option value="auto">Automatic · use embedded coordinates</option>
+                <option value="assisted">Assisted · use embedded data or add control points</option>
+                <option value="manual">Manual · rectify with control points</option>
+              </Select>
+            </Field>
+            <Field label="Source CRS (optional)" hint="Use an EPSG code, such as EPSG:32643, when the file has a known CRS but lacks CRS metadata.">
+              <Input value={sourceCrs} onChange={(e) => { setSourceCrs(e.target.value); setStats(null); }} placeholder="EPSG:4326" />
+            </Field>
+            {check.preview_base64 && <div>
+              <p className="mb-1 text-xs text-ink-mute">Click the image to capture pixel coordinates (origin at top left), then enter its matching map latitude/longitude.</p>
+              <img src={`data:image/png;base64,${check.preview_base64}`} alt="Raster source preview" className="max-h-64 max-w-full cursor-crosshair rounded-lg border" onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = Math.round((e.clientX - rect.left) / rect.width * (check.width ?? e.currentTarget.naturalWidth));
+                const y = Math.round((e.clientY - rect.top) / rect.height * (check.height ?? e.currentTarget.naturalHeight));
+                setPickedPixel([x, y]);
+              }} />
+            </div>}
+            <div className="grid grid-cols-2 gap-2">
+              <Field label={`Pixel X${pickedPixel ? ` · ${pickedPixel[0]}` : ""}`}><Input readOnly value={pickedPixel?.[0] ?? "Click the image"} /></Field>
+              <Field label={`Pixel Y${pickedPixel ? ` · ${pickedPixel[1]}` : ""}`}><Input readOnly value={pickedPixel?.[1] ?? "Click the image"} /></Field>
+              <Field label="Latitude"><Input type="number" step="any" value={pointLatLon.lat} onChange={(e) => setPointLatLon((p) => ({ ...p, lat: e.target.value }))} /></Field>
+              <Field label="Longitude"><Input type="number" step="any" value={pointLatLon.lon} onChange={(e) => setPointLatLon((p) => ({ ...p, lon: e.target.value }))} /></Field>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" disabled={!pickedPixel || !pointLatLon.lat || !pointLatLon.lon} onClick={() => {
+                const next = [...controlPoints, { image: pickedPixel!, geo: [Number(pointLatLon.lat), Number(pointLatLon.lon)] as [number, number] }];
+                setControlPoints(next); setPickedPixel(null); setPointLatLon({ lat: "", lon: "" }); setStats(null);
+              }}>Add control point ({controlPoints.length})</Button>
+              <Button size="sm" variant="outline" disabled={!file || checking} loading={checking} onClick={async () => { if (!file) return; setChecking(true); try { await runCheck(file); } catch (e) { toast.error((e as Error).message); } finally { setChecking(false); } }}>Estimate / check alignment</Button>
+            </div>
+            {!!controlPoints.length && <div className="space-y-1 text-xs">{controlPoints.map((p, i) => <div key={i} className="flex justify-between">GCP {i + 1}: px {p.image.join(", ")} → {p.geo.join(", ")}<button className="text-red-600" onClick={() => { setControlPoints(controlPoints.filter((_, j) => j !== i)); setStats(null); }}>Remove</button></div>)}</div>}
+            {check.alignment_preview_base64 && <div><p className="mb-1 text-xs font-medium">Rectified preview · RMSE {check.georeference?.rmse_m?.toFixed(1) ?? "—"} m · {check.georeference?.quality ?? "embedded"}</p><img src={`data:image/png;base64,${check.alignment_preview_base64}`} alt="Georeferenced map preview" className="max-h-64 max-w-full rounded-lg border" /></div>}
+          </div>
+        )}
         {checking && <Skeleton className="h-20" />}
         {stats && <StatsCard stats={stats} />}
 
@@ -493,7 +583,7 @@ function UploadDrawer({ state, cities, schemes, onClose, onSaved }: { state: { r
           <Button variant="ghost" onClick={close}>
             Cancel
           </Button>
-          <Button icon={<Upload className="h-4 w-4" />} disabled={!stats || saving || (!replace && !form.name.trim())} onClick={save}>
+          <Button icon={<Upload className="h-4 w-4" />} disabled={!stats || check?.requires_control_points || saving || (!replace && !form.name.trim())} onClick={save}>
             {saving ? "Saving…" : replace ? "Replace geometry" : "Save layer"}
           </Button>
         </div>

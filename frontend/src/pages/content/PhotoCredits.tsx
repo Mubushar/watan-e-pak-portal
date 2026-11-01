@@ -27,7 +27,7 @@ export default function PhotoCredits() {
   return (
     <div className="container py-10">
       <p className="section-eyebrow">Photo credits</p>
-      <h1 className="mt-1 font-display text-3xl font-bold text-brand-900 dark:text-white">The photographs on Arz-e-Pak</h1>
+      <h1 className="mt-1 font-display text-3xl font-bold text-brand-900 dark:text-white">The photographs on Watan-e-Pak</h1>
       <p className="mt-3 max-w-3xl text-sm text-ink-mute">
         Listings show their owner’s or developer’s own photos. When a listing has none yet, it shows a <b>representative photo</b> — a real photograph of a similar property, clearly marked as
         such — from the library below. All are free-licence photographs (Creative Commons or public domain) from Wikimedia Commons, Flickr, Rawpixel, StockSnap and the WordPress Photo

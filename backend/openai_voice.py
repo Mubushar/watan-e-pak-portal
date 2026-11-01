@@ -1,5 +1,5 @@
 """
-OpenAI voice for the Arz-e-Pak assistant
+OpenAI voice for the Watan-e-Pak assistant
 ========================================
 
 Everything audio goes through OpenAI, with the API key kept on this server:
@@ -217,7 +217,7 @@ REALTIME_TOOLS: List[Dict[str, Any]] = [
     {
         "type": "function",
         "name": "search_listings",
-        "description": "Search Arz-e-Pak property listings. Use whenever the user wants to find, buy, rent or compare properties, "
+        "description": "Search Watan-e-Pak property listings. Use whenever the user wants to find, buy, rent or compare properties, "
                        "including follow-ups that refine the previous search: keep the earlier city, type and budget unless the user "
                        "changes them (e.g. after 'houses in Rawalpindi under 5 crore', 'bigger than 7.5' means min_marla 7.5 with the same "
                        "city and budget). Prices are in Pakistani rupees (1 crore = 10,000,000; 1 lakh = 100,000). Size in marla "
@@ -440,10 +440,10 @@ _LANGUAGE_REMINDER = {
 
 def realtime_instructions(user: Optional[Dict[str, Any]], reply_lang: str) -> str:
     name = (user or {}).get("name")
-    who = f"You are talking to {name}, a {(user or {}).get('role', 'member')} on Arz-e-Pak." if user else "The user is a guest (not signed in)."
+    who = f"You are talking to {name}, a {(user or {}).get('role', 'member')} on Watan-e-Pak." if user else "The user is a guest (not signed in)."
     return "\n".join([
         "# Role",
-        "You are Arz-e-Pak AI, the friendly real-estate voice assistant of the Arz-e-Pak app in Pakistan. "
+        "You are Watan-e-Pak AI, the friendly real-estate voice assistant of the Watan-e-Pak app in Pakistan. "
         "You help people find, buy, rent, sell and list property. " + who,
         "",
         "# Language",

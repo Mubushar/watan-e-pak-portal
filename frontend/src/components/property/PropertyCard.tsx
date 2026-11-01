@@ -95,6 +95,7 @@ export function PropertyCard({ p, className, compact }: { p: Property; className
                 <Sparkles className="h-3 w-3" /> Featured
               </span>
             )}
+            {p.listing_purpose === "rent" && <span className="chip bg-brand-700 text-white shadow">For rent</span>}
             <span className="chip bg-white/90 text-brand-800 shadow dark:bg-black/50 dark:text-white">{titleCase(p.category)}</span>
           </div>
           <div className="absolute end-3 top-3 flex flex-col gap-2">
@@ -102,7 +103,7 @@ export function PropertyCard({ p, className, compact }: { p: Property; className
             <CompareButton id={p.id} />
           </div>
           <div className="absolute bottom-3 start-3 end-3 flex items-end justify-between text-white">
-            <p className="font-display text-xl font-bold drop-shadow">{pkrShort(p.price)}</p>
+            <p className="font-display text-xl font-bold drop-shadow">{pkrShort(p.price)}{p.listing_purpose === "rent" && <span className="ms-1 text-xs font-medium">/{p.rent_frequency === "weekly" ? "week" : "month"}</span>}</p>
             <span className="chip bg-black/40 text-white backdrop-blur">{titleCase(p.use_type)}</span>
           </div>
         </div>

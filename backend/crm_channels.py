@@ -76,7 +76,7 @@ def status() -> Dict[str, Any]:
 
 
 def _whatsapp_text(to: str, body: str) -> Dict[str, Any]:
-    version = _env("PORTAL_WHATSAPP_API_VERSION", "v21.0")
+    version = _env("PORTAL_WHATSAPP_API_VERSION", "v23.0")
     template = _env("PORTAL_WHATSAPP_CRM_TEMPLATE")
     if template:
         payload: Dict[str, Any] = {
@@ -108,7 +108,7 @@ def send(channel: str, to: str, body: str, subject: Optional[str] = None) -> Dic
     if channel == "email":
         if not to or "@" not in to:
             return {"status": "failed", "provider": None, "error": "No valid e-mail address", "to": to}
-        st, provider, err = delivery.send_email(to, subject or "Arz-e-Pak", body)
+        st, provider, err = delivery.send_email(to, subject or "Watan-e-Pak", body)
         return {"status": st, "provider": provider, "error": err, "to": to}
     phone = normalise_phone(to)
     if not phone or len(phone) < 11:

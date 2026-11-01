@@ -1,4 +1,4 @@
-# Arz-e-Pak Portal — Administration Guide
+# Watan-e-Pak Portal — Administration Guide
 
 This guide is for **portal administrators, DevOps and IT**. It covers deployment,
 configuration, access control, security, data and storage, monitoring, and the day-to-day
@@ -72,8 +72,8 @@ the ones you set first:
 # Example: production-style session
 $env:PORTAL_ENV = "production"
 $env:PORTAL_MCP_TOKEN = "<long random value>"
-$env:PORTAL_CORS_ORIGINS = "https://arzepak.pk"
-$env:PORTAL_ALLOWED_HOSTS = "arzepak.pk,api.arzepak.pk"
+$env:PORTAL_CORS_ORIGINS = "https://watanepak.pk"
+$env:PORTAL_ALLOWED_HOSTS = "watanepak.pk,api.watanepak.pk"
 uv run python main.py
 ```
 
@@ -142,6 +142,7 @@ What each one opens:
 | Permission | Opens | Roles that have it (besides super_admin) |
 | --- | --- | --- |
 | `basedata.manage` | Administration › Base data; writes to `/cities`, `/schemes`, `/blocks` | admin |
+| `projects.manage` | Landmark records in Administration › Base data | admin, developer |
 | `properties.manage` | Administration › Property database; writes to `/properties` | admin, developer |
 | `gis.manage` | Administration › GIS layers; every GIS write; unpublished layers | admin, valuer |
 | `listings.manage` | images, leasing and maintenance writes | admin, moderator, developer, agency_manager, agent, seller, landlord |
@@ -196,10 +197,11 @@ with its permission:
 | Property database | `/app/admin/properties` | `properties.manage` |
 | GIS layers | `/app/admin/gis-layers` | `gis.manage` |
 
-**Base data** — cities, housing societies / societies and blocks / zones
-(`/admin/basedata/{cities|schemes|blocks}`): add, edit and delete with validation (unique
-names, known approval statuses, sources). A city or scheme that is still in use can't be
-deleted (`409`). See `backend/README.md` › *Base data* for where the seed data comes from.
+**Base data** — cities, housing societies / societies, blocks / zones and landmarks
+(`/admin/basedata/{cities|schemes|blocks|landmarks}`): add, edit and delete with validation
+(unique names, known approval statuses, sources). Landmark records use `projects.manage`;
+landmarks linked to listings can't be deleted (`409`). A city or scheme that is still in use
+can't be deleted (`409`). See `backend/README.md` › *Base data* for seed data details.
 
 **Property database** — every listing with every field (`/admin/properties*`):
 
@@ -262,7 +264,7 @@ API equivalents: `POST /gis/layers/upload` (`dry_run`, `replace_layer_id`) and
 | `expose_otp` | true in development, false in production | Return codes as `dev_otp`. If `PORTAL_AUTH_EXPOSE_OTP` is unset, this applies only to channels with **no** delivery provider (§4.4). |
 | `login_max_failures` | 5 | Failed password sign-ins for one account (`PORTAL_LOGIN_MAX_FAILURES`) … |
 | `login_lock_minutes` | 15 | … within this many minutes lock password sign-in for that account for the window (`PORTAL_LOGIN_LOCK_MINUTES`). |
-| `channels` | `sms`, `email` | Delivery channels for OTP. |
+| `channels` | `sms`, `email` | OTP channels. Phone codes go by SMS through `PORTAL_SMS_PROVIDER` (§4.4); WhatsApp is never used for sign-in codes. |
 
 `GET /auth/config` also returns `environment` and, in development only, `demo_accounts`
 (the one-click sign-ins the login pages offer).
@@ -293,7 +295,7 @@ API equivalents: `POST /gis/layers/upload` (`dry_run`, `replace_layer_id`) and
 * **Errors** — an unhandled error returns `500` with an `error_id`; search the server log
   for that id to find the traceback.
 
-### 4.4 Delivering OTPs (SMS / WhatsApp / e-mail)
+### 4.4 Delivering OTPs (SMS / e-mail)
 
 Out of the box **no code is sent anywhere**. Each message goes only to the outbox
 (`GET /auth/notifications`, status `simulated`), and in development the API returns the
@@ -304,8 +306,8 @@ code as `dev_otp` and the apps show a *Test mode* hint. To deliver real codes, c
 | Channel | Provider | Settings |
 | --- | --- | --- |
 | E-mail | Any SMTP server (Gmail app password, Outlook, Zoho, SendGrid/Mailgun/Brevo SMTP, cPanel) | `PORTAL_SMTP_HOST`, `PORTAL_SMTP_PORT`, `PORTAL_SMTP_USER`, `PORTAL_SMTP_PASSWORD`, `PORTAL_SMTP_FROM`, `PORTAL_SMTP_SECURITY` |
+| Mobile | `PORTAL_SMS_PROVIDER=smsgate` (your own Android phone + SIM running [SMS Gateway for Android](https://sms-gate.app)) | `SMSGATE_URL`, `SMSGATE_USERNAME`, `SMSGATE_PASSWORD`, optional `SMSGATE_SIM_NUMBER` (1/2) |
 | Mobile | `PORTAL_SMS_PROVIDER=twilio` | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` or `TWILIO_MESSAGING_SERVICE_SID` |
-| Mobile | `PORTAL_SMS_PROVIDER=whatsapp` (WhatsApp Business Cloud API) | `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `PORTAL_WHATSAPP_OTP_TEMPLATE` (an approved *authentication* template), `PORTAL_WHATSAPP_OTP_LANG`, `PORTAL_WHATSAPP_OTP_BUTTON` |
 | Mobile | `PORTAL_SMS_PROVIDER=webhook` (any HTTP SMS gateway) | `PORTAL_SMS_WEBHOOK_URL`, `PORTAL_SMS_WEBHOOK_METHOD`, `PORTAL_SMS_WEBHOOK_HEADERS`, `PORTAL_SMS_WEBHOOK_BODY` (placeholders `{to}`, `{to_digits}`, `{to_local}`, `{message}`, `{code}`) |
 
 What changes once a channel is configured:
@@ -318,6 +320,40 @@ What changes once a channel is configured:
   provider's reason. A sign-up whose codes could not be delivered is rolled back, so the
   person can simply try again.
 * `GET /auth/config` → `delivery` shows which provider each channel uses (no secrets).
+
+**SMS consent.** Every endpoint that sends a code to a phone number (`/auth/signup` with a
+mobile, `/auth/otp/request`, `/auth/resend-otp`, `/auth/password/reset-request`, and
+`/auth/login` for an unverified mobile account) needs `"sms_consent": true`. Without it the
+API answers **422** `code: "sms_consent_required"`; with it, the consent is logged as
+`sms_otp_consent` in `GET /auth/events`. E-mail codes need no consent. The apps show the
+consent checkbox under the mobile field and enable *Send code* only once it is ticked.
+
+**Phone number.** Users enter the full number with country code (`+92 300 1234567`,
+`+971 50 123 4567`); a local `0300 1234567` is still read as Pakistan. In the Android app,
+*Use a number from this phone* opens Google's Phone Number Hint picker with the SIM's
+numbers (no phone permission; the picked number is only a suggestion until the code proves
+it). When the code SMS arrives, Android asks *Allow Watan-e-Pak to read this message?*
+(SMS User Consent API, no SMS permission) and fills in the code if the user allows it. On
+iOS the keyboard offers the code from Messages; on the web the user types it.
+
+#### SMS Gateway for Android (`smsgate`) setup
+
+1. Take a spare Android phone with an active SIM and an SMS bundle; keep it charged and
+   online. Its SIM number is the sender users will see.
+2. Install **SMS Gateway for Android** from <https://sms-gate.app> (Google Play or the APK
+   from its GitHub releases) and grant it SMS permission.
+3. Choose a mode in the app:
+   * **Local server** — the backend reaches the phone on the same network (or a VPN):
+     `SMSGATE_URL=http://<phone-ip>:8080/message`. Give the phone a fixed IP on the router.
+   * **Cloud server** — the backend is on the internet and the phone is not reachable
+     directly: `SMSGATE_URL=https://api.sms-gate.app/3rdparty/v1/message`.
+4. Copy the username and password the app shows into `SMSGATE_USERNAME` / `SMSGATE_PASSWORD`
+   in `backend/.env`, set `PORTAL_SMS_PROVIDER=smsgate`, and restart the backend.
+5. Check `GET /auth/config` → `delivery.sms` is `smsgate`, then sign up with your own number.
+
+Each code costs one SMS from that SIM's package. Keep volumes to OTPs: mobile operators may
+block SIMs that send bulk or marketing traffic. For higher volume or a branded sender ID use
+a Pakistani bulk-SMS company through `webhook` instead.
 
 ### 4.5 AI model and voice for the assistant (OpenAI)
 
@@ -545,7 +581,7 @@ commercial app may need DHA's permission. Check before launch.
 ### 4.8 Advertising (earning from ads)
 
 The apps carry ad slots on Home (rotating banners), Explore (one card after every 6
-listings), each listing page and Profile ("Advertise with Arz-e-Pak"). Each slot first
+listings), each listing page and Profile ("Advertise with Watan-e-Pak"). Each slot first
 shows a **sponsored ad you sold directly**. If no advertiser has booked that slot, it
 falls back to **Google**:
 

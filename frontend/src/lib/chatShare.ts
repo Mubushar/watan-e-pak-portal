@@ -34,7 +34,7 @@ export interface LocationCard {
 }
 
 // ------------------------------------------------------------------ map → chat
-const EVENT = "arzepak:chat-share";
+const EVENT = "watanepak:chat-share";
 let pending: { item: ChatAttachment; ask?: string }[] = [];
 /** Put a map item into the chat input (opening the assistant); `ask` pre-fills the question. */
 export function shareToChat(item: ChatAttachment, ask?: string) {
@@ -53,7 +53,7 @@ export function onShare(fn: () => void): () => void {
 }
 
 // ------------------------------------------------------------------ chat → map (show an attached shape)
-const SHOW_EVENT = "arzepak:map-show-shape";
+const SHOW_EVENT = "watanepak:map-show-shape";
 export interface MapShape {
   id: string;
   name: string;

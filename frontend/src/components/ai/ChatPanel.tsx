@@ -231,7 +231,7 @@ export const SUGGESTIONS = [
 const WELCOME: Msg = {
   role: "assistant",
   content:
-    "Assalam-o-Alaikum! I’m **Arz-e-Pak AI**. Tell me what you’re looking for — city, budget, size or purpose — and I’ll search live listings, societies and market data for you.",
+    "Assalam-o-Alaikum! I’m **Watan-e-Pak AI**. Tell me what you’re looking for — city, budget, size or purpose — and I’ll search live listings, societies and market data for you.",
 };
 
 /** The conversation outlives the panel: it moves between the floating window and the Map page's dock. */
@@ -347,7 +347,7 @@ export function ChatPanel({ compact, className, initial }: { compact?: boolean; 
       post<{ choices: { message: { content: string } }[] }>("/v1/chat/completions", {
         model: "portal-realestate-rag",
         messages: [
-          { role: "system", content: "You are Arz-e-Pak AI, a helpful Pakistani real-estate assistant. Answer concisely; prices in PKR crore/lakh." },
+          { role: "system", content: "You are Watan-e-Pak AI, a helpful Pakistani real-estate assistant. Answer concisely; prices in PKR crore/lakh." },
           ...history.slice(-8).map((m) => ({ role: m.role, content: [m.content, ...(m.attachments ?? []).map((a) => attachmentText(a, false))].filter(Boolean).join("\n\n") })),
         ],
       }),

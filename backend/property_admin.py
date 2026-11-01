@@ -22,18 +22,23 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 STATUSES = ["active", "pending", "sold", "rented", "withdrawn", "draft"]
 CATEGORIES = ["house", "plot", "apartment", "building", "floor", "office", "shop", "space", "warehouse", "shed"]
 USE_TYPES = ["residential", "commercial", "mix"]
+PURPOSES = ["sale", "rent"]
+RENT_FREQUENCIES = ["monthly", "weekly"]
+FURNISHING_STATUSES = ["furnished", "semi_furnished", "unfurnished"]
 
 EDITABLE = [
-    "title", "description", "price", "currency", "use_type", "category", "status", "featured",
+    "title", "description", "price", "currency", "listing_purpose", "security_deposit", "advance_months",
+    "lease_term_months", "rent_frequency", "furnishing_status", "tenant_preference", "use_type", "category", "status", "featured",
     "total_area", "covered_area", "plot_area", "marla_area", "kanal_area",
     "city_id", "scheme_id", "block_zone_area_id",
     "bedrooms", "bathrooms", "balconies", "floors",
     "street_address", "plot_number", "sector", "landmark", "latitude", "longitude",
     "agent_id", "owner_user_id", "available_from", "amenities",
 ]
-NUMBERS = {"price", "total_area", "covered_area", "plot_area", "marla_area", "kanal_area", "latitude", "longitude"}
-INTEGERS = {"bedrooms", "bathrooms", "balconies", "floors"}
-CSV_COLUMNS = ["id", "title", "price", "status", "featured", "use_type", "category", "city", "scheme", "block",
+NUMBERS = {"price", "security_deposit", "total_area", "covered_area", "plot_area", "marla_area", "kanal_area", "latitude", "longitude"}
+INTEGERS = {"bedrooms", "bathrooms", "balconies", "floors", "advance_months", "lease_term_months"}
+CSV_COLUMNS = ["id", "title", "listing_purpose", "price", "security_deposit", "advance_months", "lease_term_months",
+               "rent_frequency", "furnishing_status", "tenant_preference", "status", "featured", "use_type", "category", "city", "scheme", "block",
                "marla_area", "kanal_area", "total_area", "covered_area", "bedrooms", "bathrooms", "floors",
                "street_address", "plot_number", "sector", "landmark", "latitude", "longitude", "agent", "amenities",
                "description", "created_at", "updated_at"]
@@ -77,14 +82,14 @@ def row(p: Any) -> Dict[str, Any]:
 def query(q: str = "", city_id: str = "", scheme_id: str = "", status: str = "", category: str = "", use_type: str = "",
           featured: Optional[bool] = None, agent_id: str = "", located: Optional[bool] = None,
           min_price: Optional[float] = None, max_price: Optional[float] = None,
-          sort: str = "updated", order: str = "desc", page: int = 1, page_size: int = 25) -> Dict[str, Any]:
+          sort: str = "updated", order: str = "desc", page: int = 1, page_size: int = 25, purpose: str = "") -> Dict[str, Any]:
     core = _core()
     needle = (q or "").strip().lower()
     rows = []
     for p in core.properties_db:
         if city_id and p.city_id != city_id or scheme_id and p.scheme_id != scheme_id:
             continue
-        if status and p.status != status or category and p.category != category or use_type and p.use_type != use_type:
+        if status and p.status != status or category and p.category != category or use_type and p.use_type != use_type or purpose and getattr(p, "listing_purpose", "sale") != purpose:
             continue
         if featured is not None and bool(p.featured) != featured or agent_id and p.agent_id != agent_id:
             continue
@@ -170,6 +175,13 @@ def _clean(data: Dict[str, Any], current: Optional[Any] = None) -> Dict[str, Any
         raise Invalid("The price must be more than zero")
     if merged["price"] > 1e12:
         raise Invalid("That price is not realistic")
+    if merged.get("security_deposit") is not None and merged["security_deposit"] < 0:
+        raise Invalid("Security deposit can't be negative")
+    for key in ("advance_months", "lease_term_months"):
+        if merged.get(key) is not None and not 0 <= merged[key] <= 120:
+            raise Invalid(f"{key.replace('_', ' ')} must be between 0 and 120")
+    if merged.get("tenant_preference") and len(merged["tenant_preference"]) > 500:
+        raise Invalid("Tenant preference must be 500 characters or fewer")
     if not core.find_city(merged.get("city_id")):
         raise Invalid("Choose a valid city")
     if merged.get("scheme_id"):
@@ -184,7 +196,9 @@ def _clean(data: Dict[str, Any], current: Optional[Any] = None) -> Dict[str, Any
             raise Invalid("That block / zone doesn't exist")
         if b.scheme_id != merged.get("scheme_id"):
             raise Invalid("The block must belong to the chosen scheme")
-    for k, allowed in (("status", STATUSES), ("category", CATEGORIES), ("use_type", USE_TYPES)):
+    for k, allowed in (("status", STATUSES), ("category", CATEGORIES), ("use_type", USE_TYPES),
+                       ("listing_purpose", PURPOSES), ("rent_frequency", RENT_FREQUENCIES),
+                       ("furnishing_status", FURNISHING_STATUSES)):
         if merged.get(k) and merged[k] not in allowed:
             raise Invalid(f"{k.replace('_', ' ')} must be one of: {', '.join(allowed)}")
     lat, lon = merged.get("latitude"), merged.get("longitude")

@@ -17,19 +17,21 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+import storage
+
 DATA = Path(__file__).with_name("media") / "water" / "pk_water.json"
 AREA_CLASSES = ("lake", "reservoir", "riverbed", "pond")
 MAX_FEATURES = 6000
 
 
 def available() -> bool:
-    return DATA.exists()
+    return DATA.exists() or storage.has_asset("seed/media/water/pk_water.json")
 
 
 @lru_cache(maxsize=1)
 def _load() -> Dict[str, Any]:
-    with DATA.open(encoding="utf-8") as f:
-        return json.load(f)
+    raw = storage.read_seed_asset("media/water/pk_water.json", str(DATA))
+    return json.loads(raw.decode("utf-8")) if raw else {"meta": {}, "features": []}
 
 
 def meta() -> Dict[str, Any]:

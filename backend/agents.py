@@ -17,6 +17,10 @@ a tool *dispatcher*, so the exact same engine powers MCP tools and REST.
 """
 
 import re
+import hashlib
+import json
+import threading
+import time
 import uuid
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
@@ -358,15 +362,21 @@ class AgentStep(BaseModel):
     status: str = "pending"  # pending | running | done | skipped | failed | awaiting_approval
     requires_approval: bool = False
     approved_by: Optional[str] = None
+    approval_digest: Optional[str] = None
     output: Optional[str] = None
+    duration_ms: Optional[float] = None
+    error_type: Optional[str] = None
 
 
 class AgentRun(BaseModel):
     id: str = Field(default_factory=lambda: "run_" + uuid.uuid4().hex[:10])
+    trace_id: str = Field(default_factory=lambda: "atrace_" + uuid.uuid4().hex[:12])
+    idempotency_key: Optional[str] = None
     agent_key: str
     objective: str = ""
     subject_type: Optional[str] = None
     subject_id: Optional[str] = None
+    owner_user_id: Optional[str] = None
     context: Dict[str, Any] = Field(default_factory=dict)
     status: str = "queued"  # queued | running | awaiting_approval | approved | completed | failed
     steps: List[AgentStep] = Field(default_factory=list)
@@ -379,6 +389,7 @@ class AgentRun(BaseModel):
 
 
 runs_db: List[AgentRun] = []
+_runs_lock = threading.RLock()
 
 
 # ============================================================
@@ -452,7 +463,13 @@ def agentic_overview() -> Dict[str, Any]:
 
 def _workflow(agent: Dict[str, Any]) -> List[Dict[str, Any]]:
     if agent.get("workflow"):
-        return agent["workflow"]
+        # Apply the write policy to explicit workflows too. A hand-authored workflow
+        # cannot accidentally mark a portal mutation as an ungated step.
+        return [
+            {**step, "requires_approval": bool(step.get("requires_approval") or
+                                                (step.get("tool") and WRITE_TOOL.search(step["tool"]))) }
+            for step in agent["workflow"]
+        ]
     # Look first, act after the human gate: tools that only read or analyse run before the
     # review; tools that create, send or change something run only once it is approved.
     tools = list(agent.get("tools", []))
@@ -465,10 +482,10 @@ def _workflow(agent: Dict[str, Any]) -> List[Dict[str, Any]]:
         steps.append({"name": tool, "tool": tool,
                       "capability": tool.replace("_", " "), "requires_approval": False})
     steps.append({"name": "review", "tool": None, "capability": "human review",
-                  "requires_approval": bool(agent.get("requires_approval"))})
+                  "requires_approval": bool(agent.get("requires_approval") and not writes)})
     for tool in writes:
         steps.append({"name": tool, "tool": tool,
-                      "capability": tool.replace("_", " "), "requires_approval": False})
+                      "capability": tool.replace("_", " "), "requires_approval": True})
     steps.append({"name": "deliver", "tool": None, "capability": "deliver the result",
                   "requires_approval": False})
     return steps
@@ -476,7 +493,8 @@ def _workflow(agent: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 # Tool names that change the portal or reach people outside it.
 WRITE_TOOL = re.compile(r"(^|_)(create|send|update|delete|publish|assign|book|schedule|sign|post|dispatch|record|"
-                        r"convert|transfer|pay|notify|message|email|whatsapp|add|log|apply|renew)(_|s?$)")
+                        r"convert|transfer|pay|notify|message|email|whatsapp|add|log|apply|renew|close|complete|"
+                        r"respond|approve|route|qualify|screen|inquiry|generate|bill_account)(_|s?$)")
 
 
 def plan_run(agent_key: str, objective: str = "", subject_type: Optional[str] = None,
@@ -501,7 +519,6 @@ def plan_run(agent_key: str, objective: str = "", subject_type: Optional[str] = 
 
 
 def _summarise(value: Any, chars: int = AGENTIC_CONFIG["summary_chars"]) -> str:
-    import json
     try:
         text = json.dumps(value, ensure_ascii=False, default=str)
     except Exception:  # noqa: BLE001 - best-effort summary
@@ -509,11 +526,24 @@ def _summarise(value: Any, chars: int = AGENTIC_CONFIG["summary_chars"]) -> str:
     return text[:chars]
 
 
+def _approval_digest(run: AgentRun, step: AgentStep) -> str:
+    """Fingerprint the exact step and context a reviewer is asked to approve."""
+    payload = {"run_id": run.id, "agent_key": run.agent_key, "objective": run.objective,
+               "subject_type": run.subject_type, "subject_id": run.subject_id,
+               "context": run.context,
+               "step": step.model_dump(exclude={"status", "output", "approved_by",
+                                                "approval_digest", "duration_ms", "error_type"})}
+    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str, separators=(",", ":"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
 def run_agent(agent_key: str, objective: str = "",
               dispatch: Optional[Callable[[str, Dict[str, Any]], Any]] = None,
               context: Optional[Dict[str, Any]] = None, args: Optional[Dict[str, Any]] = None,
               subject_type: Optional[str] = None, subject_id: Optional[str] = None,
-              approve: bool = False, persist: bool = True) -> Dict[str, Any]:
+              approve: bool = False, persist: bool = True,
+              owner_user_id: Optional[str] = None,
+              idempotency_key: Optional[str] = None) -> Dict[str, Any]:
     """Plan and execute an agent run.
 
     Steps marked ``requires_approval`` (sending messages, publishing, changing deals) pause the
@@ -534,12 +564,26 @@ def run_agent(agent_key: str, objective: str = "",
                   args=dict(base_args))
         for i, s in enumerate(_workflow(agent))
     ]
-    run = AgentRun(agent_key=agent["key"], objective=objective, subject_type=subject_type,
-                   subject_id=subject_id, context=dict(context or {}), steps=steps,
-                   status="running")
+    with _runs_lock:
+        if persist and idempotency_key:
+            existing = next((r for r in runs_db if r.owner_user_id == owner_user_id and
+                             r.idempotency_key == idempotency_key), None)
+            if existing:
+                same_request = (existing.agent_key == agent["key"] and existing.objective == objective and
+                                existing.subject_type == subject_type and existing.subject_id == subject_id and
+                                existing.context == dict(context or {}))
+                return run_view(existing) if same_request else {
+                    "error": "This idempotency key was already used for a different run",
+                    "run_id": existing.id,
+                }
+        run = AgentRun(agent_key=agent["key"], objective=objective, subject_type=subject_type,
+                       owner_user_id=owner_user_id, idempotency_key=idempotency_key,
+                       subject_id=subject_id, context=dict(context or {}), steps=steps,
+                       status="running")
+        # Reserve before dispatch so a retried HTTP request cannot repeat side effects.
+        if persist:
+            runs_db.append(run)
     _execute(run, dispatch, approve)
-    if persist:
-        runs_db.append(run)
     return run_view(run)
 
 
@@ -562,6 +606,7 @@ def _execute(run: AgentRun, dispatch: Optional[Callable[[str, Dict[str, Any]], A
             continue
         if step.requires_approval and step.status != "approved" and not approve:
             step.status = "awaiting_approval"
+            step.approval_digest = _approval_digest(run, step)
             run.status = "awaiting_approval"
             run.updated_at = datetime.now()
             return
@@ -570,6 +615,7 @@ def _execute(run: AgentRun, dispatch: Optional[Callable[[str, Dict[str, Any]], A
             run.approvals.append({"step": step.name, "approved_by": "auto",
                                   "at": datetime.now().isoformat(timespec="seconds")})
         step.status = "running"
+        started = time.perf_counter()
         if step.tool and dispatch is not None:
             ctx = dict(run.context)
             ctx.update(step.args or {})
@@ -577,32 +623,54 @@ def _execute(run: AgentRun, dispatch: Optional[Callable[[str, Dict[str, Any]], A
             ctx.setdefault("agent_key", run.agent_key)
             try:
                 result = dispatch(step.tool, ctx)
+                if isinstance(result, dict) and result.get("error"):
+                    raise ValueError(str(result["error"]))
                 step.output = _summarise(result)
                 step.status = "done"
             except Exception as exc:  # noqa: BLE001 - surface, never crash the run
-                step.output = f"error: {exc}"
+                step.output = f"{type(exc).__name__}: {exc}"
+                step.error_type = type(exc).__name__
                 step.status = "failed"
+                step.duration_ms = round((time.perf_counter() - started) * 1000, 2)
+                # Later actions may depend on this output. Stop rather than running
+                # subsequent writes with incomplete context.
+                run.status = "failed"
+                run.completed_at = datetime.now()
+                run.updated_at = run.completed_at
+                run.metrics = {"steps": len(run.steps),
+                               "executed": sum(1 for s in run.steps if s.status == "done"),
+                               "failed": 1, "approvals": len(run.approvals),
+                               "duration_ms": round(sum(s.duration_ms or 0 for s in run.steps), 2)}
+                return
         else:
             step.status = "skipped"
             if not step.tool:
                 step.output = step.capability
+        step.duration_ms = round((time.perf_counter() - started) * 1000, 2)
     run.status = "completed"
     run.completed_at = datetime.now()
     run.updated_at = run.completed_at
     done = [s for s in run.steps if s.status == "done"]
     run.metrics = {"steps": len(run.steps), "executed": len(done),
                    "failed": sum(1 for s in run.steps if s.status == "failed"),
-                   "approvals": len(run.approvals)}
+                   "approvals": len(run.approvals),
+                   "duration_ms": round(sum(s.duration_ms or 0 for s in run.steps), 2)}
 
 
 def approve_run(run_id: str, approver: str = "user",
-                dispatch: Optional[Callable[[str, Dict[str, Any]], Any]] = None) -> Dict[str, Any]:
+                dispatch: Optional[Callable[[str, Dict[str, Any]], Any]] = None,
+                owner_user_id: Optional[str] = None) -> Dict[str, Any]:
     run = next((r for r in runs_db if r.id == run_id), None)
     if not run:
         return {"error": f"Unknown run: {run_id}"}
+    if owner_user_id is not None and run.owner_user_id != owner_user_id:
+        return {"error": "This run belongs to another user"}
     pending = [s for s in run.steps if s.status == "awaiting_approval"]
     if not pending:
         return {"error": "This run is not waiting for an approval", "status": run.status}
+    if any(not step.approval_digest or step.approval_digest != _approval_digest(run, step)
+           for step in pending):
+        return {"error": "The run changed after review; start a new run before approving it"}
     for step in pending:
         step.status = "approved"
         step.approved_by = approver
@@ -627,17 +695,26 @@ def approve_run(run_id: str, approver: str = "user",
     return run_view(run)
 
 
-def list_runs(agent_key: Optional[str] = None, status: Optional[str] = None) -> List[AgentRun]:
+def list_runs(agent_key: Optional[str] = None, status: Optional[str] = None,
+              owner_user_id: Optional[str] = None, include_unowned: bool = False) -> List[AgentRun]:
     rows = runs_db
     if agent_key:
         rows = [r for r in rows if r.agent_key == agent_key]
     if status:
         rows = [r for r in rows if r.status == status]
+    if owner_user_id is not None:
+        rows = [r for r in rows if r.owner_user_id == owner_user_id or
+                (include_unowned and r.owner_user_id is None)]
     return rows
 
 
-def get_run(run_id: str) -> Optional[AgentRun]:
-    return next((r for r in runs_db if r.id == run_id), None)
+def get_run(run_id: str, owner_user_id: Optional[str] = None,
+            include_unowned: bool = False) -> Optional[AgentRun]:
+    run = next((r for r in runs_db if r.id == run_id), None)
+    if run and owner_user_id is not None and run.owner_user_id != owner_user_id and not (
+            include_unowned and run.owner_user_id is None):
+        return None
+    return run
 
 
 def run_view(run: AgentRun) -> Dict[str, Any]:

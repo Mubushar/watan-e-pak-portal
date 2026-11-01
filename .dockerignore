@@ -1,0 +1,21 @@
+node_modules
+**/node_modules
+**/dist
+**/build
+**/release
+**/.venv
+**/__pycache__
+**/.pytest_cache
+.git
+.git/**
+.env
+**/.env
+**/.env.*
+!**/.env.example
+backend/data
+backend/media/uploads
+portable/android
+portable/ios
+
+# Large generated GIS raster tiles are mounted as a read-only runtime asset set.
+backend/media/masterplans

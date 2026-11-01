@@ -38,14 +38,14 @@ export function CrmChannelsTab() {
   const q = useApi<ChannelStatus>("/crm/channels");
   const [channel, setChannel] = useState<Channel>("whatsapp");
   const [to, setTo] = useState("");
-  const [body, setBody] = useState("Test message from Arz-e-Pak CRM");
+  const [body, setBody] = useState("Test message from Watan-e-Pak CRM");
   const [sending, setSending] = useState(false);
   const base = API_BASE.startsWith("http") ? API_BASE : `${window.location.origin}${API_BASE}`;
 
   const test = async () => {
     setSending(true);
     try {
-      const r = await post<SendResult>("/crm/messages/send", { channel, to, body, subject: channel === "email" ? "Arz-e-Pak CRM test" : undefined, entity_id: null });
+      const r = await post<SendResult>("/crm/messages/send", { channel, to, body, subject: channel === "email" ? "Watan-e-Pak CRM test" : undefined, entity_id: null });
       if (r.status === "sent") toast.success(`Delivered to ${r.to} via ${r.provider}`);
       else toast.message("Simulated — this channel is not configured yet");
     } catch (e) {

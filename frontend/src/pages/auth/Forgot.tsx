@@ -9,6 +9,7 @@ import { announceCode, AuthShell, DevOtpHint, OtpInput, type OtpHint } from "./A
 export default function Forgot() {
   const nav = useNavigate();
   const [identifier, setIdentifier] = useState("");
+  const [smsConsent, setSmsConsent] = useState(false);
   const [sent, setSent] = useState<{ dev?: string | null } | null>(null);
   const [code, setCode] = useState("");
   const [pw, setPw] = useState("");
@@ -17,7 +18,7 @@ export default function Forgot() {
   const request = async () => {
     setBusy(true);
     try {
-      const r = await post<OtpHint & { note?: string }>("/auth/password/reset-request", { identifier });
+      const r = await post<OtpHint & { note?: string }>("/auth/password/reset-request", { identifier, sms_consent: identifier.includes("@") ? false : smsConsent });
       setSent({ dev: r.dev_otp });
       if (r.note) toast.success(r.note);
       else announceCode(r);
@@ -51,8 +52,9 @@ export default function Forgot() {
         }}
       >
         <Field label="E-mail or mobile">
-          <Input icon={<Mail className="h-4 w-4" />} value={identifier} onChange={(e) => setIdentifier(e.target.value)} disabled={!!sent} required />
+          <Input icon={<Mail className="h-4 w-4" />} value={identifier} onChange={(e) => { setIdentifier(e.target.value); setSmsConsent(false); }} disabled={!!sent} required />
         </Field>
+        {!sent && identifier && !identifier.includes("@") && <label className="flex items-start gap-2 text-xs leading-5 text-ink-mute"><input type="checkbox" className="mt-1" checked={smsConsent} onChange={(e) => setSmsConsent(e.target.checked)} />I agree to receive an SMS password reset code at this number. Message and data rates may apply.</label>}
         {sent && (
           <>
             <div>
@@ -65,7 +67,7 @@ export default function Forgot() {
             </Field>
           </>
         )}
-        <Button type="submit" size="lg" className="w-full" loading={busy} disabled={!identifier || (!!sent && (code.length < 6 || pw.length < 8))}>
+        <Button type="submit" size="lg" className="w-full" loading={busy} disabled={!identifier || (!sent && !identifier.includes("@") && !smsConsent) || (!!sent && (code.length < 6 || pw.length < 8))}>
           {sent ? "Update password" : "Send reset code"}
         </Button>
       </form>

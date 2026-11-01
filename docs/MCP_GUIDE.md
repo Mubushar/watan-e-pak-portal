@@ -1,4 +1,4 @@
-# Arz-e-Pak Portal — MCP Guide
+# Watan-e-Pak Portal — MCP Guide
 
 This guide is for **integration engineers and AI builders** who want to drive the portal
 from an MCP client (Claude Desktop, Cursor, the MCP Inspector, a custom agent, …). It
@@ -41,9 +41,9 @@ A desktop client config for stdio looks like this (adjust the path):
 ```json
 {
   "mcpServers": {
-    "arzepak-portal": {
+    "watanepak-portal": {
       "command": "uv",
-      "args": ["run", "--directory", "C:\\path\\to\\arzepak\\backend", "python", "server.py"]
+      "args": ["run", "--directory", "C:\\path\\to\\WatanePak\\backend", "python", "server.py"]
     }
   }
 }
@@ -57,7 +57,7 @@ When you run the combined server (`uv run python main.py`), MCP is mounted at
 ```json
 {
   "mcpServers": {
-    "arzepak-portal-http": {
+    "watanepak-portal-http": {
       "type": "http",
       "url": "http://127.0.0.1:8000/mcp",
       "headers": { "Authorization": "Bearer <PORTAL_MCP_TOKEN>" }

@@ -16,6 +16,7 @@ import {
   Footprints,
   Map as MapIcon,
   Layers,
+  KeyRound,
   LineChart,
   Mail,
   MapPin,
@@ -40,7 +41,7 @@ import { gallery, libraryPhoto, resolveImage } from "@/lib/images";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/store/auth";
 import { usePrefs } from "@/store/prefs";
-import { Avatar, Badge, Button, Card, CardBody, CardHeader, Carousel, CopyButton, EmptyState, ErrorState, Field, Input, KeyValue, Modal, ScoreRing, Skeleton, Slider, Tabs, Textarea } from "@/components/ui";
+import { Avatar, Badge, Button, Card, CardBody, CardHeader, Carousel, CopyButton, EmptyState, ErrorState, Field, Input, KeyValue, Modal, ScoreRing, Select, Skeleton, Slider, Tabs, Textarea, Toggle } from "@/components/ui";
 import { AreaTrend, Bars } from "@/components/ui/charts";
 import { CompareButton, FavoriteButton, PropertyCard } from "@/components/property/PropertyCard";
 import { PortalMap, pin } from "@/components/map/PortalMap";
@@ -555,6 +556,8 @@ function ContactCard({ p }: { p: Property }) {
   }, [agents.data, p]);
   const [mode, setMode] = useState<"enquiry" | "viewing" | null>(null);
   const [form, setForm] = useState({ name: user?.name ?? "", email: user?.email ?? "", phone: user?.mobile ?? "", message: `I'm interested in “${p.title}”. Please share more details.`, when: "" });
+  const [applicationOpen, setApplicationOpen] = useState(false);
+  const [application, setApplication] = useState({ applicant: user?.name ?? "", email: user?.email ?? "", phone: user?.mobile ?? "", monthly_income: "", employment: "salaried", references_count: "2", occupants: "1", pets: false, move_in_days: "15" });
 
   const enquiry = useMutate(
     async () => {
@@ -581,14 +584,23 @@ function ContactCard({ p }: { p: Property }) {
   const discuss = useMutate(() => post<{ id?: string; conversation?: { id: string } }>("/messaging/property-thread", { property_id: p.id, created_by: user?.id, title: p.title }), {
     onSuccess: (r) => nav(`/app/messages?c=${r.conversation?.id ?? r.id ?? ""}`),
   });
+  const rentalApplication = useMutate(() => post<{ submitted: boolean; application_id?: string }>(`/properties/${p.id}/rental-applications`, {
+    ...application,
+    monthly_income: Number(application.monthly_income),
+    references_count: Number(application.references_count),
+    occupants: Number(application.occupants),
+    move_in_days: Number(application.move_in_days),
+    credit_proxy: 70,
+  }), { success: "Rental application sent", onSuccess: () => setApplicationOpen(false) });
 
   return (
     <Card className="overflow-hidden">
       <div className="bg-brand-gradient p-5 text-white">
-        <p className="text-xs uppercase tracking-widest text-white/70">Asking price</p>
+        <p className="text-xs uppercase tracking-widest text-white/70">{p.listing_purpose === "rent" ? `Rent per ${p.rent_frequency === "weekly" ? "week" : "month"}` : "Asking price"}</p>
         <p className="font-display text-3xl font-bold">{pkrShort(p.price)}</p>
-        <p className="text-sm text-white/70">{pkr(p.price)}</p>
-        {!!p.price_per_sqft && <p className="mt-1 text-xs text-gold-200">{pkr(p.price_per_sqft)} per sqft</p>}
+        <p className="text-sm text-white/70">{pkr(p.price)}{p.listing_purpose === "rent" ? ` / ${p.rent_frequency === "weekly" ? "week" : "month"}` : ""}</p>
+        {p.listing_purpose === "rent" && <p className="mt-1 text-xs text-white/80">Deposit {p.security_deposit ? pkrShort(p.security_deposit) : "to be confirmed"}{p.advance_months ? ` · ${p.advance_months} months advance` : ""}{p.lease_term_months ? ` · ${p.lease_term_months}-month lease` : ""}</p>}
+        {p.listing_purpose !== "rent" && !!p.price_per_sqft && <p className="mt-1 text-xs text-gold-200">{pkr(p.price_per_sqft)} per sqft</p>}
       </div>
       <CardBody className="space-y-4">
         {agents.isLoading ? (
@@ -619,6 +631,7 @@ function ContactCard({ p }: { p: Property }) {
         <Button className="w-full" icon={<MessageSquare className="h-4 w-4" />} onClick={() => setMode("enquiry")}>
           Send enquiry
         </Button>
+        {p.listing_purpose === "rent" && <Button variant="gold" className="w-full" icon={<KeyRound className="h-4 w-4" />} onClick={() => setApplicationOpen(true)}>Apply to rent</Button>}
         <Button variant="gold" className="w-full" icon={<CalendarCheck className="h-4 w-4" />} onClick={() => setMode("viewing")}>
           Book a viewing
         </Button>
@@ -664,6 +677,26 @@ function ContactCard({ p }: { p: Property }) {
           </Field>
         </div>
         <p className="mt-3 text-xs text-ink-mute">Your enquiry is created as a CRM lead and routed to the listing agent.</p>
+      </Modal>
+      <Modal
+        open={applicationOpen}
+        onClose={() => setApplicationOpen(false)}
+        title="Apply to rent"
+        subtitle={`${p.title} · rent ${pkrShort(p.price)} per ${p.rent_frequency === "weekly" ? "week" : "month"}`}
+        footer={<><Button variant="ghost" onClick={() => setApplicationOpen(false)}>Cancel</Button><Button variant="gold" loading={rentalApplication.isPending} disabled={!application.applicant.trim() || (!application.email.trim() && !application.phone.trim()) || Number(application.monthly_income) <= 0} onClick={() => rentalApplication.mutate()}>Submit application</Button></>}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Full name"><Input value={application.applicant} onChange={(e) => setApplication({ ...application, applicant: e.target.value })} /></Field>
+          <Field label="Monthly household income (PKR)"><Input type="number" min={1} value={application.monthly_income} onChange={(e) => setApplication({ ...application, monthly_income: e.target.value })} /></Field>
+          <Field label="Email"><Input type="email" value={application.email} onChange={(e) => setApplication({ ...application, email: e.target.value })} /></Field>
+          <Field label="Mobile"><Input value={application.phone} onChange={(e) => setApplication({ ...application, phone: e.target.value })} /></Field>
+          <Field label="Employment"><Select value={application.employment} onChange={(e) => setApplication({ ...application, employment: e.target.value })}>{["salaried", "self_employed", "business", "retired", "student"].map((v) => <option key={v} value={v}>{titleCase(v)}</option>)}</Select></Field>
+          <Field label="References"><Input type="number" min={0} max={5} value={application.references_count} onChange={(e) => setApplication({ ...application, references_count: e.target.value })} /></Field>
+          <Field label="Household occupants"><Input type="number" min={1} value={application.occupants} onChange={(e) => setApplication({ ...application, occupants: e.target.value })} /></Field>
+          <Field label="Move-in within (days)"><Input type="number" min={0} value={application.move_in_days} onChange={(e) => setApplication({ ...application, move_in_days: e.target.value })} /></Field>
+          <div className="sm:col-span-2"><Toggle checked={application.pets} onChange={(pets) => setApplication({ ...application, pets })} label={<span className="text-sm">I have pets</span>} /></div>
+        </div>
+        <p className="mt-3 text-xs text-ink-mute">Your application and contact details are shared with the rental management team for follow-up.</p>
       </Modal>
     </Card>
   );
@@ -738,7 +771,7 @@ export default function PropertyDetail() {
   const p = q.data;
   const uploads = [...(stored.data?.images ?? [])].sort((a, b) => Number(!!b.is_primary) - Number(!!a.is_primary)).map((x) => resolveImage(x.url));
   const imgs = uploads.length ? [...uploads, ...gallery(p).filter((g) => !uploads.includes(g))].slice(0, 10) : gallery(p);
-  const similar = (all.data?.results ?? []).filter((x) => x.id !== p.id && (x.category === p.category || x.city_name === p.city_name)).slice(0, 8);
+  const similar = (all.data?.results ?? []).filter((x) => x.id !== p.id && (x.listing_purpose ?? "sale") === (p.listing_purpose ?? "sale") && (x.category === p.category || x.city_name === p.city_name)).slice(0, 8);
   const loc = [p.block_name, p.scheme_name, p.city_name].filter(Boolean).join(", ");
 
   const facts = [
@@ -757,8 +790,8 @@ export default function PropertyDetail() {
           Home
         </Link>
         <ChevronRight className="h-3 w-3 rtl:rotate-180" />
-        <Link to="/properties" className="hover:text-brand-700">
-          Properties
+        <Link to={p.listing_purpose === "rent" ? "/rentals" : "/properties"} className="hover:text-brand-700">
+          {p.listing_purpose === "rent" ? "Rentals" : "Properties"}
         </Link>
         {p.city_name && (
           <>
@@ -776,7 +809,8 @@ export default function PropertyDetail() {
         <div>
           <div className="flex flex-wrap gap-2">
             {p.featured && <Badge tone="gold" icon={<Sparkles className="h-3 w-3" />}>Featured</Badge>}
-            <Badge tone="green">{titleCase(p.use_type)}</Badge>
+            <Badge tone="green">{p.listing_purpose === "rent" ? "For rent" : "For sale"}</Badge>
+            <Badge tone="blue">{titleCase(p.use_type)}</Badge>
             <Badge tone="blue">{titleCase(p.status)}</Badge>
             <Badge tone="gray" icon={<ShieldCheck className="h-3 w-3" />}>Verified listing</Badge>
           </div>
@@ -824,10 +858,12 @@ export default function PropertyDetail() {
               tabs={[
                 { value: "overview", label: "Overview", icon: <FileText className="h-4 w-4" /> },
                 { value: "location", label: "Location & nearby", icon: <MapPin className="h-4 w-4" /> },
-                { value: "investment", label: "Investment", icon: <TrendingUp className="h-4 w-4" /> },
-                { value: "pricing", label: "AI pricing", icon: <Sparkles className="h-4 w-4" /> },
-                { value: "kit", label: "Listing kit", icon: <Wand2 className="h-4 w-4" /> },
-                { value: "reports", label: "Reports", icon: <Printer className="h-4 w-4" /> },
+                ...(p.listing_purpose === "rent" ? [] : [
+                  { value: "investment" as const, label: "Investment", icon: <TrendingUp className="h-4 w-4" /> },
+                  { value: "pricing" as const, label: "AI pricing", icon: <Sparkles className="h-4 w-4" /> },
+                  { value: "kit" as const, label: "Listing kit", icon: <Wand2 className="h-4 w-4" /> },
+                  { value: "reports" as const, label: "Reports", icon: <Printer className="h-4 w-4" /> },
+                ]),
               ]}
             />
             <CardBody>
@@ -848,7 +884,14 @@ export default function PropertyDetail() {
                           { label: "Marla", value: p.marla_area ?? "—" },
                           { label: "Kanal", value: p.kanal_area ?? "—" },
                           { label: "Covered area", value: p.covered_area ? `${num(p.covered_area)} sqft` : "—" },
-                          { label: "Price / sqft", value: p.price_per_sqft ? pkr(p.price_per_sqft) : "—" },
+                          ...(p.listing_purpose === "rent" ? [
+                            { label: "Rent frequency", value: titleCase(p.rent_frequency ?? "monthly") },
+                            { label: "Security deposit", value: p.security_deposit ? pkr(p.security_deposit) : "—" },
+                            { label: "Advance", value: p.advance_months ? `${p.advance_months} months` : "—" },
+                            { label: "Lease term", value: p.lease_term_months ? `${p.lease_term_months} months` : "Flexible" },
+                            { label: "Furnishing", value: p.furnishing_status ? titleCase(p.furnishing_status) : "—" },
+                            { label: "Tenant preference", value: p.tenant_preference || "Open to applicants" },
+                          ] : [{ label: "Price / sqft", value: p.price_per_sqft ? pkr(p.price_per_sqft) : "—" }]),
                           { label: "Listed", value: p.created_at ? new Date(p.created_at).toLocaleDateString() : "—" },
                           { label: "Reference", value: <span className="font-mono text-xs">{p.id.slice(0, 8).toUpperCase()}</span> },
                         ]}
@@ -868,10 +911,10 @@ export default function PropertyDetail() {
                     </div>
                   )}
                   {tab === "location" && <LocationTab p={p} />}
-                  {tab === "investment" && <InvestmentTab p={p} />}
-                  {tab === "pricing" && <PricingTab p={p} />}
-                  {tab === "kit" && <ListingKitTab p={p} />}
-                  {tab === "reports" && <ReportsTab p={p} />}
+                  {p.listing_purpose !== "rent" && tab === "investment" && <InvestmentTab p={p} />}
+                  {p.listing_purpose !== "rent" && tab === "pricing" && <PricingTab p={p} />}
+                  {p.listing_purpose !== "rent" && tab === "kit" && <ListingKitTab p={p} />}
+                  {p.listing_purpose !== "rent" && tab === "reports" && <ReportsTab p={p} />}
                 </motion.div>
               </AnimatePresence>
             </CardBody>
@@ -883,9 +926,9 @@ export default function PropertyDetail() {
               <Sparkles className="h-10 w-10 shrink-0 text-gold-300" />
               <div className="flex-1">
                 <p className="font-display text-lg font-semibold">Not sure it’s the one?</p>
-                <p className="text-sm text-white/70">The Homebuying agent can compare this listing with everything else in your budget and flag better-value bargains.</p>
+                <p className="text-sm text-white/70">{p.listing_purpose === "rent" ? "The leasing agent can help compare rentals, understand lease terms and prepare your application." : "The Homebuying agent can compare this listing with everything else in your budget and flag better-value bargains."}</p>
               </div>
-              <Link to={`/ai/agents/conversational_buyer_agent?objective=${encodeURIComponent(`${p.bedrooms ?? ""} bed ${p.category} in ${p.city_name ?? ""} around ${pkrShort(p.price, false)}`)}`} className="btn btn-gold shrink-0">
+              <Link to={`/ai/agents/${p.listing_purpose === "rent" ? "autonomous_leasing_agent" : "conversational_buyer_agent"}?objective=${encodeURIComponent(`${p.bedrooms ?? ""} bed ${p.category} in ${p.city_name ?? ""} around ${pkrShort(p.price, false)}`)}`} className="btn btn-gold shrink-0">
                 Ask the agent
               </Link>
             </div>
@@ -894,7 +937,7 @@ export default function PropertyDetail() {
 
         <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
           <ContactCard p={p} />
-          <MortgageMini price={p.price} />
+          {p.listing_purpose !== "rent" && <MortgageMini price={p.price} />}
           <AdSlot slot="sidebar" placement="detail" />
         </aside>
       </div>
@@ -906,7 +949,7 @@ export default function PropertyDetail() {
               <p className="section-eyebrow">You may also like</p>
               <h2 className="section-title mt-1 !text-2xl sm:!text-3xl">Similar properties</h2>
             </div>
-            <Link to={`/properties?category=${p.category}`} className="btn btn-outline btn-sm">
+            <Link to={`${p.listing_purpose === "rent" ? "/rentals" : "/properties"}?category=${p.category}`} className="btn btn-outline btn-sm">
               More like this
             </Link>
           </div>

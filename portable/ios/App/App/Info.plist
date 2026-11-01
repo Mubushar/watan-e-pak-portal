@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>Arz-e-Pak</string>
+        <string>Watan-e-Pak</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -68,7 +68,7 @@
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-3940256099942544~1458002511</string>
 	<key>NSUserTrackingUsageDescription</key>
-	<string>Arz-e-Pak uses this to show ads that are more relevant to you. The app works the same if you say no.</string>
+	<string>Watan-e-Pak uses this to show ads that are more relevant to you. The app works the same if you say no.</string>
 	<key>SKAdNetworkItems</key>
 	<array>
 		<dict>
@@ -77,11 +77,11 @@
 		</dict>
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Arz-e-Pak uses the microphone for voice notes and live conversations with the AI property assistant.</string>
+	<string>Watan-e-Pak uses the microphone for voice notes and live conversations with the AI property assistant.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Take photos of your property or a project on site to add them to a listing or the map.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Arz-e-Pak uses your location while you survey on site, to pin listings and projects exactly where they are and show what is around you.</string>
+	<string>Watan-e-Pak uses your location while you survey on site, to pin listings and projects exactly where they are and show what is around you.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Choose photos of your property to add them to a listing.</string>
 	<key>NSAppTransportSecurity</key>

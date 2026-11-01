@@ -18,6 +18,7 @@ Data © OpenStreetMap contributors (ODbL); population © Kontur (CC BY 4.0).
 from __future__ import annotations
 
 import gzip
+import io
 import json
 import math
 import os
@@ -30,6 +31,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tupl
 
 import httpx
 
+import storage
 import envfile  # noqa: F401  (loads backend/.env)
 
 DATA_DIR = Path(__file__).resolve().parent / "geodata"
@@ -251,9 +253,10 @@ def _key(lat: float, lon: float) -> Tuple[int, int]:
 
 def _read(name: str) -> Optional[Dict[str, Any]]:
     path = DATA_DIR / name
-    if not path.exists():
+    raw = storage.read_seed_asset(f"geodata/{name}", str(path))
+    if not raw:
         return None
-    with gzip.open(path, "rt", encoding="utf-8") as f:
+    with gzip.open(io.BytesIO(raw), "rt", encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -506,7 +509,7 @@ def geocode_online(text: str) -> Optional[Dict[str, Any]]:
         _last_geocode = time.monotonic()
         try:
             r = httpx.get("https://nominatim.openstreetmap.org/search", timeout=8,
-                          headers={"User-Agent": "Arz-e-Pak/1.0 (real-estate assistant)"},
+                          headers={"User-Agent": "Watan-e-Pak/1.0 (real-estate assistant)"},
                           params={"q": text, "format": "jsonv2", "countrycodes": "pk", "limit": 1, "polygon_geojson": 1,
                                   "polygon_threshold": 0.0003})
             hits = r.json() if r.status_code == 200 else []

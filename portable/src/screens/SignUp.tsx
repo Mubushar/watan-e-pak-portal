@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { SIGNUP_ROLES, useAuth, type Session, type SignupRole } from "@/store/auth";
 import { usePrefs } from "@/store/prefs";
 import { Button, Field, Input, OtpInput, Segmented } from "@/components/ui";
-import { AuthLayout, channelWord, DevOtpHint, IdentifierInput, identifierValue, ResendButton, useCountdown, validIdentifier, type Channel } from "./AuthLayout";
+import { AuthLayout, channelWord, DevOtpHint, IdentifierInput, identifierValue, ResendButton, SmsConsentFields, useCountdown, useSmsCodeAutofill, validIdentifier, type Channel } from "./AuthLayout";
 
 const ROLE_ICONS: Record<SignupRole, typeof Home> = {
   buyer: Home,
@@ -57,7 +57,9 @@ export default function SignUp() {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [taken, setTaken] = useState(false);
+  const [smsConsent, setSmsConsent] = useState(false);
   const [cooldown, setCooldown] = useCountdown();
+  const [codeRequests, setCodeRequests] = useState(0);
   const identifier = identifierValue(channel, raw);
   const target = sent?.sent_to[0] ?? identifier;
   const stepIdx = STEPS.findIndex((s) => s.key === step);
@@ -66,10 +68,11 @@ export default function SignUp() {
     setBusy(true);
     setTaken(false);
     try {
-      const r = await post<SignupResult>("/auth/signup", { name: name.trim(), role, [channel]: identifier });
+      const r = await post<SignupResult>("/auth/signup", { name: name.trim(), role, [channel]: identifier, sms_consent: channel === "mobile" && smsConsent });
       setSent(r.verification);
       setStep("verify");
       setCooldown(30);
+      setCodeRequests((n) => n + 1);
       const to = r.verification.sent_to;
       if (to.some((t) => r.verification.delivery?.[t] === "sent")) toast.success(`Verification code sent by ${to.map(channelWord).join(" & ")} to ${to.join(" & ")}`);
       else toast.info("Test mode: the server didn't send a real message — use the code shown below.");
@@ -88,7 +91,7 @@ export default function SignUp() {
       const r = await post<Session>("/auth/verify-otp", { identifier: target, code: c, purpose: "signup" });
       setSession(r);
       setOnboarded(true);
-      toast.success("Account verified — welcome to Arz-e-Pak!");
+      toast.success("Account verified — welcome to Watan-e-Pak!");
       nav(next !== "/" ? next : role === "seller" || role === "agent" || role === "landlord" ? "/listings" : "/", { replace: true });
     } catch (e) {
       toast.error((e as Error).message);
@@ -100,9 +103,10 @@ export default function SignUp() {
 
   const resend = async () => {
     try {
-      const r = await post<{ dev_otp?: string | null }>("/auth/resend-otp", { identifier: target, code: "", purpose: "signup" });
+      const r = await post<{ dev_otp?: string | null }>("/auth/resend-otp", { identifier: target, code: "", purpose: "signup", sms_consent: channel === "mobile" && smsConsent });
       if (r.dev_otp) setSent((x) => (x ? { ...x, dev_otp: { [target]: r.dev_otp! } } : x));
       setCooldown(30);
+      setCodeRequests((n) => n + 1);
       toast.success("New code sent");
     } catch (e) {
       const retry = e instanceof ApiError ? (e.detail as { retry_after_seconds?: number })?.retry_after_seconds : undefined;
@@ -111,14 +115,20 @@ export default function SignUp() {
     }
   };
 
+  // Android: fill the code from the SMS once the user allows it (only when a real SMS was sent).
+  useSmsCodeAutofill(step === "verify" && channel === "mobile" && sent?.delivery?.[target] === "sent", (c) => {
+    setCode(c);
+    void verify(c);
+  }, codeRequests);
+
   return (
     <AuthLayout
       title={step === "role" ? "Create your account" : step === "details" ? "Your details" : "Verify it’s you"}
       subtitle={
         step === "role"
-          ? "Tell us how you’ll use Arz-e-Pak — we’ll tailor your home screen and AI assistant."
+          ? "Tell us how you’ll use Watan-e-Pak — we’ll tailor your home screen and AI assistant."
           : step === "details"
-            ? "No password needed. We’ll text or e-mail you a one-time code."
+            ? "No password needed. We’ll send a one-time code by SMS or e-mail."
             : `Enter the 6-digit code we sent to ${sent?.sent_to.join(" and ")}.`
       }
     >
@@ -197,13 +207,23 @@ export default function SignUp() {
                 setTaken(false);
               }}
               options={[
-                { value: "mobile", label: "Mobile", icon: <Smartphone className="h-4 w-4" /> },
+              { value: "mobile", label: "SMS", icon: <Smartphone className="h-4 w-4" /> },
                 { value: "email", label: "E-mail", icon: <Mail className="h-4 w-4" /> },
               ]}
             />
             <Field label={channel === "mobile" ? "Mobile number" : "E-mail address"}>
-              <IdentifierInput channel={channel} value={raw} onChange={setRaw} />
+              <IdentifierInput channel={channel} value={raw} onChange={(value) => { setRaw(value); setSmsConsent(false); }} />
             </Field>
+            {channel === "mobile" && (
+              <SmsConsentFields
+                consent={smsConsent}
+                onConsent={setSmsConsent}
+                onPick={(number) => {
+                  setRaw(number);
+                  setSmsConsent(false);
+                }}
+              />
+            )}
             {taken && (
               <div className="rounded-xl bg-gold-50 p-3 text-sm text-gold-900 dark:bg-gold-500/10 dark:text-gold-100">
                 You already have an account.{" "}
@@ -212,13 +232,13 @@ export default function SignUp() {
                 </Link>
               </div>
             )}
-            <Button type="submit" size="lg" className="w-full" loading={busy} disabled={name.trim().length < 2 || !validIdentifier(channel, raw)}>
+            <Button type="submit" size="lg" className="w-full" loading={busy} disabled={name.trim().length < 2 || !validIdentifier(channel, raw) || (channel === "mobile" && !smsConsent)}>
               Send verification code
             </Button>
             <button type="button" className="w-full text-sm font-semibold text-ink-mute" onClick={() => setStep("role")}>
               ← Change role
             </button>
-            <p className="text-center text-xs text-ink-mute dark:text-slate-400">By continuing you agree to the Arz-e-Pak Terms and Privacy policy.</p>
+            <p className="text-center text-xs text-ink-mute dark:text-slate-400">By continuing you agree to the Watan-e-Pak Terms and Privacy policy.</p>
           </motion.form>
         )}
 

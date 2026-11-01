@@ -17,6 +17,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+import storage
+
 DATA = Path(__file__).with_name("geodata") / "pk_megaprojects.json"
 
 TYPE_LABELS = {
@@ -33,8 +35,8 @@ UPLIFT_WEIGHT = {"high": 1.0, "medium": 0.65, "low": 0.35}
 
 @lru_cache(maxsize=1)
 def _load() -> Dict[str, Any]:
-    with DATA.open(encoding="utf-8") as f:
-        return json.load(f)
+    raw = storage.read_seed_asset("geodata/pk_megaprojects.json", str(DATA))
+    return json.loads(raw.decode("utf-8")) if raw else {"projects": []}
 
 
 def note() -> str:
@@ -204,7 +206,7 @@ def admin_add_photo(project_id: str, url: str, primary: bool = False) -> Dict[st
     images = [*(fields.get("images") or []), url]
     fields["images"] = images
     if primary or not any(u.startswith("/media/") for u in images[:-1]):
-        fields["image"], fields["image_credit"] = url, "Photo taken on site (Arz-e-Pak survey)"
+        fields["image"], fields["image_credit"] = url, "Photo taken on site (Watan-e-Pak survey)"
     e["updated_at"] = datetime.now().isoformat(timespec="seconds")
     return summary(get(project_id))
 

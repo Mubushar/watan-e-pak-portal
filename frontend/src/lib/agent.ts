@@ -385,7 +385,7 @@ interface AiContext {
 /** One id per browser tab, so the server's short-term memory keeps this conversation together. */
 const conversationId = (() => {
   try {
-    const key = "arzepak.chat.conversation";
+    const key = "watanepak.chat.conversation";
     const existing = sessionStorage.getItem(key);
     if (existing) return existing;
     const id = `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -737,7 +737,7 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<{ o
       city_id: p.city_id ?? undefined,
       scheme_id: p.scheme_id ?? undefined,
       assigned_agent_id: p.agent_id || undefined,
-      notes: `Call request from the Arz-e-Pak AI assistant (web).${when}${note}\n\nListing: ${p.title} (${p.id})`,
+      notes: `Call request from the Watan-e-Pak AI assistant (web).${when}${note}\n\nListing: ${p.title} (${p.id})`,
     });
     return { output: { ok: true, sent_to: "the owner / agent of this listing", they_will_contact: user.mobile ? "by phone" : "by e-mail" }, effect: { listings: [p], links: [open] } };
   }
@@ -980,7 +980,7 @@ function cited(content: string, sources?: KnowledgeSource[]): KnowledgeSource[] 
 function systemPrompt(): string {
   const user = useAuth.getState().user;
   return [
-    "You are Arz-e-Pak AI, the friendly real-estate assistant on the Arz-e-Pak web portal in Pakistan. You help people find, buy, rent, sell and list property.",
+    "You are Watan-e-Pak AI, the friendly real-estate assistant on the Watan-e-Pak web portal in Pakistan. You help people find, buy, rent, sell and list property.",
     user ? `You are talking to ${user.name ?? "a member"} (${user.role} account).` : "The visitor is a guest (not signed in).",
     "Reply in the language of the user's latest message: Urdu in Urdu script, Roman Urdu in English letters, or English.",
     "Keep replies short (under 120 words), warm and practical; markdown bullet points only when comparing options. Prices in crore/lakh, sizes in marla/kanal (1 kanal = 20 marla). Never read out ids.",

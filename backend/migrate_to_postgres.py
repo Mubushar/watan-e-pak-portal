@@ -12,10 +12,10 @@ Examples
     uv run python migrate_to_postgres.py doctor
 
     # Create the schema + load the data into a running PostgreSQL
-    uv run python migrate_to_postgres.py apply --dsn "postgresql://postgres:postgres@localhost:5432/arzepak"
+    uv run python migrate_to_postgres.py apply --dsn "postgresql://postgres:postgres@localhost:5432/watanepak"
 
     # Re-check row counts against the manifest
-    uv run python migrate_to_postgres.py verify --dsn "postgresql://postgres:postgres@localhost:5432/arzepak"
+    uv run python migrate_to_postgres.py verify --dsn "postgresql://postgres:postgres@localhost:5432/watanepak"
 
 The writer is framework-free and stdlib-only. Applying to PostgreSQL uses ``psycopg``
 if installed, otherwise it shells out to ``psql``; if neither exists it returns a
@@ -263,7 +263,7 @@ def _probe(dsn: str) -> tuple:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="migrate_to_postgres.py",
-        description="Generate and apply the Arz-e-Pak portal PostgreSQL migration.")
+        description="Generate and apply the Watan-e-Pak portal PostgreSQL migration.")
     parser.add_argument("--out", default=_default_out(),
                         help="output directory (default: <repo>/db)")
     parser.add_argument("--include-transient", action="store_true",
@@ -286,7 +286,7 @@ def build_parser() -> argparse.ArgumentParser:
     for name in ("apply", "verify"):
         sub = subs.add_parser(name, help="%s the migration against a database" % name)
         sub.add_argument("--dsn", required=True,
-                         help="PostgreSQL DSN, e.g. postgresql://postgres:postgres@localhost:5432/arzepak")
+                         help="PostgreSQL DSN, e.g. postgresql://postgres:postgres@localhost:5432/watanepak")
     parser.add_argument("--seed-only", action="store_true",
                         help="export the start-up sample data instead of what the portal has saved")
     return parser

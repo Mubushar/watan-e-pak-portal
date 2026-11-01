@@ -48,6 +48,6 @@ export const usePrefs = create<PrefsState>()(
       setAssistantOpen: (assistantOpen) => set({ assistantOpen }),
       setTickerPaused: (tickerPaused) => set({ tickerPaused }),
     }),
-    { name: "arzepak-prefs", partialize: (s) => ({ ...s, assistantOpen: false }) },
+    { name: "watanepak-prefs", partialize: (s) => ({ ...s, assistantOpen: false }) },
   ),
 );

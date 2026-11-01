@@ -24,7 +24,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useApi, useMutate } from "@/hooks/useApi";
-import { put } from "@/lib/api";
+import { post, put } from "@/lib/api";
 import { compact, date, num, timeAgo, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/store/auth";
@@ -555,6 +555,13 @@ function SystemTab() {
   const h = useApi<{ status: string; version: string; time: string }>("/health", undefined, { refetchInterval: 30_000 });
   const cat = useApi<{ tool_count: number; groups: Record<string, number>; resources_count: number; templates_count: number; prompts_count: number }>("/portal/catalog", undefined, { staleTime: 10 * 60_000 });
   const subs = useApi<{ count: number; subscriptions: { id: string; account: string; plan_key: string; product: string; seats: number; status: string; started_at: string }[] }>("/commercial/subscriptions");
+  const canManageSettings = useAuth.getState().can("settings.manage") || useAuth.getState().hasRole("super_admin", "admin");
+  const vectors = useApi<{ ready: boolean; vector_store: boolean; indexed_chunks: number; embedding_provider?: string | null; embedding_model: string; backend: string }>(
+    canManageSettings ? "/ai/knowledge/semantic/status" : null,
+  );
+  const rebuildVectors = useMutate(() => post("/ai/knowledge/semantic/rebuild", {}), {
+    invalidate: ["/ai/knowledge/semantic/status"], success: "Semantic knowledge index rebuilt",
+  });
   const up = h.data?.status === "ok" && ph.data?.status === "ok";
   return (
     <div className="space-y-6">
@@ -584,6 +591,26 @@ function SystemTab() {
       )}
 
       <IntegrationsCard />
+
+      {canManageSettings && (
+        <Card>
+          <CardHeader title="Semantic knowledge retrieval" subtitle="Vector search over the portal knowledge corpus" icon={<Database className="h-5 w-5" />} />
+          <CardBody className="flex flex-wrap items-center gap-4">
+            <div className="min-w-64 flex-1 text-sm text-ink-soft dark:text-slate-300">
+              {vectors.data?.ready
+                ? `Ready · ${vectors.data.indexed_chunks} indexed chunks · ${vectors.data.backend} pgvector · ${vectors.data.embedding_provider ?? "embedding provider"} · ${vectors.data.embedding_model}`
+                : vectors.data?.vector_store
+                  ? `Vector storage is ready; configure an embedding provider. Model: ${vectors.data.embedding_model}.`
+                  : "pgvector or PostgreSQL persistence is unavailable. Enable the Postgres deployment and restart the backend."}
+            </div>
+            <Button size="sm" icon={<RotateCcw className="h-4 w-4" />} loading={rebuildVectors.isPending}
+              disabled={!vectors.data?.ready} onClick={() => rebuildVectors.mutate()}>
+              Rebuild knowledge vectors
+            </Button>
+            <p className="basis-full text-xs text-ink-mute">Rebuild sends portal knowledge text to the configured embedding provider. Hybrid agent search also sends each search query to that provider for embedding.</p>
+          </CardBody>
+        </Card>
+      )}
 
       <div className="grid gap-6 xl:grid-cols-3">
         <Card className="xl:col-span-2">

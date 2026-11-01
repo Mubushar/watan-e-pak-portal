@@ -1,5 +1,5 @@
 """
-The portal's display order for cities and housing societies (Arz-e-Pak is based in Islamabad).
+The portal's display order for cities and housing societies (Watan-e-Pak is based in Islamabad).
 
 Cities
     Islamabad, Rawalpindi, Lahore, Karachi — then every other city by population.

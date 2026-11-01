@@ -1,5 +1,5 @@
 /**
- * Arz-e-Pak AI assistant — OpenAI only, mirroring how the person talks:
+ * Watan-e-Pak AI assistant — OpenAI only, mirroring how the person talks:
  *   - Typed message      → text reply (OpenAI chat model).
  *   - Voice note         → voice-note reply (OpenAI speech-to-text → chat → text-to-speech).
  *   - Live conversation  → OpenAI Realtime voice agent (lib/realtime): one tap starts a
@@ -321,7 +321,7 @@ export default function Assistant() {
               <span className="absolute -end-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-[#f6f8f6] dark:ring-[#07130d]" />
             </span>
             <span className="leading-tight">
-              Arz-e-Pak AI
+              Watan-e-Pak AI
               <span className="block text-[11px] font-medium text-ink-mute">
                 {live
                   ? liveLabel(live, ur)

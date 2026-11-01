@@ -35,6 +35,10 @@ export interface GisLayer {
   visible: boolean;
   features: number;
   image_url?: string | null;
+  raster_bounds?: [[number, number], [number, number]] | null;
+  has_raster?: boolean;
+  georeference_method?: "embedded" | "assisted" | "manual" | null;
+  georeference_rmse_m?: number | null;
   /** false while an admin hasn't published it (only GIS managers see such layers). */
   published?: boolean;
   /** Set on the portal's built-in overlays: roads, water, provinces … */
@@ -47,6 +51,7 @@ export interface GisLayerDetail extends GisLayer {
   style?: { color?: string; fillColor?: string; fillOpacity?: number; weight?: number; opacity?: number };
   z_index?: number;
   opacity?: number;
+  raster_preview_asset_id?: string | null;
 }
 
 export interface Aoi {

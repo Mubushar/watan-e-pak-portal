@@ -12,7 +12,7 @@ Deployment mode and security switches, read once from the environment (``backend
                           without a token when no PORTAL_MCP_TOKEN is set (default on).
 ``PORTAL_TRUST_PROXY``    trust X-Forwarded-For (only behind your own reverse proxy).
 ``PORTAL_MAX_BODY_MB``    largest request body accepted (default 30).
-``PORTAL_ALLOWED_HOSTS``  comma-separated Host names accepted (production; e.g. arzepak.pk,api.arzepak.pk).
+``PORTAL_ALLOWED_HOSTS``  comma-separated Host names accepted (production; e.g. watanepak.pk,api.watanepak.pk).
 """
 
 from __future__ import annotations

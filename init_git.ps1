@@ -1,13 +1,13 @@
 <#
 .SYNOPSIS
-    Turn the Arz-e-Pak portal folder into a single git repository, then
+    Turn the Watan-e-Pak portal folder into a single git repository, then
     (optionally) create a GitHub remote and push.
 
 .DESCRIPTION
     Produces ONE repository at the project ROOT (default: the folder this
-    script lives in, i.e. ...\alfaisal\arzepak), containing:
+    script lives in, i.e. ...\WatanePak), containing:
 
-        arzepak\
+        WatanePak\
           |-- backend\   (MCP + FastAPI portal: server.py, api.py, modules, tests)
           |-- *.docx     (design / requirements docs)
           |-- *.png      (brand assets)
@@ -31,7 +31,7 @@
     Message for the initial commit.
 
 .PARAMETER GitHubRepo
-    Name of the GitHub repository to create. Default 'arzepak-portal'.
+    Name of the GitHub repository to create. Default 'watan-e-pak-portal'.
 
 .PARAMETER Visibility
     'private' (default) or 'public'.
@@ -47,15 +47,15 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File .\init_git.ps1
 
 .EXAMPLE
-    powershell -NoProfile -ExecutionPolicy Bypass -File .\init_git.ps1 -GitHubRepo arzepak -Visibility public
+    powershell -NoProfile -ExecutionPolicy Bypass -File .\init_git.ps1 -GitHubRepo watan-e-pak-portal -Visibility public
 #>
 
 [CmdletBinding()]
 param(
     [string]$ProjectRoot,
     [string]$Branch         = 'main',
-    [string]$CommitMessage  = 'Initial commit: Arz-e-Pak real-estate portal (MCP + FastAPI backend)',
-    [string]$GitHubRepo     = 'arzepak-portal',
+    [string]$CommitMessage  = 'Initial commit: Watan-e-Pak real-estate portal (MCP + FastAPI backend)',
+    [string]$GitHubRepo     = 'watan-e-pak-portal',
     [ValidateSet('private', 'public')]
     [string]$Visibility     = 'private',
     [switch]$SkipRemote,
@@ -82,7 +82,7 @@ if (-not (Test-Path -LiteralPath $ProjectRoot)) { Die "ProjectRoot not found: $P
 $root    = (Resolve-Path -LiteralPath $ProjectRoot).Path
 $backend = Join-Path $root 'backend'
 
-Write-Host "Arz-e-Pak portal - git bootstrap" -ForegroundColor White
+Write-Host "Watan-e-Pak portal - git bootstrap" -ForegroundColor White
 Info "Repository root : $root"
 
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) { Die "git is not installed or not on PATH." }
@@ -119,7 +119,7 @@ if (Test-Path -LiteralPath $gitignorePath) {
 } else {
     $gitignore = @'
 # ===========================================================================
-# Arz-e-Pak portal - repository ignore rules
+# Watan-e-Pak portal - repository ignore rules
 # ===========================================================================
 
 # ---- OS / editor cruft ----

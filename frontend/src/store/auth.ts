@@ -61,7 +61,7 @@ export const useAuth = create<AuthState>()(
         return !!u && roles.some((r) => u.roles?.includes(r) || u.role === r);
       },
     }),
-    { name: "arzepak-auth" },
+    { name: "watanepak-auth" },
   ),
 );
 

@@ -87,7 +87,7 @@ def _instruction(step: Dict[str, Any]) -> str:
 def _osrm(a: Tuple[float, float], b: Tuple[float, float], mode: str, alternatives: bool) -> Optional[List[Dict[str, Any]]]:
     url = f"{BASE}/{PROFILES[mode]}/route/v1/driving/{a[1]:.6f},{a[0]:.6f};{b[1]:.6f},{b[0]:.6f}"
     try:
-        r = httpx.get(url, timeout=12, headers={"User-Agent": "Arz-e-Pak/1.0 (real-estate portal)"},
+        r = httpx.get(url, timeout=12, headers={"User-Agent": "Watan-e-Pak/1.0 (real-estate portal)"},
                       params={"overview": "full", "geometries": "geojson", "steps": "true",
                               "alternatives": "true" if alternatives else "false"})
         data = r.json() if r.status_code == 200 else {}

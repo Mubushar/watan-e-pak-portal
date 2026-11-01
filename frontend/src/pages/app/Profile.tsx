@@ -25,10 +25,14 @@ import {
   ShieldCheck,
   Smartphone,
   Sun,
+  Trash2,
+  Pencil,
+  Check,
+  X,
   UserRound,
 } from "lucide-react";
 import { useApi, useMutate } from "@/hooks/useApi";
-import { post, put } from "@/lib/api";
+import { del, post, put } from "@/lib/api";
 import { date, timeAgo, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useAuth, type User } from "@/store/auth";
@@ -144,6 +148,7 @@ export default function Profile() {
       <div className="grid gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
           <NotificationPrefs userId={authUser.id} />
+          <AssistantMemory />
         </div>
         <div className="space-y-6">
           <PasswordCard hasPassword={(me.data?.user as { has_password?: boolean } | undefined)?.has_password} />
@@ -165,6 +170,62 @@ export default function Profile() {
         </div>
       </div>
     </div>
+  );
+}
+
+interface MemoryState {
+  enabled: boolean;
+  recent_turns: number;
+  memories: { id: string; kind: string; value: string; source: string; updated_at?: string; updated?: string }[];
+}
+
+function AssistantMemory() {
+  const q = useApi<MemoryState>("/me/memory");
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const save = useMutate(({ id, value }: { id: string; value: string }) => put(`/me/memory/${id}`, { value }), {
+    invalidate: ["/me/memory"], success: "Memory updated", onSuccess: () => setEditing(null),
+  });
+  const forget = useMutate((id: string) => del(`/me/memory/${id}`), { invalidate: ["/me/memory"], success: "Memory removed" });
+  const clear = useMutate(() => del("/me/memory"), { invalidate: ["/me/memory"], success: "Assistant memory cleared" });
+  const setting = useMutate((enabled: boolean) => put("/me/memory/settings", { enabled }), { invalidate: ["/me/memory"] });
+  const memories = q.data?.memories ?? [];
+  return (
+    <Card>
+      <CardHeader title="Assistant memory" subtitle="Review, correct, or remove what the assistant remembers" icon={<History className="h-5 w-5" />} />
+      <CardBody className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-ink-mute">Recent turns: {q.data?.recent_turns ?? "—"}. Inferred facts expire from recall after 180 days.</p>
+          <div className="flex items-center gap-3">
+            <Toggle checked={q.data?.enabled ?? true} onChange={(enabled) => setting.mutate(enabled)} label="Memory on" />
+            {memories.length > 0 && <Button variant="ghost" onClick={() => clear.mutate()}>Clear all</Button>}
+          </div>
+        </div>
+        {q.isLoading ? <Skeleton className="h-16" /> : memories.length ? (
+          <div className="divide-y divide-black/5 dark:divide-white/10">
+            {memories.map((m) => (
+              <div key={m.id} className="flex flex-wrap items-center gap-3 py-3">
+                <span className="w-24 shrink-0 text-xs font-semibold uppercase tracking-wide text-ink-mute">{titleCase(m.kind)}</span>
+                {editing === m.id ? (
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <Input value={draft} onChange={(e) => setDraft(e.target.value)} aria-label="Correct remembered fact" />
+                    <Button aria-label="Save memory" disabled={save.isPending || draft.trim().length < 2} onClick={() => save.mutate({ id: m.id, value: draft.trim() })}><Check className="h-4 w-4" /></Button>
+                    <Button variant="ghost" aria-label="Cancel editing memory" onClick={() => setEditing(null)}><X className="h-4 w-4" /></Button>
+                  </div>
+                ) : (
+                  <>
+                    <span className="min-w-0 flex-1 text-sm">{m.value}</span>
+                    <span className="text-xs text-ink-mute">{m.source === "explicit" ? "You asked to remember" : "Inferred"}</span>
+                    <Button variant="ghost" aria-label={`Correct ${m.kind}`} onClick={() => { setEditing(m.id); setDraft(m.value); }}><Pencil className="h-4 w-4" /></Button>
+                    <Button variant="ghost" aria-label={`Forget ${m.kind}`} disabled={forget.isPending} onClick={() => forget.mutate(m.id)}><Trash2 className="h-4 w-4" /></Button>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : <EmptyState title="No saved preferences" hint="The assistant will use the current conversation only." />}
+      </CardBody>
+    </Card>
   );
 }
 

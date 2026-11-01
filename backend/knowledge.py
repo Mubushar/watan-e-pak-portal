@@ -463,6 +463,50 @@ def search(query: str, k: int = 6, types: Optional[Iterable[str]] = None) -> Dic
     # A structured query with no word overlap still finds matching listings ("under 1 crore").
     if not scored and filters and (not wanted or "property" in wanted):
         scored = [(0.1, d) for d in idx.docs if d["type"] == "property" and _passes(d["ref"], filters)]
+    retrieval_method = "bm25"
+    semantic_scores: Dict[int, float] = {}
+    # Semantic retrieval is additive: lexical scoring and explicit property filters stay active.
+    # When the optional provider/index is unavailable, the current BM25 behavior is unchanged.
+    try:
+        import semantic_retrieval
+        if semantic_retrieval.status().get("ready"):
+            vector_hits = semantic_retrieval.search(query, limit=max(k * 3, 12))
+            by_key = {(str(doc.get("type")), str(doc.get("id"))): (i, doc)
+                      for i, doc in enumerate(idx.docs)}
+            semantic_ranked = []
+            seen_semantic = set()
+            for row in vector_hits:
+                match = by_key.get((str(row.get("source_type")), str(row.get("source_id"))))
+                if not match:
+                    continue
+                i, doc = match
+                if i in seen_semantic:
+                    continue
+                if wanted and doc["type"] not in wanted:
+                    continue
+                if doc["type"] == "property" and not _passes(doc["ref"], filters):
+                    continue
+                seen_semantic.add(i)
+                semantic_ranked.append((i, doc, float(row.get("score") or 0)))
+            if semantic_ranked:
+                lexical_order = sorted(scored, key=lambda item: item[0], reverse=True)
+                lexical_ranks = {id(doc): rank for rank, (_score, doc) in enumerate(lexical_order, 1)}
+                document_positions = {id(doc): pos for pos, doc in enumerate(idx.docs)}
+                merged: Dict[int, Tuple[float, Dict[str, Any], float]] = {}
+                for rank, (i, doc, similarity) in enumerate(semantic_ranked, 1):
+                    merged[i] = (0.48 / (60 + rank), doc, similarity)
+                    semantic_scores[i] = similarity
+                for _score, doc in scored:
+                    i = document_positions[id(doc)]
+                    previous = merged.get(i, (0.0, doc, 0.0))
+                    rank = lexical_ranks[id(doc)]
+                    merged[i] = (previous[0] + 0.52 / (60 + rank), doc, previous[2])
+                scored = [(score, doc) for score, doc, _similarity in merged.values()]
+                scored.sort(key=lambda item: item[0], reverse=True)
+                retrieval_method = "hybrid_bm25_pgvector"
+    except Exception:
+        # Retrieval must not take down the assistant if an embedding service is unavailable.
+        pass
     scored.sort(key=lambda x: x[0], reverse=True)
     hits = []
     for rank, (s, d) in enumerate(scored[:k], start=1):
@@ -470,6 +514,10 @@ def search(query: str, k: int = 6, types: Optional[Iterable[str]] = None) -> Dic
                "url": d["url"], "tier": d["tier"], "trust": sources.describe(d["tier"]),
                "snippet": _snippet(d.get("facts") or d["text"], q), "city": d.get("city"),
                "sources": [x for x in (d.get("sources") or []) if isinstance(x, dict)][:3]}
+        hit["retrieval"] = retrieval_method
+        doc_position = next((i for i, candidate in enumerate(idx.docs) if candidate is d), None)
+        if doc_position in semantic_scores:
+            hit["semantic_score"] = round(semantic_scores[doc_position], 4)
         if d.get("date"):
             hit["date"] = d["date"]
         if d["type"] == "property":
@@ -482,4 +530,5 @@ def search(query: str, k: int = 6, types: Optional[Iterable[str]] = None) -> Dic
         for h in hits)
     return {"query": query, "filters": filters, "count": len(hits), "results": hits, "context": context,
             "took_ms": round((time.perf_counter() - started) * 1000, 1),
-            "how_to_cite": "Quote facts with their [n] marker; prefer official / verified sources when they disagree."}
+            "how_to_cite": "Quote facts with their [n] marker; prefer official / verified sources when they disagree.",
+            "retrieval": retrieval_method}

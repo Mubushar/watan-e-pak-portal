@@ -465,7 +465,7 @@ function floorplan(n) {
     s += `<path d="M${px + 10} ${py + ph} a34 34 0 0 1 34 -34" fill="none" stroke="#c99a22" stroke-width="3"/>`;
     x += w; rowH = Math.max(rowH, h);
   }
-  s += `<text x="${ox}" y="${H - 40}" font-family="Outfit, Arial" font-size="26" font-weight="800" fill="#0f5a39">Arz-e-Pak · Floor Plan ${String.fromCharCode(65 + n)}</text>`;
+  s += `<text x="${ox}" y="${H - 40}" font-family="Outfit, Arial" font-size="26" font-weight="800" fill="#0f5a39">Watan-e-Pak · Floor Plan ${String.fromCharCode(65 + n)}</text>`;
   s += `<g transform="translate(${W - 120} ${H - 110})"><circle r="44" fill="none" stroke="#0f5a39" stroke-width="3"/><path d="M0 -40 L10 0 L0 -8 L-10 0Z" fill="#c99a22"/><text y="-48" text-anchor="middle" font-family="Arial" font-size="16" font-weight="700" fill="#0f5a39">N</text></g>`;
   return svg(s);
 }
@@ -515,7 +515,7 @@ async function knockOutWhite(img) {
 
 /**
  * Find a brand asset by role. The current assets live in `branding/` and use the
- * Watan-e-Pak names; the repo root and the old Arz-e-Pak names remain as fallbacks.
+ * Watan-e-Pak names; the repo root and the old Watan-e-Pak names remain as fallbacks.
  */
 function brandAsset(...patterns) {
   for (const dir of [path.join(repo, "branding"), repo]) {

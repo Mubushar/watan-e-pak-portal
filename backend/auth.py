@@ -491,16 +491,16 @@ def _deliver(otp: OtpCode, code: str) -> Notification:
     minutes = int(AUTH_CONFIG["otp_ttl_seconds"]) // 60
     action = _PURPOSE_TEXT.get(otp.purpose, otp.purpose)
     if otp.channel == "email":
-        subject = f"{code} is your Arz-e-Pak verification code"
+        subject = f"{code} is your Watan-e-Pak verification code"
         body = (
-            f"Assalam-o-Alaikum,\n\nUse {code} to {action} on Arz-e-Pak. "
+            f"Assalam-o-Alaikum,\n\nUse {code} to {action} on Watan-e-Pak. "
             f"The code expires in {minutes} minutes.\n\n"
-            "If you didn't request this, you can ignore this e-mail.\n\n— Arz-e-Pak AI Real Estate"
+            "If you didn't request this, you can ignore this e-mail.\n\n— Watan-e-Pak AI Real Estate"
         )
         status, provider, error = delivery.send_email(otp.identifier, subject, body)
     else:
-        subject = "Arz-e-Pak"
-        body = f"Arz-e-Pak: {code} is your code to {action}. Valid for {minutes} min. Don't share it."
+        subject = "Watan-e-Pak"
+        body = f"Watan-e-Pak: {code} is your code to {action}. Valid for {minutes} min. Don't share it."
         status, provider, error = delivery.send_sms(otp.identifier, body, code)
     if status == "sent":
         # The real message carried the code; never keep it readable in the outbox.

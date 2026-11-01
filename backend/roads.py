@@ -19,19 +19,21 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+import storage
+
 DATA = Path(__file__).with_name("media") / "roads" / "pk_roads.json"
 CLASS_RANK = {"motorway": 0, "trunk": 1, "primary": 2, "secondary": 3}
 MAX_ROADS = 8000
 
 
 def available() -> bool:
-    return DATA.exists()
+    return DATA.exists() or storage.has_asset("seed/media/roads/pk_roads.json")
 
 
 @lru_cache(maxsize=1)
 def _load() -> Dict[str, Any]:
-    with DATA.open(encoding="utf-8") as f:
-        return json.load(f)
+    raw = storage.read_seed_asset("media/roads/pk_roads.json", str(DATA))
+    return json.loads(raw.decode("utf-8")) if raw else {"meta": {}, "features": []}
 
 
 def meta() -> Dict[str, Any]:

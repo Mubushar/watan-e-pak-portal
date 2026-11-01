@@ -113,7 +113,7 @@ export default function Home() {
       <section className="relative overflow-hidden bg-brand-gradient text-white md:mx-6 md:mt-6 md:rounded-3xl">
         <img src={HERO_PHOTO.img} alt="Faisal Mosque and the Margalla Hills, Islamabad" className="absolute inset-0 h-full w-full object-cover opacity-35" />
         <div className="absolute inset-0 bg-mesh" />
-        <p className="absolute bottom-12 end-3 text-[9px] text-white/50">{HERO_PHOTO.credit}</p>
+        <p className="absolute bottom-2 end-3 text-[9px] text-white/50">{HERO_PHOTO.credit}</p>
         <div className="pt-safe relative">
           <div className="screen flex items-center justify-between py-3 md:hidden">
             <Logo light compact />
@@ -127,7 +127,7 @@ export default function Home() {
               </Link>
             )}
           </div>
-          <div className="screen pb-16 pt-4 md:pb-14 md:pt-10">
+          <div className="screen pb-8 pt-4 md:pb-10 md:pt-10">
             <p className="text-sm text-white/75">{first ? `Assalam-o-Alaikum, ${first}` : "Assalam-o-Alaikum"} 👋</p>
             <h1 className="mt-1 font-display text-3xl font-bold leading-tight md:text-4xl">
               {user ? (
@@ -145,7 +145,7 @@ export default function Home() {
         </div>
       </section>
 
-      <div className="screen -mt-9 relative z-10">
+      <div className="screen relative z-10 mt-4 md:mt-6">
         {/* ---------- AI search ---------- */}
         <form
           className="card p-1.5 shadow-soft"
@@ -263,7 +263,7 @@ export default function Home() {
         {/* ---------- you + AI ---------- */}
         <section className="mt-8 rounded-3xl bg-[#0b1611] p-4 text-white">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gold-300">How we work together</p>
-          <p className="mt-1 font-display text-xl font-light">You stay in charge. Arz-e-Pak AI does the legwork.</p>
+          <p className="mt-1 font-display text-xl font-light">You stay in charge. Watan-e-Pak AI does the legwork.</p>
           <div className="mt-4 space-y-2 text-[13px]">
             {[
               ["You describe the home and budget.", "AI shortlists the best three."],
@@ -291,7 +291,7 @@ export default function Home() {
             <Bot className="relative h-6 w-6 text-gold-200" />
           </span>
           <span className="min-w-0">
-            <span className="block font-display font-bold">Talk to Arz-e-Pak AI</span>
+            <span className="block font-display font-bold">Talk to Watan-e-Pak AI</span>
             <span className="block text-xs text-white/75">Search, price or list a property just by speaking — in English or Urdu.</span>
           </span>
         </Link>

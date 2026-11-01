@@ -1,4 +1,4 @@
-# Arz-e-Pak portable app
+# Watan-e-Pak portable app
 
 One React codebase that ships as a native app on **Android**, **iOS**, **Windows** and
 **macOS** (and Linux / the browser), using the same brand theme as the web portal in
@@ -50,7 +50,7 @@ The app talks to the same FastAPI backend as the portal (`backend/`):
 
 The backend allows every origin in development, so the desktop app and any separately
 hosted build can call it. In production (`PORTAL_ENV=production`) list the origins in
-`PORTAL_CORS_ORIGINS`: the desktop app's is `app://arzepak`, plus the web build's domain. On
+`PORTAL_CORS_ORIGINS`: the desktop app's is `app://watanepak`, plus the web build's domain. On
 Android/iOS, requests go through Capacitor's native HTTP and need no CORS entry.
 
 An expired session signs the user out with a *Sign in* prompt. Sign-up as an agent creates
@@ -66,14 +66,22 @@ cd portable && npm install && npm run dev     # app on http://localhost:5174 (pr
 
 **OTP delivery:** until the backend has an SMS/e-mail provider configured, codes are not
 actually sent. The app shows a "Test mode — nothing was sent" hint with the code. To send
-real codes by e-mail (SMTP) and SMS (Twilio, WhatsApp or any HTTP SMS gateway), copy
-`backend/.env.example` to `backend/.env` and fill it in (see Administration Guide §4.4).
+real codes by e-mail (SMTP) and SMS (your own Android gateway phone, Twilio or a bulk-SMS
+gateway), copy `backend/.env.example` to `backend/.env` and fill it in (see Administration
+Guide §4.4).
+
+**Phone sign-in:** the user enters the full number with country code and ticks the SMS
+consent box before a code can be sent (the API refuses phone codes without consent). On
+Android, *Use a number from this phone* opens Google's Phone Number Hint picker
+(`PhoneNumberHintPlugin.java`), and when the code SMS arrives Android asks before the app
+reads it, then fills the code in (`SmsUserConsentPlugin.java`, SMS User Consent API).
+Neither needs a phone or SMS permission. iOS offers the code above the keyboard.
 
 ### Desktop (Windows / macOS)
 
 ```bash
 npm run desktop:dev      # Electron + Vite hot reload
-npm run desktop:win      # release/Arz-e-Pak Setup 1.0.0.exe + portable exe
+npm run desktop:win      # release/Watan-e-Pak Setup 1.0.0.exe + portable exe
 npm run desktop:mac      # release/*.dmg — run on macOS (signing/notarization: set CSC_* env vars)
 ```
 
@@ -174,3 +182,9 @@ assets/       source logo for `npm run assets` (icons + splash screens)
 
 The theme tokens in `tailwind.config.js` and the component classes in `src/index.css`
 are copied from `frontend/`. Change both together to keep the apps identical.
+
+## Docker browser build
+
+The `portable/Dockerfile` builds and serves the browser version of the app. Run the full stack from the repository root with `docker compose up --build`; it is available at <http://localhost:8081> and proxies API and media requests to the backend. The container build uses `/api` as its backend base so it works behind the Compose Nginx proxy.
+
+This container is the browser build. Use the existing Electron and Capacitor build commands above to produce Windows/macOS installers or Android/iOS packages.
