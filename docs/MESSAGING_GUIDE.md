@@ -1,4 +1,4 @@
-# Arz-e-Pak Portal — Messaging & Notifications Guide
+# Watan-e-Pak Portal — Messaging & Notifications Guide
 
 This guide describes the portal's **in-house team messaging system** end to end. It is
 written for everyone who uses, operates or integrates the messaging wing: staff, admins
@@ -14,7 +14,7 @@ The internal workspace is the **primary store of record** for business conversat
 **e-mail and Telegram are complementary notification channels, never the primary**.
 Concretely:
 
-1. **Keep conversations and records inside Arz-e-Pak.** Every discussion is tied to the
+1. **Keep conversations and records inside Watan-e-Pak.** Every discussion is tied to the
    property, plan, customer or task it concerns.
 2. **E-mail for formal communication; Telegram for optional alerts / quick coordination.**
 3. **Files are shared as secure references, not embedded bytes** — via signed, expiring,
@@ -266,10 +266,10 @@ E-mail is the **formal** complementary channel. Configured under `messaging.emai
 
 | Setting | Value |
 | --- | --- |
-| `from` | `no-reply@arzepak.pk` |
-| `reply_to` | `support@arzepak.pk` |
+| `from` | `no-reply@watanepak.pk` |
+| `reply_to` | `support@watanepak.pk` |
 | `digest` | `instant` (also `hourly`, `daily`) |
-| `subject_prefix` | `[Arz-e-Pak]` |
+| `subject_prefix` | `[Watan-e-Pak]` |
 
 Every e-mail payload carries **short text plus an authenticated deep link**
 (`/messaging/portal`) back into the portal — **never document content**. Delivery is

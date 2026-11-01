@@ -32,7 +32,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 import httpx
 
 HERE = Path(__file__).resolve().parent
-UA = {"User-Agent": "Arz-e-Pak-geodata-builder/1.0 (real-estate portal; offline import)"}
+UA = {"User-Agent": "Watan-e-Pak-geodata-builder/1.0 (real-estate portal; offline import)"}
 OVERPASS = ["https://overpass-api.de/api/interpreter", "https://maps.mail.ru/osm/tools/overpass/api/interpreter"]
 
 # Metro regions: (south, west, north, east)

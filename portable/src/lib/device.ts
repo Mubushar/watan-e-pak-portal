@@ -23,7 +23,7 @@ export function getPosition(timeoutMs = 20_000): Promise<Fix> {
         reject(
           new Error(
             e.code === e.PERMISSION_DENIED
-              ? "Location is off for Arz-e-Pak — allow it in the device settings"
+              ? "Location is off for Watan-e-Pak — allow it in the device settings"
               : e.code === e.TIMEOUT
                 ? "No GPS fix yet — step outside or near a window and try again"
                 : "Couldn't read the location",
@@ -42,7 +42,7 @@ export function watchPosition(onFix: (f: Fix) => void, onError: (e: Error) => vo
   }
   const id = navigator.geolocation.watchPosition(
     (p) => onFix({ latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: Math.round(p.coords.accuracy), at: p.timestamp }),
-    (e) => onError(new Error(e.code === e.PERMISSION_DENIED ? "Location is off for Arz-e-Pak — allow it in the device settings" : "Waiting for GPS…")),
+    (e) => onError(new Error(e.code === e.PERMISSION_DENIED ? "Location is off for Watan-e-Pak — allow it in the device settings" : "Waiting for GPS…")),
     { enableHighAccuracy: true, maximumAge: 5_000, timeout: 30_000 },
   );
   return () => navigator.geolocation.clearWatch(id);

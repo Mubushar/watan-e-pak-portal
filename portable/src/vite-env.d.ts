@@ -10,5 +10,5 @@ interface ImportMeta {
 
 /** Bridge exposed by electron/preload.cjs (desktop builds only). */
 interface Window {
-  arzepak?: { isElectron: true; platform: string; version: string };
+  watanepak?: { isElectron: true; platform: string; version: string };
 }

@@ -250,7 +250,7 @@ function Footer() {
       </div>
       <div className="relative border-t border-white/10">
         <div className="container flex flex-col items-center justify-between gap-2 py-5 text-xs text-white/50 sm:flex-row">
-          <p>© {new Date().getFullYear()} Arz-e-Pak AI Real Estate Portal. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Watan-e-Pak AI Real Estate Portal. All rights reserved.</p>
           <p className="flex items-center gap-1.5">
             <Bot className="h-3.5 w-3.5" /> Built on FastAPI · MCP · OpenAI-compatible RAG
           </p>

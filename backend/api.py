@@ -6118,7 +6118,7 @@ class ToolsPdfInfoRequest(BaseModel):
 
 class ToolsIcsRequest(BaseModel):
     events: List[Dict[str, Any]]
-    calendar_name: str = "Arz-e-Pak"
+    calendar_name: str = "Watan-e-Pak"
 
 
 class ToolsRemindersRequest(BaseModel):

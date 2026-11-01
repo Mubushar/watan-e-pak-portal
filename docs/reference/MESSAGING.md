@@ -73,5 +73,5 @@ Sensitive kinds are gated on the signed expiring link (owner/admin only for `res
 | `quiet_hours` | 21:00–08:00 |
 | `telegram.max_text` | 320 |
 | `telegram.link_code_ttl_minutes` | 15 |
-| `email.from` | no-reply@arzepak.pk |
+| `email.from` | no-reply@watanepak.pk |
 

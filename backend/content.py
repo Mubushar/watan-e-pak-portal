@@ -34,7 +34,7 @@ from pydantic import BaseModel, Field
 # ============================================================
 
 CONTENT_CONFIG: Dict[str, Any] = {
-    "site_name": "Arz-e-Pak Real Estate Portal",
+    "site_name": "Watan-e-Pak Real Estate Portal",
     "tagline": "Pakistan's smart, data-driven property marketplace",
     "default_language": "en",
     "supported_languages": ["en", "ur"],

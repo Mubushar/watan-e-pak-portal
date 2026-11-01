@@ -1151,7 +1151,7 @@ def run_ai_checks(client: TestClient) -> None:
     check("POST /ai/knowledge/search (public)", r.status_code == 200 and r.json()["count"] > 0, r.text[:120])
     r = client.post("/ai/context", json={"query": "plots in Islamabad"}, headers=anon)
     body = r.json()
-    check("POST /ai/context (guest: prompt + knowledge, no memory)", r.status_code == 200 and "Arz-e-Pak AI" in body["system_prompt"]
+    check("POST /ai/context (guest: prompt + knowledge, no memory)", r.status_code == 200 and "Watan-e-Pak AI" in body["system_prompt"]
           and "KNOWLEDGE" in body["system_prompt"] and body["memory"]["enabled"] is False, r.text[:160])
 
     def login(ident: str, pw: str) -> Dict[str, str]:
@@ -3292,7 +3292,7 @@ def run_extract_checks(client: TestClient) -> None:
     def send(name: str, data: bytes, mime: str = "application/octet-stream") -> Any:
         return client.post("/ai/extract", json={"name": name, "data_url": f"data:{mime};base64," + base64.b64encode(data).decode()})
 
-    r = send("brochure.pdf", _tiny_pdf("Arz-e-Pak plot 42 Bahria Town"), "application/pdf")
+    r = send("brochure.pdf", _tiny_pdf("Watan-e-Pak plot 42 Bahria Town"), "application/pdf")
     body = r.json()
     check("POST /ai/extract (PDF text read back by pypdf)", r.status_code == 200 and body["kind"] == "pdf" and body["pages"] == 1
           and "--- page 1 ---" in body["text"] and "Bahria Town" in body["text"] and body["note"] is None, r.text[:200])
@@ -3351,7 +3351,7 @@ def run_chat_image_checks(client: TestClient) -> None:
     import openai_facade as facade
 
     photo = "data:image/jpeg;base64," + "A" * 1_000_000
-    msgs = [{"role": "system", "content": "You are Arz-e-Pak AI."},
+    msgs = [{"role": "system", "content": "You are Watan-e-Pak AI."},
             {"role": "user", "content": [{"type": "text", "text": "What does this plot map say?"},
                                          {"type": "image_url", "image_url": {"url": photo, "detail": "auto"}}]}]
     size = facade.measure_messages(msgs)

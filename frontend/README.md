@@ -1,6 +1,6 @@
-# Arz-e-Pak — Web Frontend
+# Watan-e-Pak — Web Frontend
 
-A modern, AI-first web portal for the Arz-e-Pak real-estate backend (FastAPI + MCP).
+A modern, AI-first web portal for the Watan-e-Pak real-estate backend (FastAPI + MCP).
 React 18 · TypeScript · Vite · Tailwind CSS · TanStack Query · Framer Motion · Leaflet ·
 Recharts · Embla carousel.
 

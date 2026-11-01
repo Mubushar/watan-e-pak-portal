@@ -164,7 +164,7 @@ export default function ToolsCenter() {
             <motion.h1 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mt-3 font-display text-4xl font-bold leading-tight sm:text-5xl">
               Every property calculation, <span className="bg-gold-gradient bg-clip-text text-transparent">one place</span>.
             </motion.h1>
-            <p className="mt-4 max-w-xl text-lg text-white/75">Mortgages, marla maths, stamp duty, build costs, Hijri dates and on-map measurement — live from the Arz-e-Pak engines and callable by AI agents over MCP.</p>
+            <p className="mt-4 max-w-xl text-lg text-white/75">Mortgages, marla maths, stamp duty, build costs, Hijri dates and on-map measurement — live from the Watan-e-Pak engines and callable by AI agents over MCP.</p>
             <div className="mt-6 max-w-md">
               <Input icon={<Search className="h-4 w-4" />} placeholder="Search tools — e.g. stamp duty, marla, CGT" value={search} onChange={(e) => setSearch(e.target.value)} className="!border-white/20 !bg-white/95 !text-ink" />
             </div>

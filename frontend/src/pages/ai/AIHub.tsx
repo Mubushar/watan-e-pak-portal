@@ -73,7 +73,7 @@ function Hero({ initial }: { initial?: string }) {
       <div className="container grid gap-10 py-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-center lg:py-16">
         <div>
           <motion.span initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="chip bg-white/10 text-gold-200 ring-1 ring-white/15">
-            <Sparkles className="h-3.5 w-3.5" /> Arz-e-Pak Agentic OS
+            <Sparkles className="h-3.5 w-3.5" /> Watan-e-Pak Agentic OS
           </motion.span>
           <motion.h1 initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mt-5 font-display text-4xl font-bold leading-[1.08] sm:text-5xl xl:text-6xl">
             AI agents that <span className="bg-gold-gradient bg-clip-text text-transparent">actually do</span> real estate.
@@ -112,7 +112,7 @@ function Hero({ initial }: { initial?: string }) {
                 <span className="absolute -end-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-white dark:ring-[#0d1f16]" />
               </span>
               <div className="min-w-0">
-                <p className="font-display font-semibold">Arz-e-Pak AI</p>
+                <p className="font-display font-semibold">Watan-e-Pak AI</p>
                 <p className="text-xs text-ink-mute">RAG over live listings, societies & market data</p>
               </div>
               <Badge tone="gold" className="ms-auto hidden sm:inline-flex">

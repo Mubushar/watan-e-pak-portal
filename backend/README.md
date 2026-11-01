@@ -1660,7 +1660,7 @@ An in-house **team communication system** — the internal workspace where the t
 conversations stay tied to the properties, plans, customers and tasks they are working
 on. E-mail and Telegram are **complementary notification channels**, never the primary
 store of record, exactly as the *Messaging in Portal* brief asks: *keep business
-conversations and records inside Arz-e-Pak; use e-mail for formal communication and
+conversations and records inside Watan-e-Pak; use e-mail for formal communication and
 Telegram for optional alerts or quick coordination.*
 
 The logic lives in `messaging.py` (framework-free, reused by MCP and REST); the WebSocket

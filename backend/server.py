@@ -8835,7 +8835,7 @@ def tool_pakistan_holidays(year: int) -> str:
 
 
 @mcp.tool()
-def tool_calendar_ics(events: List[Dict[str, Any]], calendar_name: str = "Arz-e-Pak") -> str:
+def tool_calendar_ics(events: List[Dict[str, Any]], calendar_name: str = "Watan-e-Pak") -> str:
     """Render events as a downloadable iCalendar (.ics) feed."""
     return dump(tools.calendar_ics(events, calendar_name))
 
@@ -10321,7 +10321,7 @@ def res_msg_unread(user_id: str) -> str:
             description="Brief a team member on their messaging workspace and open items.")
 def prompt_messaging_briefing(user_id: str = "", focus: str = "everything urgent") -> str:
     return (
-        "You are the Arz-e-Pak team-workspace assistant.\n"
+        "You are the Watan-e-Pak team-workspace assistant.\n"
         + (f"User: {user_id}.\n" if user_id else "Scope: whole team.\n")
         + f"Focus: {focus}.\n"
         "1. msg_unread_summary (or msg_unread) for unread counts, mentions and open actions.\n"
@@ -10336,7 +10336,7 @@ def prompt_messaging_briefing(user_id: str = "", focus: str = "everything urgent
             description="Summarise a conversation thread and extract its action items.")
 def prompt_messaging_digest(conversation_id: str = "", days: int = 7) -> str:
     return (
-        "You are summarising an internal Arz-e-Pak conversation"
+        "You are summarising an internal Watan-e-Pak conversation"
         + (f" ({conversation_id})" if conversation_id else "") + f" over the last {days} days.\n"
         "1. msg_conversation_digest for activity; msg_summarize for topics and salient lines.\n"
         "2. msg_action_items to surface requests and assignments; create only what the team confirms.\n"
@@ -10348,7 +10348,7 @@ def prompt_messaging_digest(conversation_id: str = "", days: int = 7) -> str:
             description="Draft a formal e-mail escalation for an unresolved internal issue.")
 def prompt_messaging_escalation(conversation_id: str = "", issue: str = "") -> str:
     return (
-        "You are drafting a formal escalation e-mail for an internal Arz-e-Pak issue.\n"
+        "You are drafting a formal escalation e-mail for an internal Watan-e-Pak issue.\n"
         + (f"Source conversation: {conversation_id}.\n" if conversation_id else "")
         + (f"Issue: {issue}.\n" if issue else "")
         + "1. msg_summarize + msg_actions to gather the facts and the current owner.\n"
@@ -14923,11 +14923,11 @@ def _seed_content() -> None:
     # ---- Content pages ----
     content.pages_db.extend([
         content.PortalPage(
-            key="about", title="About Arz-e-Pak", category="about", order=10,
+            key="about", title="About Watan-e-Pak", category="about", order=10,
             nav_label="About", subtitle="Pakistan's smart, data-driven property marketplace",
             summary="Two decades of connecting Pakistani families, investors and developers.",
             body=[
-                "Arz-e-Pak is a full-stack real-estate portal built for Pakistan. From the "
+                "Watan-e-Pak is a full-stack real-estate portal built for Pakistan. From the "
                 "tree-lined streets of DHA Lahore to the coastline of DHA Karachi and the "
                 "planned sectors of Islamabad, we map every city, society, block and property "
                 "into one navigable, data-rich platform.",
@@ -14997,7 +14997,7 @@ def _seed_content() -> None:
             tags=["services"],
         ),
         content.PortalPage(
-            key="why-us", title="Why Arz-e-Pak", category="why-us", order=40,
+            key="why-us", title="Why Watan-e-Pak", category="why-us", order=40,
             nav_label="Why Us", subtitle="The advantages our clients keep telling us about",
             body=[
                 "Property is the largest purchase most Pakistanis ever make. We built the "
@@ -15016,7 +15016,7 @@ def _seed_content() -> None:
             key="how-it-works", title="How It Works", category="help", order=45,
             nav_label="How It Works", subtitle="Four steps from search to keys",
             body=[
-                "Arz-e-Pak follows a simple, repeatable path so nothing is left to chance.",
+                "Watan-e-Pak follows a simple, repeatable path so nothing is left to chance.",
             ],
             highlights=[
                 {"label": "1. Search", "value": "Map first", "sub": "filter by city, society, block"},
@@ -15089,7 +15089,7 @@ def _seed_content() -> None:
         ),
         content.PortalPage(
             key="terms", title="Terms of Use", category="legal", order=80,
-            nav_label="Terms", subtitle="The ground rules for using Arz-e-Pak",
+            nav_label="Terms", subtitle="The ground rules for using Watan-e-Pak",
             body=[
                 "By using the portal you agree to provide accurate information, to use listing "
                 "data for lawful purposes only, and to respect the intellectual-property rights "
@@ -15125,7 +15125,7 @@ def _seed_content() -> None:
 
     # ---- Company history timeline ----
     history_rows = [
-        (2005, 3, "founding", "Arz-e-Pak is founded in Lahore",
+        (2005, 3, "founding", "Watan-e-Pak is founded in Lahore",
          "Three agents and an engineer start the firm with a simple idea: document every deal.", True),
         (2007, 8, "milestone", "First 1,000 listings catalogued",
          "Manual field surveys turn into a searchable printed and online register.", False),
@@ -15519,8 +15519,8 @@ def _seed_content() -> None:
              priority=27, weight=1.1, budget=250_000, spend=28_000,
              impressions=3_900, clicks=79, keywords=["سیکیورٹی", "گیٹ"], tags=["security", "urdu"],
              lang="ur"),
-        dict(title="Arz-e-Pak Advertising", headline="Reach serious buyers, not idle clicks",
-             advertiser="Arz-e-Pak", category="services", slot="newsletter",
+        dict(title="Watan-e-Pak Advertising", headline="Reach serious buyers, not idle clicks",
+             advertiser="Watan-e-Pak", category="services", slot="newsletter",
              body="Put your brand in front of verified buyers, landlords, investors and "
                   "developers across four cities — with transparent performance reporting.",
              cta_label="Request the media kit", cta_url="https://example.com/advertise",
@@ -16026,7 +16026,7 @@ def _seed_messaging() -> None:
                     "panel on every property record, with e-mail and optional Telegram alerts.",
             body=[
                 "The Team Messaging wing is the portal's internal communication system. It keeps the "
-                "team's conversations inside Arz-e-Pak and tied to the work itself: direct messages, "
+                "team's conversations inside Watan-e-Pak and tied to the work itself: direct messages, "
                 "group discussions and channels such as Sales, Property Verification, GIS & Mapping, "
                 "Customer Support and Management, plus an internal discussion panel on every "
                 "property record so a listing, its map, its documents and its follow-up tasks stay "

@@ -12,7 +12,7 @@ import { useMcpAdmin, useMcpTools } from "@/components/tools/MiscTools";
 
 const MCP_URL = "http://127.0.0.1:8000/mcp";
 // MCP needs PORTAL_MCP_TOKEN (backend/.env) as a bearer token; local dev clients may skip it.
-const CONFIG = JSON.stringify({ mcpServers: { arzepak: { type: "http", url: MCP_URL, headers: { Authorization: "Bearer <PORTAL_MCP_TOKEN>" } } } }, null, 2);
+const CONFIG = JSON.stringify({ mcpServers: { watanepak: { type: "http", url: MCP_URL, headers: { Authorization: "Bearer <PORTAL_MCP_TOKEN>" } } } }, null, 2);
 
 const prefixOf = (n: string) => n.split("_")[0] ?? n;
 const tryParse = (t?: string): unknown => {
@@ -513,7 +513,7 @@ export default function McpConsole() {
   const [client, setClient] = useState<"claude" | "cursor" | "code">("claude");
   const info = init.data;
   const caps = info?.capabilities && typeof info.capabilities === "object" ? Object.keys(info.capabilities as Record<string, unknown>) : [];
-  const snippet = client === "code" ? `claude mcp add --transport http arzepak ${MCP_URL}` : CONFIG;
+  const snippet = client === "code" ? `claude mcp add --transport http watanepak ${MCP_URL}` : CONFIG;
   const where = { claude: "claude_desktop_config.json", cursor: ".cursor/mcp.json", code: "terminal" }[client];
 
   return (
@@ -526,7 +526,7 @@ export default function McpConsole() {
             <h1 className="mt-4 flex items-center gap-3 font-display text-3xl font-bold sm:text-4xl">
               <Terminal className="h-8 w-8 text-gold-300" /> MCP Console
             </h1>
-            <p className="mt-3 max-w-xl text-white/75">Inspect and call every tool, resource and prompt the Arz-e-Pak Model Context Protocol server exposes — exactly what Claude, ChatGPT or Cursor see.</p>
+            <p className="mt-3 max-w-xl text-white/75">Inspect and call every tool, resource and prompt the Watan-e-Pak Model Context Protocol server exposes — exactly what Claude, ChatGPT or Cursor see.</p>
             <div className="mt-5 flex flex-wrap items-center gap-2 text-xs">
               {!admin ? (
                 <span className="chip bg-gold-400/20 text-gold-100">

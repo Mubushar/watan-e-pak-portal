@@ -52,7 +52,7 @@ export const useAuth = create<AuthState>()(
         expiryListeners.forEach((l) => l());
       },
     }),
-    { name: "arzepak-app-auth" },
+    { name: "watanepak-app-auth" },
   ),
 );
 

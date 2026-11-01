@@ -1,4 +1,4 @@
-# Arz-e-Pak Portal — Administration Guide
+# Watan-e-Pak Portal — Administration Guide
 
 This guide is for **portal administrators, DevOps and IT**. It covers deployment,
 configuration, access control, security, data and storage, monitoring, and the day-to-day
@@ -72,8 +72,8 @@ the ones you set first:
 # Example: production-style session
 $env:PORTAL_ENV = "production"
 $env:PORTAL_MCP_TOKEN = "<long random value>"
-$env:PORTAL_CORS_ORIGINS = "https://arzepak.pk"
-$env:PORTAL_ALLOWED_HOSTS = "arzepak.pk,api.arzepak.pk"
+$env:PORTAL_CORS_ORIGINS = "https://watanepak.pk"
+$env:PORTAL_ALLOWED_HOSTS = "watanepak.pk,api.watanepak.pk"
 uv run python main.py
 ```
 
@@ -579,7 +579,7 @@ commercial app may need DHA's permission. Check before launch.
 ### 4.8 Advertising (earning from ads)
 
 The apps carry ad slots on Home (rotating banners), Explore (one card after every 6
-listings), each listing page and Profile ("Advertise with Arz-e-Pak"). Each slot first
+listings), each listing page and Profile ("Advertise with Watan-e-Pak"). Each slot first
 shows a **sponsored ad you sold directly**. If no advertiser has booked that slot, it
 falls back to **Google**:
 

@@ -112,7 +112,7 @@ function Sidebar({ collapsed, onToggle, unread }: { collapsed: boolean; onToggle
       <div className={cn("flex h-16 items-center border-b border-white/10 px-4", collapsed && "justify-center px-0")}>
         {collapsed ? (
           <Link to="/">
-            <img src="/brand/logo-mark.webp" className="h-9" alt="Arz-e-Pak" />
+            <img src="/brand/logo-mark.webp" className="h-9" alt="Watan-e-Pak" />
           </Link>
         ) : (
           <Logo light />

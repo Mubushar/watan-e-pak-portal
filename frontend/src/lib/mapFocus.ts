@@ -14,7 +14,7 @@ export interface MapFocus {
   bounds?: [number, number, number, number];
 }
 
-const EVENT = "arzepak:map-focus";
+const EVENT = "watanepak:map-focus";
 let pending: MapFocus | null = null;
 let focusedAt = 0;
 /** When the assistant last moved the map (the fly-to takes ~1 s). */
@@ -100,7 +100,7 @@ export interface RouteRequest {
   to: Spot;
   mode: "drive" | "bike" | "walk";
 }
-const ROUTE_EVENT = "arzepak:map-route";
+const ROUTE_EVENT = "watanepak:map-route";
 let pendingRoute: RouteRequest | null = null;
 export function routeOnMap(r: RouteRequest): void {
   pendingRoute = r;

@@ -770,7 +770,7 @@ Legend: `?` = optional parameter. Types are the JSON-Schema types the server adv
 | `tool_cad_formats` | Supported drawing formats and what each can actually preview/convert. | — |
 | `tool_cad_inspect` | Detect a drawing's format from its name/first bytes and report capabilities. | `filename`?:string="", `head_base64`?:optional, `size_bytes`?:integer=0 |
 | `tool_calculators` | The calculators offered by the Tools Center, with their inputs and engines. | — |
-| `tool_calendar_ics` | Render events as a downloadable iCalendar (.ics) feed. | `events`:array<object>, `calendar_name`?:string="Arz-e-Pak" |
+| `tool_calendar_ics` | Render events as a downloadable iCalendar (.ics) feed. | `events`:array<object>, `calendar_name`?:string="Watan-e-Pak" |
 | `tool_capital_gains_tax` | Capital-gains tax on a disposal, by holding period and filer status. | `gain`:number, `holding_years`:number, `filer`?:boolean=true |
 | `tool_compare_revisions` | Compare two revisions of a plan: counts, extents and added/removed items. | `a_entities`:array<object>, `b_entities`:array<object> |
 | `tool_construction_cost` | Construction-cost estimate (delegates to the construction wing's engine). | `covered_area`:number, `floors`?:integer=1, `building_type`?:string="house", `quality_tier`?:string="standard", `system`?:string="rcc_frame", `city`?:optional, `plot_area`?:optional, `escalation_years`?:number=0.0 |

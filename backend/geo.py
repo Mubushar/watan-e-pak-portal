@@ -506,7 +506,7 @@ def geocode_online(text: str) -> Optional[Dict[str, Any]]:
         _last_geocode = time.monotonic()
         try:
             r = httpx.get("https://nominatim.openstreetmap.org/search", timeout=8,
-                          headers={"User-Agent": "Arz-e-Pak/1.0 (real-estate assistant)"},
+                          headers={"User-Agent": "Watan-e-Pak/1.0 (real-estate assistant)"},
                           params={"q": text, "format": "jsonv2", "countrycodes": "pk", "limit": 1, "polygon_geojson": 1,
                                   "polygon_threshold": 0.0003})
             hits = r.json() if r.status_code == 200 else []

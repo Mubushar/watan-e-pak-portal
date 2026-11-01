@@ -176,7 +176,7 @@ export default function SignIn() {
       </AnimatePresence>
 
       <p className="mt-10 text-center text-sm text-ink-mute dark:text-slate-400">
-        New to Arz-e-Pak?{" "}
+        New to Watan-e-Pak?{" "}
         <Link to={`/signup${next !== "/" ? `?next=${encodeURIComponent(next)}` : ""}`} className="link">
           Create an account
         </Link>

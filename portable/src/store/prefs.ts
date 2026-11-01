@@ -39,6 +39,6 @@ export const usePrefs = create<PrefsState>()(
       setReplyLang: (replyLang) => set({ replyLang }),
       setOnboarded: (onboarded) => set({ onboarded }),
     }),
-    { name: "arzepak-app-prefs" },
+    { name: "watanepak-app-prefs" },
   ),
 );

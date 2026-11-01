@@ -1,4 +1,4 @@
-# Arz-e-Pak Portal — Testing Guide
+# Watan-e-Pak Portal — Testing Guide
 
 This guide is for **developers and QA**. It explains the test layers, how to run them,
 what each one covers, and how to add tests — with dedicated sections for testing the

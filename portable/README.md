@@ -1,4 +1,4 @@
-# Arz-e-Pak portable app
+# Watan-e-Pak portable app
 
 One React codebase that ships as a native app on **Android**, **iOS**, **Windows** and
 **macOS** (and Linux / the browser), using the same brand theme as the web portal in
@@ -50,7 +50,7 @@ The app talks to the same FastAPI backend as the portal (`backend/`):
 
 The backend allows every origin in development, so the desktop app and any separately
 hosted build can call it. In production (`PORTAL_ENV=production`) list the origins in
-`PORTAL_CORS_ORIGINS`: the desktop app's is `app://arzepak`, plus the web build's domain. On
+`PORTAL_CORS_ORIGINS`: the desktop app's is `app://watanepak`, plus the web build's domain. On
 Android/iOS, requests go through Capacitor's native HTTP and need no CORS entry.
 
 An expired session signs the user out with a *Sign in* prompt. Sign-up as an agent creates

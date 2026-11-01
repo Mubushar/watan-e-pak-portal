@@ -204,7 +204,7 @@ def admin_add_photo(project_id: str, url: str, primary: bool = False) -> Dict[st
     images = [*(fields.get("images") or []), url]
     fields["images"] = images
     if primary or not any(u.startswith("/media/") for u in images[:-1]):
-        fields["image"], fields["image_credit"] = url, "Photo taken on site (Arz-e-Pak survey)"
+        fields["image"], fields["image_credit"] = url, "Photo taken on site (Watan-e-Pak survey)"
     e["updated_at"] = datetime.now().isoformat(timespec="seconds")
     return summary(get(project_id))
 

@@ -233,7 +233,7 @@ const BOOKS: Record<Lang, Phrasebook> = {
         "Type, send a voice note, or start a voice conversation — in English or Urdu.",
       ].join("\n"),
     welcome: (name, role) =>
-      `Assalam-o-Alaikum${name ? ` ${name}` : ""}! I’m **Arz-e-Pak AI**. ${roleLine.en(role)}\n\nType a message, send a voice note, or start a voice conversation — English, اردو or Roman Urdu.`,
+      `Assalam-o-Alaikum${name ? ` ${name}` : ""}! I’m **Watan-e-Pak AI**. ${roleLine.en(role)}\n\nType a message, send a voice note, or start a voice conversation — English, اردو or Roman Urdu.`,
     suggestions: (role) =>
       role === "seller" || role === "landlord"
         ? ["I want to sell my 10 marla house in Lahore for 4.5 crore", "میری لسٹنگز دکھائیں", "How do I sell faster?"]
@@ -286,7 +286,7 @@ const BOOKS: Record<Lang, Phrasebook> = {
         "لکھیں، وائس نوٹ بھیجیں یا آواز میں بات شروع کریں — اردو یا انگریزی میں۔",
       ].join("\n"),
     welcome: (name, role) =>
-      `السلام علیکم${name ? ` ${name}` : ""}! میں **ارضِ پاک اے آئی** ہوں۔ ${roleLine.ur(role)}\n\nپیغام لکھیں، وائس نوٹ بھیجیں یا آواز میں بات شروع کریں — اردو، رومن اردو یا انگریزی میں۔`,
+      `السلام علیکم${name ? ` ${name}` : ""}! میں **وطنِ پاک اے آئی (Watan-e-Pak AI)** ہوں۔ ${roleLine.ur(role)}\n\nپیغام لکھیں، وائس نوٹ بھیجیں یا آواز میں بات شروع کریں — اردو، رومن اردو یا انگریزی میں۔`,
     suggestions: (role) =>
       role === "seller" || role === "landlord"
         ? ["میں لاہور میں اپنا 10 مرلہ گھر 4.5 کروڑ میں بیچنا چاہتا ہوں", "میری لسٹنگز دکھائیں", "پراپرٹی جلدی کیسے بکے؟"]
@@ -336,7 +336,7 @@ const BOOKS: Record<Lang, Phrasebook> = {
         "",
         "Likhein, voice note bhejein ya awaaz mein baat shuru karein — Urdu ya English mein.",
       ].join("\n"),
-    welcome: (name, role) => `Assalam-o-Alaikum${name ? ` ${name}` : ""}! Main **Arz-e-Pak AI** hun. ${roleLine.en(role)}`,
+    welcome: (name, role) => `Assalam-o-Alaikum${name ? ` ${name}` : ""}! Main **Watan-e-Pak AI** hun. ${roleLine.en(role)}`,
     suggestions: () => ["Lahore mein 10 marla ghar 5 crore tak", "Karachi mein flat dikhao", "Meri listings dikhao"],
     replyInstruction: "Reply in Roman Urdu (Urdu written in English letters), the way the user writes.",
   },

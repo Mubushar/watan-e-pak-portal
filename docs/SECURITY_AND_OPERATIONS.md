@@ -1,4 +1,4 @@
-# Arz-e-Pak Portal — Security & Operations
+# Watan-e-Pak Portal — Security & Operations
 
 This guide is for **whoever deploys and runs the portal**: DevOps, IT and the portal owner.
 It covers the environment variables, the security model, durable storage and backups, and
@@ -26,8 +26,8 @@ the backend after a change. Never put real secrets in documentation, tickets or 
 | `PORTAL_MCP_STATELESS` | `1` | Run the MCP HTTP transport statelessly (no `Mcp-Session-Id` needed). |
 | `PORTAL_TRUST_PROXY` | `0` | `1` only behind your own reverse proxy: the client address comes from `X-Forwarded-For` (for rate limits). `AI_TRUST_PROXY=1` has the same effect. |
 | `PORTAL_MAX_BODY_MB` | `30` | Largest request body accepted; larger requests get `413`. |
-| `PORTAL_ALLOWED_HOSTS` | *(empty)* | Comma-separated `Host` names the API answers for, e.g. `arzepak.pk,api.arzepak.pk` (`localhost` and `127.0.0.1` are always added). Unset means any host is accepted. |
-| `PORTAL_CORS_ORIGINS` | `*` in development, none in production | Comma-separated browser origins allowed to call the API (the web portal's domain, the desktop app's `app://arzepak`). `*` is ignored in production. |
+| `PORTAL_ALLOWED_HOSTS` | *(empty)* | Comma-separated `Host` names the API answers for, e.g. `watanepak.pk,api.watanepak.pk` (`localhost` and `127.0.0.1` are always added). Unset means any host is accepted. |
+| `PORTAL_CORS_ORIGINS` | `*` in development, none in production | Comma-separated browser origins allowed to call the API (the web portal's domain, the desktop app's `app://watanepak`). `*` is ignored in production. |
 | `PORTAL_HOST` / `PORTAL_PORT` | `127.0.0.1` / `8000` | Where `main.py` listens. `0.0.0.0` makes it reachable from the LAN. |
 
 ### 1.2 Sign-in and accounts
@@ -277,7 +277,7 @@ Install the PostgreSQL driver with `uv sync --extra postgres` (or
 `pip install "psycopg[binary]"`), then set:
 
 ```ini
-DATABASE_URL=postgresql://arzepak:<password>@db.internal:5432/arzepak
+DATABASE_URL=postgresql://watanepak:<password>@db.internal:5432/watanepak
 ```
 
 Run **one** backend process. Each process keeps its own in-memory copy, so several
@@ -324,7 +324,7 @@ data, not what the portal has saved. For backups use §3.3, not the export.
 - [ ] Set `PORTAL_MCP_TOKEN` to a long random value if MCP clients need access, and give it
       only to those clients. Otherwise `/mcp` is for administrators only.
 - [ ] Set `PORTAL_CORS_ORIGINS` to your exact origins: the web portal's domain and, for the
-      desktop app, `app://arzepak`. The Android and iOS apps use native HTTP and need no
+      desktop app, `app://watanepak`. The Android and iOS apps use native HTTP and need no
       CORS entry.
 - [ ] Set `PORTAL_ALLOWED_HOSTS` to your API host names.
 - [ ] Serve only through an **HTTPS reverse proxy** (nginx, Caddy, IIS, a cloud load

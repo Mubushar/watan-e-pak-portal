@@ -86,7 +86,7 @@ export default function Signup() {
       const r = await post<Session>("/auth/verify-otp", { identifier, code, purpose: "signup" });
       if (r.token) {
         setSession(r);
-        toast.success("Account verified — welcome to Arz-e-Pak!");
+        toast.success("Account verified — welcome to Watan-e-Pak!");
         if (r.user.requested_role) toast.info(`Your ${r.user.requested_role} access request is waiting for an administrator's approval.`);
         nav("/app", { replace: true });
       } else {

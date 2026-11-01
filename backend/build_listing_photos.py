@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "backend" / "geodata" / "pk_listing_photos.json"
 OUTS = [ROOT / "frontend" / "public" / "seed" / "photos", ROOT / "portable" / "public" / "seed" / "photos"]
 TS_OUTS = [ROOT / "frontend" / "src" / "lib" / "photoLibrary.ts", ROOT / "portable" / "src" / "lib" / "photoLibrary.ts"]
-UA = "ArzePakPortal/1.0 (https://github.com/Mubushar/arzepak-portal; photo library build)"
+UA = "WatanePakPortal/1.0 (https://github.com/Mubushar/watan-e-pak-portal; photo library build)"
 SIZE = (960, 720)
 SCENE_SIZE = (1600, 900)  # page headers ("scene" category)
 

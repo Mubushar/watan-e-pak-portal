@@ -1,4 +1,4 @@
-# Arz-e-Pak Portal — Agentic AI Guide
+# Watan-e-Pak Portal — Agentic AI Guide
 
 This guide is for **AI engineers and product owners** working with the portal's Agentic
 OS: the products, the 24-agent catalogue, the run engine, autonomy and approval gates, and

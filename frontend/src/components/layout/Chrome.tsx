@@ -59,14 +59,30 @@ export function OfflineBanner() {
 export function Logo({ className, light }: { className?: string; light?: boolean }) {
   return (
     <Link to="/" className={cn("flex shrink-0 items-center gap-2.5 whitespace-nowrap", className)}>
-      <img src={BRAND.mark} alt="Arz-e-Pak" className="h-10 w-auto drop-shadow-sm" />
-      <span className="leading-none">
-        <span className={cn("block font-display text-xl font-extrabold tracking-tight", light ? "text-white" : "text-brand-800 dark:text-white")}>
-          Arz-e-<span className="text-gradient">Pak</span>
-        </span>
-        <span className={cn("block text-[9px] font-semibold uppercase tracking-[.22em]", light ? "text-white/70" : "text-ink-mute dark:text-slate-400")}>AI Real Estate Portal</span>
-      </span>
+      <img src={BRAND.mark} alt="Watan-e-Pak" className="h-12 w-auto drop-shadow-sm" />
+      <BrandWords light={light} />
     </Link>
+  );
+}
+
+/**
+ * The brand wordmark, centred in three lines: وطن پاک (وطن gold, پاک green), WatanePak (green
+ * with a gold "e") and "AI Real Estate Portal". `light` is for photos and dark-green backgrounds.
+ * Same as portable/src/components/ui.tsx, except the app sets WatanePak in the regular (thinner) weight.
+ */
+export function BrandWords({ light }: { light?: boolean }) {
+  const green = light ? "text-white" : "text-brand-600 dark:text-brand-300";
+  const gold = light ? "text-gold-300" : "text-gold-500 dark:text-gold-300";
+  return (
+    <span className="flex flex-col items-center leading-none">
+      <span lang="ur" dir="rtl" className="mb-0.5 font-urdu text-[18px] font-normal leading-[1.75]">
+        <span className={gold}>وطن</span> <span className={green}>پاک</span>
+      </span>
+      <span className={cn("font-display text-[22px] font-semibold tracking-tight", green)}>
+        Watan<span className={gold}>e</span>Pak
+      </span>
+      <span className={cn("mt-0.5 text-[10.5px] font-medium tracking-wide", light ? "text-white/85" : "text-ink dark:text-slate-300")}>AI Real Estate Portal</span>
+    </span>
   );
 }
 

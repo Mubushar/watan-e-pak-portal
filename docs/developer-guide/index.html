@@ -1,6 +1,6 @@
-<title>Arz-e-Pak Developer Guide</title>
+<title>Watan-e-Pak Developer Guide</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="description" content="A visual guide to the Arz-e-Pak AI real-estate portal for developers new to AI: architecture, MCP, RAG, memory, authentication, PostgreSQL storage, REST API, GIS, CRM, administration and how to extend it.">
+<meta name="description" content="A visual guide to the Watan-e-Pak AI real-estate portal for developers new to AI: architecture, MCP, RAG, memory, authentication, PostgreSQL storage, REST API, GIS, CRM, administration and how to extend it.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -13,10 +13,10 @@
   --ink-soft: #3d4f43;
   --mute: #6b7b70;
   --line: #dde3da;
-  --brand: #0f5a3a;       /* Arz-e-Pak green */
+  --brand: #0f5a3a;       /* Watan-e-Pak green */
   --brand-ink: #0b4a2f;
   --brand-wash: #e7f1ea;
-  --gold: #b9871a;        /* Arz-e-Pak gold */
+  --gold: #b9871a;        /* Watan-e-Pak gold */
   --gold-wash: #fbf2dc;
   --code-bg: #10241a;
   --code-ink: #dcefe2;
@@ -183,7 +183,7 @@ footer { color: var(--mute); font-size: .9rem; border-top: 1px solid var(--line)
   <main>
     <header class="hero" id="top">
       <span class="eyebrow">Developer guide · for engineers new to AI</span>
-      <h1>How the Arz-e-Pak portal <em>thinks</em>, stores and serves</h1>
+      <h1>How the Watan-e-Pak portal <em>thinks</em>, stores and serves</h1>
       <p class="lede">A visual tour of the AI real-estate portal for Pakistan: the web portal, the portable app, the FastAPI backend with its MCP server, the cited knowledge base, assistant memory, PostgreSQL storage, the GIS stack and the CRM. Read it top to bottom once; afterwards use the contents rail as a map when you change something.</p>
       <div class="facts" aria-label="System in numbers">
         <div><b>700</b>REST routes</div>
@@ -440,7 +440,7 @@ _add("GET", r"^/schemes/[^/]+/summary$", "public")
       <pre><code>// claude_desktop_config.json
 {
   "mcpServers": {
-    "arzepak": {
+    "watanepak": {
       "type": "http",
       "url": "https://api.your-domain.pk/mcp",
       "headers": { "Authorization": "Bearer &lt;PORTAL_MCP_TOKEN&gt;" }
@@ -668,7 +668,7 @@ _add("GET", r"^/schemes/[^/]+/summary$", "public")
       </figure>
       <h3>Switching to PostgreSQL</h3>
       <pre><code># backend/.env
-DATABASE_URL=postgresql://arzepak:&lt;password&gt;@localhost:5432/arzepak
+DATABASE_URL=postgresql://watanepak:&lt;password&gt;@localhost:5432/watanepak
 
 # install the driver once
 uv pip install "psycopg[binary]"
@@ -678,7 +678,7 @@ GET /portal/storage        → backend, rows per store, last flush
 POST /portal/storage/flush → save now
 
 # backups
-pg_dump -Fc arzepak &gt; arzepak-$(date +%F).dump</code></pre>
+pg_dump -Fc watanepak &gt; watanepak-$(date +%F).dump</code></pre>
       <div class="note green"><b>Relational export.</b> <code>migrate_to_postgres.py</code> still generates a fully normalised schema (one table per store, foreign keys) for reporting and BI tools; the live portal uses the document table above.</div>
     </section>
 
@@ -796,6 +796,6 @@ cd ../portable &amp;&amp; npx tsc -b --noEmit   # app types</code></pre>
       </dl>
     </section>
 
-    <footer>Arz-e-Pak AI Real Estate Portal · developer guide, October 2026 · screenshots from a development build with sample data · source: <code>docs/developer-guide/</code></footer>
+    <footer>Watan-e-Pak AI Real Estate Portal · developer guide, October 2026 · screenshots from a development build with sample data · source: <code>docs/developer-guide/</code></footer>
   </main>
 </div>

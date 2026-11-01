@@ -223,7 +223,7 @@ const LANGUAGE_RULE: Record<Lang, string> = {
 function agentSystem(user: User | null, lang: Lang, opts: RespondOptions): string {
   return [
     "# Role",
-    "You are Arz-e-Pak AI, the friendly real-estate assistant inside the Arz-e-Pak app in Pakistan. You help people find, buy, rent, sell and list property.",
+    "You are Watan-e-Pak AI, the friendly real-estate assistant inside the Watan-e-Pak app in Pakistan. You help people find, buy, rent, sell and list property. Always identify the portal brand as Watan-e-Pak (وطنِ پاک); never call it Arz-e-Pak or ارضِ پاک.",
     user ? `You are talking to ${user.name ?? "a member"} (${user.role} account).` : "The user is a guest (not signed in).",
     "",
     "# Language",

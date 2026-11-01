@@ -242,7 +242,7 @@ export default function ListingForm() {
             <CheckCircle2 className="h-10 w-10" />
           </motion.span>
           <h1 className="mt-5 font-display text-2xl font-bold text-brand-900 dark:text-white">You're live! 🎉</h1>
-          <p className="mt-2 max-w-sm text-ink-mute">“{created.title}” is now searchable in the app, on the Arz-e-Pak portal and by every AI agent.</p>
+          <p className="mt-2 max-w-sm text-ink-mute">“{created.title}” is now searchable in the app, on the Watan-e-Pak portal and by every AI agent.</p>
           <div className="mt-8 grid w-full max-w-sm gap-3">
             <Link to={`/property/${created.id}`} className="btn btn-primary btn-lg">
               View listing

@@ -215,7 +215,7 @@ export default function Pricing() {
 
       {/* products */}
       <div id="products" className="scroll-mt-20">
-        <Section eyebrow="Catalogue" title="The product line-up" subtitle="Each product is a module of the Arz-e-Pak Agentic OS — built on the same MCP server and data.">
+        <Section eyebrow="Catalogue" title="The product line-up" subtitle="Each product is a module of the Watan-e-Pak Agentic OS — built on the same MCP server and data.">
           <QueryState q={products} skeleton={<Skeleton className="h-80" />}>
             {(d) => (
               <motion.div variants={stagger.container} initial="hidden" whileInView="show" viewport={{ once: true }} className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">

@@ -61,7 +61,7 @@ export default function Stories() {
             Real families. Real returns. <span className="text-gradient">Real Pakistan.</span>
           </>
         }
-        subtitle="Buyers, investors, developers and landlords on what changed when they moved with Arz-e-Pak."
+        subtitle="Buyers, investors, developers and landlords on what changed when they moved with Watan-e-Pak."
         crumbs={[{ label: "Home", to: "/" }, { label: "Stories" }]}
       >
         {q.data && (

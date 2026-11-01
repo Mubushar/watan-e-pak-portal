@@ -1,5 +1,5 @@
 /**
- * Ad slots. A slot shows a sponsored ad sold by Arz-e-Pak when there is one, otherwise
+ * Ad slots. A slot shows a sponsored ad sold by Watan-e-Pak when there is one, otherwise
  * Google AdSense on the web build (see lib/ads). Every ad is labelled "Sponsored".
  */
 import { useEffect, useRef, useState, type ComponentType } from "react";
@@ -218,7 +218,7 @@ export function AdSlot({ slot, placement, variant = "card", index = 0, rotate = 
   return null;
 }
 
-/** "Advertise with Arz-e-Pak": invites vendors to buy ad space. */
+/** "Advertise with Watan-e-Pak": invites vendors to buy ad space. */
 export function AdvertiseWithUs({ className }: { className?: string }) {
   const [cfg, setCfg] = useState<AdConfig | null>(null);
   useEffect(() => {
@@ -231,10 +231,10 @@ export function AdvertiseWithUs({ className }: { className?: string }) {
         <Megaphone className="h-5 w-5" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="font-semibold text-brand-900 dark:text-white">Advertise with Arz-e-Pak</p>
+        <p className="font-semibold text-brand-900 dark:text-white">Advertise with Watan-e-Pak</p>
         <p className="mt-0.5 text-sm text-ink-soft dark:text-slate-300">{cfg?.advertise.body ?? "Reach buyers, investors and developers across Pakistan."}</p>
         {email && (
-          <a href={`mailto:${email}?subject=${encodeURIComponent("Advertising on Arz-e-Pak")}`} className="btn btn-outline mt-3 !py-2 text-sm">
+          <a href={`mailto:${email}?subject=${encodeURIComponent("Advertising on Watan-e-Pak")}`} className="btn btn-outline mt-3 !py-2 text-sm">
             Contact {email}
           </a>
         )}

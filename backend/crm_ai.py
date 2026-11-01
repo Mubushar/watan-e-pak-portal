@@ -327,7 +327,7 @@ GOALS = {
 def _template(name: str, goal: str, lang: str, matches: List[Dict[str, Any]], agent: Optional[str], city: Optional[str]) -> Dict[str, str]:
     first = (name or "").split()[0] if name else ""
     top = matches[0] if matches else None
-    sig = agent or "Arz-e-Pak team"
+    sig = agent or "Watan-e-Pak team"
     if lang == "ur":
         lines = {
             "follow_up": f"السلام علیکم {first}! امید ہے آپ خیریت سے ہیں۔ آپ کی پراپرٹی کی تلاش کے بارے میں رابطہ کر رہا ہوں — کیا ہم آج مختصر بات کر سکتے ہیں؟",
@@ -339,7 +339,7 @@ def _template(name: str, goal: str, lang: str, matches: List[Dict[str, Any]], ag
             "proposal": f"السلام علیکم {first}! آپ کے لیے قیمت اور ادائیگی کا پلان تیار ہے۔ کیا میں ابھی بھیج دوں؟",
         }
         body = lines.get(goal, lines["follow_up"]) + f"\n— {sig}"
-        return {"subject": "Arz-e-Pak — آپ کی پراپرٹی کی تلاش", "body": body}
+        return {"subject": "Watan-e-Pak — آپ کی پراپرٹی کی تلاش", "body": body}
     lines = {
         "follow_up": f"Hi {first}, hope you're well! Following up on your property search — do you have 5 minutes for a quick call today?",
         "new_matches": f"Hi {first}, new listings just came in{f' in {city}' if city else ''} that fit your budget" + (f", including \"{top['title']}\"" if top else "") + ". Shall I send you the details?",
@@ -349,7 +349,7 @@ def _template(name: str, goal: str, lang: str, matches: List[Dict[str, Any]], ag
         "thank_you": f"Thank you for your time today, {first}! Let me know if any questions come up.",
         "proposal": f"Hi {first}, your price breakdown and payment plan are ready. Shall I send them over?",
     }
-    return {"subject": "Your property search — Arz-e-Pak", "body": lines.get(goal, lines["follow_up"]) + f"\n— {sig}"}
+    return {"subject": "Your property search — Watan-e-Pak", "body": lines.get(goal, lines["follow_up"]) + f"\n— {sig}"}
 
 
 def _lead_context(lead: Any) -> Dict[str, Any]:
@@ -460,7 +460,7 @@ def draft_message(entity_type: str, entity_id: str, channel: str = "whatsapp", g
         "You write outreach messages for a Pakistani real-estate agent. Short, personal, specific, honest; no fake urgency. "
         f"Tone: {tone}. Channel: {channel} ({'max 300 characters' if channel == 'sms' else 'WhatsApp-friendly, under 90 words' if channel == 'whatsapp' else 'email with a subject'}). "
         + ("Write in Urdu (Urdu script)." if lang == "ur" else "Write in English.")
-        + f" Sign as {agent or 'the Arz-e-Pak team'}.",
+        + f" Sign as {agent or 'the Watan-e-Pak team'}.",
         f"Goal: {GOALS.get(goal, goal)}.\nExtra instructions: {notes or '-'}\nContext (JSON):\n" + json.dumps(ctx, ensure_ascii=False, default=str)
         + '\nReturn JSON: {"subject": string or null, "body": string}.',
         max_tokens=500,

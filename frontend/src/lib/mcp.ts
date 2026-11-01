@@ -80,7 +80,7 @@ export const mcp = {
     rpc<{ serverInfo: { name: string; version: string }; capabilities: unknown; protocolVersion: string }>("initialize", {
       protocolVersion: "2025-06-18",
       capabilities: {},
-      clientInfo: { name: "arzepak-web", version: "1.0.0" },
+      clientInfo: { name: "watanepak-web", version: "1.0.0" },
     }),
   listTools: () => rpc<{ tools: McpTool[] }>("tools/list"),
   listResources: () => rpc<{ resources: { uri: string; name: string; description?: string; mimeType?: string }[] }>("resources/list"),

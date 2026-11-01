@@ -91,7 +91,7 @@ export default function SignUp() {
       const r = await post<Session>("/auth/verify-otp", { identifier: target, code: c, purpose: "signup" });
       setSession(r);
       setOnboarded(true);
-      toast.success("Account verified — welcome to Arz-e-Pak!");
+      toast.success("Account verified — welcome to Watan-e-Pak!");
       nav(next !== "/" ? next : role === "seller" || role === "agent" || role === "landlord" ? "/listings" : "/", { replace: true });
     } catch (e) {
       toast.error((e as Error).message);

@@ -263,7 +263,7 @@ export default function Home() {
         {/* ---------- you + AI ---------- */}
         <section className="mt-8 rounded-3xl bg-[#0b1611] p-4 text-white">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gold-300">How we work together</p>
-          <p className="mt-1 font-display text-xl font-light">You stay in charge. Arz-e-Pak AI does the legwork.</p>
+          <p className="mt-1 font-display text-xl font-light">You stay in charge. Watan-e-Pak AI does the legwork.</p>
           <div className="mt-4 space-y-2 text-[13px]">
             {[
               ["You describe the home and budget.", "AI shortlists the best three."],
@@ -291,7 +291,7 @@ export default function Home() {
             <Bot className="relative h-6 w-6 text-gold-200" />
           </span>
           <span className="min-w-0">
-            <span className="block font-display font-bold">Talk to Arz-e-Pak AI</span>
+            <span className="block font-display font-bold">Talk to Watan-e-Pak AI</span>
             <span className="block text-xs text-white/75">Search, price or list a property just by speaking — in English or Urdu.</span>
           </span>
         </Link>

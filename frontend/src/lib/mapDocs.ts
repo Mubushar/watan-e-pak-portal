@@ -59,7 +59,7 @@ export async function measureFile(m: { mode: "distance" | "area"; coords: LatLon
   const len = lengthUnits(isArea ? pathLengthM([...m.coords, m.coords[0]!]) : pathLengthM(m.coords));
   const a = isArea ? areaUnits(polygonAreaM2(m.coords)) : null;
   const title = isArea ? `Area measurement — ${a!.text}` : `Distance measurement — ${len.text}`;
-  const r = new ReportBuilder(isArea ? "Area measurement" : "Distance measurement", `${isArea ? a!.text : len.text} · measured on the Arz-e-Pak map`);
+  const r = new ReportBuilder(isArea ? "Area measurement" : "Distance measurement", `${isArea ? a!.text : len.text} · measured on the Watan-e-Pak map`);
   r.image(img, "Measured on the map (scale bar bottom left).");
   r.heading("Result");
   if (a)
@@ -259,10 +259,10 @@ export async function writtenReport(title: string, sections: ReportSection[], op
   return finish(await r.toPdf(), title, "pdf", title);
 }
 
-export async function chatFile(messages: { role: "user" | "assistant"; content: string }[], title = "Conversation with Arz-e-Pak AI"): Promise<ChatFile> {
+export async function chatFile(messages: { role: "user" | "assistant"; content: string }[], title = "Conversation with Watan-e-Pak AI"): Promise<ChatFile> {
   const r = new ReportBuilder(title, `${messages.length} messages`);
   for (const m of messages) {
-    r.heading(m.role === "user" ? "You" : "Arz-e-Pak AI");
+    r.heading(m.role === "user" ? "You" : "Watan-e-Pak AI");
     r.paragraph(m.content.replace(/\*\*|__|`/g, "").replace(/^#+\s*/gm, ""));
   }
   return finish(await r.toPdf(), title, "pdf", title);

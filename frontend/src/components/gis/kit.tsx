@@ -111,7 +111,7 @@ export function ReportModal({ report, onClose }: { report: ReportRef | null; onC
   const src = report ? apiUrl(report.path, { ...report.query, theme, lang }) : "";
   useEffect(() => setLoading(true), [src]);
   return (
-    <Modal open={!!report} onClose={onClose} title={report?.title} subtitle="Generated live by the Arz-e-Pak GIS engine" size="xl">
+    <Modal open={!!report} onClose={onClose} title={report?.title} subtitle="Generated live by the Watan-e-Pak GIS engine" size="xl">
       {report && (
         <div className="relative -mx-6 -my-5">
           {loading && (

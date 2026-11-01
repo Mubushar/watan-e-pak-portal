@@ -40,7 +40,7 @@ export default function Profile() {
       if (j.status !== "ok") throw new Error("Unexpected response");
       setServerUrl(normalizeServerUrl(server) || null);
       resetServerVoice();
-      toast.success(`Connected to Arz-e-Pak server v${j.version ?? "?"}`);
+      toast.success(`Connected to Watan-e-Pak server v${j.version ?? "?"}`);
     } catch {
       toast.error(`Can't reach ${url}. Check the address and that the backend is running.`);
     } finally {
@@ -57,7 +57,7 @@ export default function Profile() {
             <div className="flex items-center gap-4 bg-brand-gradient p-5 text-white">
               <Avatar name={user.name ?? user.email ?? user.mobile} className="h-14 w-14 text-lg" />
               <div className="min-w-0">
-                <p className="truncate font-display text-xl font-bold">{user.name ?? "Arz-e-Pak member"}</p>
+                <p className="truncate font-display text-xl font-bold">{user.name ?? "Watan-e-Pak member"}</p>
                 <span className="chip mt-1 bg-white/15 text-gold-200">{roleLabel(user.role)}</span>
               </div>
             </div>
@@ -188,7 +188,7 @@ export default function Profile() {
         )}
 
         <p className="pb-4 text-center text-xs text-ink-mute">
-          Arz-e-Pak AI Real Estate · {runtimeLabel[runtime]} app v{window.arzepak?.version ?? "1.0.0"}
+          Watan-e-Pak AI Real Estate · {runtimeLabel[runtime]} app v{window.watanepak?.version ?? "1.0.0"}
           <br />
           Map data ©{" "}
           <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="underline">

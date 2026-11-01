@@ -143,7 +143,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "Report": "رپورٹ",
         "Investment Outlook": "سرمایہ کاری کا امکان",
         # ---- portal / content ----
-        "Arz-e-Pak Real Estate Portal": "ارضِ پاک رئیل اسٹیٹ پورٹل",
+        "Watan-e-Pak Real Estate Portal": "وطنِ پاک رئیل اسٹیٹ پورٹل",
         "Pakistan's smart, data-driven property marketplace": "پاکستان کی ذہین اور ڈیٹا پر مبنی پراپرٹی مارکیٹ",
         "Home": "ہوم",
         "About": "تعارف",

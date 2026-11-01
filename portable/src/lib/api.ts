@@ -1,5 +1,5 @@
 /**
- * Fetch wrapper around the Arz-e-Pak FastAPI backend (same API as the web portal).
+ * Fetch wrapper around the Watan-e-Pak FastAPI backend (same API as the web portal).
  *
  * - Base URL comes from Profile → Server, else VITE_API_BASE, else a platform default.
  * - The bearer token from the auth store is attached automatically.
@@ -147,7 +147,7 @@ export async function api<T = unknown>(path: string, opts: ApiOptions = {}): Pro
       const s = await fromSnapshot<T>(path, opts.query);
       if (s !== undefined) return s;
     }
-    throw new ApiError(`Can't reach the Arz-e-Pak server (${apiBase()}). Check Profile → Server.`, 0);
+    throw new ApiError(`Can't reach the Watan-e-Pak server (${apiBase()}). Check Profile → Server.`, 0);
   } finally {
     clearTimeout(timer);
   }
@@ -161,7 +161,7 @@ export async function api<T = unknown>(path: string, opts: ApiOptions = {}): Pro
       const s = await fromSnapshot<T>(path, opts.query);
       if (s !== undefined) return s;
     }
-    throw new ApiError("The Arz-e-Pak server is unavailable right now.", res.status);
+    throw new ApiError("The Watan-e-Pak server is unavailable right now.", res.status);
   }
   setOffline(false);
 

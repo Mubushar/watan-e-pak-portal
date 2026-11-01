@@ -741,7 +741,7 @@ function Cta() {
         <div className="absolute inset-0 bg-gradient-to-r from-brand-950 via-brand-950/90 to-transparent rtl:bg-gradient-to-l" />
         <div className="relative max-w-xl">
           <p className="section-eyebrow !text-gold-300">For owners, brokers & developers</p>
-          <h2 className="mt-2 font-display text-3xl font-bold sm:text-4xl">List with Arz-e-Pak and let AI market it for you</h2>
+          <h2 className="mt-2 font-display text-3xl font-bold sm:text-4xl">List with Watan-e-Pak and let AI market it for you</h2>
           <p className="mt-3 text-white/75">Instant pricing from comparable sales, auto-generated listing kits and social posts, and a CRM that scores every buyer’s intent.</p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link to="/app/listings/new" className="btn btn-gold btn-lg">
