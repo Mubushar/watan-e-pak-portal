@@ -335,7 +335,7 @@ effect on the next start. Keep it out of git; `.env` is ignored.
 
 To turn real sending on:
 - **E-mail:** the `PORTAL_SMTP_*` settings.
-- **SMS:** `PORTAL_SMS_PROVIDER=twilio` or `webhook`.
+- **SMS:** `PORTAL_SMS_PROVIDER=smsgate` (your own Android phone + SIM running SMS Gateway for Android), `twilio` or `webhook`. Phone codes are only sent when the request carries `"sms_consent": true`.
 - **WhatsApp:** `WHATSAPP_TOKEN` and `WHATSAPP_PHONE_ID`. Free text only reaches people who messaged you in the last 24 hours; outside that window set `PORTAL_WHATSAPP_CRM_TEMPLATE` to an approved template with one body parameter.
 - **Voice notes and spoken answers:** `OPENAI_API_KEY`.
 

@@ -1,8 +1,9 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Bot, LineChart, MapPinned, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Bot, LineChart, MapPinned, Phone, ShieldCheck, Smartphone } from "lucide-react";
 import { HERO } from "@/lib/images";
+import { isAndroidApp, pickDeviceNumber, waitForSmsCode } from "@/lib/phoneNumberHint";
 import { Logo } from "@/components/ui";
 
 const PERKS: [typeof Bot, string][] = [
@@ -81,7 +82,7 @@ export function AuthLayout({ title, subtitle, children, back = true }: { title: 
   );
 }
 
-/** "Sent by SMS" / "e-mail" for toasts. */
+/** The phone OTP route uses SMS; email identifiers use e-mail. */
 export function channelWord(target: string): string {
   return target.includes("@") ? "e-mail" : "SMS";
 }
@@ -117,9 +118,12 @@ export function ResendButton({ seconds, onResend }: { seconds: number; onResend:
 // ------------------------------------------------------------------ identifier helpers
 export type Channel = "mobile" | "email";
 
-/** "0300 1234567", "3001234567", "+92 300 1234567" → "+923001234567" (PK numbers). */
+/**
+ * The full international number: "+92 300 1234567" / "0092…" → "+923001234567", "+971 50…" kept.
+ * A local Pakistani "0300 1234567" is still accepted and gets +92.
+ */
 export function toE164(raw: string): string {
-  let d = raw.replace(/[^\d+]/g, "");
+  let d = raw.replace(/[^\d+]/g, "").replace(/(?!^)\+/g, "");
   if (d.startsWith("+")) return d;
   if (d.startsWith("00")) return `+${d.slice(2)}`;
   if (d.startsWith("92") && d.length >= 12) return `+${d}`;
@@ -127,17 +131,24 @@ export function toE164(raw: string): string {
   return `+92${d}`;
 }
 
+/** "+923001234567" → "+92 300 1234567" (other countries: as typed). */
+export function formatPhone(e164: string): string {
+  const m = e164.match(/^\+92(\d{3})(\d{7})$/);
+  return m ? `+92 ${m[1]} ${m[2]}` : e164;
+}
+
 export function validIdentifier(channel: Channel, v: string): boolean {
   if (channel === "email") return /^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$/.test(v.trim());
-  const d = toE164(v).slice(1);
-  return /^\d{11,15}$/.test(d);
+  const e164 = toE164(v);
+  // Pakistan: a 10-digit mobile number (3xx xxxxxxx); elsewhere 8–15 digits like the server.
+  return e164.startsWith("+92") ? /^\+923\d{9}$/.test(e164) : /^\+[1-9]\d{7,14}$/.test(e164);
 }
 
 export function identifierValue(channel: Channel, v: string): string {
   return channel === "email" ? v.trim().toLowerCase() : toE164(v);
 }
 
-/** Mobile (+92 prefix) / e-mail input that switches keyboard type per channel. */
+/** Mobile (full number with country code) / e-mail input that switches keyboard type per channel. */
 export function IdentifierInput({ channel, value, onChange }: { channel: Channel; value: string; onChange: (v: string) => void }) {
   if (channel === "email")
     return (
@@ -154,20 +165,60 @@ export function IdentifierInput({ channel, value, onChange }: { channel: Channel
       />
     );
   return (
-    <div className="flex h-12 overflow-hidden rounded-xl border border-black/10 bg-white focus-within:border-brand-500 focus-within:ring-4 focus-within:ring-brand-500/15 dark:border-white/10 dark:bg-white/5" dir="ltr">
-      <span className="flex items-center gap-1.5 border-e border-black/10 px-3 text-sm font-semibold text-ink-soft dark:border-white/10 dark:text-slate-300">🇵🇰 +92</span>
-      <input
-        className="min-w-0 flex-1 bg-transparent px-3 text-base outline-none placeholder:text-ink-mute/70"
-        type="tel"
-        inputMode="tel"
-        autoComplete="tel-national"
-        placeholder="300 1234567"
-        value={value}
-        onChange={(e) => onChange(e.target.value.replace(/[^\d\s+-]/g, ""))}
-        autoFocus
-      />
+    <div dir="ltr">
+      <div className="flex h-12 overflow-hidden rounded-xl border border-black/10 bg-white focus-within:border-brand-500 focus-within:ring-4 focus-within:ring-brand-500/15 dark:border-white/10 dark:bg-white/5">
+        <span className="flex items-center border-e border-black/10 px-3 text-ink-mute dark:border-white/10">
+          <Phone className="h-4 w-4" />
+        </span>
+        <input
+          className="min-w-0 flex-1 bg-transparent px-3 text-base outline-none placeholder:text-ink-mute/70"
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          placeholder="+92 300 1234567"
+          value={value}
+          onFocus={() => !value && onChange("+92 ")}
+          onChange={(e) => onChange(e.target.value.replace(/[^\d\s+-]/g, ""))}
+          autoFocus
+        />
+      </div>
+      <p className="mt-1.5 text-xs text-ink-mute dark:text-slate-400">Full number with country code, e.g. +92 300 1234567 or +971 50 123 4567.</p>
     </div>
   );
+}
+
+/**
+ * Below the mobile field: "use this phone's number" (Android SIM picker) and the SMS consent
+ * the API requires before it sends a phone code. Changing the number clears the consent.
+ */
+export function SmsConsentFields({ consent, onConsent, onPick }: { consent: boolean; onConsent: (v: boolean) => void; onPick: (formatted: string) => void }) {
+  return (
+    <div className="space-y-3">
+      {isAndroidApp && (
+        <button
+          type="button"
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-brand-600/30 py-2.5 text-sm font-semibold text-brand-700 dark:text-brand-300"
+          onClick={() => void pickDeviceNumber().then((n) => n && onPick(formatPhone(toE164(n))))}
+        >
+          <Smartphone className="h-4 w-4" /> Use a number from this phone
+        </button>
+      )}
+      <label className="flex items-start gap-2.5 rounded-xl bg-black/[.03] p-3 text-xs leading-5 text-ink-soft dark:bg-white/5 dark:text-slate-300">
+        <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-brand-700" checked={consent} onChange={(e) => onConsent(e.target.checked)} />
+        <span>
+          I agree to receive a one-time verification code by SMS at this number. Standard SMS rates may apply.
+          {isAndroidApp && " Android will ask before the app reads the code message."}
+        </span>
+      </label>
+    </div>
+  );
+}
+
+/** While the code screen is open on Android, fill the code from the SMS once the user allows it. */
+export function useSmsCodeAutofill(active: boolean, onCode: (code: string) => void, requestKey: unknown) {
+  const latest = useRef(onCode);
+  latest.current = onCode;
+  useEffect(() => (active ? waitForSmsCode((code) => latest.current(code)) : undefined), [active, requestKey]);
 }
 
 export function useCountdown(): [number, (s: number) => void] {

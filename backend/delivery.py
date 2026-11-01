@@ -1,5 +1,5 @@
 """
-Outbound delivery for verification codes (e-mail + SMS / WhatsApp)
+Outbound delivery for verification codes (e-mail + SMS)
 ==================================================================
 
 ``auth.py`` calls :func:`send_email` / :func:`send_sms` for every one-time code.
@@ -15,17 +15,19 @@ SendGrid/Mailgun/Brevo SMTP, cPanel mail, ...)::
     PORTAL_SMTP_PORT=587                 # 587 = STARTTLS, 465 = implicit TLS
     PORTAL_SMTP_USER=you@example.com
     PORTAL_SMTP_PASSWORD=app-password
-    PORTAL_SMTP_FROM="Arz-e-Pak <no-reply@example.com>"   # defaults to the user
+    PORTAL_SMTP_FROM="Watan-e-Pak <no-reply@example.com>"   # defaults to the user
     PORTAL_SMTP_SECURITY=starttls        # starttls | ssl | none (default from port)
 
 SMS — pick one provider with ``PORTAL_SMS_PROVIDER``:
 
+* ``smsgate``  — your own Android phone + SIM running the free *SMS Gateway for Android*
+  app (https://sms-gate.app): ``SMSGATE_URL`` (the app's message endpoint, e.g.
+  ``http://192.168.1.50:8080/message`` in Local Server mode or
+  ``https://api.sms-gate.app/3rdparty/v1/message`` in Cloud mode), ``SMSGATE_USERNAME``
+  and ``SMSGATE_PASSWORD`` (shown in the app), optional ``SMSGATE_SIM_NUMBER`` (1/2 on
+  dual-SIM phones).
 * ``twilio``   — ``TWILIO_ACCOUNT_SID``, ``TWILIO_AUTH_TOKEN`` and ``TWILIO_FROM``
   (a sender number / alphanumeric id) or ``TWILIO_MESSAGING_SERVICE_SID``.
-* ``whatsapp`` — WhatsApp Business Cloud API: ``WHATSAPP_TOKEN``, ``WHATSAPP_PHONE_ID``
-  and an approved *authentication* template ``PORTAL_WHATSAPP_OTP_TEMPLATE``
-  (language ``PORTAL_WHATSAPP_OTP_LANG``, default ``en``). Templates with a
-  "copy code" button need ``PORTAL_WHATSAPP_OTP_BUTTON=1`` (the default).
 * ``webhook``  — any HTTP SMS gateway (e.g. a Pakistani bulk-SMS provider):
   ``PORTAL_SMS_WEBHOOK_URL``, ``PORTAL_SMS_WEBHOOK_METHOD`` (``POST``/``GET``),
   optional ``PORTAL_SMS_WEBHOOK_HEADERS`` (JSON object) and
@@ -71,8 +73,8 @@ def sms_provider() -> str:
     """The configured SMS provider, or ``"simulated"`` when none (or incomplete)."""
     name = _env("PORTAL_SMS_PROVIDER").lower()
     required = {
+        "smsgate": ["SMSGATE_URL", "SMSGATE_USERNAME", "SMSGATE_PASSWORD"],
         "twilio": ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN"],
-        "whatsapp": ["WHATSAPP_TOKEN", "WHATSAPP_PHONE_ID", "PORTAL_WHATSAPP_OTP_TEMPLATE"],
         "webhook": ["PORTAL_SMS_WEBHOOK_URL"],
     }.get(name)
     if not required or any(not _env(k) for k in required):
@@ -131,7 +133,7 @@ def send_email(to: str, subject: str, body: str) -> Result:
         return "failed", "smtp", f"{type(exc).__name__}: {exc}"
 
 
-# ------------------------------------------------------------------ SMS / WhatsApp
+# ------------------------------------------------------------------ SMS
 
 
 def _phone_forms(e164: str) -> Dict[str, str]:
@@ -155,10 +157,10 @@ def send_sms(to: str, message: str, code: str) -> Result:
         return "simulated", "simulated", None
     try:
         with httpx.Client(timeout=TIMEOUT_SECONDS) as client:
-            if provider == "twilio":
+            if provider == "smsgate":
+                resp = _smsgate(client, to, message)
+            elif provider == "twilio":
                 resp = _twilio(client, to, message)
-            elif provider == "whatsapp":
-                resp = _whatsapp(client, to, code)
             else:
                 resp = _webhook(client, to, message, code)
     except httpx.HTTPError as exc:
@@ -183,25 +185,15 @@ def _twilio(client: httpx.Client, to: str, message: str) -> httpx.Response:
     )
 
 
-def _whatsapp(client: httpx.Client, to: str, code: str) -> httpx.Response:
-    version = _env("PORTAL_WHATSAPP_API_VERSION", "v21.0")
-    components: list[Dict[str, Any]] = [{"type": "body", "parameters": [{"type": "text", "text": code}]}]
-    if _env("PORTAL_WHATSAPP_OTP_BUTTON", "1") not in ("0", "false", "no"):
-        components.append({"type": "button", "sub_type": "url", "index": "0",
-                           "parameters": [{"type": "text", "text": code}]})
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": to.lstrip("+"),
-        "type": "template",
-        "template": {
-            "name": _env("PORTAL_WHATSAPP_OTP_TEMPLATE"),
-            "language": {"code": _env("PORTAL_WHATSAPP_OTP_LANG", "en")},
-            "components": components,
-        },
-    }
+def _smsgate(client: httpx.Client, to: str, message: str) -> httpx.Response:
+    """SMS Gateway for Android: the gateway phone sends the SMS from its own SIM."""
+    payload: Dict[str, Any] = {"textMessage": {"text": message}, "phoneNumbers": [to]}
+    sim = _env("SMSGATE_SIM_NUMBER")
+    if sim:
+        payload["simNumber"] = int(sim)
     return client.post(
-        f"https://graph.facebook.com/{version}/{_env('WHATSAPP_PHONE_ID')}/messages",
-        json=payload, headers={"Authorization": f"Bearer {os.environ.get('WHATSAPP_TOKEN', '')}"},
+        _env("SMSGATE_URL"), json=payload,
+        auth=(_env("SMSGATE_USERNAME"), os.environ.get("SMSGATE_PASSWORD", "")),
     )
 
 

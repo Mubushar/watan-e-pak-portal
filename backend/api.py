@@ -2255,21 +2255,37 @@ class SignupRequest(BaseModel):
     password: Optional[str] = None
     name: Optional[str] = None
     role: str = "user"
+    sms_consent: bool = False
 
 
 class OtpVerifyRequest(BaseModel):
     identifier: str
     code: str
     purpose: str = "signup"
+    sms_consent: bool = False
 
 
 class LoginRequest(BaseModel):
     identifier: str
     password: str
+    sms_consent: bool = False
 
 
 class IdentifierRequest(BaseModel):
     identifier: str
+    sms_consent: bool = False
+
+
+def _require_sms_consent(identifier: str, consent: bool) -> None:
+    """Require and record explicit consent before sending an OTP by SMS."""
+    if "@" not in (identifier or ""):
+        if not consent:
+            raise HTTPException(status_code=422, detail={
+                "code": "sms_consent_required",
+                "error": "Please consent to receive an SMS verification code.",
+            })
+        normalized = core.auth.normalize_identifier(identifier) or identifier
+        core.auth.log_event("sms_otp_consent", normalized, detail="User consented to receive an SMS verification code")
 
 
 class ResetPasswordRequest(BaseModel):
@@ -2332,7 +2348,9 @@ def _auth_result(result: Any) -> Any:
 def auth_signup(payload: SignupRequest) -> Any:
     """Register with an email and/or mobile number. The account stays *pending*
     until the OTP we send is verified with `/auth/verify-otp`."""
-    return _auth_result(j(core.auth_signup(**payload.model_dump(exclude_none=True))))
+    if payload.mobile:
+        _require_sms_consent(payload.mobile, payload.sms_consent)
+    return _auth_result(j(core.auth_signup(**payload.model_dump(exclude_none=True, exclude={"sms_consent"}))))
 
 
 @app.post("/auth/verify-otp", tags=["auth"])
@@ -2344,18 +2362,24 @@ def auth_verify_otp(payload: OtpVerifyRequest) -> Any:
 @app.post("/auth/resend-otp", tags=["auth"])
 def auth_resend_otp(payload: OtpVerifyRequest) -> Any:
     """Re-send a verification code (cooldown + hourly cap apply)."""
+    _require_sms_consent(payload.identifier, payload.sms_consent)
     return _auth_result(j(core.auth_resend_otp(payload.identifier, purpose=payload.purpose)))
 
 
 @app.post("/auth/login", tags=["auth"])
 def auth_login(payload: LoginRequest) -> Any:
     """Password login. Returns `401` for bad credentials and `403` for unverified accounts."""
+    ident = core.auth.normalize_identifier(payload.identifier)
+    user = core.auth.find_user(ident) if ident else None
+    if user is not None and not user.verified and ident and "@" not in ident:
+        _require_sms_consent(ident, payload.sms_consent)
     return _auth_result(j(core.auth_login(payload.identifier, payload.password)))
 
 
 @app.post("/auth/otp/request", tags=["auth"])
 def auth_request_otp(payload: IdentifierRequest) -> Any:
     """Start a passwordless login by sending an OTP."""
+    _require_sms_consent(payload.identifier, payload.sms_consent)
     return _auth_result(j(core.auth_request_otp(payload.identifier)))
 
 
@@ -2368,6 +2392,7 @@ def auth_verify_login_otp(payload: OtpVerifyRequest) -> Any:
 @app.post("/auth/password/reset-request", tags=["auth"])
 def auth_request_password_reset(payload: IdentifierRequest) -> Any:
     """Send a password-reset code."""
+    _require_sms_consent(payload.identifier, payload.sms_consent)
     return _auth_result(j(core.auth_request_password_reset(payload.identifier)))
 
 

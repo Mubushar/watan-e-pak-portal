@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "pk.arzepak.app",
-  appName: "Arz-e-Pak",
+  appId: "pk.watanepak.app",
+  appName: "Watan-e-Pak",
   webDir: "dist",
   backgroundColor: "#f6f8f6",
   android: {

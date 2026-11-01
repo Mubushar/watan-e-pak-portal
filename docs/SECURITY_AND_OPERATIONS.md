@@ -40,9 +40,9 @@ the backend after a change. Never put real secrets in documentation, tickets or 
 | `PORTAL_LOGIN_LOCK_MINUTES` | `15` | The lock window, in minutes. |
 | `PORTAL_OWNER_USERNAME`, `PORTAL_OWNER_PASSWORD` | *(empty)* | The owner's own super-admin account, re-applied on every start (optional `PORTAL_OWNER_EMAIL`, `PORTAL_OWNER_MOBILE`, `PORTAL_OWNER_NAME`). |
 
-OTP delivery (`PORTAL_SMTP_*`, `PORTAL_SMS_PROVIDER`, `TWILIO_*`, `WHATSAPP_*`,
-`PORTAL_SMS_WEBHOOK_*`) is described in the
-[Administration Guide §4.4](ADMINISTRATION_GUIDE.md#44-delivering-otps-sms--whatsapp--e-mail).
+OTP delivery (`PORTAL_SMTP_*`, `PORTAL_SMS_PROVIDER`, `SMSGATE_*`, `TWILIO_*`,
+`PORTAL_SMS_WEBHOOK_*`) and the SMS consent rule is described in the
+[Administration Guide §4.4](ADMINISTRATION_GUIDE.md#44-delivering-otps-sms--e-mail).
 
 ### 1.3 Storage
 

@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Briefcase, Building, CheckCircle2, Home, KeyRound, LineChart, Mail, Phone, Store, UserRound } from "lucide-react";
+import { Briefcase, Building, CheckCircle2, Home, KeyRound, LineChart, Mail, Smartphone, Store, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { post } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useAuth, type Session } from "@/store/auth";
-import { Button, Field, Input } from "@/components/ui";
+import { Button, Field, Input, Segmented } from "@/components/ui";
 import { announceCode, AuthShell, DevOtpHint, OtpInput, type OtpHint } from "./AuthShell";
 
 const ROLES = [
@@ -47,6 +47,8 @@ export default function Signup() {
   const nav = useNavigate();
   const setSession = useAuth((s) => s.setSession);
   const [form, setForm] = useState({ name: "", email: "", mobile: "", password: "", role: "buyer" });
+  const [channel, setChannel] = useState<"mobile" | "email">("mobile");
+  const [smsConsent, setSmsConsent] = useState(false);
   const [step, setStep] = useState<"details" | "verify">("details");
   const [sent, setSent] = useState<SignupResult["verification"] | null>(null);
   const [code, setCode] = useState("");
@@ -59,15 +61,16 @@ export default function Signup() {
     try {
       const r = await post<SignupResult>("/auth/signup", {
         name: form.name,
-        email: form.email || undefined,
-        mobile: form.mobile || undefined,
+        email: channel === "email" ? form.email || undefined : undefined,
+        mobile: channel === "mobile" ? form.mobile || undefined : undefined,
         password: form.password,
         role: form.role,
+        sms_consent: channel === "mobile" && smsConsent,
       });
       const v = r.verification;
       setSent(v);
       setStep("verify");
-      if (v.sent_to.some((t) => v.delivery?.[t] === "sent")) toast.success(`Verification code sent to ${v.sent_to.join(" & ")}`);
+      if (v.sent_to.some((t) => v.delivery?.[t] === "sent")) toast.success(`Verification code sent by ${v.sent_to.map((t) => t.includes("@") ? "e-mail" : "SMS").join(" & ")} to ${v.sent_to.join(" & ")}`);
       else toast.info("Test mode: the server didn’t send a real message — use the code shown below.");
       for (const f of v.failed ?? []) if (f) toast.warning(f);
     } catch (e) {
@@ -153,14 +156,20 @@ export default function Signup() {
             <Field label="Full name">
               <Input icon={<UserRound className="h-4 w-4" />} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ahmed Khan" required />
             </Field>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="E-mail">
-                <Input icon={<Mail className="h-4 w-4" />} type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" />
+            <Segmented value={channel} onChange={setChannel} options={[
+              { value: "mobile", label: "SMS", icon: <Smartphone className="h-4 w-4" /> },
+              { value: "email", label: "E-mail", icon: <Mail className="h-4 w-4" /> },
+            ]} />
+            {channel === "email" ? (
+              <Field label="E-mail address">
+                <Input icon={<Mail className="h-4 w-4" />} type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" required />
               </Field>
-              <Field label="Mobile">
-                <Input icon={<Phone className="h-4 w-4" />} value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} placeholder="03xx xxxxxxx" />
+            ) : (
+              <Field label="Mobile number" hint="Full number with country code, e.g. +92 300 1234567 or +971 50 123 4567.">
+                <Input icon={<Smartphone className="h-4 w-4" />} type="tel" autoComplete="tel" value={form.mobile} onFocus={() => !form.mobile && setForm({ ...form, mobile: "+92 " })} onChange={(e) => { setForm({ ...form, mobile: e.target.value }); setSmsConsent(false); }} placeholder="+92 300 1234567" required />
               </Field>
-            </div>
+            )}
+            {channel === "mobile" && <label className="flex items-start gap-2 text-xs leading-5 text-ink-mute"><input type="checkbox" className="mt-1" checked={smsConsent} onChange={(e) => setSmsConsent(e.target.checked)} />I agree to receive an SMS verification code at this number. Message and data rates may apply.</label>}
             <Field label="Password" hint="At least 8 characters with a number and a capital letter.">
               <Input icon={<KeyRound className="h-4 w-4" />} type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••••" autoComplete="new-password" required />
               <div className="mt-2 flex gap-1">
@@ -169,7 +178,7 @@ export default function Signup() {
                 ))}
               </div>
             </Field>
-            <Button type="submit" size="lg" className="w-full" loading={busy} disabled={!form.name || (!form.email && !form.mobile) || form.password.length < 8}>
+            <Button type="submit" size="lg" className="w-full" loading={busy} disabled={!form.name || !(channel === "email" ? form.email : form.mobile) || form.password.length < 8 || (channel === "mobile" && !smsConsent)}>
               Continue
             </Button>
             <p className="text-center text-xs text-ink-mute">
@@ -209,7 +218,7 @@ export default function Signup() {
                 type="button"
                 className="font-semibold text-brand-700 hover:underline dark:text-brand-300"
                 onClick={() =>
-                  post<OtpHint>("/auth/resend-otp", { identifier, code: "", purpose: "signup" })
+                  post<OtpHint>("/auth/resend-otp", { identifier, code: "", purpose: "signup", sms_consent: smsConsent })
                     .then((r) => {
                       if (r.dev_otp) setSent((x) => (x ? { ...x, dev_otp: { [identifier]: r.dev_otp! } } : x));
                       announceCode(r, identifier);

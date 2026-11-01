@@ -66,14 +66,22 @@ cd portable && npm install && npm run dev     # app on http://localhost:5174 (pr
 
 **OTP delivery:** until the backend has an SMS/e-mail provider configured, codes are not
 actually sent. The app shows a "Test mode — nothing was sent" hint with the code. To send
-real codes by e-mail (SMTP) and SMS (Twilio, WhatsApp or any HTTP SMS gateway), copy
-`backend/.env.example` to `backend/.env` and fill it in (see Administration Guide §4.4).
+real codes by e-mail (SMTP) and SMS (your own Android gateway phone, Twilio or a bulk-SMS
+gateway), copy `backend/.env.example` to `backend/.env` and fill it in (see Administration
+Guide §4.4).
+
+**Phone sign-in:** the user enters the full number with country code and ticks the SMS
+consent box before a code can be sent (the API refuses phone codes without consent). On
+Android, *Use a number from this phone* opens Google's Phone Number Hint picker
+(`PhoneNumberHintPlugin.java`), and when the code SMS arrives Android asks before the app
+reads it, then fills the code in (`SmsUserConsentPlugin.java`, SMS User Consent API).
+Neither needs a phone or SMS permission. iOS offers the code above the keyboard.
 
 ### Desktop (Windows / macOS)
 
 ```bash
 npm run desktop:dev      # Electron + Vite hot reload
-npm run desktop:win      # release/Arz-e-Pak Setup 1.0.0.exe + portable exe
+npm run desktop:win      # release/Watan-e-Pak Setup 1.0.0.exe + portable exe
 npm run desktop:mac      # release/*.dmg — run on macOS (signing/notarization: set CSC_* env vars)
 ```
 

@@ -18,6 +18,7 @@ export default function Login() {
   const [mode, setMode] = useState<Mode>("password");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [smsConsent, setSmsConsent] = useState(false);
   const [code, setCode] = useState("");
   const [otpSent, setOtpSent] = useState<{ purpose: "login" | "signup"; dev?: string | null } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -34,7 +35,7 @@ export default function Login() {
   const loginPassword = async (id = identifier, pw = password) => {
     setBusy(true);
     try {
-      finish(await post<Session>("/auth/login", { identifier: id, password: pw }));
+      finish(await post<Session>("/auth/login", { identifier: id, password: pw, sms_consent: smsConsent }));
     } catch (e) {
       const d = e instanceof ApiError ? (e.detail as (OtpHint & { otp_required?: boolean }) | undefined) : undefined;
       if (d?.otp_required) {
@@ -52,7 +53,7 @@ export default function Login() {
   const requestOtp = async () => {
     setBusy(true);
     try {
-      const r = await post<OtpHint>("/auth/otp/request", { identifier });
+      const r = await post<OtpHint>("/auth/otp/request", { identifier, sms_consent: identifier.includes("@") ? false : smsConsent });
       setOtpSent({ purpose: "login", dev: r.dev_otp });
       announceCode(r);
     } catch (e) {
@@ -103,9 +104,10 @@ export default function Login() {
           else void verifyOtp();
         }}
       >
-        <Field label="E-mail or mobile">
-          <Input icon={<Mail className="h-4 w-4" />} value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="E-mail, mobile (03xx xxxxxxx) or username" autoComplete="username" required />
+        <Field label={mode === "otp" ? "E-mail or mobile number" : "E-mail or mobile"} hint={mode === "otp" ? "We’ll send the code to your email or by SMS, based on what you enter." : undefined}>
+          <Input icon={<Mail className="h-4 w-4" />} value={identifier} onChange={(e) => { setIdentifier(e.target.value); setSmsConsent(false); }} placeholder={mode === "otp" ? "Email or mobile number" : "E-mail, mobile (03xx xxxxxxx) or username"} autoComplete="username" required />
         </Field>
+        {identifier && !identifier.includes("@") && <label className="flex items-start gap-2 text-xs leading-5 text-ink-mute"><input type="checkbox" className="mt-1" checked={smsConsent} onChange={(e) => setSmsConsent(e.target.checked)} />I agree to receive an SMS verification code at this number when needed. Message and data rates may apply.</label>}
         {mode === "password" ? (
           <Field label={<span className="flex justify-between">Password <Link to="/forgot" className="normal-case tracking-normal text-brand-700 dark:text-brand-300">Forgot?</Link></span>}>
             <Input icon={<KeyRound className="h-4 w-4" />} type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" required />
@@ -122,13 +124,13 @@ export default function Login() {
             </div>
           )
         )}
-        <Button type="submit" size="lg" className="w-full" loading={busy} disabled={!identifier || (mode === "password" ? !password : !!otpSent && code.length < 6)}>
+        <Button type="submit" size="lg" className="w-full" loading={busy} disabled={!identifier || (mode === "otp" && !identifier.includes("@") && !smsConsent) || (mode === "password" ? !password : !!otpSent && code.length < 6)}>
           {mode === "password" ? "Sign in" : otpSent ? "Verify & sign in" : "Send me a code"}
         </Button>
       </form>
 
       <p className="mt-6 text-center text-sm text-ink-mute">
-        New to Arz-e-Pak?{" "}
+        New to Watan-e-Pak?{" "}
         <Link to="/signup" className="link">
           Create an account
         </Link>
