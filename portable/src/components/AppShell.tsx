@@ -28,7 +28,7 @@ function OfflineBanner() {
   return (
     <AnimatePresence>
       {offline && (
-        <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden bg-gold-100 text-gold-900 dark:bg-gold-900/40 dark:text-gold-100">
+        <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="pt-safe overflow-hidden bg-gold-100 text-gold-900 dark:bg-gold-900/40 dark:text-gold-100">
           <div className="screen flex items-center gap-2 py-1.5 text-xs font-medium">
             <CloudOff className="h-3.5 w-3.5 shrink-0" />
             Offline — showing saved sample listings. Check your connection or Profile → Server.
